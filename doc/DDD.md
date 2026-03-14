@@ -356,7 +356,6 @@ Este contexto abrange as operações de CRUD (Create, Read, Update, Delete) para
 
 ## 6. Diagramas
 
-Esta seção apresenta as representações visuais dos contextos e do modelo de domínio.
 
 ### 6.1. Context Map
 
@@ -369,4 +368,17 @@ O Context Map ilustra as relações entre os diferentes Bounded Contexts identif
 O diagrama abaixo detalha as entidades, agregados e suas relações dentro do núcleo do sistema.
 
 ![Domain Model](/doc/img/domain_model.png)
+
+### 6.3. Domain Storytelling: Fluxo de Criação e Acompanhamento da OS
+
+Este diagrama narra a interação entre os atores e o sistema no processo de criação e acompanhamento de uma Ordem de Serviço.
+
+![Domain Storytelling OS](/doc/img/os_flow.png)
+
+### 6.4. Event Storming: Fluxo de Gestão de Peças e Insumos
+
+Este diagrama visualiza os eventos e comandos envolvidos na gestão de peças e insumos.
+
+![Event Storming Peças e Insumos](/doc/img/event_storming.png)
+
 
