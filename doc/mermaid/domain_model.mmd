@@ -1,0 +1,62 @@
+classDiagram
+    class OrdemDeServico {
+        +Guid Id
+        +Guid ClienteId
+        +Guid VeiculoId
+        +DateTime DataAbertura
+        +StatusOS Status
+        +Orcamento Orcamento
+        +List~ItemServico~ ItensServico
+        +List~ItemPeca~ ItensPeca
+        +Criar()
+        +AdicionarServico()
+        +AdicionarPeca()
+        +GerarOrcamento()
+        +Aprovar()
+        +Finalizar()
+    }
+    class ItemServico {
+        +Guid ServicoId
+        +string Descricao
+        +decimal ValorUnitario
+        +int Quantidade
+        +decimal ValorTotal
+    }
+    class ItemPeca {
+        +Guid PecaId
+        +string Descricao
+        +decimal ValorUnitario
+        +int Quantidade
+        +decimal ValorTotal
+    }
+    class Cliente {
+        +Guid Id
+        +string Nome
+        +CPFCNPJ Documento
+        +string Contato
+    }
+    class Veiculo {
+        +Guid Id
+        +string Placa
+        +string Marca
+        +string Modelo
+        +int Ano
+    }
+    class Peca {
+        +Guid Id
+        +string Nome
+        +decimal Preco
+        +int QtdEstoque
+    }
+    class Servico {
+        +Guid Id
+        +string Nome
+        +decimal Preco
+    }
+
+    OrdemDeServico "1" *-- "many" ItemServico
+    OrdemDeServico "1" *-- "many" ItemPeca
+    OrdemDeServico --> Cliente : Referencia
+    OrdemDeServico --> Veiculo : Referencia
+    ItemServico --> Servico : Referencia
+    ItemPeca --> Peca : Referencia

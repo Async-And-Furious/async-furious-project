@@ -1,0 +1,28 @@
+sequenceDiagram
+    actor Cliente
+    participant Recepcionista
+    participant Sistema
+    participant Mecanico
+
+    Cliente->>Recepcionista: Informa dados e necessidade de serviço
+    Recepcionista->>Sistema: Cadastra Cliente e Veículo
+    Recepcionista->>Sistema: Cria Ordem de Serviço (OS)
+    Sistema-->>Recepcionista: OS Criada (ID: #OS123)
+    Recepcionista->>Mecanico: Atribui OS #OS123
+    Mecanico->>Sistema: Assume OS #OS123
+    Mecanico->>Sistema: Registra Diagnóstico do Veículo
+    Sistema-->>Mecanico: Diagnóstico Registrado
+    Mecanico->>Sistema: Lista Serviços e Peças Necessárias
+    Sistema-->>Sistema: Gera Orçamento
+    Sistema->>Cliente: Envia Orçamento para Aprovação
+    Cliente->>Sistema: Aprova Orçamento
+    Sistema-->>Mecanico: Notifica Orçamento Aprovado
+    Mecanico->>Sistema: Inicia Execução dos Serviços
+    Sistema-->>Cliente: Atualiza Status da OS para 'Em Execução'
+    Mecanico->>Sistema: Finaliza Serviços e Registra Peças Utilizadas
+    Sistema-->>Cliente: Atualiza Status da OS para 'Finalizada'
+    Cliente->>Sistema: Consulta Status da OS
+    Sistema-->>Cliente: Informa Status 'Finalizada'
+    Cliente->>Recepcionista: Retira Veículo
+    Recepcionista->>Sistema: Marca OS como 'Entregue'
+    Sistema-->>Cliente: Confirma Entrega da OS

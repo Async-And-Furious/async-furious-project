@@ -1,0 +1,11 @@
+graph TD
+    subgraph "Gestão de Peças e Insumos"
+        A[Comando: CadastrarPeca] --> B{Evento: PecaCadastrada}
+        B --> C[Comando: AtualizarPeca]
+        C --> D{Evento: PecaAtualizada}
+        D --> E[Comando: RemoverPeca]
+        E --> F{Evento: PecaRemovida}
+
+        G[Comando: AtualizarEstoquePeca] --> H{Evento: EstoqueAtualizado}
+        H --> I{Evento: PecaComEstoqueBaixo}
+    end

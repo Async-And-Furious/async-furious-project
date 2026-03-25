@@ -1,0 +1,24 @@
+graph TD
+    subgraph "Contexto de Atendimento"
+        Customer[Cliente]
+        Vehicle[Veículo]
+    end
+    subgraph "Contexto de Operação"
+        OS[Ordem de Serviço]
+        Quote[Orçamento]
+    end
+    subgraph "Contexto de Inventário"
+        Parts[Peças/Insumos]
+        Services[Serviços]
+    end
+    subgraph "Contexto de Segurança"
+        Auth[Autenticação JWT]
+    end
+
+    Customer -- "Shared Kernel" --> OS
+    Quote -- "Upstream/Downstream" --> Customer
+    OS -- "Upstream/Downstream" --> Quote
+    Vehicle -- "Shared Kernel" --> OS
+    Parts -- "Upstream/Downstream" --> OS
+    Services -- "Upstream/Downstream" --> OS
+    Auth -- "ACL" --> OS
