@@ -1,1 +1,2 @@
-- **ID-01** - Scaffold NestJS starter project
+- [ANF-02](https://osklenbr.atlassian.net/browse/ANF-02) - Organize domain storytelling suggestions.
+- [ANF-01] - Scaffold NestJS starter project
