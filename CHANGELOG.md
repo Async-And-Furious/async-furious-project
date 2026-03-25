@@ -1,2 +1,3 @@
+- [ANF-03](https://osklenbr.atlassian.net/browse/ANF-03) - Configure formatting, Prisma, and project docs
 - [ANF-02](https://osklenbr.atlassian.net/browse/ANF-02) - Organize domain storytelling suggestions.
 - [ANF-01] - Scaffold NestJS starter project
