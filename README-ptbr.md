@@ -11,7 +11,7 @@ Este projeto é um sistema backend para **gestão integrada de oficina mecânica
 - **Centralização**: Substitui planilhas e notas manuais por um sistema unificado
 - **Rastreamento**: Clientes acompanham o status da ordem de serviço via API pública
 - **Controle de Estoque**: Gerenciamento de peças e alertas de estoque mínimo
-- **Validação**: CPF/CNPJ e plaque veiculares seguem padrões brasileiros
+- **Validação**: CPF/CNPJ e placas veiculares seguem padrões brasileiros
 
 ### Funcionalidades Principais
 
@@ -33,7 +33,7 @@ Este projeto é um sistema backend para **gestão integrada de oficina mecânica
 | Framework      | NestJS 11.x     |
 | Linguagem      | TypeScript 5.x  |
 | Banco de Dados | PostgreSQL 15   |
-| ORM            | Drizzle ORM     |
+| ORM            | Prisma          |
 | Autenticação   | JWT + bcrypt    |
 | Documentação   | Swagger/OpenAPI |
 | Container      | Docker Compose  |
@@ -70,10 +70,10 @@ JWT_SECRET=sua-chave-secreta-aqui
 ### 3. Iniciar com Docker Compose
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-Isso inició:
+Isso inicia:
 
 - PostgreSQL na porta 5432
 - Aplicação na porta 3000
@@ -84,8 +84,8 @@ Isso inició:
 # Instalar dependências
 npm install
 
-# Executar migrações (se houver)
-npm run migration:run
+# Executar migrações
+npx prisma migrate dev
 
 # Iniciar desenvolvimento
 npm run start:dev
@@ -95,61 +95,57 @@ npm run start:dev
 
 ## 📚 Documentação da API
 
-Após iniciar o projeto, acesso a documentação Swagger em:
+Após iniciar o projeto, acessa a documentação Swagger em:
 
 ```
 http://localhost:3000/api/docs
 ```
 
-### Endpoints Principais
+### Rotas Principais
+
+#### Raiz
+
+| Método | Endpoint | Descrição         |
+| ------ | -------- | ----------------- |
+| GET    | `/`      | Health check root |
 
 #### Autenticação
 
-| Método | Endpoint             | Descrição       |
-| ------ | -------------------- | --------------- |
-| POST   | `/api/v1/auth/login` | Obter token JWT |
+| Método | Endpoint         | Descrição              |
+| ------ | ---------------- | ---------------------- |
+| POST   | `/auth/register` | Registrar novo usuário |
+| POST   | `/auth/login`    | Obter token JWT        |
 
-#### Ordens de Serviço (Admin)
+#### Clientes (Protegido - JWT)
 
-| Método | Endpoint                            | Descrição        |
-| ------ | ----------------------------------- | ---------------- |
-| POST   | `/api/v1/service-orders`            | Criar OS         |
-| GET    | `/api/v1/service-orders`            | Listar OS        |
-| GET    | `/api/v1/service-orders/:id`        | Detalhar OS      |
-| PATCH  | `/api/v1/service-orders/:id/status` | Atualizar status |
+| Método | Endpoint         | Descrição    | Acesso       |
+| ------ | ---------------- | ------------ | ------------ |
+| POST   | `/customers`     | Criar        | Apenas admin |
+| GET    | `/customers`     | Listar todos | Autenticado  |
+| GET    | `/customers/:id` | Detalhar     | Autenticado  |
+| PATCH  | `/customers/:id` | Atualizar    | Apenas admin |
+| DELETE | `/customers/:id` | Excluir      | Apenas admin |
 
-#### Ordens de Serviço (Público)
+#### Em Breve
 
-| Método | Endpoint              | Descrição        |
-| ------ | --------------------- | ---------------- |
-| GET    | `/api/v1/track/:soId` | Consultar status |
-
-#### Clientes (Admin)
-
-| Método | Endpoint                | Descrição |
-| ------ | ----------------------- | --------- |
-| POST   | `/api/v1/customers`     | Cadastrar |
-| GET    | `/api/v1/customers`     | Listar    |
-| GET    | `/api/v1/customers/:id` | Detalhar  |
-
-#### Veículos (Admin)
-
-| Método | Endpoint               | Descrição |
-| ------ | ---------------------- | --------- |
-| POST   | `/api/v1/vehicles`     | Cadastrar |
-| GET    | `/api/v1/vehicles/:id` | Detalhar  |
-
-#### Peças (Admin)
-
-| Método | Endpoint                  | Descrição         |
-| ------ | ------------------------- | ----------------- |
-| POST   | `/api/v1/parts`           | Cadastrar         |
-| GET    | `/api/v1/parts`           | Listar            |
-| PATCH  | `/api/v1/parts/:id/stock` | Atualizar estoque |
+| Módulo            | Endpoint          | Status   |
+| ----------------- | ----------------- | -------- |
+| Ordens de Serviço | `/service-orders` | Em breve |
+| Veículos          | `/vehicles`       | Em breve |
+| Peças             | `/parts`          | Em breve |
+| Rastreamento      | `/track/:soId`    | Em breve |
 
 ---
 
-## 🧪 Executar Tests
+## 🔐 Autenticação
+
+- Endpoints em `/customers` exigem token JWT (exceto listagem)
+- Endpoints `/auth/*` são públicos
+- Token: Bearer com expiração de 1 hora
+
+---
+
+## 🧪 Executar Testes
 
 ```bash
 # Todos os testes
@@ -163,9 +159,25 @@ npm run test:watch
 
 # Teste específico por nome
 npm run test -- --testNamePattern="Customer"
+
+# Arquivo de teste específico
+npm run test -- src/modules/infrastructure/auth/auth.service.spec.ts
 ```
 
-### Cobertura Mínima (segundo PRD)
+### Comandos de Build e Lint
+
+```bash
+# Build de produção
+npm run build
+
+# Formatar código
+npm run format
+
+# Lint com auto-fix
+npm run lint
+```
+
+### Cobertura Mínima (conforme PRD)
 
 | Domínio               | Mínimo |
 | --------------------- | ------ |
@@ -181,40 +193,36 @@ npm run test -- --testNamePattern="Customer"
 
 ```
 src/
-├── domain/                    # Camada de domínio
-│   ├── customer/              # Agregado cliente
-│   │   ├── entities/
-│   │   └── value-objects/    # TaxId (CPF/CNPJ)
-│   ├── vehicle/              # Agregado veículo
-│   │   └── value-objects/    # LicensePlate
-│   ├── service-order/       # Agregado OS
-│   │   ├── entities/
-│   │   ├── value-objects/    # SOStatus, Quote
-│   │   └── events/           # Eventos de domínio
-│   ├── parts/                # Agregado peças
-│   └── shared/               # Value objects compartilhados
-├── application/               # Casos de uso, DTOs
-├── infrastructure/            # Persistência, segurança
-└── interfaces/               # Controllers REST
+├── modules/
+│   ├── domain/
+│   │   └── customers/          # Agregado cliente
+│   │       ├── customer.controller.ts
+│   │       ├── customer.service.ts
+│   │       ├── customer.module.ts
+│   │       └── dto/
+│   └── infrastructure/
+│       ├── auth/                # Autenticação e autorização
+│       │   ├── auth.controller.ts
+│       │   ├── auth.service.ts
+│       │   ├── guards/
+│       │   └── strategies/
+│       └── database/            # Conexão Prisma
+├── app.controller.ts
+├── app.service.ts
+├── app.module.ts
+└── main.ts
 ```
 
 ---
 
-## 🔐 Autenticação
-
-- Endpoints `/api/v1/*` (exceto `/track/*`) exigem token JWT
-- Endpoints `/api/v1/track/*` são públicos (sem autenticação)
-- Token padrão: Bearer com expiry de 1 hora
-
----
-
-## 📝 Padrões de Código
+## 📝 Convenções de Código
 
 Consulte [AGENTS.md](./AGENTS.md) para:
 
 - Convenções de nomenclatura
 - Padrões de código TypeScript/NestJS
 - Políticas de imports e formatação
+- Configurações ESLint/Prettier
 
 ---
 

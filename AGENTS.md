@@ -1,210 +1,305 @@
-# AGENTS.md — Workshop Service System
+# AGENTS.md - Guia para Agentes de Código
 
-> Build/test/coding guidelines for this NestJS project.
-> **Greenfield project** — No code yet. Follow PRD patterns below.
+> Este arquivo contém diretrizes para agentes de código que operam neste repositório.
 
-## Quick Reference
+---
 
-| Command                                    | Description          |
-| ------------------------------------------ | -------------------- |
-| `npm run build`                            | Compile TypeScript   |
-| `npm run lint`                             | Lint and fix files   |
-| `npm run format`                           | Format with Prettier |
-| `npm run test`                             | Run all tests        |
-| `npm run test -- --testNamePattern="name"` | Run single test      |
+## 🚦 Comandos de Build, Lint e Test
 
-## Build & Testing
+### Comandos Principais
 
 ```bash
-npm run start:dev      # Watch mode
-npm run start:debug    # Debug with breakpoints
-npm run build          # Production build
-npm run test           # Run all tests
-npm run test:watch     # Watch mode
-npm run test:cov       # Coverage report
-npm run lint           # Lint and auto-fix
-npm run format         # Format with Prettier
+# Desenvolvimento (inicia PostgreSQL + aplicação)
+npm run dev
+
+# Build de produção
+npm run build
+
+# Iniciar produção
+npm run prod
 ```
 
-## Project Context
+### Testes
 
-**Tech Stack**: NestJS + TypeScript + PostgreSQL 15 + Prisma ORM  
-**Auth**: JWT (admin) + Public tracking endpoint  
-**Domain**: Customer, Vehicle, Service Order, Parts
+```bash
+# Todos os testes
+npm run test
 
-## Code Style Guidelines
+# Com cobertura de código
+npm run test:cov
 
-### Project Structure (DDD)
+# Modo watch (re executa ao modificar)
+npm run test:watch
+
+# Teste específico por nome
+npm run test -- --testNamePattern="Customer"
+
+# Teste específico por arquivo
+npm run test -- src/modules/infrastructure/auth/auth.service.spec.ts
+
+# Debug de teste
+npm run test:debug
+
+# Testes E2E
+npm run test:e2e
+```
+
+### Lint e Formatação
+
+```bash
+# Executar ESLint com auto-fix
+npm run lint
+
+# Formatar com Prettier
+npm run format
+```
+
+---
+
+## 📝 Convenções de Código
+
+### Estrutura de Arquivos (DDD)
 
 ```
 src/
-├── domain/           # Business logic - entities, value objects
-│   ├── customer/     # TaxId (CPF/CNPJ) validation
-│   ├── vehicle/      # LicensePlate (Brazilian)
-│   ├── service-order/ # SOStatus lifecycle, Quote
-│   └── parts/        # Inventory control
-├── application/     # Use cases, DTOs
-├── infrastructure/  # DB, auth, config
-└── interfaces/      # REST controllers
+├── modules/
+│   ├── domain/
+│   │   └── [entidade]/
+│   │       ├── [entidade].controller.ts   # Routes
+│   │       ├── [entidade].service.ts      # Lógica de negócio
+│   │       ├── [entidade].module.ts       # Registro do módulo
+│   │       └── dto/                       # Data Transfer Objects
+│   └── infrastructure/
+│       ├── auth/                          # JWT, guards, estratégias
+│       └── database/                      # Prisma/ORM
+├── app.controller.ts
+├── app.service.ts
+├── app.module.ts
+└── main.ts
 ```
+
+### Nomeclatura
+
+| Tipo          | Convenção                  | Exemplo                         |
+| ------------- | -------------------------- | ------------------------------- |
+| Arquivos      | kebab-case                 | `customer.service.ts`           |
+| Classes       | PascalCase                 | `CustomerService`               |
+| Interfaces    | PascalCase                 | `CreateCustomerDto`             |
+| Métodos       | camelCase                  | `findAll()`, `createCustomer()` |
+| Variáveis     | camelCase                  | `const customerId`              |
+| Constantes    | UPPER_SNAKE_CASE           | `DEFAULT_PAGE_SIZE`             |
+| Enums         | PascalCase + valores UPPER | `UserRole.ADMIN`                |
+| Valor Objects | PascalCase                 | `TaxId`, `LicensePlate`         |
 
 ### Imports
 
 ```typescript
-// Order: External → Internal → Relative
-import { Injectable } from '@nestjs/common';
-import { Customer } from '@/domain/customer/entities/customer.entity';
+// 1. Imports externos (NestJS, libs)
+import { Controller, Get, Post } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+
+// 2. Imports internos (módulos locais)
+import { CustomerService } from './customer.service';
+import { CreateCustomerDto } from './dto/customer.dto';
+
+// 3. Imports de tipos
+import type { AuthUser } from '../auth/types/auth.types';
+
+// Use paths alias quando disponível
+import { CustomerEntity } from '@/modules/domain/customers/entities/customer.entity';
 ```
 
-### Naming Conventions
-
-| Type          | Convention       | Example                    |
-| ------------- | ---------------- | -------------------------- |
-| Files         | kebab-case       | `customer.service.ts`      |
-| Classes       | PascalCase       | `Customer`, `ServiceOrder` |
-| Value Objects | PascalCase       | `TaxId`, `Money`           |
-| Methods       | camelCase        | `createCustomer`           |
-| DTOs          | PascalCase + Dto | `CreateCustomerDto`        |
-| Database      | snake_case       | `customers`, `created_at`  |
-
----
-
-## Domain Patterns (from PRD)
-
-### TaxId (CPF/CNPJ)
+### Typescript
 
 ```typescript
-export class TaxId extends ValueObject<{ value: string; type: TaxIdType }> {
-  static readonly CPF_LENGTH = 11, CNPJ_LENGTH = 14;
-  static create(value: string): TaxId {
-    const digits = value.replace(/\D/g, '');
-    const type = digits.length === 11 ? TaxIdType.CPF : TaxIdType.CNPJ;
-    if (!this.validateCheckDigit(digits, type)) throw new Error('Invalid Tax ID');
-    return new TaxId({ value: digits, type });
-  }
+// ✅ Use tipos explícitos para retornos
+async findAll(): Promise<Customer[]> { }
+
+// ✅ Use interfaces para DTOs
+interface CreateCustomerDto {
+  name: string;
+  email: string;
+  taxId: string;
+}
+
+// ✅ Use type para unions/tuplas
+type OrderStatus = 'RECEIVED' | 'IN_PROGRESS' | 'DELIVERED';
+
+// ❌ Evite 'any' - use 'unknown' se necessário
+function process(data: unknown): string {
+  if (typeof data === 'string') return data;
+  return '';
 }
 ```
 
-### SOStatus Lifecycle
+### Decoradores NestJS
 
 ```typescript
-export enum SOStatus {
-  RECEIVED,
-  UNDER_DIAGNOSIS,
-  AWAITING_APPROVAL,
-  IN_PROGRESS,
-  FINISHED,
-  DELIVERED,
-}
-// Valid: RECEIVED → UNDER_DIAGNOSIS → AWAITING_APPROVAL → IN_PROGRESS → FINISHED → DELIVERED
-// Also: AWAITING_APPROVAL → FINISHED (if rejected)
-```
+// Controllers - use prefixo claro
+@Controller('customers')
+@Controller('auth')
+@Controller('service-orders')
 
-### Money & LicensePlate
+// Roteamento - HTTP method adequado
+@Get()     // Ler / Listar
+@Post()    // Criar
+@Patch()   // Atualização parcial
+@Put()     // Substituição completa
+@Delete()  // Remover
 
-```typescript
-// Money: Non-negative, 2 decimal places
-export class Money {
-  static create(amount: number): Money {
-    if (amount < 0) throw new Error('Money cannot be negative');
-    return new Money(Math.round(amount * 100) / 100);
-  }
-}
-
-// LicensePlate: Brazilian format (AAA-1234 or AAA1A23)
-export class LicensePlate {
-  private static readonly PATTERN = /^[A-Z]{3}[0-9]{4}$|^[A-Z]{3}[0-9][A-Z][0-9]{2}$/;
-  static create(value: string): LicensePlate {
-    const normalized = value.toUpperCase().replace(/-/g, '');
-    if (!this.PATTERN.test(normalized)) throw new Error('Invalid license plate');
-    return new LicensePlate(normalized);
-  }
-}
-```
-
----
-
-## API Patterns
-
-### Admin (JWT Required)
-
-```typescript
-@Controller('api/v1/service-orders')
+// Guards e autenticação
 @UseGuards(JwtAuthGuard)
-export class ServiceOrderController {
-  @Post() create(@Body() dto: CreateServiceOrderDto) {}
-  @Get() findAll(@Query() query: ListQuery) {}
-  @Patch(':id/status') updateStatus(@Param('id') id: string, @Body() dto: UpdateStatusDto) {}
+@UseGuards(RolesGuard)
+@Roles('admin')  // RBAC
+```
+
+### Error Handling
+
+```typescript
+// ✅ Use exceptions nativos do NestJS
+import { NotFoundException, BadRequestException } from '@nestjs/common';
+
+async findOne(id: string) {
+  const customer = await this.customerRepository.find(id);
+  if (!customer) {
+    throw new NotFoundException(`Customer ${id} not found`);
+  }
+  return customer;
+}
+
+// ✅ Tratamento centralizado para errosknown
+catch (error) {
+  if (error instanceof ValidationError) {
+    throw new BadRequestException(error.message);
+  }
+  throw new InternalServerErrorException('Unexpected error');
 }
 ```
 
-### Public Tracking (No Auth)
+### Validação
 
 ```typescript
-@Controller('api/v1/track')
-export class TrackingController {
-  @Get(':soId') track(@Param('soId') soId: string) {
-    /* soId, status, vehiclePlate, services, createdAt, lastUpdated */
-  }
+// Use class-validator para DTOs
+import { IsString, IsEmail, IsOptional, MaxLength } from 'class-validator';
+
+export class CreateCustomerDto {
+  @IsString()
+  @MaxLength(100)
+  name: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @MaxLength(20)
+  phone?: string;
 }
+```
+
+### Banco de Dados (Prisma)
+
+```typescript
+// Schema naming: snake_case para tabelas/campos
+model Customer {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders    Order[]
+}
+```
+
+### Comments e Documentação
+
+```typescript
+/**
+ * Creates a new customer in the system.
+ *
+ * @param dto - Customer creation data
+ * @returns Created customer entity
+ * @throws BadRequestException if email already exists
+ */
+async create(dto: CreateCustomerDto): Promise<Customer> { }
 ```
 
 ---
 
-## Testing Guidelines
+## 🎯 Padrões de Testes
+
+### Estrutura de Teste
 
 ```typescript
 describe('CustomerService', () => {
   let service: CustomerService;
+  let repository: jest.Mocked<CustomerRepository>;
+
   beforeEach(async () => {
     const module = await Test.createTestingModule({
-      providers: [CustomerService, { provide: CustomerRepository, useValue: mockRepo }],
+      providers: [CustomerService, { provide: CustomerRepository, useFactory: () => ({}) }],
     }).compile();
+
     service = module.get<CustomerService>(CustomerService);
+    repository = module.get(CustomerRepository);
   });
-  it('should be defined', () => expect(service).toBeDefined());
+
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 });
 ```
 
-### Coverage Requirements (from PRD)
+### Nomenclatura de Testes
 
-| Domain                      | Minimum |
-| --------------------------- | ------- |
-| Service Order lifecycle     | 90%     |
-| Customer & TaxId validation | 85%     |
-| Quote calculation           | 90%     |
-| Parts inventory             | 85%     |
-| Status transitions          | 90%     |
-
----
-
-## Configuration
-
-```bash
-PORT=3000
-DATABASE_URL=postgresql://user:pass@localhost:5432/workshop
-JWT_SECRET=your-secret-here
+```typescript
+describe('CustomerService', () => {
+  describe('create', () => {
+    it('should create a customer with valid data', () => {});
+    it('should throw BadRequestException for duplicate email', () => {});
+  });
+});
 ```
 
-## NOTES
+---
 
-### Current Status (2025-03-25)
+## 📋 Configurações do Projeto
 
-- **Greenfield project** - Only NestJS boilerplate exists in `src/`
-- No DDD structure implemented yet (no domain/, application/, infrastructure/, interfaces/)
-- No API endpoints beyond default `/` endpoint
-- No authentication module
-- No database schema/migrations
+### Prettier (`.prettierrc`)
 
-### Known Gaps
+```json
+{
+  "semi": true,
+  "trailingComma": "es5",
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "bracketSpacing": true
+}
+```
 
-- `docker-compose.yml` referenced in README but not present
-- DDD directory structure needs to be created
-- Domain value objects (TaxId, LicensePlate, Money, SOStatus) not implemented
+### TypeScript (`tsconfig.json`)
+
+- Target: ES2023
+- Strict mode: enabled
+- decorators: enabled
+- Path alias: `@/*` → `./src/*`
 
 ---
 
-## Related Context
+## ⚠️ Regras Importantes
 
-- `/home/trigo/.config/opencode/context/project-intelligence/technical-domain.md`
-- `/home/trigo/.config/opencode/context/core/standards/code-quality.md`
+1. **Nunca use `as any`** - Use tipos adequados ou `unknown`
+2. **Nunca use `@ts-ignore`** - Corrija o tipo ou use verificação
+3. **Sempre valide entrada** - Use class-validator em DTOs
+4. **Trate erros adequadamente** - Use exceptions do NestJS
+5. **Não commite senhas** - Use `.env` e `.gitignore`
+6. **Testes são obrigatórios** - Mantenha cobertura mínima de 85%
+
+---
+
+## 📚 Recursos
+
+- NestJS: https://docs.nestjs.com/
+- Prisma: https://www.prisma.io/docs/
+- Class Validator: https://github.com/typestack/class-validator
