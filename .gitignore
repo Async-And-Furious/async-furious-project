@@ -64,3 +64,7 @@ Thumbs.db
 .cache/
 .eslintcache
 .pnpm-store/
+
+.specify/
+.sisyphus/
+.opencode/
