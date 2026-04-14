@@ -1,0 +1,24 @@
+services:
+  database:
+    extends:
+      file: ./docker-compose.dependencies.yml
+      service: database
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workshop-api
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workshop
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      NODE_ENV: production
+    depends_on:
+      database:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

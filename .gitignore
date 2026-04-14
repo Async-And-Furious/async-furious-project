@@ -1,1 +1,70 @@
+# Dependencies
 node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# Prisma
+/src/generated/prisma
+prisma/migrations/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Debug
+*.map
+
+# NestJS
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (private keys, certificates)
+*.pem
+*.key
+*.crt
+
+# CI/CD
+.github/workflows/*.local.yml
+
+# Cache
+.cache/
+.eslintcache
+.pnpm-store/
+
+.specify/
+.sisyphus/
+.opencode/

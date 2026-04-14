@@ -1,0 +1,81 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TaxIdType {
+  CPF
+  CNPJ
+}
+
+enum SOStatus {
+  RECEIVED
+  UNDER_DIAGNOSIS
+  AWAITING_APPROVAL
+  IN_PROGRESS
+  FINISHED
+  DELIVERED
+}
+
+enum EstimateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("admin")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+}
+
+model Customer {
+  id          String    @id @default(uuid())
+  name        String
+  email       String    @unique
+  phone       String?
+  tax_id      String    @unique
+  tax_id_type TaxIdType
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+
+  vehicles       Vehicle[]
+  service_orders ServiceOrder[]
+}
+
+model Vehicle {
+  id            String   @id @default(uuid())
+  license_plate String   @unique
+  brand         String
+  model         String
+  year          Int
+  color         String?
+  customer_id   String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  customer       Customer       @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  service_orders ServiceOrder[]
+}
+
+model ServiceOrder {
+  id           String    @id @default(uuid())
+  vehicle_id   String
+  customer_id  String
+  status       SOStatus  @default(RECEIVED)
+  description  String?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  delivered_at DateTime?
+
+  vehicle  Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+}
