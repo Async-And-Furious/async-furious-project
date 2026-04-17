@@ -79,3 +79,15 @@ model ServiceOrder {
   vehicle  Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
   customer Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
 }
+
+model Peca {
+  id                 String   @id @default(uuid())
+  nome               String
+  codigo             String   @unique
+  descricao          String?
+  preco              Decimal  @db.Decimal(10, 2)
+  quantidade_estoque Int      @default(0)
+  quantidade_minima  Int      @default(1)
+  created_at         DateTime @default(now())
+  updated_at         DateTime @updatedAt
+}
