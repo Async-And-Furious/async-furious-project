@@ -3,21 +3,19 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './shared/infrastructure/database/database.module';
-import { AuthModule } from './shared/auth/auth.module';
-import { ClienteModule } from './modules/clientes/cliente.module';
-import { VeiculoModule } from './modules/veiculos/veiculo.module';
-import { OrdemDeServicoModule } from './modules/ordens-servico/ordem-de-servico.module';
-import { PecaModule } from './modules/pecas/peca.module';
+import { AuthModule } from './auth/auth.module';
+import { CadastroModule } from './modules/cadastro/cadastro.module';
+import { PecasInsumosModule } from './modules/pecas-insumos/pecas-insumos.module';
+import { OrdemServicoModule } from './modules/ordem-servico/ordem-servico.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     DatabaseModule,
     AuthModule,
-    ClienteModule,
-    VeiculoModule,
-    OrdemDeServicoModule,
-    PecaModule,
+    CadastroModule,
+    PecasInsumosModule,
+    OrdemServicoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
