@@ -5,12 +5,12 @@ export class CreateVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
   async execute(data: {
-    license_plate: string;
-    brand: string;
-    model: string;
-    year: number;
-    color?: string;
-    customer_id: string;
+    placa: string;
+    marca: string;
+    modelo: string;
+    ano: number;
+    cor?: string;
+    id_cliente: string;
   }): Promise<Veiculo> {
     return this.repository.create(data);
   }
@@ -44,7 +44,7 @@ export class UpdateVeiculoUseCase {
 
   async execute(
     id: string,
-    data: { brand?: string; model?: string; year?: number; color?: string }
+    data: { marca?: string; modelo?: string; ano?: number; cor?: string }
   ): Promise<Veiculo> {
     return this.repository.update(id, data);
   }

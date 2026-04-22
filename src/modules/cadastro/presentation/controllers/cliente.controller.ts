@@ -60,20 +60,20 @@ export class ClienteController {
     examples: {
       'Exemplo com CPF': {
         value: {
-          name: 'João Silva',
+          nome: 'João Silva',
           email: 'joao@example.com',
-          phone: '11999999999',
-          tax_id: '12345678901',
-          tax_id_type: 'CPF',
+          telefone: '11999999999',
+          documento: '12345678901',
+          tipo_documento: 'CPF',
         },
       },
       'Exemplo com CNPJ': {
         value: {
-          name: 'Empresa XYZ',
+          nome: 'Empresa XYZ',
           email: 'contato@empresa.com',
-          phone: '1133333333',
-          tax_id: '12345678000190',
-          tax_id_type: 'CNPJ',
+          telefone: '1133333333',
+          documento: '12345678000190',
+          tipo_documento: 'CNPJ',
         },
       },
     },

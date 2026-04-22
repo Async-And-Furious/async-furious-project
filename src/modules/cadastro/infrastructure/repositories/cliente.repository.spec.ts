@@ -11,11 +11,11 @@ describe('ClienteRepository', () => {
 
   const mockCliente: Cliente = {
     id: '123',
-    name: 'Test Client',
+    nome: 'Test Client',
     email: 'test@test.com',
-    phone: '11999999999',
-    tax_id: '12345678901',
-    tax_id_type: 'CPF',
+    telefone: '11999999999',
+    documento: '12345678901',
+    tipo_documento: 'CPF',
     created_at: new Date(),
     updated_at: new Date(),
   };
@@ -52,11 +52,11 @@ describe('ClienteRepository', () => {
   describe('create', () => {
     it('should create a cliente', async () => {
       const createData = {
-        name: 'Test Client',
+        nome: 'Test Client',
         email: 'test@test.com',
-        phone: '11999999999',
-        tax_id: '12345678901',
-        tax_id_type: 'CPF' as const,
+        telefone: '11999999999',
+        documento: '12345678901',
+        tipo_documento: 'CPF' as const,
       };
       mockPrismaService.customer.create.mockResolvedValue({
         ...createData,
@@ -67,21 +67,21 @@ describe('ClienteRepository', () => {
 
       const result = await repository.create(createData);
 
-      expect(result.name).toBe('Test Client');
+      expect(result.nome).toBe('Test Client');
       expect(result.email).toBe('test@test.com');
       expect(mockPrismaService.customer.create).toHaveBeenCalledWith({ data: createData });
     });
 
-    it('should create a cliente without phone', async () => {
+    it('should create a cliente without telefone', async () => {
       const createData = {
-        name: 'Test Client',
+        nome: 'Test Client',
         email: 'test@test.com',
-        tax_id: '12345678901',
-        tax_id_type: 'CPF' as const,
+        documento: '12345678901',
+        tipo_documento: 'CPF' as const,
       };
       mockPrismaService.customer.create.mockResolvedValue({
         ...createData,
-        phone: null,
+        telefone: null,
         id: '123',
         created_at: new Date(),
         updated_at: new Date(),
@@ -89,7 +89,7 @@ describe('ClienteRepository', () => {
 
       const result = await repository.create(createData);
 
-      expect(result.phone).toBeNull();
+      expect(result.telefone).toBeNull();
       expect(mockPrismaService.customer.create).toHaveBeenCalledWith({ data: createData });
     });
   });
@@ -99,21 +99,21 @@ describe('ClienteRepository', () => {
       const mockCustomers = [
         {
           id: '1',
-          name: 'Client 1',
+          nome: 'Client 1',
           email: 'client1@test.com',
-          phone: null,
-          tax_id: '1',
-          tax_id_type: 'CPF',
+          telefone: null,
+          documento: '1',
+          tipo_documento: 'CPF',
           created_at: new Date(),
           updated_at: new Date(),
         },
         {
           id: '2',
-          name: 'Client 2',
+          nome: 'Client 2',
           email: 'client2@test.com',
-          phone: null,
-          tax_id: '2',
-          tax_id_type: 'CPF',
+          telefone: null,
+          documento: '2',
+          tipo_documento: 'CPF',
           created_at: new Date(),
           updated_at: new Date(),
         },
@@ -139,9 +139,9 @@ describe('ClienteRepository', () => {
       expect(mockPrismaService.customer.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
-            { name: { contains: 'test', mode: 'insensitive' as const } },
+            { nome: { contains: 'test', mode: 'insensitive' as const } },
             { email: { contains: 'test', mode: 'insensitive' as const } },
-            { tax_id: { contains: 'test' } },
+            { documento: { contains: 'test' } },
           ],
         },
         skip: 0,
@@ -167,7 +167,7 @@ describe('ClienteRepository', () => {
     it('should return a cliente by id', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue({
         ...mockCliente,
-        vehicles: [],
+        veiculos: [],
       } as never);
 
       const result = await repository.findOne('123');
@@ -175,7 +175,7 @@ describe('ClienteRepository', () => {
       expect(result.id).toBe('123');
       expect(mockPrismaService.customer.findUnique).toHaveBeenCalledWith({
         where: { id: '123' },
-        include: { vehicles: true },
+        include: { veiculos: true },
       });
     });
 
@@ -188,18 +188,18 @@ describe('ClienteRepository', () => {
 
   describe('update', () => {
     it('should update a cliente', async () => {
-      const updateData = { name: 'Updated Name' };
-      const updatedCliente = { ...mockCliente, name: 'Updated Name' };
+      const updateData = { nome: 'Updated Name' };
+      const updatedCliente = { ...mockCliente, nome: 'Updated Name' };
 
       mockPrismaService.customer.findUnique.mockResolvedValue({
         ...mockCliente,
-        vehicles: [],
+        veiculos: [],
       } as never);
       mockPrismaService.customer.update.mockResolvedValue(updatedCliente as never);
 
       const result = await repository.update('123', updateData);
 
-      expect(result.name).toBe('Updated Name');
+      expect(result.nome).toBe('Updated Name');
       expect(mockPrismaService.customer.update).toHaveBeenCalledWith({
         where: { id: '123' },
         data: updateData,
@@ -207,18 +207,18 @@ describe('ClienteRepository', () => {
     });
 
     it('should update multiple fields', async () => {
-      const updateData = { name: 'New Name', email: 'new@test.com' };
+      const updateData = { nome: 'New Name', email: 'new@test.com' };
       const updatedCliente = { ...mockCliente, ...updateData };
 
       mockPrismaService.customer.findUnique.mockResolvedValue({
         ...mockCliente,
-        vehicles: [],
+        veiculos: [],
       } as never);
       mockPrismaService.customer.update.mockResolvedValue(updatedCliente as never);
 
       const result = await repository.update('123', updateData);
 
-      expect(result.name).toBe('New Name');
+      expect(result.nome).toBe('New Name');
       expect(result.email).toBe('new@test.com');
     });
   });
@@ -227,7 +227,7 @@ describe('ClienteRepository', () => {
     it('should delete a cliente', async () => {
       mockPrismaService.customer.findUnique.mockResolvedValue({
         ...mockCliente,
-        vehicles: [],
+        veiculos: [],
       } as never);
       mockPrismaService.customer.delete.mockResolvedValue(mockCliente as never);
 

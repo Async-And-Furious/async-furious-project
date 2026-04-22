@@ -10,7 +10,7 @@ export class CreateClienteDto {
   })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  nome: string;
 
   @ApiProperty({
     example: 'joao@example.com',
@@ -26,7 +26,7 @@ export class CreateClienteDto {
   })
   @IsString()
   @IsOptional()
-  phone?: string;
+  telefone?: string;
 
   @ApiProperty({
     example: '12345678901',
@@ -36,7 +36,7 @@ export class CreateClienteDto {
   })
   @IsString()
   @IsNotEmpty()
-  tax_id: string;
+  documento: string;
 
   @ApiProperty({
     example: 'CPF',
@@ -44,7 +44,7 @@ export class CreateClienteDto {
     description: 'Tipo de documento fiscal',
   })
   @IsEnum(['CPF', 'CNPJ'])
-  tax_id_type: 'CPF' | 'CNPJ';
+  tipo_documento: 'CPF' | 'CNPJ';
 }
 
 export class UpdateClienteDto {
@@ -56,7 +56,7 @@ export class UpdateClienteDto {
   @IsString()
   @IsNotEmpty()
   @IsOptional()
-  name?: string;
+  nome?: string;
 
   @ApiProperty({
     example: 'newemail@example.com',
@@ -75,7 +75,7 @@ export class UpdateClienteDto {
   @IsString()
   @IsNotEmpty()
   @IsOptional()
-  phone?: string;
+  telefone?: string;
 }
 
 export class ListQueryDto {

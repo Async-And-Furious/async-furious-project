@@ -1,10 +1,10 @@
 export class Cliente {
   id: string;
-  name: string;
+  nome: string;
   email: string;
-  phone: string | null;
-  tax_id: string;
-  tax_id_type: 'CPF' | 'CNPJ';
+  telefone: string | null;
+  documento: string;
+  tipo_documento: 'CPF' | 'CNPJ';
   created_at: Date;
   updated_at: Date;
 }

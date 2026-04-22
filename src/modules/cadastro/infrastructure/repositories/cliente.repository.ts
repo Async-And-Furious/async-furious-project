@@ -8,11 +8,11 @@ export class ClienteRepository implements IClienteRepository {
   constructor(private prisma: PrismaService) {}
 
   async create(data: {
-    name: string;
+    nome: string;
     email: string;
-    phone?: string;
-    tax_id: string;
-    tax_id_type: 'CPF' | 'CNPJ';
+    telefone?: string;
+    documento: string;
+    tipo_documento: 'CPF' | 'CNPJ';
   }): Promise<Cliente> {
     return (await this.prisma.customer.create({ data })) as unknown as Cliente;
   }
@@ -29,9 +29,9 @@ export class ClienteRepository implements IClienteRepository {
     const where = search
       ? {
           OR: [
-            { name: { contains: search, mode: 'insensitive' as const } },
+            { nome: { contains: search, mode: 'insensitive' as const } },
             { email: { contains: search, mode: 'insensitive' as const } },
-            { tax_id: { contains: search } },
+            { documento: { contains: search } },
           ],
         }
       : {};
@@ -55,7 +55,7 @@ export class ClienteRepository implements IClienteRepository {
   async findOne(id: string): Promise<Cliente> {
     const customer = await this.prisma.customer.findUnique({
       where: { id },
-      include: { vehicles: true },
+      include: { veiculos: true },
     });
 
     if (!customer) {
@@ -67,7 +67,7 @@ export class ClienteRepository implements IClienteRepository {
 
   async update(
     id: string,
-    data: { name?: string; email?: string; phone?: string }
+    data: { nome?: string; email?: string; telefone?: string }
   ): Promise<Cliente> {
     await this.findOne(id);
 

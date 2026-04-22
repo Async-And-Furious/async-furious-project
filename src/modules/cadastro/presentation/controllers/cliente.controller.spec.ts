@@ -28,11 +28,11 @@ describe('ClienteController', () => {
 
   const mockCliente: Cliente = {
     id: '123',
-    name: 'Test Client',
+    nome: 'Test Client',
     email: 'test@test.com',
-    phone: '11999999999',
-    tax_id: '12345678901',
-    tax_id_type: 'CPF',
+    telefone: '11999999999',
+    documento: '12345678901',
+    tipo_documento: 'CPF',
     created_at: new Date(),
     updated_at: new Date(),
   };
@@ -61,11 +61,11 @@ describe('ClienteController', () => {
   describe('create', () => {
     it('should create a cliente', async () => {
       const createDto: CreateClienteDto = {
-        name: 'Test Client',
+        nome: 'Test Client',
         email: 'test@test.com',
-        phone: '11999999999',
-        tax_id: '12345678901',
-        tax_id_type: 'CPF',
+        telefone: '11999999999',
+        documento: '12345678901',
+        tipo_documento: 'CPF',
       };
       mockCreateUseCase.execute.mockResolvedValue(mockCliente);
 
@@ -75,18 +75,18 @@ describe('ClienteController', () => {
       expect(mockCreateUseCase.execute).toHaveBeenCalledWith(createDto);
     });
 
-    it('should create a cliente without phone', async () => {
+    it('should create a cliente without telefone', async () => {
       const createDto: CreateClienteDto = {
-        name: 'Test Client',
+        nome: 'Test Client',
         email: 'test@test.com',
-        tax_id: '12345678901',
-        tax_id_type: 'CPF',
+        documento: '12345678901',
+        tipo_documento: 'CPF',
       };
-      mockCreateUseCase.execute.mockResolvedValue({ ...mockCliente, phone: null });
+      mockCreateUseCase.execute.mockResolvedValue({ ...mockCliente, telefone: null });
 
       const result = await controller.create(createDto);
 
-      expect(result.phone).toBeNull();
+      expect(result.telefone).toBeNull();
       expect(mockCreateUseCase.execute).toHaveBeenCalledWith(createDto);
     });
   });
@@ -148,28 +148,28 @@ describe('ClienteController', () => {
 
   describe('update', () => {
     it('should update a cliente', async () => {
-      const updateDto: UpdateClienteDto = { name: 'Updated Name' };
-      mockUpdateUseCase.execute.mockResolvedValue({ ...mockCliente, name: 'Updated Name' });
+      const updateDto: UpdateClienteDto = { nome: 'Updated Name' };
+      mockUpdateUseCase.execute.mockResolvedValue({ ...mockCliente, nome: 'Updated Name' });
 
       const result = await controller.update('123', updateDto);
 
-      expect(result.name).toBe('Updated Name');
+      expect(result.nome).toBe('Updated Name');
       expect(mockUpdateUseCase.execute).toHaveBeenCalledWith('123', updateDto);
     });
 
     it('should update multiple fields', async () => {
       const updateDto: UpdateClienteDto = {
-        name: 'New Name',
+        nome: 'New Name',
         email: 'new@test.com',
-        phone: '11988887777',
+        telefone: '11988887777',
       };
       mockUpdateUseCase.execute.mockResolvedValue({ ...mockCliente, ...updateDto });
 
       const result = await controller.update('123', updateDto);
 
-      expect(result.name).toBe('New Name');
+      expect(result.nome).toBe('New Name');
       expect(result.email).toBe('new@test.com');
-      expect(result.phone).toBe('11988887777');
+      expect(result.telefone).toBe('11988887777');
     });
   });
 

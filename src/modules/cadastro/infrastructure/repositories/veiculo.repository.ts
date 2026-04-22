@@ -8,12 +8,12 @@ export class VeiculoRepository implements IVeiculoRepository {
   constructor(private prisma: PrismaService) {}
 
   async create(data: {
-    license_plate: string;
-    brand: string;
-    model: string;
-    year: number;
-    color?: string;
-    customer_id: string;
+    placa: string;
+    marca: string;
+    modelo: string;
+    ano: number;
+    cor?: string;
+    id_cliente: string;
   }): Promise<Veiculo> {
     return (await this.prisma.vehicle.create({ data })) as unknown as Veiculo;
   }
@@ -30,9 +30,9 @@ export class VeiculoRepository implements IVeiculoRepository {
     const where = search
       ? {
           OR: [
-            { license_plate: { contains: search, mode: 'insensitive' as const } },
-            { brand: { contains: search, mode: 'insensitive' as const } },
-            { model: { contains: search, mode: 'insensitive' as const } },
+            { placa: { contains: search, mode: 'insensitive' as const } },
+            { marca: { contains: search, mode: 'insensitive' as const } },
+            { modelo: { contains: search, mode: 'insensitive' as const } },
           ],
         }
       : {};
@@ -43,7 +43,7 @@ export class VeiculoRepository implements IVeiculoRepository {
         skip,
         take: limit,
         orderBy: { created_at: 'desc' },
-        include: { customer: true },
+        include: { cliente: true },
       }),
       this.prisma.vehicle.count({ where }),
     ]);
@@ -57,20 +57,20 @@ export class VeiculoRepository implements IVeiculoRepository {
   async findOne(id: string): Promise<Veiculo> {
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { id },
-      include: { customer: true },
+      include: { cliente: true },
     });
     if (!vehicle) throw new NotFoundException(`Veiculo with ID ${id} not found`);
     return vehicle as unknown as Veiculo;
   }
 
-  async findByLicensePlate(license_plate: string): Promise<Veiculo | null> {
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { license_plate } });
+  async findByPlaca(placa: string): Promise<Veiculo | null> {
+    const vehicle = await this.prisma.vehicle.findUnique({ where: { placa } });
     return vehicle as unknown as Veiculo;
   }
 
   async update(
     id: string,
-    data: { brand?: string; model?: string; year?: number; color?: string }
+    data: { marca?: string; modelo?: string; ano?: number; cor?: string }
   ): Promise<Veiculo> {
     await this.findOne(id);
     return (await this.prisma.vehicle.update({

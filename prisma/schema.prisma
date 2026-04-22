@@ -38,46 +38,46 @@ model User {
 }
 
 model Customer {
-  id          String    @id @default(uuid())
-  name        String
-  email       String    @unique
-  phone       String?
-  tax_id      String    @unique
-  tax_id_type TaxIdType
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
+  id             String    @id @default(uuid())
+  nome           String    @map("name")
+  email          String    @unique
+  telefone       String?   @map("phone")
+  documento      String    @unique @map("tax_id")
+  tipo_documento TaxIdType @map("tax_id_type")
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 
-  vehicles       Vehicle[]
-  service_orders ServiceOrder[]
+  veiculos       Vehicle[]
+  ordens_servico ServiceOrder[]
 }
 
 model Vehicle {
-  id            String   @id @default(uuid())
-  license_plate String   @unique
-  brand         String
-  model         String
-  year          Int
-  color         String?
-  customer_id   String
-  created_at    DateTime @default(now())
-  updated_at    DateTime @updatedAt
+  id         String   @id @default(uuid())
+  placa      String   @unique @map("license_plate")
+  marca      String   @map("brand")
+  modelo     String   @map("model")
+  ano        Int      @map("year")
+  cor        String?  @map("color")
+  id_cliente String   @map("customer_id")
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  customer       Customer       @relation(fields: [customer_id], references: [id], onDelete: Cascade)
-  service_orders ServiceOrder[]
+  cliente        Customer       @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  ordens_servico ServiceOrder[]
 }
 
 model ServiceOrder {
-  id           String    @id @default(uuid())
-  vehicle_id   String
-  customer_id  String
-  status       SOStatus  @default(RECEIVED)
-  description  String?
-  created_at   DateTime  @default(now())
-  updated_at   DateTime  @updatedAt
-  delivered_at DateTime?
+  id          String    @id @default(uuid())
+  id_veiculo  String    @map("vehicle_id")
+  id_cliente  String    @map("customer_id")
+  status      SOStatus  @default(RECEIVED)
+  descricao   String?   @map("description")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  entregue_em DateTime? @map("delivered_at")
 
-  vehicle  Vehicle  @relation(fields: [vehicle_id], references: [id], onDelete: Cascade)
-  customer Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  veiculo  Vehicle  @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
+  cliente  Customer @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
 }
 
 model Peca {

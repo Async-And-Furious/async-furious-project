@@ -1,7 +1,7 @@
 export class OrdemDeServico {
   id: string;
-  vehicle_id: string;
-  customer_id: string;
+  id_veiculo: string;
+  id_cliente: string;
   status:
     | 'RECEIVED'
     | 'UNDER_DIAGNOSIS'
@@ -9,8 +9,8 @@ export class OrdemDeServico {
     | 'IN_PROGRESS'
     | 'FINISHED'
     | 'DELIVERED';
-  description: string | null;
+  descricao: string | null;
   created_at: Date;
   updated_at: Date;
-  delivered_at: Date | null;
+  entregue_em: Date | null;
 }

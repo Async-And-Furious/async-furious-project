@@ -6,17 +6,31 @@ Este documento apresenta a aplicação dos princípios de Domain-Driven Design (
 
 ## 2. Linguagem Ubíqua (Ubiquitous Language)
 
-| Termo | Definição |
-|---|---|
-| **Ordem de Serviço (OS)** | Registro principal que engloba todo o processo de atendimento e execução de serviços em um veículo. |
-| **Cliente** | Pessoa física ou jurídica que solicita os serviços da oficina. Identificado por CPF/CNPJ. |
-| **Veículo** | Automóvel do cliente que será submetido a serviços. Identificado por placa, marca, modelo e ano. |
-| **Serviço** | Atividade específica realizada no veículo (ex: troca de óleo, alinhamento). |
-| **Peça/Insumo** | Componente ou material utilizado na execução de um serviço. |
-| **Orçamento** | Proposta de custo dos serviços e peças para o cliente, gerada automaticamente. |
-| **Status da OS** | Estágio atual da Ordem de Serviço (Recebida, Em Diagnóstico, Aguardando Aprovação, Em Execução, Finalizada, Entregue). |
-| **Estoque** | Controle da quantidade de peças e insumos disponíveis. |
-| **Autenticação JWT** | Mecanismo de segurança para acesso às APIs administrativas. |
+| Termo | Campo no Código | Definição |
+|---|---|---|
+| **Ordem de Serviço (OS)** | `OrdemDeServico` | Registro principal que engloba todo o processo de atendimento e execução de serviços em um veículo. |
+| **Cliente** | `Cliente` | Pessoa física ou jurídica que solicita os serviços da oficina. Identificado por CPF/CNPJ. |
+| **Veículo** | `Veiculo` | Automóvel do cliente que será submetido a serviços. Identificado por placa, marca, modelo e ano. |
+| **Serviço** | `Servico` | Atividade específica realizada no veículo (ex: troca de óleo, alinhamento). |
+| **Peça/Insumo** | `PecaInsumo` | Componente ou material utilizado na execução de um serviço. |
+| **Orçamento** | `Orcamento` | Proposta de custo dos serviços e peças para o cliente, gerada automaticamente. |
+| **Status da OS** | `status` | Estágio atual da Ordem de Serviço: `RECEIVED` (Recebida), `UNDER_DIAGNOSIS` (Em Diagnóstico), `AWAITING_APPROVAL` (Aguardando Aprovação), `IN_PROGRESS` (Em Execução), `FINISHED` (Finalizada), `DELIVERED` (Entregue). |
+| **Estoque** | `quantidade_estoque` | Controle da quantidade de peças e insumos disponíveis. |
+| **Autenticação JWT** | `AuthModule` | Mecanismo de segurança para acesso às APIs administrativas. |
+| **Nome** | `nome` | Nome completo ou razão social do cliente. |
+| **Telefone** | `telefone` | Contato telefônico do cliente. |
+| **Documento** | `documento` | CPF ou CNPJ do cliente. |
+| **Tipo de Documento** | `tipo_documento` | Classificação do documento fiscal: `CPF` (pessoa física) ou `CNPJ` (pessoa jurídica). |
+| **Placa** | `placa` | Placa de identificação do veículo (formato Mercosul ou antigo). |
+| **Marca** | `marca` | Fabricante do veículo (ex: Toyota, Honda, Fiat). |
+| **Modelo** | `modelo` | Versão/modelo do veículo (ex: Corolla, Civic, Palio). |
+| **Ano** | `ano` | Ano de fabricação do veículo. |
+| **Cor** | `cor` | Cor predominante do veículo. |
+| **ID do Cliente** | `id_cliente` | Referência ao cliente dono do veículo ou da OS. |
+| **ID do Veículo** | `id_veiculo` | Referência ao veículo associado à OS. |
+| **Descrição** | `descricao` | Texto descritivo do problema ou do serviço solicitado na OS. |
+| **Entregue em** | `entregue_em` | Data/hora em que a OS foi entregue ao cliente. |
+| **Quantidade Mínima** | `quantidade_minima` | Nível mínimo de estoque de uma peça que aciona alerta de reposição. |
 
 ## 3. Bounded Contexts (Contextos Delimitados)
 
@@ -192,94 +206,15 @@ Trata da autenticação de usuários administrativos e da validação de dados s
     *   Token JWT
     *   Data de Expiração
 
-## 5. Event Storming (Fluxos Principais)
+## 5. Event Storming — Eventos por Bounded Context
 
+Os eventos de domínio estão organizados por BC, refletindo a estrutura de módulos definida em `src/modules/`.
 
-### 5.1. Criação da Ordem de Serviço (OS) - Detalhado com base no Fluxo Fornecido
+---
 
-Este fluxo descreve o processo de criação de uma Ordem de Serviço, desde a interação inicial do cliente até a geração do orçamento, conforme o diagrama de fluxo de criação de OS.
+### 5.1. BC: Criação e Acompanhamento da OS (`ordem-servico`)
 
-#### Etapas do Fluxo (Baseado no Diagrama):
-
-1.  **Cliente Informa Dados:** O cliente fornece as informações necessárias para a criação da OS.
-2.  **Recepcionista Cadastra Veículo:** A recepcionista utiliza os dados do cliente para cadastrar o veículo no sistema.
-3.  **Recepcionista Cria OS:** A recepcionista inicia a criação da Ordem de Serviço.
-4.  **Mecânico Assume OS:** Um mecânico assume a responsabilidade pela OS.
-5.  **Mecânico Analisa Veículo:** O mecânico realiza a análise do veículo para identificar os serviços e peças necessários.
-6.  **Mecânico Lista Serviços e Peças:** Com base na análise, o mecânico lista os serviços a serem realizados e as peças/insumos necessários.
-7.  **Geração e Envio do Orçamento:** O sistema gera o orçamento com base nos serviços e peças, e o envia ao cliente para aprovação.
-
-#### Eventos de Domínio:
-
-*   `DadosClienteInformados`
-*   `VeiculoCadastrado`
-*   `OrdemDeServicoIniciada`
-*   `OrdemDeServicoAssumidaPorMecanico`
-*   `VeiculoAnalisado`
-*   `ServicosListadosParaOS`
-*   `PecasListadasParaOS`
-*   `OrcamentoGerado`
-*   `OrcamentoEnviadoParaAprovacao`
-*   `OrcamentoAprovado`
-*   `OrcamentoRejeitado`
-*   `StatusOSAtualizado`
-*   `OrdemDeServicoFinalizada`
-*   `OrdemDeServicoEntregue`
-
-#### Comandos:
-
-*   `InformarDadosCliente`
-*   `CadastrarVeiculo`
-*   `IniciarOrdemDeServico`
-*   `AssumirOrdemDeServico`
-*   `AnalisarVeiculo`
-*   `ListarServicosParaOS`
-*   `ListarPecasParaOS`
-*   `GerarOrcamento`
-*   `EnviarOrcamentoParaAprovacao`
-*   `AprovarOrcamento`
-*   `RejeitarOrcamento`
-*   `AtualizarStatusOS`
-*   `FinalizarOrdemDeServico`
-*   `EntregarOrdemDeServico`
-
-### 5.2. Acompanhamento da OS (Detalhes Adicionais)
-
-#### Eventos de Domínio:
-
-*   `OrdemDeServicoCriada`
-*   `ClienteIdentificado`
-*   `VeiculoCadastrado`
-*   `ServicoAdicionadoAOS`
-*   `PecaAdicionadaAOS`
-*   `OrcamentoGerado`
-*   `OrcamentoEnviadoParaAprovacao`
-*   `OrcamentoAprovado`
-*   `OrcamentoRejeitado`
-*   `StatusOSAtualizado`
-*   `OrdemDeServicoFinalizada`
-*   `OrdemDeServicoEntregue`
-
-#### Comandos:
-
-*   `CriarOrdemDeServico`
-*   `IdentificarCliente`
-*   `CadastrarVeiculo`
-*   `AdicionarServicoAOS`
-*   `AdicionarPecaAOS`
-*   `GerarOrcamento`
-*   `EnviarOrcamentoParaAprovacao`
-*   `AprovarOrcamento`
-*   `RejeitarOrcamento`
-*   `AtualizarStatusOS`
-*   `FinalizarOrdemDeServico`
-*   `EntregarOrdemDeServico`
-
-### 5.2. Acompanhamento da OS (Detalhes Adicionais)
-
-Este fluxo detalha as interações para monitorar o progresso de uma Ordem de Serviço, desde a sua criação até a entrega final, incluindo a comunicação com o cliente para aprovação de orçamentos.
-
-#### Eventos de Domínio:
+#### Eventos de Domínio (9):
 
 *   `OrdemDeServicoRecebida`
 *   `OrdemDeServicoEmDiagnostico`
@@ -287,23 +222,32 @@ Este fluxo detalha as interações para monitorar o progresso de uma Ordem de Se
 *   `OrdemDeServicoEmExecucao`
 *   `OrdemDeServicoFinalizada`
 *   `OrdemDeServicoEntregue`
-*   `ProgressoOSConsultadoPeloCliente`
+*   `OrcamentoGerado`
+*   `OrcamentoAprovado`
+*   `OrcamentoRejeitado`
 
 #### Comandos:
 
-*   `MudarStatusParaRecebida`
+*   `IniciarOrdemDeServico`
 *   `MudarStatusParaEmDiagnostico`
 *   `MudarStatusParaAguardandoAprovacao`
 *   `MudarStatusParaEmExecucao`
 *   `MudarStatusParaFinalizada`
 *   `MudarStatusParaEntregue`
+*   `GerarOrcamento`
+*   `AprovarOrcamento`
+*   `RejeitarOrcamento`
 *   `ConsultarProgressoOS`
+*   `AdicionarServicoAOS`
+*   `AdicionarPecaAOS`
+*   `FinalizarOrdemDeServico`
+*   `EntregarOrdemDeServico`
 
-### 5.3. Gestão Administrativa
+---
 
-Este contexto abrange as operações de CRUD (Create, Read, Update, Delete) para clientes, veículos, serviços e peças, além do monitoramento de ordens de serviço e tempo de execução.
+### 5.2. BC: Gestão Cadastral (`cadastro`)
 
-#### Eventos de Domínio:
+#### Eventos de Domínio (9):
 
 *   `ClienteCadastrado`
 *   `ClienteAtualizado`
@@ -311,14 +255,9 @@ Este contexto abrange as operações de CRUD (Create, Read, Update, Delete) para
 *   `VeiculoCadastrado`
 *   `VeiculoAtualizado`
 *   `VeiculoRemovido`
-*   `ServicoCadastrado`
-*   `ServicoAtualizado`
-*   `ServicoRemovido`
-*   `PecaCadastrada`
-*   `PecaAtualizada`
-*   `PecaRemovida`
-*   `EstoqueAtualizado`
-*   `TempoMedioExecucaoMonitorado`
+*   `ClienteIdentificado`
+*   `DadosClienteInformados`
+*   `VeiculoAnalisado`
 
 #### Comandos:
 
@@ -328,24 +267,24 @@ Este contexto abrange as operações de CRUD (Create, Read, Update, Delete) para
 *   `CadastrarVeiculo`
 *   `AtualizarVeiculo`
 *   `RemoverVeiculo`
-*   `CadastrarServico`
-*   `AtualizarServico`
-*   `RemoverServico`
-*   `CadastrarPeca`
-*   `AtualizarPeca`
-*   `RemoverPeca`
-*   `AtualizarEstoquePeca`
-*   `MonitorarTempoMedioExecucao`
+*   `IdentificarCliente`
+*   `InformarDadosCliente`
+*   `AnalisarVeiculo`
 
-### 5.4. Gestão de Peças e Insumos
+---
 
-#### Eventos de Domínio:
+### 5.3. BC: Gestão de Peças e Insumos (`pecas-insumos`)
+
+#### Eventos de Domínio (8):
 
 *   `PecaCadastrada`
 *   `PecaAtualizada`
 *   `PecaRemovida`
 *   `EstoqueAtualizado`
 *   `PecaComEstoqueBaixo`
+*   `PecasListadasParaOS`
+*   `PecaAdicionadaAOS`
+*   `ReposicaoEstoqueSolicitada`
 
 #### Comandos:
 
@@ -353,6 +292,24 @@ Este contexto abrange as operações de CRUD (Create, Read, Update, Delete) para
 *   `AtualizarPeca`
 *   `RemoverPeca`
 *   `AtualizarEstoquePeca`
+*   `ListarPecasParaOS`
+*   `SolicitarReposicaoEstoque`
+
+---
+
+### 5.4. BC: Gestão Financeira (`financeiro`) — _não implementado_
+
+#### Eventos de Domínio (3):
+
+*   `PagamentoRegistrado`
+*   `PagamentoProcessado`
+*   `NotaFiscalEmitida`
+
+#### Comandos:
+
+*   `RegistrarPagamento`
+*   `ProcessarPagamento`
+*   `EmitirNotaFiscal`
 
 ## 6. Diagramas
 

@@ -3,48 +3,48 @@ import { IsString, IsNotEmpty, IsOptional, IsInt, IsUUID, Min, Max } from 'class
 export class CreateVeiculoDto {
   @IsString()
   @IsNotEmpty()
-  license_plate: string;
+  placa: string;
 
   @IsString()
   @IsNotEmpty()
-  brand: string;
+  marca: string;
 
   @IsString()
   @IsNotEmpty()
-  model: string;
+  modelo: string;
 
   @IsInt()
   @Min(1900)
   @Max(new Date().getFullYear() + 1)
-  year: number;
+  ano: number;
 
   @IsString()
   @IsOptional()
-  color?: string;
+  cor?: string;
 
   @IsUUID()
   @IsNotEmpty()
-  customer_id: string;
+  id_cliente: string;
 }
 
 export class UpdateVeiculoDto {
   @IsString()
   @IsOptional()
-  brand?: string;
+  marca?: string;
 
   @IsString()
   @IsOptional()
-  model?: string;
+  modelo?: string;
 
   @IsInt()
   @Min(1900)
   @Max(new Date().getFullYear() + 1)
   @IsOptional()
-  year?: number;
+  ano?: number;
 
   @IsString()
   @IsOptional()
-  color?: string;
+  cor?: string;
 }
 
 export class ListQueryDto {

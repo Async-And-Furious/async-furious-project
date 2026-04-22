@@ -25,15 +25,15 @@ describe('CreateClienteUseCase', () => {
 
   it('should create a cliente with valid data', async () => {
     const input = {
-      name: 'Test Client',
+      nome: 'Test Client',
       email: 'test@test.com',
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
     };
     const mockCliente: Cliente = {
       id: '1',
       ...input,
-      phone: null,
+      telefone: null,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -41,18 +41,18 @@ describe('CreateClienteUseCase', () => {
 
     const result = await useCase.execute(input);
 
-    expect(result.name).toBe('Test Client');
+    expect(result.nome).toBe('Test Client');
     expect(result.email).toBe('test@test.com');
     expect(mockRepository.create).toHaveBeenCalledWith(input);
   });
 
-  it('should create a cliente with phone', async () => {
+  it('should create a cliente with telefone', async () => {
     const input = {
-      name: 'Test Client',
+      nome: 'Test Client',
       email: 'test@test.com',
-      phone: '11999999999',
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: '11999999999',
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
     };
     const mockCliente: Cliente = {
       id: '1',
@@ -64,21 +64,21 @@ describe('CreateClienteUseCase', () => {
 
     const result = await useCase.execute(input);
 
-    expect(result.phone).toBe('11999999999');
+    expect(result.telefone).toBe('11999999999');
     expect(mockRepository.create).toHaveBeenCalledWith(input);
   });
 
   it('should create a cliente with CNPJ', async () => {
     const input = {
-      name: 'Test Company',
+      nome: 'Test Company',
       email: 'company@test.com',
-      tax_id: '12345678000199',
-      tax_id_type: 'CNPJ' as const,
+      documento: '12345678000199',
+      tipo_documento: 'CNPJ' as const,
     };
     const mockCliente: Cliente = {
       id: '1',
       ...input,
-      phone: null,
+      telefone: null,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -86,7 +86,7 @@ describe('CreateClienteUseCase', () => {
 
     const result = await useCase.execute(input);
 
-    expect(result.tax_id_type).toBe('CNPJ');
+    expect(result.tipo_documento).toBe('CNPJ');
     expect(mockRepository.create).toHaveBeenCalledWith(input);
   });
 });
@@ -110,11 +110,11 @@ describe('ListClientesUseCase', () => {
     const mockData: Cliente[] = [
       {
         id: '1',
-        name: 'Client 1',
+        nome: 'Client 1',
         email: 'client1@test.com',
-        phone: null,
-        tax_id: '12345678901',
-        tax_id_type: 'CPF' as const,
+        telefone: null,
+        documento: '12345678901',
+        tipo_documento: 'CPF' as const,
         created_at: new Date(),
         updated_at: new Date(),
       },
@@ -125,7 +125,7 @@ describe('ListClientesUseCase', () => {
     const result = await useCase.execute();
 
     expect(result.data).toHaveLength(1);
-    expect(result.data[0].name).toBe('Client 1');
+    expect(result.data[0].nome).toBe('Client 1');
     expect(mockRepository.findAll).toHaveBeenCalledWith(undefined, undefined, undefined);
   });
 
@@ -168,11 +168,11 @@ describe('GetClienteUseCase', () => {
   it('should get a cliente by id', async () => {
     const mockCliente: Cliente = {
       id: '123',
-      name: 'Test Client',
+      nome: 'Test Client',
       email: 'test@test.com',
-      phone: null,
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: null,
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -181,18 +181,18 @@ describe('GetClienteUseCase', () => {
     const result = await useCase.execute('123');
 
     expect(result.id).toBe('123');
-    expect(result.name).toBe('Test Client');
+    expect(result.nome).toBe('Test Client');
     expect(mockRepository.findOne).toHaveBeenCalledWith('123');
   });
 
   it('should call repository with correct id', async () => {
     const mockCliente: Cliente = {
       id: 'abc-123',
-      name: 'Test Client',
+      nome: 'Test Client',
       email: 'test@test.com',
-      phone: null,
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: null,
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -219,15 +219,15 @@ describe('UpdateClienteUseCase', () => {
     useCase = new UpdateClienteUseCase(mockRepository);
   });
 
-  it('should update a cliente name', async () => {
-    const updateData = { name: 'Updated Name' };
+  it('should update a cliente nome', async () => {
+    const updateData = { nome: 'Updated Name' };
     const mockCliente: Cliente = {
       id: '123',
-      name: 'Updated Name',
+      nome: 'Updated Name',
       email: 'test@test.com',
-      phone: null,
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: null,
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -235,7 +235,7 @@ describe('UpdateClienteUseCase', () => {
 
     const result = await useCase.execute('123', updateData);
 
-    expect(result.name).toBe('Updated Name');
+    expect(result.nome).toBe('Updated Name');
     expect(mockRepository.update).toHaveBeenCalledWith('123', updateData);
   });
 
@@ -243,11 +243,11 @@ describe('UpdateClienteUseCase', () => {
     const updateData = { email: 'newemail@test.com' };
     const mockCliente: Cliente = {
       id: '123',
-      name: 'Test',
+      nome: 'Test',
       email: 'newemail@test.com',
-      phone: null,
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: null,
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -259,15 +259,15 @@ describe('UpdateClienteUseCase', () => {
     expect(mockRepository.update).toHaveBeenCalledWith('123', updateData);
   });
 
-  it('should update a cliente phone', async () => {
-    const updateData = { phone: '11999999999' };
+  it('should update a cliente telefone', async () => {
+    const updateData = { telefone: '11999999999' };
     const mockCliente: Cliente = {
       id: '123',
-      name: 'Test',
+      nome: 'Test',
       email: 'test@test.com',
-      phone: '11999999999',
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: '11999999999',
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -275,19 +275,19 @@ describe('UpdateClienteUseCase', () => {
 
     const result = await useCase.execute('123', updateData);
 
-    expect(result.phone).toBe('11999999999');
+    expect(result.telefone).toBe('11999999999');
     expect(mockRepository.update).toHaveBeenCalledWith('123', updateData);
   });
 
   it('should update multiple fields', async () => {
-    const updateData = { name: 'New Name', email: 'new@test.com', phone: '11988887777' };
+    const updateData = { nome: 'New Name', email: 'new@test.com', telefone: '11988887777' };
     const mockCliente: Cliente = {
       id: '123',
-      name: 'New Name',
+      nome: 'New Name',
       email: 'new@test.com',
-      phone: '11988887777',
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: '11988887777',
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -295,9 +295,9 @@ describe('UpdateClienteUseCase', () => {
 
     const result = await useCase.execute('123', updateData);
 
-    expect(result.name).toBe('New Name');
+    expect(result.nome).toBe('New Name');
     expect(result.email).toBe('new@test.com');
-    expect(result.phone).toBe('11988887777');
+    expect(result.telefone).toBe('11988887777');
     expect(mockRepository.update).toHaveBeenCalledWith('123', updateData);
   });
 });
@@ -320,11 +320,11 @@ describe('DeleteClienteUseCase', () => {
   it('should delete a cliente by id', async () => {
     const mockCliente: Cliente = {
       id: '123',
-      name: 'Test Client',
+      nome: 'Test Client',
       email: 'test@test.com',
-      phone: null,
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: null,
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -339,11 +339,11 @@ describe('DeleteClienteUseCase', () => {
   it('should call repository with correct id', async () => {
     const mockCliente: Cliente = {
       id: 'abc-123',
-      name: 'Test',
+      nome: 'Test',
       email: 'test@test.com',
-      phone: null,
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
+      telefone: null,
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
       created_at: new Date(),
       updated_at: new Date(),
     };

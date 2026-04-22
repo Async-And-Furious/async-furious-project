@@ -8,9 +8,9 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   constructor(private prisma: PrismaService) {}
 
   async create(data: {
-    vehicle_id: string;
-    customer_id: string;
-    description?: string;
+    id_veiculo: string;
+    id_cliente: string;
+    descricao?: string;
   }): Promise<OrdemDeServico> {
     return (await this.prisma.serviceOrder.create({ data })) as unknown as OrdemDeServico;
   }
@@ -25,7 +25,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   }> {
     const skip = (page - 1) * limit;
     const where = search
-      ? { description: { contains: search, mode: 'insensitive' as const } }
+      ? { descricao: { contains: search, mode: 'insensitive' as const } }
       : {};
 
     const [data, total] = await Promise.all([
@@ -34,7 +34,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
         skip,
         take: limit,
         orderBy: { created_at: 'desc' },
-        include: { vehicle: true, customer: true },
+        include: { veiculo: true, cliente: true },
       }),
       this.prisma.serviceOrder.count({ where }),
     ]);
@@ -48,7 +48,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   async findOne(id: string): Promise<OrdemDeServico> {
     const order = await this.prisma.serviceOrder.findUnique({
       where: { id },
-      include: { vehicle: true, customer: true },
+      include: { veiculo: true, cliente: true },
     });
     if (!order) throw new NotFoundException(`OrdemDeServico with ID ${id} not found`);
     return order as unknown as OrdemDeServico;
@@ -56,7 +56,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
 
   async update(
     id: string,
-    data: { status?: OrdemDeServico['status']; description?: string }
+    data: { status?: OrdemDeServico['status']; descricao?: string }
   ): Promise<OrdemDeServico> {
     await this.findOne(id);
     return (await this.prisma.serviceOrder.update({

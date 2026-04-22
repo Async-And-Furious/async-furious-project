@@ -7,11 +7,11 @@ export class CreateClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
   async execute(data: {
-    name: string;
+    nome: string;
     email: string;
-    phone?: string;
-    tax_id: string;
-    tax_id_type: 'CPF' | 'CNPJ';
+    telefone?: string;
+    documento: string;
+    tipo_documento: 'CPF' | 'CNPJ';
   }): Promise<Cliente> {
     return this.repository.create(data);
   }
@@ -48,7 +48,7 @@ export class UpdateClienteUseCase {
 
   async execute(
     id: string,
-    data: { name?: string; email?: string; phone?: string }
+    data: { nome?: string; email?: string; telefone?: string }
   ): Promise<Cliente> {
     return this.repository.update(id, data);
   }
