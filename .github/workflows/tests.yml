@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  test:
+    name: Run All Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run build
+        run: npm run build
