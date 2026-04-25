@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { OrdemServicoController } from './presentation/controllers/ordem-servico.controller';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
+import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
 import {
   CreateOrdemServicoUseCase,
   ListOrdensServicoUseCase,
@@ -18,6 +19,7 @@ import {
   controllers: [OrdemServicoController],
   providers: [
     OrdemServicoRepository,
+    OrcamentoRepository,
     {
       provide: CreateOrdemServicoUseCase,
       useFactory: (repo: OrdemServicoRepository) => new CreateOrdemServicoUseCase(repo),
@@ -45,20 +47,23 @@ import {
     },
     {
       provide: GerarOrcamentoUseCase,
-      useFactory: (repo: OrdemServicoRepository) => new GerarOrcamentoUseCase(repo),
-      inject: [OrdemServicoRepository],
+      useFactory: (osRepo: OrdemServicoRepository, orcRepo: OrcamentoRepository) =>
+        new GerarOrcamentoUseCase(osRepo, orcRepo),
+      inject: [OrdemServicoRepository, OrcamentoRepository],
     },
     {
       provide: AprovarOrcamentoUseCase,
-      useFactory: (repo: OrdemServicoRepository) => new AprovarOrcamentoUseCase(repo),
-      inject: [OrdemServicoRepository],
+      useFactory: (osRepo: OrdemServicoRepository, orcRepo: OrcamentoRepository) =>
+        new AprovarOrcamentoUseCase(osRepo, orcRepo),
+      inject: [OrdemServicoRepository, OrcamentoRepository],
     },
     {
       provide: RejeitarOrcamentoUseCase,
-      useFactory: (repo: OrdemServicoRepository) => new RejeitarOrcamentoUseCase(repo),
-      inject: [OrdemServicoRepository],
+      useFactory: (osRepo: OrdemServicoRepository, orcRepo: OrcamentoRepository) =>
+        new RejeitarOrcamentoUseCase(osRepo, orcRepo),
+      inject: [OrdemServicoRepository, OrcamentoRepository],
     },
   ],
-  exports: [OrdemServicoRepository],
+  exports: [OrdemServicoRepository, OrcamentoRepository],
 })
 export class OrdemServicoModule {}

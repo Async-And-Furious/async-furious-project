@@ -1,4 +1,4 @@
-import { Decimal } from '@prisma/client/runtime/library';
+import type { Orcamento } from './orcamento.entity';
 
 export class OrdemDeServico {
   id: string;
@@ -12,12 +12,8 @@ export class OrdemDeServico {
     | 'FINISHED'
     | 'DELIVERED';
   descricao: string | null;
-  valor_total_servicos: Decimal;
-  valor_total_pecas: Decimal;
-  valor_total_geral: Decimal;
-  orcamento_status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  orcamento_aprovado: boolean;
   created_at: Date;
   updated_at: Date;
-  entregueEm: Date | null;
+  entregue_em: Date | null;
+  orcamento?: Orcamento;
 }
