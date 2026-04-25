@@ -1,102 +1,108 @@
-import { BadRequestException } from '@nestjs/common';
-import { Decimal } from '@prisma/client/runtime/library';
-import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { Orcamento } from '../../domain/entities/orcamento.entity';
 import { OrcamentoVo } from '../../domain/value-objects/orcamento.vo';
+import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 
 export class GerarOrcamentoUseCase {
-  constructor(private readonly repository: IOrdemServicoRepository) {}
+  constructor(
+    private readonly ordemServicoRepository: IOrdemServicoRepository,
+    private readonly orcamentoRepository: IOrcamentoRepository
+  ) {}
 
   async execute(
-    id: string,
-    data: {
-      valor_total_servicos: Decimal | number;
-      valor_total_pecas: Decimal | number;
-    }
-  ): Promise<OrdemDeServico> {
-    // Busca a OS para validar se existe
-    const ordemDeServico = await this.repository.findOne(id);
-    if (!ordemDeServico) {
-      throw new BadRequestException(`Ordem de Serviço com ID ${id} não encontrada`);
+    id_ordem_servico: string,
+    data: { valor_total_servicos: number; valor_total_pecas: number }
+  ): Promise<Orcamento> {
+    const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
+    if (!os) {
+      throw new BadRequestException(`Ordem de Serviço com ID ${id_ordem_servico} não encontrada`);
     }
 
-    // Verifica se já existe orçamento aprovado
-    if (ordemDeServico.orcamento_aprovado && ordemDeServico.orcamento_status === 'APPROVED') {
+    const orcamentoExistente =
+      await this.orcamentoRepository.findByOrdemServicoId(id_ordem_servico);
+    if (orcamentoExistente?.status === 'APPROVED') {
       throw new BadRequestException(
         'Não é possível gerar novo orçamento. Existe um orçamento já aprovado.'
       );
     }
 
-    // Cria o orçamento usando o VO
-    const orcamento = OrcamentoVo.create(data);
+    const vo = OrcamentoVo.create(data);
 
-    // Atualiza a OS com os dados do orçamento
-    return this.repository.update(id, {
-      valor_total_servicos: orcamento.getValorTotalServicos(),
-      valor_total_pecas: orcamento.getValorTotalPecas(),
-      valor_total_geral: orcamento.getValorTotalGeral(),
-      orcamento_status: 'PENDING',
-      orcamento_aprovado: false,
+    if (orcamentoExistente) {
+      return this.orcamentoRepository.update(orcamentoExistente.id, {
+        valor_total_servicos: vo.getValorTotalServicos().toNumber(),
+        valor_total_pecas: vo.getValorTotalPecas().toNumber(),
+        valor_total_geral: vo.getValorTotalGeral().toNumber(),
+        status: 'PENDING',
+      });
+    }
+
+    return this.orcamentoRepository.create({
+      id_ordem_servico,
+      valor_total_servicos: vo.getValorTotalServicos().toNumber(),
+      valor_total_pecas: vo.getValorTotalPecas().toNumber(),
+      valor_total_geral: vo.getValorTotalGeral().toNumber(),
     });
   }
 }
 
 export class AprovarOrcamentoUseCase {
-  constructor(private readonly repository: IOrdemServicoRepository) {}
+  constructor(
+    private readonly ordemServicoRepository: IOrdemServicoRepository,
+    private readonly orcamentoRepository: IOrcamentoRepository
+  ) {}
 
-  async execute(id: string): Promise<OrdemDeServico> {
-    // Busca a OS para validar se existe
-    const ordemDeServico = await this.repository.findOne(id);
-    if (!ordemDeServico) {
-      throw new BadRequestException(`Ordem de Serviço com ID ${id} não encontrada`);
+  async execute(id_ordem_servico: string): Promise<Orcamento> {
+    const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
+    if (!os) {
+      throw new BadRequestException(`Ordem de Serviço com ID ${id_ordem_servico} não encontrada`);
     }
 
-    // Verifica se existe orçamento pendente
-    if (ordemDeServico.orcamento_status !== 'PENDING') {
+    const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id_ordem_servico);
+    if (!orcamento) {
+      throw new NotFoundException('Nenhum orçamento encontrado para esta Ordem de Serviço.');
+    }
+
+    if (orcamento.status !== 'PENDING') {
       throw new BadRequestException(
-        `Orçamento não está pendente. Status atual: ${ordemDeServico.orcamento_status}`
+        `Orçamento não está pendente. Status atual: ${orcamento.status}`
       );
     }
 
-    // Verifica se já foi aprovado
-    if (ordemDeServico.orcamento_aprovado) {
-      throw new BadRequestException('Este orçamento já foi aprovado.');
+    if (orcamento.valor_total_geral <= 0) {
+      throw new BadRequestException('Não é possível aprovar orçamento sem valores definidos.');
     }
 
-    // Aprova o orçamento
-    const resultado = await this.repository.update(id, {
-      orcamento_status: 'APPROVED',
-      orcamento_aprovado: true,
-      status: 'IN_PROGRESS',
-    });
+    await this.ordemServicoRepository.update(id_ordem_servico, { status: 'IN_PROGRESS' });
 
-    return resultado;
+    return this.orcamentoRepository.update(orcamento.id, { status: 'APPROVED' });
   }
 }
 
 export class RejeitarOrcamentoUseCase {
-  constructor(private readonly repository: IOrdemServicoRepository) {}
+  constructor(
+    private readonly ordemServicoRepository: IOrdemServicoRepository,
+    private readonly orcamentoRepository: IOrcamentoRepository
+  ) {}
 
-  async execute(id: string): Promise<OrdemDeServico> {
-    // Busca a OS para validar se existe
-    const ordemDeServico = await this.repository.findOne(id);
-    if (!ordemDeServico) {
-      throw new BadRequestException(`Ordem de Serviço com ID ${id} não encontrada`);
+  async execute(id_ordem_servico: string): Promise<Orcamento> {
+    const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
+    if (!os) {
+      throw new BadRequestException(`Ordem de Serviço com ID ${id_ordem_servico} não encontrada`);
     }
 
-    // Verifica se existe orçamento pendente
-    if (ordemDeServico.orcamento_status !== 'PENDING') {
+    const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id_ordem_servico);
+    if (!orcamento) {
+      throw new NotFoundException('Nenhum orçamento encontrado para esta Ordem de Serviço.');
+    }
+
+    if (orcamento.status !== 'PENDING') {
       throw new BadRequestException(
-        `Orçamento não está pendente. Status atual: ${ordemDeServico.orcamento_status}`
+        `Orçamento não está pendente. Status atual: ${orcamento.status}`
       );
     }
 
-    // Rejeita o orçamento
-    const resultado = await this.repository.update(id, {
-      orcamento_status: 'REJECTED',
-      orcamento_aprovado: false,
-    });
-
-    return resultado;
+    return this.orcamentoRepository.update(orcamento.id, { status: 'REJECTED' });
   }
 }

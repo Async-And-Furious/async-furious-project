@@ -3,11 +3,6 @@ import { OrdemDeServico } from '../entities/ordem-servico.entity';
 export type OrdemServicoUpdateData = {
   status?: OrdemDeServico['status'];
   descricao?: string;
-  valor_total_servicos?: OrdemDeServico['valor_total_servicos'];
-  valor_total_pecas?: OrdemDeServico['valor_total_pecas'];
-  valor_total_geral?: OrdemDeServico['valor_total_geral'];
-  orcamento_status?: OrdemDeServico['orcamento_status'];
-  orcamento_aprovado?: boolean;
 };
 
 export interface IOrdemServicoRepository {
