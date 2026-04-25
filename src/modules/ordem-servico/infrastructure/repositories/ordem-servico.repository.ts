@@ -35,7 +35,11 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
         skip,
         take: limit,
         orderBy: { created_at: 'desc' },
-        include: { veiculo: true, cliente: true },
+        include: {
+          veiculo: true,
+          cliente: true,
+          orcamento: true,
+        },
       }),
       this.prisma.serviceOrder.count({ where }),
     ]);
@@ -49,9 +53,9 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   async findOne(id: string): Promise<OrdemDeServico> {
     const order = await this.prisma.serviceOrder.findUnique({
       where: { id },
-      include: { veiculo: true, cliente: true },
+      include: { veiculo: true, cliente: true, orcamento: true },
     });
-    if (!order) throw new NotFoundException(`OrdemDeServico with ID ${id} not found`);
+    if (!order) throw new NotFoundException(`Ordem de Serviço com ID ${id} não encontrada`);
     return order as unknown as OrdemDeServico;
   }
 

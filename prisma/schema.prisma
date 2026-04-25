@@ -67,22 +67,31 @@ model Vehicle {
 }
 
 model ServiceOrder {
-  id                      String          @id @default(uuid())
-  id_veiculo              String          @map("vehicle_id")
-  id_cliente              String          @map("customer_id")
-  status                  SOStatus        @default(RECEIVED)
-  descricao               String?         @map("description")
-  valor_total_servicos    Decimal         @default(0) @db.Decimal(10, 2) @map("total_services_value")
-  valor_total_pecas       Decimal         @default(0) @db.Decimal(10, 2) @map("total_parts_value")
-  valor_total_geral       Decimal         @default(0) @db.Decimal(10, 2) @map("total_general_value")
-  orcamento_status        EstimateStatus  @default(PENDING) @map("estimate_status")
-  orcamento_aprovado      Boolean         @default(false) @map("estimate_approved")
-  created_at              DateTime        @default(now())
-  updated_at              DateTime        @updatedAt
-  entregue_em             DateTime?       @map("delivered_at")
+  id          String    @id @default(uuid())
+  id_veiculo  String    @map("vehicle_id")
+  id_cliente  String    @map("customer_id")
+  status      SOStatus  @default(RECEIVED)
+  descricao   String?   @map("description")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  entregue_em DateTime? @map("delivered_at")
 
-  veiculo  Vehicle  @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
-  cliente  Customer @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  veiculo   Vehicle    @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
+  cliente   Customer   @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  orcamento Orcamento?
+}
+
+model Orcamento {
+  id                   String         @id @default(uuid())
+  id_ordem_servico     String         @unique @map("service_order_id")
+  valor_total_servicos Decimal        @default(0) @db.Decimal(10, 2) @map("total_services_value")
+  valor_total_pecas    Decimal        @default(0) @db.Decimal(10, 2) @map("total_parts_value")
+  valor_total_geral    Decimal        @default(0) @db.Decimal(10, 2) @map("total_general_value")
+  status               EstimateStatus @default(PENDING) @map("estimate_status")
+  created_at           DateTime       @default(now())
+  updated_at           DateTime       @updatedAt
+
+  ordem_servico ServiceOrder @relation(fields: [id_ordem_servico], references: [id], onDelete: Cascade)
 }
 
 model Peca {
