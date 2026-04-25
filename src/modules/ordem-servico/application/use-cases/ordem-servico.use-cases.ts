@@ -5,8 +5,8 @@ export class CreateOrdemServicoUseCase {
   constructor(private readonly repository: IOrdemServicoRepository) {}
 
   async execute(data: {
-    id_veiculo: string;
-    id_cliente: string;
+    veiculoId: string;
+    clienteId: string;
     descricao?: string;
   }): Promise<OrdemDeServico> {
     return this.repository.create(data);

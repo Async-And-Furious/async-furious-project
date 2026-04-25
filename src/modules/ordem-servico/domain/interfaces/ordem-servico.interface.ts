@@ -2,8 +2,8 @@ import { OrdemDeServico } from '../entities/ordem-servico.entity';
 
 export interface IOrdemServicoRepository {
   create(data: {
-    id_veiculo: string;
-    id_cliente: string;
+    veiculoId: string;
+    clienteId: string;
     descricao?: string;
   }): Promise<OrdemDeServico>;
   findAll(

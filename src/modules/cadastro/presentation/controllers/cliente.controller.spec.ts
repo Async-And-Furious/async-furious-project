@@ -6,7 +6,7 @@ import {
   GetClienteUseCase,
   UpdateClienteUseCase,
   DeleteClienteUseCase,
-} from '../../application/use-cases/cliente.use-cases';
+} from '../../application/use-cases';
 import { CreateClienteDto, UpdateClienteDto, ListQueryDto } from '../dto/cliente.dto';
 import { Cliente } from '../../domain/entities/cliente.entity';
 import { AuthUser } from '../../../../auth/types/auth.types';

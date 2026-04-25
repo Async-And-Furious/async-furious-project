@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -8,11 +9,20 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   constructor(private prisma: PrismaService) {}
 
   async create(data: {
-    id_veiculo: string;
-    id_cliente: string;
+    veiculoId: string;
+    clienteId: string;
     descricao?: string;
   }): Promise<OrdemDeServico> {
-    return (await this.prisma.serviceOrder.create({ data })) as unknown as OrdemDeServico;
+    const entity = await this.prisma.ordemServico.create({
+      data: {
+        id: randomUUID(),
+        id_veiculo: data.veiculoId,
+        id_cliente: data.clienteId,
+        descricao: data.descricao,
+        status: 'RECEIVED',
+      },
+    });
+    return entity as unknown as OrdemDeServico;
   }
 
   async findAll(
@@ -24,19 +34,17 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
     const skip = (page - 1) * limit;
-    const where = search
-      ? { descricao: { contains: search, mode: 'insensitive' as const } }
-      : {};
+    const where = search ? { descricao: { contains: search, mode: 'insensitive' as const } } : {};
 
     const [data, total] = await Promise.all([
-      this.prisma.serviceOrder.findMany({
+      this.prisma.ordemServico.findMany({
         where,
         skip,
         take: limit,
         orderBy: { created_at: 'desc' },
         include: { veiculo: true, cliente: true },
       }),
-      this.prisma.serviceOrder.count({ where }),
+      this.prisma.ordemServico.count({ where }),
     ]);
 
     return {
@@ -46,7 +54,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   }
 
   async findOne(id: string): Promise<OrdemDeServico> {
-    const order = await this.prisma.serviceOrder.findUnique({
+    const order = await this.prisma.ordemServico.findUnique({
       where: { id },
       include: { veiculo: true, cliente: true },
     });
@@ -59,7 +67,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     data: { status?: OrdemDeServico['status']; descricao?: string }
   ): Promise<OrdemDeServico> {
     await this.findOne(id);
-    return (await this.prisma.serviceOrder.update({
+    return (await this.prisma.ordemServico.update({
       where: { id },
       data: data as any,
     })) as unknown as OrdemDeServico;
@@ -67,7 +75,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
 
   async remove(id: string): Promise<OrdemDeServico> {
     await this.findOne(id);
-    return (await this.prisma.serviceOrder.delete({
+    return (await this.prisma.ordemServico.delete({
       where: { id },
     })) as unknown as OrdemDeServico;
   }

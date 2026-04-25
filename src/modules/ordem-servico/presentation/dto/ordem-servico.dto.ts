@@ -3,11 +3,11 @@ import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum } from 'class-validato
 export class CreateOrdemServicoDto {
   @IsUUID()
   @IsNotEmpty()
-  id_veiculo: string;
+  veiculoId: string;
 
   @IsUUID()
   @IsNotEmpty()
-  id_cliente: string;
+  clienteId: string;
 
   @IsString()
   @IsOptional()

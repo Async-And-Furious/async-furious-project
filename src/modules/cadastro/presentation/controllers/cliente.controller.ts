@@ -32,7 +32,7 @@ import {
   GetClienteUseCase,
   UpdateClienteUseCase,
   DeleteClienteUseCase,
-} from '../../application/use-cases/cliente.use-cases';
+} from '../../application/use-cases';
 
 @Controller('clientes')
 @ApiTags('Clientes')

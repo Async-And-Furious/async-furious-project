@@ -25,7 +25,7 @@ export class ListPecasInsumoUseCase {
   async execute(
     page?: number,
     limit?: number,
-    search?: string,
+    search?: string
   ): Promise<{
     data: PecaInsumo[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
@@ -49,7 +49,7 @@ export class UpdatePecaInsumoUseCase {
 
   async execute(
     id: string,
-    data: { nome?: string; descricao?: string; preco?: number; quantidade_minima?: number },
+    data: { nome?: string; descricao?: string; preco?: number; quantidade_minima?: number }
   ): Promise<PecaInsumo> {
     return this.repository.update(id, data);
   }

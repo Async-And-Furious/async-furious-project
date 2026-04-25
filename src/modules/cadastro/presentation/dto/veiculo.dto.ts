@@ -24,7 +24,7 @@ export class CreateVeiculoDto {
 
   @IsUUID()
   @IsNotEmpty()
-  id_cliente: string;
+  clienteId: string;
 }
 
 export class UpdateVeiculoDto {

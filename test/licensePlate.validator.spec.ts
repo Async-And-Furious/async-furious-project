@@ -44,10 +44,10 @@ describe('PlacaVeiculoVo', () => {
 
       invalidPlates.forEach((plate) => {
         const result = PlacaVeiculoVo.isValid(plate);
-          if (result === true) {
-            console.log(`❌ Failed for plate: "${plate}" - Should be false but returned true`);
-          }
-          expect(result).toBe(false);
+        if (result === true) {
+          console.log(`❌ Failed for plate: "${plate}" - Should be false but returned true`);
+        }
+        expect(result).toBe(false);
       });
     });
 

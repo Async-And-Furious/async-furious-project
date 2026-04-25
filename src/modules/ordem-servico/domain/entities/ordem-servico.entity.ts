@@ -1,7 +1,7 @@
 export class OrdemDeServico {
   id: string;
-  id_veiculo: string;
-  id_cliente: string;
+  veiculoId: string;
+  clienteId: string;
   status:
     | 'RECEIVED'
     | 'UNDER_DIAGNOSIS'
@@ -12,5 +12,5 @@ export class OrdemDeServico {
   descricao: string | null;
   created_at: Date;
   updated_at: Date;
-  entregue_em: Date | null;
+  entregueEm: Date | null;
 }

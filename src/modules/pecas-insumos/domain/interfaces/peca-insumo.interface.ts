@@ -12,7 +12,7 @@ export interface IPecaInsumoRepository {
   findAll(
     page?: number,
     limit?: number,
-    search?: string,
+    search?: string
   ): Promise<{
     data: PecaInsumo[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
@@ -25,7 +25,7 @@ export interface IPecaInsumoRepository {
       descricao?: string;
       preco?: number;
       quantidade_minima?: number;
-    },
+    }
   ): Promise<PecaInsumo>;
   updateEstoque(id: string, quantidade: number): Promise<PecaInsumo>;
   remove(id: string): Promise<PecaInsumo>;

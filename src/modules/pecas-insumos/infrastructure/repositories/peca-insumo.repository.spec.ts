@@ -6,7 +6,7 @@ import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 
 describe('PecaInsumoRepository', () => {
   let repository: PecaInsumoRepository;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   let mockPrismaService: any;
 
   const mockPecaInsumo: PecaInsumo = {
@@ -15,8 +15,8 @@ describe('PecaInsumoRepository', () => {
     codigo: 'FO-001',
     descricao: 'Filtro de óleo para motor 1.0',
     preco: 29.9,
-    quantidade_estoque: 10,
-    quantidade_minima: 2,
+    quantidadeEstoque: 10,
+    quantidadeMinima: 2,
     created_at: new Date(),
     updated_at: new Date(),
   };
@@ -34,10 +34,7 @@ describe('PecaInsumoRepository', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PecaInsumoRepository,
-        { provide: PrismaService, useValue: mockPrismaService },
-      ],
+      providers: [PecaInsumoRepository, { provide: PrismaService, useValue: mockPrismaService }],
     }).compile();
 
     repository = module.get<PecaInsumoRepository>(PecaInsumoRepository);
@@ -54,8 +51,8 @@ describe('PecaInsumoRepository', () => {
         codigo: 'FO-001',
         descricao: 'Filtro de óleo para motor 1.0',
         preco: 29.9,
-        quantidade_estoque: 10,
-        quantidade_minima: 2,
+        quantidadeEstoque: 10,
+        quantidadeMinima: 2,
       };
       mockPrismaService.peca.create.mockResolvedValue({
         ...createData,
@@ -76,8 +73,8 @@ describe('PecaInsumoRepository', () => {
       mockPrismaService.peca.create.mockResolvedValue({
         ...createData,
         descricao: null,
-        quantidade_estoque: 0,
-        quantidade_minima: 1,
+        quantidadeEstoque: 0,
+        quantidadeMinima: 1,
         id: '456',
         created_at: new Date(),
         updated_at: new Date(),
@@ -131,7 +128,7 @@ describe('PecaInsumoRepository', () => {
 
       expect(result.pagination.totalPages).toBe(3);
       expect(mockPrismaService.peca.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 5 }),
+        expect.objectContaining({ skip: 5 })
       );
     });
   });
@@ -175,7 +172,7 @@ describe('PecaInsumoRepository', () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
       await expect(repository.update('nonexistent', { nome: 'X' })).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
     });
   });
@@ -185,15 +182,15 @@ describe('PecaInsumoRepository', () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(mockPecaInsumo as never);
       mockPrismaService.peca.update.mockResolvedValue({
         ...mockPecaInsumo,
-        quantidade_estoque: 25,
+        quantidadeEstoque: 25,
       } as never);
 
       const result = await repository.updateEstoque('123', 25);
 
-      expect(result.quantidade_estoque).toBe(25);
+      expect(result.quantidadeEstoque).toBe(25);
       expect(mockPrismaService.peca.update).toHaveBeenCalledWith({
         where: { id: '123' },
-        data: { quantidade_estoque: 25 },
+        data: { quantidadeEstoque: 25 },
       });
     });
 
