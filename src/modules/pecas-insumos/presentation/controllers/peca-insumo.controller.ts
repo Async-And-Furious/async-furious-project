@@ -12,6 +12,15 @@ import {
   Inject,
 } from '@nestjs/common';
 import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import {
   CreatePecaInsumoDto,
   UpdatePecaInsumoDto,
   UpdateEstoquePecaInsumoDto,
@@ -31,6 +40,8 @@ import {
   DeletePecaInsumoUseCase,
 } from '../../application/use-cases/peca-insumo.use-cases';
 
+@ApiTags('Pecas Insumos')
+@ApiBearerAuth()
 @Controller('pecas')
 @UseGuards(JwtAuthGuard)
 export class PecaInsumoController {
@@ -47,11 +58,29 @@ export class PecaInsumoController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiOperation({
+    summary: 'Criar nova peça/insumo',
+    description: 'Cria uma nova peça ou insumo no sistema. Requer role de admin.',
+  })
+  @ApiBody({ type: CreatePecaInsumoDto })
+  @ApiResponse({ status: 201, description: 'Peça/insumo criado com sucesso' })
+  @ApiResponse({ status: 400, description: 'Validação falhou - dados inválidos' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   create(@Body() dto: CreatePecaInsumoDto) {
     return this.createUseCase.execute(dto);
   }
 
   @Get()
+  @ApiOperation({
+    summary: 'Listar todas as peças/insumos',
+    description: 'Retorna lista paginada de peças e insumos',
+  })
+  @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
+  @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
+  @ApiQuery({ name: 'search', type: String, required: false, example: 'Filtro' })
+  @ApiResponse({ status: 200, description: 'Lista de peças/insumos retornada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   findAll(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
     return this.listUseCase.execute(
       Number(query.page) || 1,
@@ -61,6 +90,11 @@ export class PecaInsumoController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Obter peça/insumo por ID' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Peça/insumo encontrado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 404, description: 'Peça/insumo não encontrado' })
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
     return this.getUseCase.execute(id);
   }
@@ -68,6 +102,13 @@ export class PecaInsumoController {
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiOperation({ summary: 'Atualizar peça/insumo' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiBody({ type: UpdatePecaInsumoDto })
+  @ApiResponse({ status: 200, description: 'Peça/insumo atualizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 404, description: 'Peça/insumo não encontrado' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdatePecaInsumoDto) {
     return this.updateUseCase.execute(id, dto);
   }
@@ -75,6 +116,16 @@ export class PecaInsumoController {
   @Patch(':id/estoque')
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiOperation({
+    summary: 'Atualizar estoque de peça/insumo',
+    description: 'Atualiza apenas a quantidade em estoque',
+  })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiBody({ type: UpdateEstoquePecaInsumoDto })
+  @ApiResponse({ status: 200, description: 'Estoque atualizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 404, description: 'Peça/insumo não encontrado' })
   updateEstoque(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateEstoquePecaInsumoDto) {
     return this.updateEstoqueUseCase.execute(id, dto.quantidade);
   }
@@ -82,6 +133,12 @@ export class PecaInsumoController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiOperation({ summary: 'Deletar peça/insumo' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Peça/insumo deletado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 404, description: 'Peça/insumo não encontrado' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.deleteUseCase.execute(id);
   }
