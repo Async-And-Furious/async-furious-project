@@ -39,7 +39,18 @@ describe('ClientesController (e2e)', () => {
 
     // Clean up test data
     await prismaService.user.deleteMany({ where: { email: testUser.email } });
-    await prismaService.customer.deleteMany({ where: { tax_id: '12345678901' } });
+    await prismaService.customer.deleteMany({
+      where: {
+        email: {
+          in: [
+            'testclient@example.com',
+            'test2@example.com',
+            'newemail@example.com',
+            'delete@example.com',
+          ],
+        },
+      },
+    });
 
     // Create test user
     const hashedPassword = await bcrypt.hash(testUser.password, 10);
@@ -63,11 +74,11 @@ describe('ClientesController (e2e)', () => {
   describe('POST /clientes', () => {
     it('should create a new cliente', async () => {
       const createClienteDto = {
-        name: 'Test Client',
+        nome: 'Test Client',
         email: 'testclient@example.com',
-        phone: '11999999999',
-        tax_id: '12345678901',
-        tax_id_type: 'CPF',
+        telefone: '11999999999',
+        documento: '52998224725',
+        tipo_documento: 'CPF',
       };
 
       const response = await request(app.getHttpServer())
@@ -77,17 +88,17 @@ describe('ClientesController (e2e)', () => {
         .expect(201);
 
       expect(response.body).toHaveProperty('id');
-      expect(response.body.name).toBe('Test Client');
+      expect(response.body.nome).toBe('Test Client');
       expect(response.body.email).toBe('testclient@example.com');
       testClienteId = response.body.id;
     });
 
     it('should fail without auth token', async () => {
       const createClienteDto = {
-        name: 'Test Client',
+        nome: 'Test Client',
         email: 'test2@example.com',
-        tax_id: '12345678902',
-        tax_id_type: 'CPF',
+        documento: '11222333000181',
+        tipo_documento: 'CNPJ',
       };
 
       await request(app.getHttpServer()).post('/clientes').send(createClienteDto).expect(401);
@@ -95,16 +106,31 @@ describe('ClientesController (e2e)', () => {
 
     it('should fail with invalid data', async () => {
       const invalidDto = {
-        name: 'Test Client',
+        nome: 'Test Client',
         email: 'invalid-email',
-        tax_id: '123',
-        tax_id_type: 'INVALID',
+        documento: '123',
+        tipo_documento: 'INVALID',
       };
 
       await request(app.getHttpServer())
         .post('/clientes')
         .set('Authorization', `Bearer ${authToken}`)
         .send(invalidDto)
+        .expect(400);
+    });
+
+    it('should fail when documento is invalid for CPF', async () => {
+      const invalidDocumentoDto = {
+        nome: 'Test Client',
+        email: 'invalid-doc@example.com',
+        documento: '12345678901',
+        tipo_documento: 'CPF',
+      };
+
+      await request(app.getHttpServer())
+        .post('/clientes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(invalidDocumentoDto)
         .expect(400);
     });
   });
@@ -151,7 +177,7 @@ describe('ClientesController (e2e)', () => {
         .expect(200);
 
       expect(response.body.id).toBe(testClienteId);
-      expect(response.body).toHaveProperty('name');
+      expect(response.body).toHaveProperty('nome');
     });
 
     it('should return 404 for nonexistent cliente', async () => {
@@ -164,7 +190,7 @@ describe('ClientesController (e2e)', () => {
 
   describe('PATCH /clientes/:id', () => {
     it('should update a cliente', async () => {
-      const updateDto = { name: 'Updated Name' };
+      const updateDto = { nome: 'Updated Name' };
 
       const response = await request(app.getHttpServer())
         .patch(`/clientes/${testClienteId}`)
@@ -172,14 +198,14 @@ describe('ClientesController (e2e)', () => {
         .send(updateDto)
         .expect(200);
 
-      expect(response.body.name).toBe('Updated Name');
+      expect(response.body.nome).toBe('Updated Name');
     });
 
     it('should update multiple fields', async () => {
       const updateDto = {
-        name: 'New Name',
+        nome: 'New Name',
         email: 'newemail@example.com',
-        phone: '11988887777',
+        telefone: '11988887777',
       };
 
       const response = await request(app.getHttpServer())
@@ -188,7 +214,7 @@ describe('ClientesController (e2e)', () => {
         .send(updateDto)
         .expect(200);
 
-      expect(response.body.name).toBe('New Name');
+      expect(response.body.nome).toBe('New Name');
       expect(response.body.email).toBe('newemail@example.com');
     });
   });
@@ -200,10 +226,10 @@ describe('ClientesController (e2e)', () => {
       // Create a cliente to delete
       const cliente = await prismaService.customer.create({
         data: {
-          name: 'To Delete',
+          nome: 'To Delete',
           email: 'delete@example.com',
-          tax_id: '12345678999',
-          tax_id_type: 'CPF',
+          documento: '11444777000161',
+          tipo_documento: 'CNPJ',
         },
       });
       clienteToDeleteId = cliente.id;
@@ -216,7 +242,7 @@ describe('ClientesController (e2e)', () => {
         .expect(200);
 
       // Verify deletion
-      const response = await request(app.getHttpServer())
+      await request(app.getHttpServer())
         .get(`/clientes/${clienteToDeleteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);

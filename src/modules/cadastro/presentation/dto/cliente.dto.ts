@@ -1,5 +1,56 @@
-import { IsEmail, IsNotEmpty, IsString, IsEnum, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  IsEnum,
+  IsOptional,
+  registerDecorator,
+  ValidationArguments,
+  ValidationOptions,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+} from 'class-validator';
+import { cpf, cnpj } from 'cpf-cnpj-validator';
+
+@ValidatorConstraint({ name: 'isDocumentoByTipo', async: false })
+class DocumentoByTipoConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown, args: ValidationArguments): boolean {
+    if (typeof value !== 'string') {
+      return false;
+    }
+
+    const dto = args.object as CreateClienteDto;
+    const digits = value.replace(/\D/g, '');
+
+    if (dto.tipo_documento === 'CPF') {
+      return cpf.isValid(digits);
+    }
+
+    if (dto.tipo_documento === 'CNPJ') {
+      return cnpj.isValid(digits);
+    }
+
+    return false;
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    const dto = args.object as CreateClienteDto;
+    return `Documento invalido para o tipo ${dto.tipo_documento ?? 'informado'}`;
+  }
+}
+
+function IsDocumentoByTipo(validationOptions?: ValidationOptions) {
+  return function (object: object, propertyName: string) {
+    registerDecorator({
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      constraints: [],
+      validator: DocumentoByTipoConstraint,
+    });
+  };
+}
 
 export class CreateClienteDto {
   @ApiProperty({
@@ -36,6 +87,9 @@ export class CreateClienteDto {
   })
   @IsString()
   @IsNotEmpty()
+  @IsDocumentoByTipo({
+    message: 'Documento invalido para o tipo_documento informado',
+  })
   documento: string;
 
   @ApiProperty({

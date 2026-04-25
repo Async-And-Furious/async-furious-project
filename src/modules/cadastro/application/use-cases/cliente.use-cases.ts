@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Cliente } from '../../domain/entities/cliente.entity';
 import type { IClienteRepository } from '../../domain/interfaces/cliente.interface';
+import { CpfCnpjVo } from '../../domain/value-objects/cpf-cnpj.vo';
 
 @Injectable()
 export class CreateClienteUseCase {
@@ -13,7 +14,22 @@ export class CreateClienteUseCase {
     documento: string;
     tipo_documento: 'CPF' | 'CNPJ';
   }): Promise<Cliente> {
-    return this.repository.create(data);
+    const documentoNumerico = data.documento.replace(/\D/g, '');
+    const isValidDocumento =
+      data.tipo_documento === 'CPF'
+        ? CpfCnpjVo.validateCPF(documentoNumerico)
+        : CpfCnpjVo.validateCNPJ(documentoNumerico);
+
+    if (!isValidDocumento) {
+      throw new BadRequestException('Documento invalido para o tipo_documento informado');
+    }
+
+    const documentoFormatado = CpfCnpjVo.formatByType(documentoNumerico, data.tipo_documento);
+
+    return this.repository.create({
+      ...data,
+      documento: documentoFormatado,
+    });
   }
 }
 

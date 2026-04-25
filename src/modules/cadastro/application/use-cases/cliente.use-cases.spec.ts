@@ -1,5 +1,6 @@
 import { Cliente } from '../../domain/entities/cliente.entity';
 import { IClienteRepository } from '../../domain/interfaces/cliente.interface';
+import { BadRequestException } from '@nestjs/common';
 import {
   CreateClienteUseCase,
   ListClientesUseCase,
@@ -27,12 +28,13 @@ describe('CreateClienteUseCase', () => {
     const input = {
       nome: 'Test Client',
       email: 'test@test.com',
-      documento: '12345678901',
+      documento: '52998224725',
       tipo_documento: 'CPF' as const,
     };
     const mockCliente: Cliente = {
       id: '1',
       ...input,
+      documento: '529.982.247-25',
       telefone: null,
       created_at: new Date(),
       updated_at: new Date(),
@@ -43,7 +45,10 @@ describe('CreateClienteUseCase', () => {
 
     expect(result.nome).toBe('Test Client');
     expect(result.email).toBe('test@test.com');
-    expect(mockRepository.create).toHaveBeenCalledWith(input);
+    expect(mockRepository.create).toHaveBeenCalledWith({
+      ...input,
+      documento: '529.982.247-25',
+    });
   });
 
   it('should create a cliente with telefone', async () => {
@@ -51,12 +56,13 @@ describe('CreateClienteUseCase', () => {
       nome: 'Test Client',
       email: 'test@test.com',
       telefone: '11999999999',
-      documento: '12345678901',
+      documento: '52998224725',
       tipo_documento: 'CPF' as const,
     };
     const mockCliente: Cliente = {
       id: '1',
       ...input,
+      documento: '529.982.247-25',
       created_at: new Date(),
       updated_at: new Date(),
     };
@@ -65,19 +71,23 @@ describe('CreateClienteUseCase', () => {
     const result = await useCase.execute(input);
 
     expect(result.telefone).toBe('11999999999');
-    expect(mockRepository.create).toHaveBeenCalledWith(input);
+    expect(mockRepository.create).toHaveBeenCalledWith({
+      ...input,
+      documento: '529.982.247-25',
+    });
   });
 
   it('should create a cliente with CNPJ', async () => {
     const input = {
       nome: 'Test Company',
       email: 'company@test.com',
-      documento: '12345678000199',
+      documento: '11222333000181',
       tipo_documento: 'CNPJ' as const,
     };
     const mockCliente: Cliente = {
       id: '1',
       ...input,
+      documento: '11.222.333/0001-81',
       telefone: null,
       created_at: new Date(),
       updated_at: new Date(),
@@ -87,7 +97,34 @@ describe('CreateClienteUseCase', () => {
     const result = await useCase.execute(input);
 
     expect(result.tipo_documento).toBe('CNPJ');
-    expect(mockRepository.create).toHaveBeenCalledWith(input);
+    expect(mockRepository.create).toHaveBeenCalledWith({
+      ...input,
+      documento: '11.222.333/0001-81',
+    });
+  });
+
+  it('should throw when CPF is invalid', async () => {
+    const input = {
+      nome: 'Invalid CPF Client',
+      email: 'invalid-cpf@test.com',
+      documento: '12345678901',
+      tipo_documento: 'CPF' as const,
+    };
+
+    await expect(useCase.execute(input)).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('should throw when CNPJ is invalid', async () => {
+    const input = {
+      nome: 'Invalid CNPJ Client',
+      email: 'invalid-cnpj@test.com',
+      documento: '12345678000199',
+      tipo_documento: 'CNPJ' as const,
+    };
+
+    await expect(useCase.execute(input)).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockRepository.create).not.toHaveBeenCalled();
   });
 });
 
