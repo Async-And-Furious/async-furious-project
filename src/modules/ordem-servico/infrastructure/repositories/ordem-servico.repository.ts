@@ -2,7 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
-import { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
+import {
+  IOrdemServicoRepository,
+  OrdemServicoUpdateData,
+} from '../../domain/interfaces/ordem-servico.interface';
 
 @Injectable()
 export class OrdemServicoRepository implements IOrdemServicoRepository {
@@ -62,10 +65,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     return order as unknown as OrdemDeServico;
   }
 
-  async update(
-    id: string,
-    data: { status?: OrdemDeServico['status']; descricao?: string }
-  ): Promise<OrdemDeServico> {
+  async update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico> {
     await this.findOne(id);
     return (await this.prisma.ordemServico.update({
       where: { id },

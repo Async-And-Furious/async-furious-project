@@ -73,3 +73,13 @@ export class ListQueryDto {
   @IsOptional()
   search?: string;
 }
+
+export class GerarOrcamentoDto {
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valor_total_servicos: number;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valor_total_pecas: number;
+}
