@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ClienteController } from './presentation/controllers/cliente.controller';
 import { VeiculoController } from './presentation/controllers/veiculo.controller';
+import { ServicoController } from './presentation/controllers/servico.controller';
 import { ClienteRepository } from './infrastructure/repositories/cliente.repository';
 import { VeiculoRepository } from './infrastructure/repositories/veiculo.repository';
+import { ServicoRepository } from './infrastructure/repositories/servico.repository';
 import {
   CreateClienteUseCase,
   ListClientesUseCase,
@@ -17,12 +19,20 @@ import {
   UpdateVeiculoUseCase,
   DeleteVeiculoUseCase,
 } from './application/use-cases/veiculo.use-cases';
+import {
+  CreateServicoUseCase,
+  ListServicosUseCase,
+  GetServicoUseCase,
+  UpdateServicoUseCase,
+  DeleteServicoUseCase,
+} from './application/use-cases/servico.use-cases';
 
 @Module({
-  controllers: [ClienteController, VeiculoController],
+  controllers: [ClienteController, VeiculoController, ServicoController],
   providers: [
     ClienteRepository,
     VeiculoRepository,
+    ServicoRepository,
     {
       provide: CreateClienteUseCase,
       useFactory: (repo: ClienteRepository) => new CreateClienteUseCase(repo),
@@ -73,7 +83,32 @@ import {
       useFactory: (repo: VeiculoRepository) => new DeleteVeiculoUseCase(repo),
       inject: [VeiculoRepository],
     },
+    {
+      provide: CreateServicoUseCase,
+      useFactory: (repo: ServicoRepository) => new CreateServicoUseCase(repo),
+      inject: [ServicoRepository],
+    },
+    {
+      provide: ListServicosUseCase,
+      useFactory: (repo: ServicoRepository) => new ListServicosUseCase(repo),
+      inject: [ServicoRepository],
+    },
+    {
+      provide: GetServicoUseCase,
+      useFactory: (repo: ServicoRepository) => new GetServicoUseCase(repo),
+      inject: [ServicoRepository],
+    },
+    {
+      provide: UpdateServicoUseCase,
+      useFactory: (repo: ServicoRepository) => new UpdateServicoUseCase(repo),
+      inject: [ServicoRepository],
+    },
+    {
+      provide: DeleteServicoUseCase,
+      useFactory: (repo: ServicoRepository) => new DeleteServicoUseCase(repo),
+      inject: [ServicoRepository],
+    },
   ],
-  exports: [ClienteRepository, VeiculoRepository],
+  exports: [ClienteRepository, VeiculoRepository, ServicoRepository],
 })
 export class CadastroModule {}

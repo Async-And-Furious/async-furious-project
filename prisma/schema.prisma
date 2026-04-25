@@ -91,3 +91,12 @@ model Peca {
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 }
+
+model Servico {
+  id          String   @id @default(uuid())
+  nome        String
+  descricao   String?
+  preco       Decimal  @db.Decimal(10, 2)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
