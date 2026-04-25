@@ -4,11 +4,7 @@ import { IServicoRepository } from '../../domain/interfaces/servico.interface';
 export class CreateServicoUseCase {
   constructor(private readonly repository: IServicoRepository) {}
 
-  async execute(data: {
-    nome: string;
-    descricao?: string;
-    preco: number;
-  }): Promise<Servico> {
+  async execute(data: { nome: string; descricao?: string; preco: number }): Promise<Servico> {
     return this.repository.create(data);
   }
 }

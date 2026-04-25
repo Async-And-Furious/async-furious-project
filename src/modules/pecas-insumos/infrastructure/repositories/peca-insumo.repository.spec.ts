@@ -6,7 +6,7 @@ import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 
 describe('PecaInsumoRepository', () => {
   let repository: PecaInsumoRepository;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   let mockPrismaService: any;
 
   const mockPecaInsumo: PecaInsumo = {
@@ -34,10 +34,7 @@ describe('PecaInsumoRepository', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        PecaInsumoRepository,
-        { provide: PrismaService, useValue: mockPrismaService },
-      ],
+      providers: [PecaInsumoRepository, { provide: PrismaService, useValue: mockPrismaService }],
     }).compile();
 
     repository = module.get<PecaInsumoRepository>(PecaInsumoRepository);
@@ -131,7 +128,7 @@ describe('PecaInsumoRepository', () => {
 
       expect(result.pagination.totalPages).toBe(3);
       expect(mockPrismaService.peca.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ skip: 5 }),
+        expect.objectContaining({ skip: 5 })
       );
     });
   });
@@ -175,7 +172,7 @@ describe('PecaInsumoRepository', () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
       await expect(repository.update('nonexistent', { nome: 'X' })).rejects.toThrow(
-        NotFoundException,
+        NotFoundException
       );
     });
   });

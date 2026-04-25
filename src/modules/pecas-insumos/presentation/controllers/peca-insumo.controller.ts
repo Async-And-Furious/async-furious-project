@@ -41,7 +41,7 @@ export class PecaInsumoController {
     @Inject(UpdatePecaInsumoUseCase) private readonly updateUseCase: UpdatePecaInsumoUseCase,
     @Inject(UpdateEstoquePecaInsumoUseCase)
     private readonly updateEstoqueUseCase: UpdateEstoquePecaInsumoUseCase,
-    @Inject(DeletePecaInsumoUseCase) private readonly deleteUseCase: DeletePecaInsumoUseCase,
+    @Inject(DeletePecaInsumoUseCase) private readonly deleteUseCase: DeletePecaInsumoUseCase
   ) {}
 
   @Post()
@@ -56,7 +56,7 @@ export class PecaInsumoController {
     return this.listUseCase.execute(
       Number(query.page) || 1,
       Number(query.limit) || 10,
-      query.search,
+      query.search
     );
   }
 

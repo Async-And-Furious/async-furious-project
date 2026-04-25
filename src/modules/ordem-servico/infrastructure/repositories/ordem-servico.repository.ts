@@ -24,9 +24,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
     const skip = (page - 1) * limit;
-    const where = search
-      ? { descricao: { contains: search, mode: 'insensitive' as const } }
-      : {};
+    const where = search ? { descricao: { contains: search, mode: 'insensitive' as const } } : {};
 
     const [data, total] = await Promise.all([
       this.prisma.serviceOrder.findMany({

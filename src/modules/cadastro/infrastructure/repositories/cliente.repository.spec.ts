@@ -6,7 +6,7 @@ import { Cliente } from '../../domain/entities/cliente.entity';
 
 describe('ClienteRepository', () => {
   let repository: ClienteRepository;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
   let mockPrismaService: any;
 
   const mockCliente: Cliente = {
