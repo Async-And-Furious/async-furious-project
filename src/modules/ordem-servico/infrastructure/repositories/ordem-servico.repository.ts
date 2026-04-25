@@ -51,15 +51,21 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
       where: { id },
       include: { veiculo: true, cliente: true },
     });
-    if (!order) throw new NotFoundException(`OrdemDeServico with ID ${id} not found`);
+    if (!order) throw new NotFoundException(`Ordem de Serviço com ID ${id} não encontrada`);
     return order as unknown as OrdemDeServico;
   }
 
   async update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico> {
     await this.findOne(id);
+    const prismaData = {
+      ...data,
+      ...(data.orcamento_status !== undefined && {
+        orcamento_aprovado: data.orcamento_status === 'APPROVED',
+      }),
+    };
     return (await this.prisma.serviceOrder.update({
       where: { id },
-      data,
+      data: prismaData,
     })) as unknown as OrdemDeServico;
   }
 

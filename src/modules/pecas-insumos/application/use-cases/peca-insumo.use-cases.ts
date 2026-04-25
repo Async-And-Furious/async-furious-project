@@ -1,8 +1,6 @@
-import { Injectable } from '@nestjs/common';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 
-@Injectable()
 export class CreatePecaInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
 
@@ -18,7 +16,6 @@ export class CreatePecaInsumoUseCase {
   }
 }
 
-@Injectable()
 export class ListPecasInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
 
@@ -34,7 +31,6 @@ export class ListPecasInsumoUseCase {
   }
 }
 
-@Injectable()
 export class GetPecaInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
 
@@ -43,7 +39,6 @@ export class GetPecaInsumoUseCase {
   }
 }
 
-@Injectable()
 export class UpdatePecaInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
 
@@ -55,7 +50,6 @@ export class UpdatePecaInsumoUseCase {
   }
 }
 
-@Injectable()
 export class UpdateEstoquePecaInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
 
@@ -64,7 +58,6 @@ export class UpdateEstoquePecaInsumoUseCase {
   }
 }
 
-@Injectable()
 export class DeletePecaInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
 

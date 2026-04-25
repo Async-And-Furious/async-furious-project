@@ -15,12 +15,6 @@ export class AuthService {
     private config: ConfigService
   ) {}
 
-  /**
-   * Registers a new user with the system.
-   * @param dto - Registration data containing email, password, and name
-   * @returns JWT token and user information
-   * @throws ConflictException if email is already registered
-   */
   async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase().trim();
 
@@ -48,12 +42,6 @@ export class AuthService {
     return this.generateToken(user);
   }
 
-  /**
-   * Authenticates a user and returns a JWT token.
-   * @param dto - Login credentials containing email and password
-   * @returns JWT token and user information
-   * @throws UnauthorizedException if credentials are invalid
-   */
   async login(dto: LoginDto) {
     const email = dto.email.toLowerCase().trim();
 
@@ -77,11 +65,6 @@ export class AuthService {
     return this.generateToken(user);
   }
 
-  /**
-   * Generates a JWT token for the authenticated user.
-   * @param user - User object containing id, email, and name
-   * @returns JWT token and user information
-   */
   private generateToken(user: { id: string; email: string; name: string }) {
     const payload = { sub: user.id, email: user.email, name: user.name };
     return {
@@ -94,11 +77,6 @@ export class AuthService {
     };
   }
 
-  /**
-   * Validates a user by their ID for JWT authentication.
-   * @param userId - The user's ID to validate
-   * @returns User object with id, email, name, and role if found
-   */
   async validateUser(userId: string) {
     return this.prisma.user.findUnique({
       where: { id: userId },

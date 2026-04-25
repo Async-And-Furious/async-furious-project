@@ -59,7 +59,7 @@ export class ClienteRepository implements IClienteRepository {
     });
 
     if (!customer) {
-      throw new NotFoundException(`Cliente with ID ${id} not found`);
+      throw new NotFoundException(`Cliente com ID ${id} não encontrado`);
     }
 
     return customer as unknown as Cliente;

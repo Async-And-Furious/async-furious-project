@@ -1,0 +1,153 @@
+## CODE REVIEW - feat/start...feat/EntityOrcamento
+
+---
+
+### 1. VISÃO GERAL DA PR
+
+A branch adiciona a entidade Orcamento ao módulo ordem-servico, implementando funcionalidades
+completas de geração, aprovação e rejeição de orçamentos. A mudança engloba:
+
+- Novas entidades e Value Objects: Orcamento, OrcamentoVo (com precisão decimal)
+- 3 Use Cases de negócio: Gerar, Aprovar, Rejeitar orçamentos
+- Camada de infraestrutura: Repositório Orcamento com Prisma
+- Presentation layer: DTOs e endpoints REST com autenticação
+- Testes unitários: 400+ linhas cobrindo Value Object e Use Cases
+- Schema Prisma: Modelo relacional com relationship 1:1 com ServiceOrder
+- Configuração: Integração no módulo com useFactory para injeção de dependência
+
+---
+
+### 2. QUALIDADE E CONSISTÊNCIA DO CÓDIGO
+
+Pontos Positivos:
+- Nomenclatura clara: valor_total_servicos, valor_total_pecas, valor_total_geral
+- TypeScript adequado: Uso de tipos discriminados ('PENDING' | 'APPROVED' | 'REJECTED')
+- Conversão de tipos precisa: toNumber() no VO para evitar problemas com Decimal
+- Padrão Clean Architecture consistente: Segue exatamente o mesmo padrão do módulo cadastro
+
+Problemas:
+- src/modules/ordem-servico/presentation/dto/ordem-servico.dto.ts:48-56
+  @IsNumber({ maxDecimalPlaces: 2 }) não valida precisão efetivamente em class-validator.
+  Deveria usar @Min(0) sem maxDecimalPlaces ou implementar validador customizado.
+  Risco: Valores como 123.456 passam na validação DTO mas falham no banco.
+
+- src/modules/ordem-servico/infrastructure/repositories/orcamento.repository.ts:20
+  Cast "as unknown as Orcamento" é um code smell. Melhor: criar mapper explícito.
+
+- Falta de constantes de erro: Strings hardcoded em múltiplos places.
+  A mensagem "Ordem de Serviço com ID ${id} não encontrada" aparece 6x.
+
+---
+
+### 3. ARQUITETURA E ADERÊNCIA AO CLEAN ARCHITECTURE / DDD
+
+Aderência Geral: 8/10
+
+Respeitado corretamente:
+- Separação clara em camadas (domain → application → infrastructure → presentation)
+- Use Cases como classes puras sem @Injectable(), registrados via useFactory
+- Value Object imutável com validações no construtor privado
+- Repository pattern com interfaces bem definidas
+- DTOs segregados da camada de domínio
+
+Divergências arquiteturais:
+- src/modules/ordem-servico/application/use-cases/orcamento.use-cases.ts:8-10
+  Use Cases recebem dois repositórios (IOrdemServicoRepository + IOrcamentoRepository).
+  Violação parcial do princípio Single Responsibility.
+  Comparar com cliente.use-cases.ts (módulo cadastro) onde cada UC tem 1 repositório.
+
+- src/modules/ordem-servico/domain/interfaces/orcamento.interface.ts
+  Interface IOrcamentoRepository não tem método delete() ou remove().
+  Inconsistência com IOrdemServicoRepository que tem remove(id).
+
+---
+
+### 4. TESTES - COBERTURA E QUALIDADE
+
+Cobertura: 7/10
+
+Bem executado:
+- test/ordem-servico/orcamento.vo.spec.ts — Excelente cobertura de Value Object (25 cenários)
+  Factory methods testados, validações de valores negativos, precisão decimal, toDTO().
+
+- test/ordem-servico/orcamento.use-cases.spec.ts — 12 cenários de Use Cases
+  Mocking correto com jest.fn(), happy paths e error paths cobertos.
+
+Deficiências críticas:
+- test/ordem-servico/orcamento.use-cases.spec.ts:67-74
+  Não testa se os valores passados são realmente números (após .toNumber()).
+  Risco: valores Decimal passam como undefined se VO quebrar.
+
+- test/ordem-servico/orcamento.use-cases.spec.ts:158-160
+  Teste "should throw when valor_total_geral is zero" cobre só o zero.
+  Edge case faltante: teste com valor negativo.
+
+- ZERO testes para OrcamentoRepository (infrastructure).
+  Sem validação de throws em NotFoundException.
+  Recomendação: adicionar orcamento.repository.spec.ts.
+
+- Sem testes E2E dos endpoints REST.
+  Módulo cadastro tem clientes.e2e-spec.ts e servicos.e2e-spec.ts.
+  Falta: test/ordem-servico/ordem-servico.e2e-spec.ts.
+
+---
+
+### 5. POSSÍVEIS PROBLEMAS OU RISCOS
+
+Críticos:
+1. src/modules/ordem-servico/domain/value-objects/orcamento.vo.ts:35
+   Uso de Decimal pode falhar se importação de @prisma/client/runtime/library
+   não estiver disponível em runtime.
+
+2. src/modules/ordem-servico/infrastructure/repositories/ordem-servico.repository.ts:38-41
+   N+1 query problem: carrega veiculo, cliente e orcamento em TODA listagem.
+   Impacto: performance em listas grandes.
+
+Moderados:
+3. src/modules/ordem-servico/presentation/controllers/ordem-servico.controller.ts
+   Falta Swagger/OpenAPI decorators nos endpoints de orçamento.
+   Inconsistência com ClienteController que tem @ApiOperation e @ApiResponse.
+
+4. src/modules/ordem-servico/ordem-servico.module.ts:47-65
+   Module ficou verboso com 6 use cases + 2 repositórios.
+   Sugestão: extrair factory helpers para reduzir boilerplate.
+
+---
+
+### 6. SUGESTÕES DE MELHORIA ESPECÍFICAS
+
+1. Centralizar mensagens de erro em um arquivo de constantes:
+   src/modules/ordem-servico/domain/constants/errors.ts
+
+2. Substituir casts "as unknown as Entity" por mappers explícitos nos repositories.
+
+3. Adicionar Swagger decorators nos endpoints de orçamento
+   (gerar, aprovar, rejeitar) para consistência com o restante da API.
+
+4. Adicionar orcamento.repository.spec.ts cobrindo create, findByOrdemServicoId e update.
+
+5. Criar test/ordem-servico/ordem-servico.e2e-spec.ts cobrindo o fluxo completo:
+   criar OS → gerar orçamento → aprovar → verificar status IN_PROGRESS.
+
+6. Adicionar método delete/remove em IOrcamentoRepository para completar o ciclo de vida.
+
+---
+
+### RESUMO EXECUTIVO
+
+| Aspecto                   | Score |
+|---------------------------|-------|
+| Cobertura de código       |  7/10 |
+| Aderência Clean Arch      |  8/10 |
+| Qualidade do código       |  7/10 |
+| DDD compliance            |  6/10 |
+| Documentação (Swagger)    |  5/10 |
+| Tratamento de erros       |  7/10 |
+
+Recomendação: APROVAR com mudanças solicitadas.
+
+Prioridades:
+1. Remover casts "as unknown" — criar mappers explícitos
+2. Adicionar testes E2E e repository spec
+3. Centralizar mensagens de erro
+4. Adicionar Swagger docs nos endpoints de orçamento
