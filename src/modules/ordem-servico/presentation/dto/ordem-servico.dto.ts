@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum, IsNumber, Min } from 'class-validator';
 
 export class CreateOrdemServicoDto {
   @IsUUID()
@@ -44,4 +44,14 @@ export class ListQueryDto {
   limit?: number;
   @IsOptional()
   search?: string;
+}
+
+export class GerarOrcamentoDto {
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valor_total_servicos: number;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valor_total_pecas: number;
 }

@@ -8,6 +8,11 @@ import {
   UpdateOrdemServicoUseCase,
   DeleteOrdemServicoUseCase,
 } from './application/use-cases/ordem-servico.use-cases';
+import {
+  GerarOrcamentoUseCase,
+  AprovarOrcamentoUseCase,
+  RejeitarOrcamentoUseCase,
+} from './application/use-cases/orcamento.use-cases';
 
 @Module({
   controllers: [OrdemServicoController],
@@ -36,6 +41,21 @@ import {
     {
       provide: DeleteOrdemServicoUseCase,
       useFactory: (repo: OrdemServicoRepository) => new DeleteOrdemServicoUseCase(repo),
+      inject: [OrdemServicoRepository],
+    },
+    {
+      provide: GerarOrcamentoUseCase,
+      useFactory: (repo: OrdemServicoRepository) => new GerarOrcamentoUseCase(repo),
+      inject: [OrdemServicoRepository],
+    },
+    {
+      provide: AprovarOrcamentoUseCase,
+      useFactory: (repo: OrdemServicoRepository) => new AprovarOrcamentoUseCase(repo),
+      inject: [OrdemServicoRepository],
+    },
+    {
+      provide: RejeitarOrcamentoUseCase,
+      useFactory: (repo: OrdemServicoRepository) => new RejeitarOrcamentoUseCase(repo),
       inject: [OrdemServicoRepository],
     },
   ],

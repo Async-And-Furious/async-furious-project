@@ -1,3 +1,5 @@
+import { Decimal } from '@prisma/client/runtime/library';
+
 export class OrdemDeServico {
   id: string;
   id_veiculo: string;
@@ -10,6 +12,11 @@ export class OrdemDeServico {
     | 'FINISHED'
     | 'DELIVERED';
   descricao: string | null;
+  valor_total_servicos: Decimal;
+  valor_total_pecas: Decimal;
+  valor_total_geral: Decimal;
+  orcamento_status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  orcamento_aprovado: boolean;
   created_at: Date;
   updated_at: Date;
   entregue_em: Date | null;
