@@ -3,10 +3,23 @@ import { NotFoundException } from '@nestjs/common';
 import { VeiculoRepository } from './veiculo.repository';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 
+interface MockPrismaVeiculo {
+  create: jest.Mock;
+  findMany: jest.Mock;
+  findUnique: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  count: jest.Mock;
+}
+
+interface MockPrismaService {
+  veiculo: MockPrismaVeiculo;
+}
+
 describe('VeiculoRepository', () => {
   let repository: VeiculoRepository;
 
-  let mockPrismaService: any;
+  let mockPrismaService: MockPrismaService;
 
   const validPlaca = 'ABC1234';
 

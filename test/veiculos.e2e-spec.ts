@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
+import request, { SuperTest } from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -13,6 +14,7 @@ function generateValidPlaca(prefix: string = 'ABC'): string {
 
 describe('VeiculosController (e2e)', () => {
   let app: INestApplication;
+  let server: SuperTest<App>;
   let prismaService: PrismaService;
   let jwtService: JwtService;
   let authToken: string;
@@ -55,6 +57,7 @@ describe('VeiculosController (e2e)', () => {
     );
     await app.init();
 
+    server = request(app.getHttpServer() as never);
     prismaService = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
 
@@ -68,7 +71,7 @@ describe('VeiculosController (e2e)', () => {
 
     authToken = jwtService.sign({ sub: user.id, email: user.email, role: user.role });
 
-    const clienteResponse = await request(app.getHttpServer())
+    const clienteResponse = await server
       .post('/clientes')
       .set('Authorization', `Bearer ${authToken}`)
       .send(testCliente)
@@ -81,10 +84,10 @@ describe('VeiculosController (e2e)', () => {
     if (testVeiculoId) {
       await prismaService.veiculo.deleteMany({ where: { id: testVeiculoId } });
     }
-  if (testClienteId) {
-    await prismaService.veiculo.deleteMany({ where: { id_cliente: testClienteId } });
-    await prismaService.cliente.deleteMany({ where: { id: testClienteId } });
-  }
+    if (testClienteId) {
+      await prismaService.veiculo.deleteMany({ where: { id_cliente: testClienteId } });
+      await prismaService.cliente.deleteMany({ where: { id: testClienteId } });
+    }
     await prismaService.user.deleteMany({ where: { email: testUser.email } });
     await app.close();
   });
@@ -98,7 +101,7 @@ describe('VeiculosController (e2e)', () => {
         clienteId: testClienteId,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createVeiculoDto)
@@ -122,14 +125,11 @@ describe('VeiculosController (e2e)', () => {
         clienteId: testClienteId,
       };
 
-      await request(app.getHttpServer())
-        .post('/veiculos')
-        .send(createVeiculoDto)
-        .expect(401);
+      await server.post('/veiculos').send(createVeiculoDto).expect(401);
     });
 
     it('should fail with invalid data (missing required fields)', async () => {
-      await request(app.getHttpServer())
+      await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ marca: 'Toyota' })
@@ -146,7 +146,7 @@ describe('VeiculosController (e2e)', () => {
         clienteId: testClienteId,
       };
 
-      await request(app.getHttpServer())
+      await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(invalidDto)
@@ -163,7 +163,7 @@ describe('VeiculosController (e2e)', () => {
         clienteId: '00000000-0000-0000-0000-000000000000',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(invalidDto);
@@ -181,13 +181,13 @@ describe('VeiculosController (e2e)', () => {
         clienteId: testClienteId,
       };
 
-      await request(app.getHttpServer())
+      await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createDto)
         .expect(201);
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createDto);
@@ -200,7 +200,7 @@ describe('VeiculosController (e2e)', () => {
 
   describe('GET /veiculos', () => {
     it('should list veiculos with pagination', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -213,7 +213,7 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should list veiculos with custom pagination', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/veiculos?page=1&limit=5')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -223,24 +223,22 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should list veiculos with search by marca', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/veiculos?search=Honda')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      expect(response.body.data.some((v: any) => v.marca === 'Honda')).toBe(true);
+      expect(response.body.data.some((v: { marca: string }) => v.marca === 'Honda')).toBe(true);
     });
 
     it('should require auth token', async () => {
-      await request(app.getHttpServer())
-        .get('/veiculos')
-        .expect(401);
+      await server.get('/veiculos').expect(401);
     });
   });
 
   describe('GET /veiculos/:id', () => {
     it('should get a veiculo by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get(`/veiculos/${testVeiculoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -251,16 +249,14 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should return 404 for nonexistent veiculo', async () => {
-      await request(app.getHttpServer())
+      await server
         .get('/veiculos/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
     });
 
     it('should require auth token', async () => {
-      await request(app.getHttpServer())
-        .get(`/veiculos/${testVeiculoId}`)
-        .expect(401);
+      await server.get(`/veiculos/${testVeiculoId}`).expect(401);
     });
   });
 
@@ -268,7 +264,7 @@ describe('VeiculosController (e2e)', () => {
     it('should update a veiculo', async () => {
       const updateDto = { marca: 'Toyota' };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .patch(`/veiculos/${testVeiculoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
@@ -285,7 +281,7 @@ describe('VeiculosController (e2e)', () => {
         cor: 'Azul',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .patch(`/veiculos/${testVeiculoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
@@ -297,7 +293,7 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should not allow updating clienteId', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .patch(`/veiculos/${testVeiculoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ clienteId: 'new-cliente-id' });
@@ -306,7 +302,7 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should return 404 for nonexistent veiculo', async () => {
-      await request(app.getHttpServer())
+      await server
         .patch('/veiculos/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${authToken}`)
         .send({ marca: 'Ford' })
@@ -314,10 +310,7 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should require auth token', async () => {
-      await request(app.getHttpServer())
-        .patch(`/veiculos/${testVeiculoId}`)
-        .send({ marca: 'Ford' })
-        .expect(401);
+      await server.patch(`/veiculos/${testVeiculoId}`).send({ marca: 'Ford' }).expect(401);
     });
 
     it('should require admin role', async () => {
@@ -332,7 +325,7 @@ describe('VeiculosController (e2e)', () => {
       });
       const nonAdminToken = jwtService.sign({ sub: user.id, email: user.email, role: user.role });
 
-      await request(app.getHttpServer())
+      await server
         .patch(`/veiculos/${testVeiculoId}`)
         .set('Authorization', `Bearer ${nonAdminToken}`)
         .send({ marca: 'Ford' })
@@ -366,12 +359,12 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should delete a veiculo', async () => {
-      await request(app.getHttpServer())
+      await server
         .delete(`/veiculos/${veiculoToDeleteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await server
         .get(`/veiculos/${veiculoToDeleteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
@@ -397,7 +390,7 @@ describe('VeiculosController (e2e)', () => {
         },
       });
 
-      await request(app.getHttpServer())
+      await server
         .delete(`/veiculos/${veiculo.id}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -411,16 +404,14 @@ describe('VeiculosController (e2e)', () => {
     });
 
     it('should return 404 for nonexistent veiculo', async () => {
-      await request(app.getHttpServer())
+      await server
         .delete('/veiculos/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
     });
 
     it('should require auth token', async () => {
-      await request(app.getHttpServer())
-        .delete(`/veiculos/${veiculoToDeleteId}`)
-        .expect(401);
+      await server.delete(`/veiculos/${veiculoToDeleteId}`).expect(401);
     });
   });
 
@@ -436,7 +427,7 @@ describe('VeiculosController (e2e)', () => {
         clienteId: testClienteId,
       };
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createDto)
@@ -475,7 +466,7 @@ describe('VeiculosController (e2e)', () => {
         clienteId: anotherCliente.id,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createDto)
@@ -504,7 +495,7 @@ describe('VeiculosController (e2e)', () => {
         clienteId: testClienteId,
       };
 
-      const createResponse = await request(app.getHttpServer())
+      const createResponse = await server
         .post('/veiculos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createDto)
@@ -520,7 +511,7 @@ describe('VeiculosController (e2e)', () => {
 
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      await request(app.getHttpServer())
+      await server
         .patch(`/veiculos/${veiculoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send({ marca: 'Renault Updated' })

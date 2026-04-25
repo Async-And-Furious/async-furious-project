@@ -11,18 +11,22 @@ import { CreateVeiculoDto, UpdateVeiculoDto, ListQueryDto } from '../dto/veiculo
 import { VeiculoResponseDto, VeiculoListResponseDto } from '../dto/veiculo.response.dto';
 import { AuthUser } from '../../../../auth/types/auth.types';
 
+interface MockUseCase {
+  execute: jest.Mock;
+}
+
 describe('VeiculoController', () => {
   let controller: VeiculoController;
 
-  let mockCreateUseCase: jest.Mocked<any>;
+  let mockCreateUseCase: MockUseCase;
 
-  let mockListUseCase: jest.Mocked<any>;
+  let mockListUseCase: MockUseCase;
 
-  let mockGetUseCase: jest.Mocked<any>;
+  let mockGetUseCase: MockUseCase;
 
-  let mockUpdateUseCase: jest.Mocked<any>;
+  let mockUpdateUseCase: MockUseCase;
 
-  let mockDeleteUseCase: jest.Mocked<any>;
+  let mockDeleteUseCase: MockUseCase;
 
   const mockAuthUser: AuthUser = {
     id: 'user-123',

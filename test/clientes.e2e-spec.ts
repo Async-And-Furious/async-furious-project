@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
+import request, { SuperTest } from 'supertest';
+import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -8,6 +9,7 @@ import bcrypt from 'bcrypt';
 
 describe('ClientesController (e2e)', () => {
   let app: INestApplication;
+  let server: SuperTest<App>;
   let prismaService: PrismaService;
   let jwtService: JwtService;
   let authToken: string;
@@ -34,6 +36,7 @@ describe('ClientesController (e2e)', () => {
     );
     await app.init();
 
+    server = request(app.getHttpServer() as never);
     prismaService = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
 
@@ -68,7 +71,7 @@ describe('ClientesController (e2e)', () => {
         tipoDocumento: 'CPF',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .post('/clientes')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createClienteDto)
@@ -88,7 +91,7 @@ describe('ClientesController (e2e)', () => {
         tipoDocumento: 'CPF',
       };
 
-      await request(app.getHttpServer()).post('/clientes').send(createClienteDto).expect(401);
+      await server.post('/clientes').send(createClienteDto).expect(401);
     });
 
     it('should fail with invalid data', async () => {
@@ -99,7 +102,7 @@ describe('ClientesController (e2e)', () => {
         tipoDocumento: 'INVALID',
       };
 
-      await request(app.getHttpServer())
+      await server
         .post('/clientes')
         .set('Authorization', `Bearer ${authToken}`)
         .send(invalidDto)
@@ -109,7 +112,7 @@ describe('ClientesController (e2e)', () => {
 
   describe('GET /clientes', () => {
     it('should list clientes with pagination', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/clientes')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -122,7 +125,7 @@ describe('ClientesController (e2e)', () => {
     });
 
     it('should list clientes with search', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/clientes?search=Test')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -131,7 +134,7 @@ describe('ClientesController (e2e)', () => {
     });
 
     it('should list clientes with pagination params', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/clientes?page=1&limit=5')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -143,7 +146,7 @@ describe('ClientesController (e2e)', () => {
 
   describe('GET /clientes/:id', () => {
     it('should get a cliente by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get(`/clientes/${testClienteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -153,7 +156,7 @@ describe('ClientesController (e2e)', () => {
     });
 
     it('should return 404 for nonexistent cliente', async () => {
-      await request(app.getHttpServer())
+      await server
         .get('/clientes/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
@@ -164,7 +167,7 @@ describe('ClientesController (e2e)', () => {
     it('should update a cliente', async () => {
       const updateDto = { nome: 'Updated Name' };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .patch(`/clientes/${testClienteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
@@ -180,7 +183,7 @@ describe('ClientesController (e2e)', () => {
         telefone: '11988887777',
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .patch(`/clientes/${testClienteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
@@ -193,19 +196,19 @@ describe('ClientesController (e2e)', () => {
 
   describe('DELETE /clientes/:id', () => {
     it('should delete a cliente', async () => {
-      await request(app.getHttpServer())
+      await server
         .delete(`/clientes/${testClienteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await server
         .get(`/clientes/${testClienteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
     });
 
     it('should return 404 for nonexistent cliente', async () => {
-      await request(app.getHttpServer())
+      await server
         .delete('/clientes/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);

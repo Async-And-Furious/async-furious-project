@@ -69,7 +69,10 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     await this.findOne(id);
     return (await this.prisma.ordemServico.update({
       where: { id },
-      data: data as any,
+      data: {
+        ...(data.status && { status: data.status }),
+        ...(data.descricao !== undefined && { descricao: data.descricao }),
+      },
     })) as unknown as OrdemDeServico;
   }
 

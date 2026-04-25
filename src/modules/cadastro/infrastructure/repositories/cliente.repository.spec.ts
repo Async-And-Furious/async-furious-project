@@ -3,10 +3,23 @@ import { NotFoundException } from '@nestjs/common';
 import { ClienteRepository } from './cliente.repository';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 
+interface MockPrismaCliente {
+  create: jest.Mock;
+  findMany: jest.Mock;
+  findUnique: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  count: jest.Mock;
+}
+
+interface MockPrismaService {
+  cliente: MockPrismaCliente;
+}
+
 describe('ClienteRepository', () => {
   let repository: ClienteRepository;
 
-  let mockPrismaService: any;
+  let mockPrismaService: MockPrismaService;
 
   const validCpf = '52998224725';
 

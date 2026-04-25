@@ -23,7 +23,7 @@ describe('PlacaVeiculoVo', () => {
 
     it('should return false for empty or null values', () => {
       expect(PlacaVeiculoVo.isValid('')).toBe(false);
-      expect(PlacaVeiculoVo.isValid(null as any)).toBe(false);
+      expect(PlacaVeiculoVo.isValid(null as unknown as string)).toBe(false);
     });
 
     it('should return true for traditional plates without hyphen (ABC1234)', () => {

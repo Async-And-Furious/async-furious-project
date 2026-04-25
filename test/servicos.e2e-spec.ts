@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request from 'supertest';
+import request, { SuperTest } from 'supertest';
+import { App } from 'supertest/types';
 import bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module';
@@ -8,6 +9,7 @@ import { PrismaService } from '../src/shared/infrastructure/database/prisma.serv
 
 describe('ServicosController (e2e)', () => {
   let app: INestApplication;
+  let server: SuperTest<App>;
   let prismaService: PrismaService;
   let jwtService: JwtService;
   let authToken: string;
@@ -34,6 +36,7 @@ describe('ServicosController (e2e)', () => {
     );
     await app.init();
 
+    server = request(app.getHttpServer() as never);
     prismaService = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
 
@@ -66,7 +69,7 @@ describe('ServicosController (e2e)', () => {
         preco: 120.5,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .post('/servicos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(createServicoDto)
@@ -85,7 +88,7 @@ describe('ServicosController (e2e)', () => {
         preco: 90,
       };
 
-      await request(app.getHttpServer()).post('/servicos').send(createServicoDto).expect(401);
+      await server.post('/servicos').send(createServicoDto).expect(401);
     });
 
     it('should fail with invalid data', async () => {
@@ -94,7 +97,7 @@ describe('ServicosController (e2e)', () => {
         preco: -1,
       };
 
-      await request(app.getHttpServer())
+      await server
         .post('/servicos')
         .set('Authorization', `Bearer ${authToken}`)
         .send(invalidDto)
@@ -104,7 +107,7 @@ describe('ServicosController (e2e)', () => {
 
   describe('GET /servicos', () => {
     it('should list servicos with pagination', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/servicos')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -117,7 +120,7 @@ describe('ServicosController (e2e)', () => {
     });
 
     it('should list servicos with search', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/servicos?search=Lavagem')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -126,7 +129,7 @@ describe('ServicosController (e2e)', () => {
     });
 
     it('should list servicos with pagination params', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get('/servicos?page=1&limit=5')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -138,7 +141,7 @@ describe('ServicosController (e2e)', () => {
 
   describe('GET /servicos/:id', () => {
     it('should get a servico by id', async () => {
-      const response = await request(app.getHttpServer())
+      const response = await server
         .get(`/servicos/${testServicoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
@@ -148,7 +151,7 @@ describe('ServicosController (e2e)', () => {
     });
 
     it('should return 404 for nonexistent servico', async () => {
-      await request(app.getHttpServer())
+      await server
         .get('/servicos/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
@@ -159,7 +162,7 @@ describe('ServicosController (e2e)', () => {
     it('should update a servico', async () => {
       const updateDto = { nome: 'E2E Servico Lavagem Premium' };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .patch(`/servicos/${testServicoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
@@ -175,7 +178,7 @@ describe('ServicosController (e2e)', () => {
         preco: 350,
       };
 
-      const response = await request(app.getHttpServer())
+      const response = await server
         .patch(`/servicos/${testServicoId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .send(updateDto)
@@ -202,19 +205,19 @@ describe('ServicosController (e2e)', () => {
     });
 
     it('should delete a servico', async () => {
-      await request(app.getHttpServer())
+      await server
         .delete(`/servicos/${servicoToDeleteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
-      await request(app.getHttpServer())
+      await server
         .get(`/servicos/${servicoToDeleteId}`)
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
     });
 
     it('should return 404 for nonexistent servico', async () => {
-      await request(app.getHttpServer())
+      await server
         .delete('/servicos/00000000-0000-0000-0000-000000000000')
         .set('Authorization', `Bearer ${authToken}`)
         .expect(404);

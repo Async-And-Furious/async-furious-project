@@ -4,10 +4,23 @@ import { PecaInsumoRepository } from './peca-insumo.repository';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 
+interface MockPrismaPeca {
+  create: jest.Mock;
+  findMany: jest.Mock;
+  findUnique: jest.Mock;
+  update: jest.Mock;
+  delete: jest.Mock;
+  count: jest.Mock;
+}
+
+interface MockPrismaService {
+  peca: MockPrismaPeca;
+}
+
 describe('PecaInsumoRepository', () => {
   let repository: PecaInsumoRepository;
 
-  let mockPrismaService: any;
+  let mockPrismaService: MockPrismaService;
 
   const mockPecaInsumo: PecaInsumo = {
     id: '123',
