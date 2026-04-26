@@ -77,7 +77,7 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
 
     return this.prisma.peca.update({
       where: { id },
-      data: { quantidadeEstoque: quantidade },
+      data: { quantidade_estoque: quantidade },
     }) as unknown as PecaInsumo;
   }
 
