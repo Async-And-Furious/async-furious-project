@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { Cliente } from '../../domain/entities/cliente.entity';
 import {
