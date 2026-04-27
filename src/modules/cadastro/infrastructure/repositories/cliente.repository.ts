@@ -75,7 +75,6 @@ export class ClienteRepository implements IClienteRepository {
   async findById(id: string): Promise<Cliente> {
     const ormEntity = await this.prisma.cliente.findUnique({
       where: { id },
-      include: { veiculos: true },
     });
 
     if (!ormEntity) {
@@ -119,7 +118,6 @@ export class ClienteRepository implements IClienteRepository {
     tipo_documento: 'CPF' | 'CNPJ';
     created_at: Date;
     updated_at: Date;
-    veiculos?: unknown[];
   }): ClienteORMEntity {
     return {
       id: data.id,

@@ -47,10 +47,10 @@ export class Cliente {
     tipoDocumento: TipoDocumento;
   }): Cliente {
     if (!props.id) {
-      throw new DomainException('ID e obrigatorio');
+      throw new DomainException('ID é obrigatório');
     }
     if (!props.nome || props.nome.trim().length === 0) {
-      throw new DomainException('Nome e obrigatorio');
+      throw new DomainException('Nome é obrigatório');
     }
 
     const contato = ContatoVo.criar(props.email, props.telefone);

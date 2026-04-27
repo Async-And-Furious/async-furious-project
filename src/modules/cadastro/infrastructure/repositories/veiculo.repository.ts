@@ -8,6 +8,7 @@ import {
   UpdateVeiculoInput,
 } from '../../domain/interfaces/veiculo.interface';
 import { VeiculoMapper, VeiculoORMEntity } from '../persistence/veiculo.orm-entity';
+import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 
 @Injectable()
 export class VeiculoRepository implements IVeiculoRepository {
@@ -25,18 +26,24 @@ export class VeiculoRepository implements IVeiculoRepository {
     });
 
     const ormData = VeiculoMapper.toOrm(veiculo);
-    const ormEntity = await this.prisma.veiculo.create({
-      data: {
-        placa: ormData.placa,
-        marca: ormData.marca,
-        modelo: ormData.modelo,
-        ano: ormData.ano,
-        cor: ormData.cor,
-        id_cliente: ormData.id_cliente,
-      },
-    });
-
-    return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
+    try {
+      const ormEntity = await this.prisma.veiculo.create({
+        data: {
+          placa: ormData.placa,
+          marca: ormData.marca,
+          modelo: ormData.modelo,
+          ano: ormData.ano,
+          cor: ormData.cor,
+          id_cliente: ormData.id_cliente,
+        },
+      });
+      return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new DomainException('Placa já cadastrada');
+      }
+      throw error;
+    }
   }
 
   async findAll(

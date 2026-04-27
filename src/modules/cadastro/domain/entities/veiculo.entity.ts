@@ -68,16 +68,16 @@ export class Veiculo {
     clienteId: string;
   }): Veiculo {
     if (!props.id) {
-      throw new DomainException('ID e obrigatorio');
+      throw new DomainException('ID é obrigatório');
     }
     if (!props.marca || props.marca.trim().length === 0) {
-      throw new DomainException('Marca e obrigatoria');
+      throw new DomainException('Marca é obrigatória');
     }
     if (!props.modelo || props.modelo.trim().length === 0) {
-      throw new DomainException('Modelo e obrigatorio');
+      throw new DomainException('Modelo é obrigatório');
     }
     if (props.ano < 1900 || props.ano > new Date().getFullYear() + 1) {
-      throw new DomainException('Ano invalido');
+      throw new DomainException('Ano inválido');
     }
 
     const placa = PlacaVeiculoVo.criar(props.placa);

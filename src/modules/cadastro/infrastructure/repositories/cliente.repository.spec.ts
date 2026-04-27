@@ -182,7 +182,6 @@ describe('ClienteRepository', () => {
       expect(result.id).toBe('123');
       expect(mockPrismaService.cliente.findUnique).toHaveBeenCalledWith({
         where: { id: '123' },
-        include: { veiculos: true },
       });
     });
 

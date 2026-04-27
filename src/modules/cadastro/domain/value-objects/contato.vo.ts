@@ -19,11 +19,11 @@ export class ContatoVo {
 
   static criar(email: string, telefone?: string): ContatoVo {
     if (!email || !ContatoVo.isValidEmail(email)) {
-      throw new DomainException('Email invalido');
+      throw new DomainException('Email inválido');
     }
 
     if (telefone && !ContatoVo.isValidPhone(telefone)) {
-      throw new DomainException('Telefone invalido');
+      throw new DomainException('Telefone inválido');
     }
 
     return new ContatoVo(email.toLowerCase(), telefone || null);

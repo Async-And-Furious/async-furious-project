@@ -26,7 +26,7 @@ export class PlacaVeiculoVo {
 
   static criar(placa: string): PlacaVeiculoVo {
     if (!placa || typeof placa !== 'string') {
-      throw new DomainException('Placa invalida');
+      throw new DomainException('Placa inválida');
     }
 
     const sanitized = placa.replace(/[-\s]/g, '').toUpperCase();
@@ -36,7 +36,7 @@ export class PlacaVeiculoVo {
     }
 
     if (!BRAZILIAN_PLATE_PATTERN.test(sanitized)) {
-      throw new DomainException('Placa invalida - formato deve ser ABC1D23');
+      throw new DomainException('Placa inválida - formato deve ser ABC1D23');
     }
 
     return new PlacaVeiculoVo(sanitized);
