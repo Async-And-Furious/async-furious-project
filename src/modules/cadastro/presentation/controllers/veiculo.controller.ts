@@ -11,10 +11,21 @@ import {
   ParseUUIDPipe,
   Inject,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CreateVeiculoDto, UpdateVeiculoDto, ListQueryDto } from '../dto/veiculo.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
+import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
+import type { AuthUser } from '../../../../auth/types/auth.types';
 import {
   CreateVeiculoUseCase,
   ListVeiculosUseCase,
@@ -23,6 +34,8 @@ import {
   DeleteVeiculoUseCase,
 } from '../../application/use-cases/veiculo.use-cases';
 
+@ApiTags('Veiculos')
+@ApiBearerAuth()
 @Controller('veiculos')
 @UseGuards(JwtAuthGuard)
 export class VeiculoController {
@@ -37,12 +50,34 @@ export class VeiculoController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiOperation({
+    summary: 'Criar novo veículo',
+    description: 'Cria um novo veículo no sistema. Requer role de admin.',
+  })
+  @ApiBody({ type: CreateVeiculoDto })
+  @ApiResponse({ status: 201, description: 'Veículo criado com sucesso' })
+  @ApiResponse({
+    status: 400,
+    description: 'Validação falhou - dados inválidos ou placa duplicada',
+  })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   create(@Body() dto: CreateVeiculoDto) {
     return this.createUseCase.execute(dto);
   }
 
   @Get()
-  findAll(@Query() query: ListQueryDto) {
+  @ApiOperation({
+    summary: 'Listar todos os veículos',
+    description: 'Retorna lista paginada de veículos',
+  })
+  @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
+  @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
+  @ApiQuery({ name: 'search', type: String, required: false, example: 'Toyota' })
+  @ApiResponse({ status: 200, description: 'Lista de veículos retornada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  findAll(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
     return this.listUseCase.execute(
       Number(query.page) || 1,
       Number(query.limit) || 10,
@@ -51,13 +86,25 @@ export class VeiculoController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiOperation({ summary: 'Obter veículo por ID' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Veículo encontrado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
     return this.getUseCase.execute(id);
   }
 
   @Patch(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiOperation({ summary: 'Atualizar veículo' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiBody({ type: UpdateVeiculoDto })
+  @ApiResponse({ status: 200, description: 'Veículo atualizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateVeiculoDto) {
     return this.updateUseCase.execute(id, dto);
   }
@@ -65,6 +112,12 @@ export class VeiculoController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles('admin')
+  @ApiOperation({ summary: 'Deletar veículo' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Veículo deletado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.deleteUseCase.execute(id);
   }

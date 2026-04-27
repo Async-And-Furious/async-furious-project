@@ -1,28 +1,48 @@
-/**
- * Padrão Brasileiro (Tradicional e Mercosul):
- * - 3 letras iniciais
- * - 1 número
- * - 1 letra ou número (onde se diferencia o Mercosul)
- * - 2 números finais
- */
+import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
+
 const BRAZILIAN_PLATE_PATTERN = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/;
 
 export class PlacaVeiculoVo {
-  /**
-   * Valida placas brasileiras garantindo integridade de formato e tamanho.
-   * @param plate String da placa enviada pelo usuário ou sistema.
-   */
-  static isValid(plate: string | null | undefined): boolean {
-    if (!plate || typeof plate !== 'string') {
-      return false;
+  private readonly _valor: string;
+
+  private constructor(valor: string) {
+    this._valor = valor;
+  }
+
+  get valor(): string {
+    return this._valor;
+  }
+
+  get formato(): string {
+    return this._valor.toUpperCase();
+  }
+
+  static isValid(placa: string): boolean {
+    if (!placa || typeof placa !== 'string') return false;
+    const sanitized = placa.replace(/[-\s]/g, '').toUpperCase();
+    if (sanitized.length !== 7) return false;
+    return BRAZILIAN_PLATE_PATTERN.test(sanitized);
+  }
+
+  static criar(placa: string): PlacaVeiculoVo {
+    if (!placa || typeof placa !== 'string') {
+      throw new DomainException('Placa invalida');
     }
 
-    const sanitized = plate.replace(/[-\s]/g, '').toUpperCase();
+    const sanitized = placa.replace(/[-\s]/g, '').toUpperCase();
 
     if (sanitized.length !== 7) {
-      return false;
+      throw new DomainException('Placa deve conter 7 caracteres');
     }
 
-    return BRAZILIAN_PLATE_PATTERN.test(sanitized);
+    if (!BRAZILIAN_PLATE_PATTERN.test(sanitized)) {
+      throw new DomainException('Placa invalida - formato deve ser ABC1D23');
+    }
+
+    return new PlacaVeiculoVo(sanitized);
+  }
+
+  equals(other: PlacaVeiculoVo): boolean {
+    return this._valor === other._valor;
   }
 }

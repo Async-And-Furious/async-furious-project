@@ -1,30 +1,40 @@
 import { IsString, IsNotEmpty, IsOptional, IsNumber, IsPositive, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePecaInsumoDto {
+  @ApiProperty({ example: 'Filtro de Óleo', description: 'Nome da peça/insumo' })
   @IsString()
   @IsNotEmpty()
   nome: string;
 
+  @ApiProperty({ example: 'FO-001', description: 'Código único da peça' })
   @IsString()
   @IsNotEmpty()
   codigo: string;
 
+  @ApiPropertyOptional({
+    example: 'Filtro de óleo para motor 1.0',
+    description: 'Descrição detalhada',
+  })
   @IsString()
   @IsOptional()
   descricao?: string;
 
+  @ApiProperty({ example: 45.9, description: 'Preço unitário' })
   @IsNumber()
   @IsPositive()
   @Type(() => Number)
   preco: number;
 
+  @ApiPropertyOptional({ example: 100, description: 'Quantidade em estoque' })
   @IsNumber()
   @Min(0)
   @IsOptional()
   @Type(() => Number)
   quantidade_estoque?: number;
 
+  @ApiPropertyOptional({ example: 10, description: 'Quantidade mínima para alerta' })
   @IsNumber()
   @Min(0)
   @IsOptional()
@@ -33,21 +43,25 @@ export class CreatePecaInsumoDto {
 }
 
 export class UpdatePecaInsumoDto {
+  @ApiPropertyOptional({ example: 'Filtro de Óleo Premium', description: 'Nome da peça' })
   @IsString()
   @IsNotEmpty()
   @IsOptional()
   nome?: string;
 
+  @ApiPropertyOptional({ example: 'Filtro de óleo sintético', description: 'Descrição detalhada' })
   @IsString()
   @IsOptional()
   descricao?: string;
 
+  @ApiPropertyOptional({ example: 59.9, description: 'Preço unitário' })
   @IsNumber()
   @IsPositive()
   @IsOptional()
   @Type(() => Number)
   preco?: number;
 
+  @ApiPropertyOptional({ example: 15, description: 'Quantidade mínima para alerta' })
   @IsNumber()
   @Min(0)
   @IsOptional()
@@ -56,6 +70,7 @@ export class UpdatePecaInsumoDto {
 }
 
 export class UpdateEstoquePecaInsumoDto {
+  @ApiProperty({ example: 50, description: 'Nova quantidade em estoque' })
   @IsNumber()
   @Min(0)
   @Type(() => Number)
@@ -63,12 +78,15 @@ export class UpdateEstoquePecaInsumoDto {
 }
 
 export class ListQueryDto {
+  @ApiPropertyOptional({ example: 1, description: 'Número da página' })
   @IsOptional()
   page?: number;
 
+  @ApiPropertyOptional({ example: 10, description: 'Quantidade por página' })
   @IsOptional()
   limit?: number;
 
+  @ApiPropertyOptional({ example: 'Filtro', description: 'Buscar por nome ou código' })
   @IsOptional()
   search?: string;
 }

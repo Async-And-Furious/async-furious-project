@@ -1,59 +1,60 @@
-import { Veiculo } from '../../domain/entities/veiculo.entity';
-import { IVeiculoRepository } from '../../domain/interfaces/veiculo.interface';
+import { Injectable } from '@nestjs/common';
+import {
+  VeiculoResponseDto,
+  VeiculoListResponseDto,
+} from '../../presentation/dto/veiculo.response.dto';
+import type { IVeiculoRepository } from '../../domain/interfaces/veiculo.interface';
+import type {
+  CreateVeiculoInput,
+  UpdateVeiculoInput,
+} from '../../domain/interfaces/veiculo.interface';
 
+@Injectable()
 export class CreateVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
-  async execute(data: {
-    placa: string;
-    marca: string;
-    modelo: string;
-    ano: number;
-    cor?: string;
-    id_cliente: string;
-  }): Promise<Veiculo> {
-    return this.repository.create(data);
+  async execute(data: CreateVeiculoInput): Promise<VeiculoResponseDto> {
+    const veiculo = await this.repository.create(data);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 }
 
+@Injectable()
 export class ListVeiculosUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
-  async execute(
-    page?: number,
-    limit?: number,
-    search?: string
-  ): Promise<{
-    data: Veiculo[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
-  }> {
-    return this.repository.findAll(page, limit, search);
+  async execute(page?: number, limit?: number, search?: string): Promise<VeiculoListResponseDto> {
+    const result = await this.repository.findAll(page, limit, search);
+    return VeiculoListResponseDto.fromDomain(result.data, result.pagination);
   }
 }
 
+@Injectable()
 export class GetVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
-  async execute(id: string): Promise<Veiculo> {
-    return this.repository.findOne(id);
+  async execute(id: string): Promise<VeiculoResponseDto> {
+    const veiculo = await this.repository.findById(id);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 }
 
+@Injectable()
 export class UpdateVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
-  async execute(
-    id: string,
-    data: { marca?: string; modelo?: string; ano?: number; cor?: string }
-  ): Promise<Veiculo> {
-    return this.repository.update(id, data);
+  async execute(id: string, data: UpdateVeiculoInput): Promise<VeiculoResponseDto> {
+    const veiculo = await this.repository.update(id, data);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 }
 
+@Injectable()
 export class DeleteVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
-  async execute(id: string): Promise<Veiculo> {
-    return this.repository.remove(id);
+  async execute(id: string): Promise<VeiculoResponseDto> {
+    const veiculo = await this.repository.remove(id);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 }

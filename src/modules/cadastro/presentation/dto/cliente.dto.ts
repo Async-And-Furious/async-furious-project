@@ -44,7 +44,7 @@ export class CreateClienteDto {
     description: 'Tipo de documento fiscal',
   })
   @IsEnum(['CPF', 'CNPJ'])
-  tipo_documento: 'CPF' | 'CNPJ';
+  tipoDocumento: 'CPF' | 'CNPJ';
 }
 
 export class UpdateClienteDto {

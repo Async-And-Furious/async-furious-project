@@ -37,47 +37,47 @@ model User {
   updated_at DateTime @updatedAt
 }
 
-model Customer {
+model Cliente {
   id             String    @id @default(uuid())
-  nome           String    @map("name")
+  nome           String
   email          String    @unique
-  telefone       String?   @map("phone")
-  documento      String    @unique @map("tax_id")
-  tipo_documento TaxIdType @map("tax_id_type")
+  telefone       String?
+  documento      String    @unique
+  tipo_documento TaxIdType
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
-  veiculos       Vehicle[]
-  ordens_servico ServiceOrder[]
+  veiculos        Veiculo[]
+  ordensServico   OrdemServico[]
 }
 
-model Vehicle {
+model Veiculo {
   id         String   @id @default(uuid())
-  placa      String   @unique @map("license_plate")
-  marca      String   @map("brand")
-  modelo     String   @map("model")
-  ano        Int      @map("year")
-  cor        String?  @map("color")
-  id_cliente String   @map("customer_id")
+  placa      String   @unique
+  marca      String
+  modelo     String
+  ano        Int
+  cor        String?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  cliente        Customer       @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
-  ordens_servico ServiceOrder[]
+  cliente         Cliente        @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  id_cliente      String
+  ordensServico   OrdemServico[]
 }
 
-model ServiceOrder {
+model OrdemServico {
   id          String    @id @default(uuid())
-  id_veiculo  String    @map("vehicle_id")
-  id_cliente  String    @map("customer_id")
   status      SOStatus  @default(RECEIVED)
-  descricao   String?   @map("description")
+  descricao   String?
   created_at  DateTime  @default(now())
   updated_at  DateTime  @updatedAt
-  entregue_em DateTime? @map("delivered_at")
+  entregueEm  DateTime?
 
-  veiculo  Vehicle  @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
-  cliente  Customer @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  veiculo    Veiculo @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
+  id_veiculo String
+  cliente    Cliente @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  id_cliente String
 }
 
 model Peca {
@@ -86,8 +86,8 @@ model Peca {
   codigo             String   @unique
   descricao          String?
   preco              Decimal  @db.Decimal(10, 2)
-  quantidade_estoque Int      @default(0)
-  quantidade_minima  Int      @default(1)
+  quantidadeEstoque  Int      @default(0)
+  quantidadeMinima   Int      @default(1)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 }

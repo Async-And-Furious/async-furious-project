@@ -124,7 +124,7 @@ describe('PecaInsumoController', () => {
 
       await controller.findAll(
         { page: 2, limit: 5, search: 'filtro' } as unknown as ListQueryDto,
-        mockAuthUser,
+        mockAuthUser
       );
 
       expect(mockListUseCase.execute).toHaveBeenCalledWith(2, 5, 'filtro');

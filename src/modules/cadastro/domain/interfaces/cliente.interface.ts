@@ -1,13 +1,22 @@
 import { Cliente } from '../entities/cliente.entity';
+import type { TipoDocumento } from '../value-objects/cpf-cnpj.vo';
+
+export interface CreateClienteInput {
+  nome: string;
+  email: string;
+  telefone?: string;
+  documento: string;
+  tipoDocumento: TipoDocumento;
+}
+
+export interface UpdateClienteInput {
+  nome?: string;
+  email?: string;
+  telefone?: string;
+}
 
 export interface IClienteRepository {
-  create(data: {
-    nome: string;
-    email: string;
-    telefone?: string;
-    documento: string;
-    tipo_documento: 'CPF' | 'CNPJ';
-  }): Promise<Cliente>;
+  create(data: CreateClienteInput): Promise<Cliente>;
   findAll(
     page?: number,
     limit?: number,
@@ -16,7 +25,7 @@ export interface IClienteRepository {
     data: Cliente[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }>;
-  findOne(id: string): Promise<Cliente>;
-  update(id: string, data: { nome?: string; email?: string; telefone?: string }): Promise<Cliente>;
+  findById(id: string): Promise<Cliente>;
+  update(id: string, data: UpdateClienteInput): Promise<Cliente>;
   remove(id: string): Promise<Cliente>;
 }

@@ -23,7 +23,7 @@ describe('PlacaVeiculoVo', () => {
 
     it('should return false for empty or null values', () => {
       expect(PlacaVeiculoVo.isValid('')).toBe(false);
-      expect(PlacaVeiculoVo.isValid(null as any)).toBe(false);
+      expect(PlacaVeiculoVo.isValid(null as unknown as string)).toBe(false);
     });
 
     it('should return true for traditional plates without hyphen (ABC1234)', () => {
@@ -44,10 +44,10 @@ describe('PlacaVeiculoVo', () => {
 
       invalidPlates.forEach((plate) => {
         const result = PlacaVeiculoVo.isValid(plate);
-          if (result === true) {
-            console.log(`❌ Failed for plate: "${plate}" - Should be false but returned true`);
-          }
-          expect(result).toBe(false);
+        if (result === true) {
+          console.log(`❌ Failed for plate: "${plate}" - Should be false but returned true`);
+        }
+        expect(result).toBe(false);
       });
     });
 
