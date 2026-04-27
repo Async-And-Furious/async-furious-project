@@ -44,20 +44,11 @@ export class CpfCnpjVo {
 
     const numeros = valor.replace(/\D/g, '');
 
-    if (tipo === 'CPF') {
-      if (numeros.length !== 11) {
-        throw new DomainException('CPF deve conter 11 digitos');
-      }
-      if (!cpf.isValid(numeros)) {
-        throw new DomainException('CPF invalido');
-      }
-    } else {
-      if (numeros.length !== 14) {
-        throw new DomainException('CNPJ deve conter 14 digitos');
-      }
-      if (!cnpj.isValid(numeros)) {
-        throw new DomainException('CNPJ invalido');
-      }
+    if (tipo === 'CPF' && !cpf.isValid(numeros)) {
+      throw new DomainException('CPF invalido');
+    }
+    if (tipo === 'CNPJ' && !cnpj.isValid(numeros)) {
+      throw new DomainException('CNPJ invalido');
     }
 
     return new CpfCnpjVo(numeros, tipo);
