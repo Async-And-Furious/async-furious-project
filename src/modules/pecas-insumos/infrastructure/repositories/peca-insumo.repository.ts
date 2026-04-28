@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import { formatPaginatedResponse } from '../../../../shared/infrastructure/database/repository.utils';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 
@@ -26,7 +27,6 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
     data: PecaInsumo[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const skip = (page - 1) * limit;
     const where = search
       ? {
           OR: [
@@ -40,17 +40,14 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
     const [data, total] = await Promise.all([
       this.prisma.peca.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
       }),
       this.prisma.peca.count({ where }),
     ]);
 
-    return {
-      data: data as unknown as PecaInsumo[],
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return formatPaginatedResponse(data as unknown as PecaInsumo[], page, limit, total);
   }
 
   async findOne(id: string): Promise<PecaInsumo> {

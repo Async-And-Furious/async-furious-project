@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import { formatPaginatedResponse } from '../../../../shared/infrastructure/database/repository.utils';
 import { Cliente } from '../../domain/entities/cliente.entity';
 import {
   IClienteRepository,
@@ -45,7 +46,6 @@ export class ClienteRepository implements IClienteRepository {
     data: Cliente[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const skip = (page - 1) * limit;
     const where = search
       ? {
           OR: [
@@ -59,17 +59,19 @@ export class ClienteRepository implements IClienteRepository {
     const [ormData, total] = await Promise.all([
       this.prisma.cliente.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
       }),
       this.prisma.cliente.count({ where }),
     ]);
 
-    return {
-      data: ormData.map((d) => ClienteMapper.toDomain(this.mapToORMEntity(d))),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return formatPaginatedResponse(
+      ormData.map((d) => ClienteMapper.toDomain(this.mapToORMEntity(d))),
+      page,
+      limit,
+      total
+    );
   }
 
   async findById(id: string): Promise<Cliente> {
