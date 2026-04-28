@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizado-finalizada.event';
 
 @Injectable()
 export class FinalizarMonitoramentoTempoPolicy {
+  private readonly logger = new Logger(FinalizarMonitoramentoTempoPolicy.name);
+
   constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   @OnEvent('StatusAtualizadoFinalizada')
@@ -16,9 +18,7 @@ export class FinalizarMonitoramentoTempoPolicy {
     if (os.iniciada_em) {
       const duracaoMs = finalizada_em.getTime() - os.iniciada_em.getTime();
       const duracaoMin = Math.round(duracaoMs / 60000);
-      console.log(
-        `[FinalizarMonitoramentoTempo] OS ${evento.ordemServicoId} finalizada em ${duracaoMin} minuto(s).`,
-      );
+      this.logger.log(`OS ${evento.ordemServicoId} finalizada em ${duracaoMin} minuto(s).`);
     }
   }
 }

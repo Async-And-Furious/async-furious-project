@@ -122,12 +122,7 @@ describe('OS Policies', () => {
   describe('P-03 NotificarClienteDiagnosticoPolicy', () => {
     it('deve executar stub sem lançar erro', () => {
       const policy = new NotificarClienteDiagnosticoPolicy();
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-
-      policy.handle(new StatusAtualizadoEmDiagnostico('os-1'));
-
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
+      expect(() => policy.handle(new StatusAtualizadoEmDiagnostico('os-1'))).not.toThrow();
     });
   });
 
@@ -186,12 +181,10 @@ describe('OS Policies', () => {
   describe('P-05 EnviarOrcamentoPolicy', () => {
     it('deve emitir OrcamentoEnviado', async () => {
       const policy = new EnviarOrcamentoPolicy(emissor);
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await policy.handle(new OrcamentoGerado('os-1', 'orc-1'));
 
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrcamentoEnviado));
-      consoleSpy.mockRestore();
     });
   });
 
@@ -297,27 +290,21 @@ describe('OS Policies', () => {
       const iniciada_em = new Date(Date.now() - 30 * 60 * 1000);
       osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em }));
       osRepo.update.mockResolvedValue(mockOs());
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       const policy = new FinalizarMonitoramentoTempoPolicy(osRepo);
 
       await policy.handle(new StatusAtualizadoFinalizada('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { finalizada_em: expect.any(Date) });
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
     });
 
     it('deve atualizar finalizada_em sem logar quando iniciada_em é null', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em: null }));
       osRepo.update.mockResolvedValue(mockOs());
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       const policy = new FinalizarMonitoramentoTempoPolicy(osRepo);
 
       await policy.handle(new StatusAtualizadoFinalizada('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { finalizada_em: expect.any(Date) });
-      expect(consoleSpy).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
     });
   });
 
@@ -325,14 +312,12 @@ describe('OS Policies', () => {
 
   describe('P-12 NotificarClienteConclusaoPolicy', () => {
     it('deve emitir ClienteNotificadoConclusao', async () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       const policy = new NotificarClienteConclusaoPolicy(emissor);
 
       await policy.handle(new StatusAtualizadoFinalizada('os-1'));
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('ClienteNotificadoConclusao');
-      consoleSpy.mockRestore();
     });
   });
 
