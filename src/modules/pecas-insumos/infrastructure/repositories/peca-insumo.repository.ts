@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import {
+  formatPaginatedResponse,
+  buildSearchWhere,
+} from '../../../../shared/infrastructure/database/repository.utils';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 
 @Injectable()
 export class PecaInsumoRepository implements IPecaInsumoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: {
     nome: string;
@@ -26,31 +30,19 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
     data: PecaInsumo[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const skip = (page - 1) * limit;
-    const where = search
-      ? {
-          OR: [
-            { nome: { contains: search, mode: 'insensitive' as const } },
-            { codigo: { contains: search, mode: 'insensitive' as const } },
-            { descricao: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where = buildSearchWhere(['nome', 'codigo', 'descricao'], search) || {};
 
     const [data, total] = await Promise.all([
       this.prisma.peca.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
       }),
       this.prisma.peca.count({ where }),
     ]);
 
-    return {
-      data: data as unknown as PecaInsumo[],
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return formatPaginatedResponse(data as unknown as PecaInsumo[], page, limit, total);
   }
 
   async findOne(id: string): Promise<PecaInsumo> {
@@ -77,7 +69,7 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
 
     return this.prisma.peca.update({
       where: { id },
-      data: { quantidadeEstoque: quantidade },
+      data: { quantidade_estoque: quantidade },
     }) as unknown as PecaInsumo;
   }
 

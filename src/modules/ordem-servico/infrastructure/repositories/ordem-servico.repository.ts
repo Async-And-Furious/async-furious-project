@@ -1,12 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import {
+  formatPaginatedResponse,
+  buildSearchWhere,
+} from '../../../../shared/infrastructure/database/repository.utils';
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
-import { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
+import {
+  IOrdemServicoRepository,
+  OrdemServicoUpdateData,
+} from '../../domain/interfaces/ordem-servico.interface';
 
 @Injectable()
 export class OrdemServicoRepository implements IOrdemServicoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: {
     veiculoId: string;
@@ -33,39 +40,36 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     data: OrdemDeServico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const skip = (page - 1) * limit;
-    const where = search ? { descricao: { contains: search, mode: 'insensitive' as const } } : {};
+    const where = buildSearchWhere(['descricao'], search) || {};
 
     const [data, total] = await Promise.all([
       this.prisma.ordemServico.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
-        include: { veiculo: true, cliente: true },
+        include: {
+          veiculo: true,
+          cliente: true,
+          orcamento: true,
+        },
       }),
       this.prisma.ordemServico.count({ where }),
     ]);
 
-    return {
-      data: data as unknown as OrdemDeServico[],
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return formatPaginatedResponse(data as unknown as OrdemDeServico[], page, limit, total);
   }
 
   async findOne(id: string): Promise<OrdemDeServico> {
     const order = await this.prisma.ordemServico.findUnique({
       where: { id },
-      include: { veiculo: true, cliente: true },
+      include: { veiculo: true, cliente: true, orcamento: true },
     });
-    if (!order) throw new NotFoundException(`OrdemDeServico with ID ${id} not found`);
+    if (!order) throw new NotFoundException(`Ordem de Serviço com ID ${id} não encontrada`);
     return order as unknown as OrdemDeServico;
   }
 
-  async update(
-    id: string,
-    data: { status?: OrdemDeServico['status']; descricao?: string }
-  ): Promise<OrdemDeServico> {
+  async update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico> {
     await this.findOne(id);
     return (await this.prisma.ordemServico.update({
       where: { id },

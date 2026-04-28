@@ -24,6 +24,7 @@ import {
   CreateOrdemServicoDto,
   UpdateOrdemServicoDto,
   ListQueryDto,
+  GerarOrcamentoDto,
 } from '../dto/ordem-servico.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
@@ -37,6 +38,11 @@ import {
   UpdateOrdemServicoUseCase,
   DeleteOrdemServicoUseCase,
 } from '../../application/use-cases/ordem-servico.use-cases';
+import {
+  GerarOrcamentoUseCase,
+  AprovarOrcamentoUseCase,
+  RejeitarOrcamentoUseCase,
+} from '../../application/use-cases/orcamento.use-cases';
 
 @ApiTags('Ordens Servico')
 @ApiBearerAuth()
@@ -53,7 +59,13 @@ export class OrdemServicoController {
     @Inject(UpdateOrdemServicoUseCase)
     private readonly updateUseCase: UpdateOrdemServicoUseCase,
     @Inject(DeleteOrdemServicoUseCase)
-    private readonly deleteUseCase: DeleteOrdemServicoUseCase
+    private readonly deleteUseCase: DeleteOrdemServicoUseCase,
+    @Inject(GerarOrcamentoUseCase)
+    private readonly gerarOrcamentoUseCase: GerarOrcamentoUseCase,
+    @Inject(AprovarOrcamentoUseCase)
+    private readonly aprovarOrcamentoUseCase: AprovarOrcamentoUseCase,
+    @Inject(RejeitarOrcamentoUseCase)
+    private readonly rejeitarOrcamentoUseCase: RejeitarOrcamentoUseCase
   ) {}
 
   @Post()
@@ -129,5 +141,26 @@ export class OrdemServicoController {
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.deleteUseCase.execute(id);
+  }
+
+  @Patch(':id/orcamento/gerar')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  gerarOrcamento(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GerarOrcamentoDto) {
+    return this.gerarOrcamentoUseCase.execute(id, dto);
+  }
+
+  @Patch(':id/orcamento/aprovar')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  aprovarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
+    return this.aprovarOrcamentoUseCase.execute(id);
+  }
+
+  @Patch(':id/orcamento/rejeitar')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  rejeitarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
+    return this.rejeitarOrcamentoUseCase.execute(id);
   }
 }

@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import {
+  formatPaginatedResponse,
+  buildSearchWhere,
+} from '../../../../shared/infrastructure/database/repository.utils';
 import { Veiculo } from '../../domain/entities/veiculo.entity';
 import {
   IVeiculoRepository,
@@ -11,7 +15,7 @@ import { VeiculoMapper, VeiculoORMEntity } from '../persistence/veiculo.orm-enti
 
 @Injectable()
 export class VeiculoRepository implements IVeiculoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateVeiculoInput): Promise<Veiculo> {
     const veiculo = Veiculo.criar({
@@ -47,31 +51,24 @@ export class VeiculoRepository implements IVeiculoRepository {
     data: Veiculo[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const skip = (page - 1) * limit;
-    const where = search
-      ? {
-          OR: [
-            { placa: { contains: search, mode: 'insensitive' as const } },
-            { marca: { contains: search, mode: 'insensitive' as const } },
-            { modelo: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where = buildSearchWhere(['placa', 'marca', 'modelo'], search) || {};
 
     const [ormData, total] = await Promise.all([
       this.prisma.veiculo.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
       }),
       this.prisma.veiculo.count({ where }),
     ]);
 
-    return {
-      data: ormData.map((d) => VeiculoMapper.toDomain(this.mapToORMEntity(d))),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return formatPaginatedResponse(
+      ormData.map((d) => VeiculoMapper.toDomain(this.mapToORMEntity(d))),
+      page,
+      limit,
+      total
+    );
   }
 
   async findById(id: string): Promise<Veiculo> {

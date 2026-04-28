@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum, IsNumber, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateOrdemServicoDto {
@@ -72,4 +72,14 @@ export class ListQueryDto {
   @ApiPropertyOptional({ example: 'troca', description: 'Buscar por descrição' })
   @IsOptional()
   search?: string;
+}
+
+export class GerarOrcamentoDto {
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valor_total_servicos: number;
+
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valor_total_pecas: number;
 }

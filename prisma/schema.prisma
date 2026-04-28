@@ -39,45 +39,65 @@ model User {
 
 model Cliente {
   id             String    @id @default(uuid())
-  nome           String
+  nome           String    @map("name")
   email          String    @unique
-  telefone       String?
-  documento      String    @unique
-  tipo_documento TaxIdType
+  telefone       String?   @map("phone")
+  documento      String    @unique @map("tax_id")
+  tipo_documento TaxIdType @map("tax_id_type")
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
   veiculos        Veiculo[]
   ordensServico   OrdemServico[]
+
+  @@map("Customer")
 }
 
 model Veiculo {
   id         String   @id @default(uuid())
-  placa      String   @unique
-  marca      String
-  modelo     String
-  ano        Int
-  cor        String?
+  placa      String   @unique @map("license_plate")
+  marca      String   @map("brand")
+  modelo     String   @map("model")
+  ano        Int      @map("year")
+  cor        String?  @map("color")
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
   cliente         Cliente        @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
-  id_cliente      String
+  id_cliente      String         @map("customer_id")
   ordensServico   OrdemServico[]
+
+  @@map("Vehicle")
 }
 
 model OrdemServico {
   id          String    @id @default(uuid())
+  id_veiculo  String    @map("vehicle_id")
+  id_cliente  String    @map("customer_id")
   status      SOStatus  @default(RECEIVED)
-  descricao   String?
+  descricao   String?   @map("description")
   created_at  DateTime  @default(now())
   updated_at  DateTime  @updatedAt
-  entregueEm  DateTime?
+  entregue_em DateTime? @map("delivered_at")
 
-  veiculo    Veiculo @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
-  id_veiculo String
-  cliente    Cliente @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
-  id_cliente String
+  veiculo   Veiculo    @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
+  cliente   Cliente    @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  orcamento Orcamento?
+
+  @@map("ServiceOrder")
+}
+
+model Orcamento {
+  id                   String         @id @default(uuid())
+  id_ordem_servico     String         @unique @map("service_order_id")
+  valor_total_servicos Decimal        @default(0) @db.Decimal(10, 2) @map("total_services_value")
+  valor_total_pecas    Decimal        @default(0) @db.Decimal(10, 2) @map("total_parts_value")
+  valor_total_geral    Decimal        @default(0) @db.Decimal(10, 2) @map("total_general_value")
+  status               EstimateStatus @default(PENDING) @map("estimate_status")
+  created_at           DateTime       @default(now())
+  updated_at           DateTime       @updatedAt
+
+  ordem_servico OrdemServico @relation(fields: [id_ordem_servico], references: [id], onDelete: Cascade)
 }
 
 model Peca {
@@ -86,8 +106,8 @@ model Peca {
   codigo             String   @unique
   descricao          String?
   preco              Decimal  @db.Decimal(10, 2)
-  quantidadeEstoque  Int      @default(0)
-  quantidadeMinima   Int      @default(1)
+  quantidade_estoque Int      @default(0)
+  quantidade_minima  Int      @default(1)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 }

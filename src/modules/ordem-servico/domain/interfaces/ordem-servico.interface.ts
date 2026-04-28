@@ -1,5 +1,10 @@
 import { OrdemDeServico } from '../entities/ordem-servico.entity';
 
+export type OrdemServicoUpdateData = {
+  status?: OrdemDeServico['status'];
+  descricao?: string;
+};
+
 export interface IOrdemServicoRepository {
   create(data: {
     veiculoId: string;
@@ -15,9 +20,6 @@ export interface IOrdemServicoRepository {
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }>;
   findOne(id: string): Promise<OrdemDeServico>;
-  update(
-    id: string,
-    data: { status?: OrdemDeServico['status']; descricao?: string }
-  ): Promise<OrdemDeServico>;
+  update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico>;
   remove(id: string): Promise<OrdemDeServico>;
 }

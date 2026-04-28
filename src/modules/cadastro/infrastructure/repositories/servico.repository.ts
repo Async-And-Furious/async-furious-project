@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import {
+  formatPaginatedResponse,
+  buildSearchWhere,
+} from '../../../../shared/infrastructure/database/repository.utils';
 import { Servico } from '../../domain/entities/servico.entity';
 import { IServicoRepository } from '../../domain/interfaces/servico.interface';
 
 @Injectable()
 export class ServicoRepository implements IServicoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: { nome: string; descricao?: string; preco: number }): Promise<Servico> {
     return (await this.prisma.servico.create({ data })) as unknown as Servico;
@@ -19,30 +23,19 @@ export class ServicoRepository implements IServicoRepository {
     data: Servico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const skip = (page - 1) * limit;
-    const where = search
-      ? {
-          OR: [
-            { nome: { contains: search, mode: 'insensitive' as const } },
-            { descricao: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where = buildSearchWhere(['nome', 'descricao'], search) || {};
 
     const [data, total] = await Promise.all([
       this.prisma.servico.findMany({
         where,
-        skip,
+        skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
       }),
       this.prisma.servico.count({ where }),
     ]);
 
-    return {
-      data: data as unknown as Servico[],
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    };
+    return formatPaginatedResponse(data as unknown as Servico[], page, limit, total);
   }
 
   async findOne(id: string): Promise<Servico> {

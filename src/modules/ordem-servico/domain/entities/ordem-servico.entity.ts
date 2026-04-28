@@ -1,3 +1,5 @@
+import type { Orcamento } from './orcamento.entity';
+
 export class OrdemDeServico {
   id: string;
   veiculoId: string;
@@ -12,5 +14,6 @@ export class OrdemDeServico {
   descricao: string | null;
   created_at: Date;
   updated_at: Date;
-  entregueEm: Date | null;
+  entregue_em: Date | null;
+  orcamento?: Orcamento;
 }
