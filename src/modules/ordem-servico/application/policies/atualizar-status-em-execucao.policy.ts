@@ -14,18 +14,17 @@ export class AtualizarStatusEmExecucaoPolicy {
 
   @OnEvent('OsSemPecasConfirmada')
   async handleSemPecas(evento: OsSemPecasConfirmada): Promise<void> {
-    await this.ordemServicoRepository.update(evento.ordemServicoId, {
-      status: 'IN_PROGRESS',
-    });
-    await this.emissor.emitir(new StatusAtualizadoEmExecucao(evento.ordemServicoId));
+    await this.iniciarExecucao(evento.ordemServicoId);
   }
 
   // P-18 hook: when pecas-insumos module emits PecasReservadas, also starts execution
   @OnEvent('PecasReservadas')
   async handlePecasReservadas(evento: { ordemServicoId: string }): Promise<void> {
-    await this.ordemServicoRepository.update(evento.ordemServicoId, {
-      status: 'IN_PROGRESS',
-    });
-    await this.emissor.emitir(new StatusAtualizadoEmExecucao(evento.ordemServicoId));
+    await this.iniciarExecucao(evento.ordemServicoId);
+  }
+
+  private async iniciarExecucao(ordemServicoId: string): Promise<void> {
+    await this.ordemServicoRepository.update(ordemServicoId, { status: 'IN_PROGRESS' });
+    await this.emissor.emitir(new StatusAtualizadoEmExecucao(ordemServicoId));
   }
 }
