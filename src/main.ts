@@ -44,6 +44,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err) => {
-  console.error('Failed to bootstrap application', err);
+  process.stderr.write(`Failed to bootstrap application: ${String(err)}\n`);
   process.exit(1);
 });
