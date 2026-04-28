@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BarramentoEventos } from '../../../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { OrcamentoRecusado } from '../../domain/events/orcamento-recusado.event';
 import { StatusAtualizadoEncerradaSemExecucao } from '../../domain/events/status-atualizado-encerrada-sem-execucao.event';
@@ -9,7 +9,7 @@ import { StatusAtualizadoEncerradaSemExecucao } from '../../domain/events/status
 export class AtualizarStatusEncerradaSemExecucaoPolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   @OnEvent('OrcamentoRecusado')
@@ -17,7 +17,7 @@ export class AtualizarStatusEncerradaSemExecucaoPolicy {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'CLOSED_WITHOUT_EXECUTION',
     });
-    await this.barramento.emitir(
+    await this.emissor.emitir(
       new StatusAtualizadoEncerradaSemExecucao(evento.ordemServicoId),
     );
   }

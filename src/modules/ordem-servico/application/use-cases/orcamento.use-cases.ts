@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
-import { BarramentoEventos } from '../../../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -12,7 +12,7 @@ export class AprovarOrcamentoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {
@@ -32,7 +32,7 @@ export class AprovarOrcamentoUseCase {
     }
 
     const approved = await this.orcamentoRepository.update(orcamento.id, { status: 'APPROVED' });
-    await this.barramento.emitir(
+    await this.emissor.emitir(
       new OrcamentoAprovado(id_ordem_servico, approved.id, approved.valor_total_pecas),
     );
     return approved;
@@ -44,7 +44,7 @@ export class RecusarOrcamentoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {
@@ -60,7 +60,7 @@ export class RecusarOrcamentoUseCase {
     }
 
     const rejected = await this.orcamentoRepository.update(orcamento.id, { status: 'REJECTED' });
-    await this.barramento.emitir(new OrcamentoRecusado(id_ordem_servico, rejected.id));
+    await this.emissor.emitir(new OrcamentoRecusado(id_ordem_servico, rejected.id));
     return rejected;
   }
 }

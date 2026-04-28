@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BarramentoEventos } from '../../../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado-pelo-cliente.event';
 import { StatusAtualizadoEntregue } from '../../domain/events/status-atualizado-entregue.event';
@@ -9,7 +9,7 @@ import { StatusAtualizadoEntregue } from '../../domain/events/status-atualizado-
 export class AtualizarStatusEntreguePolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   @OnEvent('ServicoAprovadoPeloCliente')
@@ -18,6 +18,6 @@ export class AtualizarStatusEntreguePolicy {
       status: 'DELIVERED',
       entregue_em: new Date(),
     });
-    await this.barramento.emitir(new StatusAtualizadoEntregue(evento.ordemServicoId));
+    await this.emissor.emitir(new StatusAtualizadoEntregue(evento.ordemServicoId));
   }
 }

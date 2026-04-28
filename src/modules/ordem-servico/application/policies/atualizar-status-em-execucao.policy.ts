@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BarramentoEventos } from '../../../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { OsSemPecasConfirmada } from '../../domain/events/os-sem-pecas-confirmada.event';
 import { StatusAtualizadoEmExecucao } from '../../domain/events/status-atualizado-em-execucao.event';
@@ -9,7 +9,7 @@ import { StatusAtualizadoEmExecucao } from '../../domain/events/status-atualizad
 export class AtualizarStatusEmExecucaoPolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   @OnEvent('OsSemPecasConfirmada')
@@ -17,7 +17,7 @@ export class AtualizarStatusEmExecucaoPolicy {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'IN_PROGRESS',
     });
-    await this.barramento.emitir(new StatusAtualizadoEmExecucao(evento.ordemServicoId));
+    await this.emissor.emitir(new StatusAtualizadoEmExecucao(evento.ordemServicoId));
   }
 
   // P-18 hook: when pecas-insumos module emits PecasReservadas, also starts execution
@@ -26,6 +26,6 @@ export class AtualizarStatusEmExecucaoPolicy {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'IN_PROGRESS',
     });
-    await this.barramento.emitir(new StatusAtualizadoEmExecucao(evento.ordemServicoId));
+    await this.emissor.emitir(new StatusAtualizadoEmExecucao(evento.ordemServicoId));
   }
 }

@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { OrdemServicoController } from './presentation/controllers/ordem-servico.controller';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
-import { BarramentoEventos } from '../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import {
   CriarOrdemServicoUseCase,
   AssumirOrdemServicoUseCase,
@@ -40,7 +40,7 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
   providers: [
     OrdemServicoRepository,
     OrcamentoRepository,
-    BarramentoEventos,
+    EmissorEventos,
 
     // Policies (registered as NestJS providers — @OnEvent listeners)
     {
@@ -50,9 +50,9 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
     },
     {
       provide: AtualizarStatusEmDiagnosticoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AtualizarStatusEmDiagnosticoPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: NotificarClienteDiagnosticoPolicy,
@@ -64,14 +64,14 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: BarramentoEventos,
+        barramento: EmissorEventos,
       ) => new GerarOrcamentoPolicy(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
     },
     {
       provide: EnviarOrcamentoPolicy,
-      useFactory: (barramento: BarramentoEventos) => new EnviarOrcamentoPolicy(barramento),
-      inject: [BarramentoEventos],
+      useFactory: (barramento: EmissorEventos) => new EnviarOrcamentoPolicy(barramento),
+      inject: [EmissorEventos],
     },
     {
       provide: AtualizarStatusAguardandoAprovacaoPolicy,
@@ -81,14 +81,14 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
     },
     {
       provide: VerificarNecessidadePecasPolicy,
-      useFactory: (barramento: BarramentoEventos) => new VerificarNecessidadePecasPolicy(barramento),
-      inject: [BarramentoEventos],
+      useFactory: (barramento: EmissorEventos) => new VerificarNecessidadePecasPolicy(barramento),
+      inject: [EmissorEventos],
     },
     {
       provide: AtualizarStatusEmExecucaoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AtualizarStatusEmExecucaoPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: IniciarMonitoramentoTempoPolicy,
@@ -97,9 +97,9 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
     },
     {
       provide: AtualizarStatusFinalizadaPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AtualizarStatusFinalizadaPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: FinalizarMonitoramentoTempoPolicy,
@@ -109,80 +109,80 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
     },
     {
       provide: NotificarClienteConclusaoPolicy,
-      useFactory: (barramento: BarramentoEventos) =>
+      useFactory: (barramento: EmissorEventos) =>
         new NotificarClienteConclusaoPolicy(barramento),
-      inject: [BarramentoEventos],
+      inject: [EmissorEventos],
     },
     {
       provide: AtualizarStatusEntreguePolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AtualizarStatusEntreguePolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: AtualizarStatusEncerradaSemExecucaoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AtualizarStatusEncerradaSemExecucaoPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
 
     // Use Cases
     {
       provide: CriarOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new CriarOrdemServicoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: AssumirOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AssumirOrdemServicoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: AnalisarVeiculoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AnalisarVeiculoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: ListarServicosInsumosNaOsUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: BarramentoEventos,
+        barramento: EmissorEventos,
       ) => new ListarServicosInsumosNaOsUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
     },
     {
       provide: AprovarOrcamentoUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: BarramentoEventos,
+        barramento: EmissorEventos,
       ) => new AprovarOrcamentoUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
     },
     {
       provide: RecusarOrcamentoUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: BarramentoEventos,
+        barramento: EmissorEventos,
       ) => new RecusarOrcamentoUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
     },
     {
       provide: FinalizarExecucaoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new FinalizarExecucaoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: AprovarServicoPrestadoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: BarramentoEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AprovarServicoPrestadoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, BarramentoEventos],
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: ConsultarStatusOrdemServicoUseCase,

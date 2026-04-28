@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
-import { BarramentoEventos } from '../../../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { OrcamentoVo } from '../../domain/value-objects/orcamento.vo';
@@ -13,7 +13,7 @@ export class GerarOrcamentoPolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   @OnEvent('ServicosEInsumosListados')
@@ -54,6 +54,6 @@ export class GerarOrcamentoPolicy {
       });
     }
 
-    await this.barramento.emitir(new OrcamentoGerado(evento.ordemServicoId, orcamento.id));
+    await this.emissor.emitir(new OrcamentoGerado(evento.ordemServicoId, orcamento.id));
   }
 }

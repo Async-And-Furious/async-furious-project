@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { BarramentoEventos } from '../../../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { ServicoConcluidoPeloMecanico } from '../../domain/events/servico-concluido-pelo-mecanico.event';
 import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizado-finalizada.event';
@@ -9,7 +9,7 @@ import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizad
 export class AtualizarStatusFinalizadaPolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   @OnEvent('ServicoConcluidoPeloMecanico')
@@ -17,6 +17,6 @@ export class AtualizarStatusFinalizadaPolicy {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'FINISHED',
     });
-    await this.barramento.emitir(new StatusAtualizadoFinalizada(evento.ordemServicoId));
+    await this.emissor.emitir(new StatusAtualizadoFinalizada(evento.ordemServicoId));
   }
 }

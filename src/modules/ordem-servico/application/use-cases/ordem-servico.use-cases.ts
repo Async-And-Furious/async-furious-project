@@ -1,6 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
-import { BarramentoEventos } from '../../../../shared/infrastructure/barramento-eventos/barramento-eventos.service';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -16,7 +16,7 @@ import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado
 export class CriarOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(data: {
@@ -25,7 +25,7 @@ export class CriarOrdemServicoUseCase {
     descricao?: string;
   }): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.create(data);
-    await this.barramento.emitir(new OrdemServicoCriada(os.id, os.clienteId, os.veiculoId));
+    await this.emissor.emitir(new OrdemServicoCriada(os.id, os.clienteId, os.veiculoId));
     return this.ordemServicoRepository.findOne(os.id);
   }
 }
@@ -34,7 +34,7 @@ export class CriarOrdemServicoUseCase {
 export class AssumirOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -44,7 +44,7 @@ export class AssumirOrdemServicoUseCase {
         `OS deve estar no status Recebida para ser assumida. Status atual: ${os.status}`,
       );
     }
-    await this.barramento.emitir(new OrdemServicoAssumida(id));
+    await this.emissor.emitir(new OrdemServicoAssumida(id));
     return this.ordemServicoRepository.findOne(id);
   }
 }
@@ -53,7 +53,7 @@ export class AssumirOrdemServicoUseCase {
 export class AnalisarVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -63,7 +63,7 @@ export class AnalisarVeiculoUseCase {
         `OS deve estar Em Diagnóstico para analisar o veículo. Status atual: ${os.status}`,
       );
     }
-    await this.barramento.emitir(new VeiculoAnalisado(id));
+    await this.emissor.emitir(new VeiculoAnalisado(id));
     return this.ordemServicoRepository.findOne(id);
   }
 }
@@ -73,7 +73,7 @@ export class ListarServicosInsumosNaOsUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(
@@ -86,7 +86,7 @@ export class ListarServicosInsumosNaOsUseCase {
         `OS deve estar Em Diagnóstico ou Aguardando Aprovação. Status atual: ${os.status}`,
       );
     }
-    await this.barramento.emitir(
+    await this.emissor.emitir(
       new ServicosEInsumosListados(id, data.valor_total_servicos, data.valor_total_pecas),
     );
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id);
@@ -101,7 +101,7 @@ export class ListarServicosInsumosNaOsUseCase {
 export class FinalizarExecucaoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -111,7 +111,7 @@ export class FinalizarExecucaoUseCase {
         `OS deve estar Em Execução para ser finalizada. Status atual: ${os.status}`,
       );
     }
-    await this.barramento.emitir(new ServicoConcluidoPeloMecanico(id));
+    await this.emissor.emitir(new ServicoConcluidoPeloMecanico(id));
     return this.ordemServicoRepository.findOne(id);
   }
 }
@@ -120,7 +120,7 @@ export class FinalizarExecucaoUseCase {
 export class AprovarServicoPrestadoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly barramento: BarramentoEventos,
+    private readonly emissor: EmissorEventos,
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -130,7 +130,7 @@ export class AprovarServicoPrestadoUseCase {
         `OS deve estar Finalizada para aprovação do serviço pelo cliente. Status atual: ${os.status}`,
       );
     }
-    await this.barramento.emitir(new ServicoAprovadoPeloCliente(id));
+    await this.emissor.emitir(new ServicoAprovadoPeloCliente(id));
     return this.ordemServicoRepository.findOne(id);
   }
 }
