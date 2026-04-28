@@ -1,3 +1,4 @@
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EmissorEventos } from './emissor-eventos.service';
 import { DomainEvent } from '../../domain/events/domain-event.base';
 
@@ -9,8 +10,10 @@ class EventoTeste extends DomainEvent {
 
 describe('EmissorEventos', () => {
   it('deve chamar emitAsync com o nome da classe do evento e o evento', async () => {
-    const mockEventEmitter = { emitAsync: jest.fn().mockResolvedValue([]) };
-    const emissor = new EmissorEventos(mockEventEmitter as any);
+    const mockEventEmitter = {
+      emitAsync: jest.fn().mockResolvedValue([]),
+    } as unknown as EventEmitter2;
+    const emissor = new EmissorEventos(mockEventEmitter);
     const evento = new EventoTeste('teste');
 
     await emissor.emitir(evento);

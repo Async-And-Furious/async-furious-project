@@ -26,6 +26,9 @@ import { ServicoConcluidoPeloMecanico } from '../../src/modules/ordem-servico/do
 import { StatusAtualizadoFinalizada } from '../../src/modules/ordem-servico/domain/events/status-atualizado-finalizada.event';
 import { ServicoAprovadoPeloCliente } from '../../src/modules/ordem-servico/domain/events/servico-aprovado-pelo-cliente.event';
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
+import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
+import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
+import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 
@@ -56,14 +59,26 @@ const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
 });
 
 describe('OS Policies', () => {
-  let osRepo: { findOne: jest.Mock; update: jest.Mock };
-  let orcRepo: { findByOrdemServicoId: jest.Mock; create: jest.Mock; update: jest.Mock };
-  let emissor: { emitir: jest.Mock };
+  let osRepo: jest.Mocked<IOrdemServicoRepository>;
+  let orcRepo: jest.Mocked<IOrcamentoRepository>;
+  let emissor: jest.Mocked<EmissorEventos>;
 
   beforeEach(() => {
-    osRepo = { findOne: jest.fn(), update: jest.fn() };
-    orcRepo = { findByOrdemServicoId: jest.fn(), create: jest.fn(), update: jest.fn() };
-    emissor = { emitir: jest.fn().mockResolvedValue(undefined) };
+    osRepo = {
+      findOne: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      findAll: jest.fn(),
+      remove: jest.fn(),
+    } as jest.Mocked<IOrdemServicoRepository>;
+    orcRepo = {
+      findByOrdemServicoId: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+    } as jest.Mocked<IOrcamentoRepository>;
+    emissor = {
+      emitir: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<EmissorEventos>;
   });
 
   // ─── P-01 ────────────────────────────────────────────────────────────────
@@ -71,7 +86,7 @@ describe('OS Policies', () => {
   describe('P-01 AtualizarStatusRecebidaPolicy', () => {
     it('não deve atualizar quando OS já está RECEIVED', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const policy = new AtualizarStatusRecebidaPolicy(osRepo as any);
+      const policy = new AtualizarStatusRecebidaPolicy(osRepo);
 
       await policy.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
@@ -80,7 +95,7 @@ describe('OS Policies', () => {
 
     it('deve forçar status RECEIVED quando OS foi criada em status incorreto', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const policy = new AtualizarStatusRecebidaPolicy(osRepo as any);
+      const policy = new AtualizarStatusRecebidaPolicy(osRepo);
 
       await policy.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
@@ -93,7 +108,7 @@ describe('OS Policies', () => {
   describe('P-02 AtualizarStatusEmDiagnosticoPolicy', () => {
     it('deve atualizar para UNDER_DIAGNOSIS e emitir StatusAtualizadoEmDiagnostico', async () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo as any, emissor as any);
+      const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo, emissor);
 
       await policy.handle(new OrdemServicoAssumida('os-1'));
 
@@ -105,11 +120,11 @@ describe('OS Policies', () => {
   // ─── P-03 ────────────────────────────────────────────────────────────────
 
   describe('P-03 NotificarClienteDiagnosticoPolicy', () => {
-    it('deve executar stub sem lançar erro', async () => {
+    it('deve executar stub sem lançar erro', () => {
       const policy = new NotificarClienteDiagnosticoPolicy();
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
-      await policy.handle(new StatusAtualizadoEmDiagnostico('os-1'));
+      policy.handle(new StatusAtualizadoEmDiagnostico('os-1'));
 
       expect(consoleSpy).toHaveBeenCalled();
       consoleSpy.mockRestore();
@@ -125,11 +140,13 @@ describe('OS Policies', () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
       orcRepo.findByOrdemServicoId.mockResolvedValue(null);
       orcRepo.create.mockResolvedValue(mockOrc());
-      const policy = new GerarOrcamentoPolicy(osRepo as any, orcRepo as any, emissor as any);
+      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
 
       await policy.handle(evento);
 
-      expect(orcRepo.create).toHaveBeenCalledWith(expect.objectContaining({ id_ordem_servico: 'os-1' }));
+      expect(orcRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ id_ordem_servico: 'os-1' })
+      );
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrcamentoGerado));
     });
 
@@ -137,25 +154,28 @@ describe('OS Policies', () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
       orcRepo.findByOrdemServicoId.mockResolvedValue(mockOrc({ status: 'PENDING' }));
       orcRepo.update.mockResolvedValue(mockOrc());
-      const policy = new GerarOrcamentoPolicy(osRepo as any, orcRepo as any, emissor as any);
+      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
 
       await policy.handle(evento);
 
-      expect(orcRepo.update).toHaveBeenCalledWith('orc-1', expect.objectContaining({ status: 'PENDING' }));
+      expect(orcRepo.update).toHaveBeenCalledWith(
+        'orc-1',
+        expect.objectContaining({ status: 'PENDING' })
+      );
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrcamentoGerado));
     });
 
     it('deve lançar DomainException quando orçamento já está APPROVED', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
       orcRepo.findByOrdemServicoId.mockResolvedValue(mockOrc({ status: 'APPROVED' }));
-      const policy = new GerarOrcamentoPolicy(osRepo as any, orcRepo as any, emissor as any);
+      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
 
       await expect(policy.handle(evento)).rejects.toThrow(DomainException);
     });
 
     it('deve lançar DomainException quando OS está em status inválido', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const policy = new GerarOrcamentoPolicy(osRepo as any, orcRepo as any, emissor as any);
+      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
 
       await expect(policy.handle(evento)).rejects.toThrow(DomainException);
     });
@@ -165,7 +185,7 @@ describe('OS Policies', () => {
 
   describe('P-05 EnviarOrcamentoPolicy', () => {
     it('deve emitir OrcamentoEnviado', async () => {
-      const policy = new EnviarOrcamentoPolicy(emissor as any);
+      const policy = new EnviarOrcamentoPolicy(emissor);
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
 
       await policy.handle(new OrcamentoGerado('os-1', 'orc-1'));
@@ -180,7 +200,7 @@ describe('OS Policies', () => {
   describe('P-06 AtualizarStatusAguardandoAprovacaoPolicy', () => {
     it('deve atualizar para AWAITING_APPROVAL quando OS está UNDER_DIAGNOSIS', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo as any);
+      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
 
       await policy.handle(new OrcamentoEnviado('os-1', 'orc-1'));
 
@@ -189,7 +209,7 @@ describe('OS Policies', () => {
 
     it('não deve atualizar quando OS já não está UNDER_DIAGNOSIS', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
-      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo as any);
+      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
 
       await policy.handle(new OrcamentoEnviado('os-1', 'orc-1'));
 
@@ -201,7 +221,7 @@ describe('OS Policies', () => {
 
   describe('P-07 VerificarNecessidadePecasPolicy', () => {
     it('deve emitir OrcamentoAprovadoComPecas quando valorTotalPecas > 0', async () => {
-      const policy = new VerificarNecessidadePecasPolicy(emissor as any);
+      const policy = new VerificarNecessidadePecasPolicy(emissor);
 
       await policy.handle(new OrcamentoAprovado('os-1', 'orc-1', 50));
 
@@ -210,7 +230,7 @@ describe('OS Policies', () => {
     });
 
     it('deve emitir OsSemPecasConfirmada quando valorTotalPecas é 0', async () => {
-      const policy = new VerificarNecessidadePecasPolicy(emissor as any);
+      const policy = new VerificarNecessidadePecasPolicy(emissor);
 
       await policy.handle(new OrcamentoAprovado('os-1', 'orc-1', 0));
 
@@ -224,7 +244,7 @@ describe('OS Policies', () => {
   describe('P-08 AtualizarStatusEmExecucaoPolicy', () => {
     it('deve atualizar para IN_PROGRESS e emitir StatusAtualizadoEmExecucao via OsSemPecasConfirmada', async () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo as any, emissor as any);
+      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
 
       await policy.handleSemPecas(new OsSemPecasConfirmada('os-1'));
 
@@ -234,7 +254,7 @@ describe('OS Policies', () => {
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas', async () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo as any, emissor as any);
+      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
 
       await policy.handlePecasReservadas({ ordemServicoId: 'os-1' });
 
@@ -248,7 +268,7 @@ describe('OS Policies', () => {
   describe('P-09 IniciarMonitoramentoTempoPolicy', () => {
     it('deve atualizar iniciada_em com data atual', async () => {
       osRepo.update.mockResolvedValue(mockOs());
-      const policy = new IniciarMonitoramentoTempoPolicy(osRepo as any);
+      const policy = new IniciarMonitoramentoTempoPolicy(osRepo);
 
       await policy.handle(new StatusAtualizadoEmExecucao('os-1'));
 
@@ -261,7 +281,7 @@ describe('OS Policies', () => {
   describe('P-10 AtualizarStatusFinalizadaPolicy', () => {
     it('deve atualizar para FINISHED e emitir StatusAtualizadoFinalizada', async () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'FINISHED' }));
-      const policy = new AtualizarStatusFinalizadaPolicy(osRepo as any, emissor as any);
+      const policy = new AtualizarStatusFinalizadaPolicy(osRepo, emissor);
 
       await policy.handle(new ServicoConcluidoPeloMecanico('os-1'));
 
@@ -278,7 +298,7 @@ describe('OS Policies', () => {
       osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em }));
       osRepo.update.mockResolvedValue(mockOs());
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      const policy = new FinalizarMonitoramentoTempoPolicy(osRepo as any);
+      const policy = new FinalizarMonitoramentoTempoPolicy(osRepo);
 
       await policy.handle(new StatusAtualizadoFinalizada('os-1'));
 
@@ -291,7 +311,7 @@ describe('OS Policies', () => {
       osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em: null }));
       osRepo.update.mockResolvedValue(mockOs());
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      const policy = new FinalizarMonitoramentoTempoPolicy(osRepo as any);
+      const policy = new FinalizarMonitoramentoTempoPolicy(osRepo);
 
       await policy.handle(new StatusAtualizadoFinalizada('os-1'));
 
@@ -306,7 +326,7 @@ describe('OS Policies', () => {
   describe('P-12 NotificarClienteConclusaoPolicy', () => {
     it('deve emitir ClienteNotificadoConclusao', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      const policy = new NotificarClienteConclusaoPolicy(emissor as any);
+      const policy = new NotificarClienteConclusaoPolicy(emissor);
 
       await policy.handle(new StatusAtualizadoFinalizada('os-1'));
 
@@ -321,7 +341,7 @@ describe('OS Policies', () => {
   describe('P-13 AtualizarStatusEntreguePolicy', () => {
     it('deve atualizar para DELIVERED com entregue_em e emitir StatusAtualizadoEntregue', async () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'DELIVERED' }));
-      const policy = new AtualizarStatusEntreguePolicy(osRepo as any, emissor as any);
+      const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
 
       await policy.handle(new ServicoAprovadoPeloCliente('os-1'));
 
@@ -339,7 +359,7 @@ describe('OS Policies', () => {
   describe('P-14 AtualizarStatusEncerradaSemExecucaoPolicy', () => {
     it('deve atualizar para CLOSED_WITHOUT_EXECUTION e emitir StatusAtualizadoEncerradaSemExecucao', async () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'CLOSED_WITHOUT_EXECUTION' }));
-      const policy = new AtualizarStatusEncerradaSemExecucaoPolicy(osRepo as any, emissor as any);
+      const policy = new AtualizarStatusEncerradaSemExecucaoPolicy(osRepo, emissor);
 
       await policy.handle(new OrcamentoRecusado('os-1', 'orc-1'));
 

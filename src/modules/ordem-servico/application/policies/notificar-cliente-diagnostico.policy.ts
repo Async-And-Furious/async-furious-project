@@ -5,11 +5,9 @@ import { StatusAtualizadoEmDiagnostico } from '../../domain/events/status-atuali
 @Injectable()
 export class NotificarClienteDiagnosticoPolicy {
   @OnEvent('StatusAtualizadoEmDiagnostico')
-  async handle(evento: StatusAtualizadoEmDiagnostico): Promise<void> {
-    // Stub: In a full system, would dispatch notification to client
-    // Will integrate with notification module when available
+  handle(evento: StatusAtualizadoEmDiagnostico): void {
     console.log(
-      `[NotificarClienteDiagnostico] OS ${evento.ordemServicoId} em diagnóstico — cliente notificado (stub).`,
+      `[NotificarClienteDiagnostico] OS ${evento.ordemServicoId} em diagnóstico — cliente notificado (stub).`
     );
   }
 }

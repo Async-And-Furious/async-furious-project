@@ -7,13 +7,14 @@ import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-serv
 import { OrcamentoVo } from '../../domain/value-objects/orcamento.vo';
 import { ServicosEInsumosListados } from '../../domain/events/servicos-e-insumos-listados.event';
 import { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event';
+import type { Orcamento } from '../../domain/entities/orcamento.entity';
 
 @Injectable()
 export class GerarOrcamentoPolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   @OnEvent('ServicosEInsumosListados')
@@ -22,7 +23,7 @@ export class GerarOrcamentoPolicy {
 
     if (!['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {
       throw new DomainException(
-        `Orçamento só pode ser gerado quando OS está Em Diagnóstico ou Aguardando Aprovação. Status atual: ${os.status}`,
+        `Orçamento só pode ser gerado quando OS está Em Diagnóstico ou Aguardando Aprovação. Status atual: ${os.status}`
       );
     }
 
@@ -37,7 +38,7 @@ export class GerarOrcamentoPolicy {
       throw new DomainException('Não é possível alterar orçamento já aprovado.');
     }
 
-    let orcamento;
+    let orcamento: Orcamento;
     if (existing) {
       orcamento = await this.orcamentoRepository.update(existing.id, {
         valor_total_servicos: vo.getValorTotalServicos().toNumber(),
