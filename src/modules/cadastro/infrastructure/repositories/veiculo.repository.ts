@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
-import { formatPaginatedResponse } from '../../../../shared/infrastructure/database/repository.utils';
+import {
+  formatPaginatedResponse,
+  buildSearchWhere,
+} from '../../../../shared/infrastructure/database/repository.utils';
 import { Veiculo } from '../../domain/entities/veiculo.entity';
 import {
   IVeiculoRepository,
@@ -48,15 +51,7 @@ export class VeiculoRepository implements IVeiculoRepository {
     data: Veiculo[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const where = search
-      ? {
-          OR: [
-            { placa: { contains: search, mode: 'insensitive' as const } },
-            { marca: { contains: search, mode: 'insensitive' as const } },
-            { modelo: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where = buildSearchWhere(['placa', 'marca', 'modelo'], search) || {};
 
     const [ormData, total] = await Promise.all([
       this.prisma.veiculo.findMany({

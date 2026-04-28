@@ -149,9 +149,9 @@ describe('ClienteRepository', () => {
       expect(mockPrismaService.cliente.findMany).toHaveBeenCalledWith({
         where: {
           OR: [
-            { nome: { contains: 'test', mode: 'insensitive' as const } },
-            { email: { contains: 'test', mode: 'insensitive' as const } },
-            { documento: { contains: 'test' } },
+            { nome: { contains: 'test', mode: 'insensitive' } },
+            { email: { contains: 'test', mode: 'insensitive' } },
+            { documento: { contains: 'test', mode: 'insensitive' } },
           ],
         },
         skip: 0,

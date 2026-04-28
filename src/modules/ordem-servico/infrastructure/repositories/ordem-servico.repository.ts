@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
-import { formatPaginatedResponse } from '../../../../shared/infrastructure/database/repository.utils';
+import {
+  formatPaginatedResponse,
+  buildSearchWhere,
+} from '../../../../shared/infrastructure/database/repository.utils';
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import {
   IOrdemServicoRepository,
@@ -37,7 +40,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     data: OrdemDeServico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const where = search ? { descricao: { contains: search, mode: 'insensitive' as const } } : {};
+    const where = buildSearchWhere(['descricao'], search) || {};
 
     const [data, total] = await Promise.all([
       this.prisma.ordemServico.findMany({

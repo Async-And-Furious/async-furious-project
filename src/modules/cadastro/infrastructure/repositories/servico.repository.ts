@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
-import { formatPaginatedResponse } from '../../../../shared/infrastructure/database/repository.utils';
+import {
+  formatPaginatedResponse,
+  buildSearchWhere,
+} from '../../../../shared/infrastructure/database/repository.utils';
 import { Servico } from '../../domain/entities/servico.entity';
 import { IServicoRepository } from '../../domain/interfaces/servico.interface';
 
@@ -20,14 +23,7 @@ export class ServicoRepository implements IServicoRepository {
     data: Servico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const where = search
-      ? {
-          OR: [
-            { nome: { contains: search, mode: 'insensitive' as const } },
-            { descricao: { contains: search, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    const where = buildSearchWhere(['nome', 'descricao'], search) || {};
 
     const [data, total] = await Promise.all([
       this.prisma.servico.findMany({
