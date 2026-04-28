@@ -8,7 +8,7 @@ import type {
 
 @Injectable()
 export class OrcamentoRepository implements IOrcamentoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: {
     id_ordem_servico: string;

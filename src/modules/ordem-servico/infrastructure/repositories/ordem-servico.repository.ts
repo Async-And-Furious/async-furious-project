@@ -9,7 +9,7 @@ import {
 
 @Injectable()
 export class OrdemServicoRepository implements IOrdemServicoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: {
     veiculoId: string;

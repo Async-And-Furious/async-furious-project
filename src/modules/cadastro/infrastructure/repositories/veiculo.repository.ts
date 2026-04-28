@@ -11,7 +11,7 @@ import { VeiculoMapper, VeiculoORMEntity } from '../persistence/veiculo.orm-enti
 
 @Injectable()
 export class VeiculoRepository implements IVeiculoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateVeiculoInput): Promise<Veiculo> {
     const veiculo = Veiculo.criar({

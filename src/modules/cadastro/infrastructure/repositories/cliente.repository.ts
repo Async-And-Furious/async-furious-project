@@ -11,7 +11,7 @@ import { ClienteMapper, ClienteORMEntity } from '../persistence/cliente.orm-enti
 
 @Injectable()
 export class ClienteRepository implements IClienteRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateClienteInput): Promise<Cliente> {
     const cliente = Cliente.criar({

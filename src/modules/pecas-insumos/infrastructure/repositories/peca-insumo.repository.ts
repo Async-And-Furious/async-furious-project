@@ -5,7 +5,7 @@ import { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.inter
 
 @Injectable()
 export class PecaInsumoRepository implements IPecaInsumoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: {
     nome: string;

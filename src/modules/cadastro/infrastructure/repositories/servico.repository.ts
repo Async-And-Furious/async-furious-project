@@ -5,7 +5,7 @@ import { IServicoRepository } from '../../domain/interfaces/servico.interface';
 
 @Injectable()
 export class ServicoRepository implements IServicoRepository {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: { nome: string; descricao?: string; preco: number }): Promise<Servico> {
     return (await this.prisma.servico.create({ data })) as unknown as Servico;
