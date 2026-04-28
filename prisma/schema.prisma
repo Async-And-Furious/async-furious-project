@@ -30,74 +30,68 @@ enum EstimateStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      String   @default("admin")
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String
+  name       String
+  role       String   @default("admin")
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
 
 model Cliente {
   id             String    @id @default(uuid())
-  nome           String    @map("name")
+  nome           String
   email          String    @unique
-  telefone       String?   @map("phone")
-  documento      String    @unique @map("tax_id")
-  tipo_documento TaxIdType @map("tax_id_type")
+  telefone       String?
+  documento      String    @unique
+  tipo_documento TaxIdType
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
-  veiculos        Veiculo[]
-  ordensServico   OrdemServico[]
-
-  @@map("Customer")
+  veiculos      Veiculo[]
+  ordensServico OrdemServico[]
 }
 
 model Veiculo {
   id         String   @id @default(uuid())
-  placa      String   @unique @map("license_plate")
-  marca      String   @map("brand")
-  modelo     String   @map("model")
-  ano        Int      @map("year")
-  cor        String?  @map("color")
+  placa      String   @unique
+  marca      String
+  modelo     String
+  ano        Int
+  cor        String?
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  cliente         Cliente        @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
-  id_cliente      String         @map("customer_id")
-  ordensServico   OrdemServico[]
-
-  @@map("Vehicle")
+  id_cliente    String
+  cliente       Cliente        @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  ordensServico OrdemServico[]
 }
 
 model OrdemServico {
   id            String    @id @default(uuid())
-  id_veiculo    String    @map("vehicle_id")
-  id_cliente    String    @map("customer_id")
+  id_veiculo    String
+  id_cliente    String
   status        SOStatus  @default(RECEIVED)
-  descricao     String?   @map("description")
-  iniciada_em   DateTime? @map("started_at")
-  finalizada_em DateTime? @map("finished_at")
-  entregue_em   DateTime? @map("delivered_at")
+  descricao     String?
+  iniciada_em   DateTime?
+  finalizada_em DateTime?
+  entregue_em   DateTime?
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
   veiculo   Veiculo    @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
   cliente   Cliente    @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
   orcamento Orcamento?
-
-  @@map("ServiceOrder")
 }
 
 model Orcamento {
   id                   String         @id @default(uuid())
-  id_ordem_servico     String         @unique @map("service_order_id")
-  valor_total_servicos Decimal        @default(0) @db.Decimal(10, 2) @map("total_services_value")
-  valor_total_pecas    Decimal        @default(0) @db.Decimal(10, 2) @map("total_parts_value")
-  valor_total_geral    Decimal        @default(0) @db.Decimal(10, 2) @map("total_general_value")
-  status               EstimateStatus @default(PENDING) @map("estimate_status")
+  id_ordem_servico     String         @unique
+  valor_total_servicos Decimal        @default(0) @db.Decimal(10, 2)
+  valor_total_pecas    Decimal        @default(0) @db.Decimal(10, 2)
+  valor_total_geral    Decimal        @default(0) @db.Decimal(10, 2)
+  status               EstimateStatus @default(PENDING)
   created_at           DateTime       @default(now())
   updated_at           DateTime       @updatedAt
 
