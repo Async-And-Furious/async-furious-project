@@ -12,6 +12,9 @@ import {
   FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
   ConsultarStatusOrdemServicoUseCase,
+  ListarOrdensServicoUseCase,
+  DetalharOrdemServicoUseCase,
+  DeletarOrdemServicoUseCase,
 } from '../../src/modules/ordem-servico/application/use-cases/ordem-servico.use-cases';
 import type { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
@@ -381,6 +384,49 @@ describe('OS + Orçamento Use Cases', () => {
 
       const uc = new ConsultarStatusOrdemServicoUseCase(mockOsRepository as any);
       await expect(uc.execute('invalid')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // ─── UC-11: ListarOrdensServicoUseCase ───────────────────────────────────
+
+  describe('ListarOrdensServicoUseCase', () => {
+    it('deve delegar para o repositório e retornar lista paginada', async () => {
+      const paginado = { data: [mockOs], pagination: { page: 1, limit: 10, total: 1, totalPages: 1 } };
+      mockOsRepository.findAll.mockResolvedValue(paginado);
+
+      const uc = new ListarOrdensServicoUseCase(mockOsRepository as any);
+      const result = await uc.execute(1, 10, 'troca');
+
+      expect(mockOsRepository.findAll).toHaveBeenCalledWith(1, 10, 'troca');
+      expect(result).toBe(paginado);
+    });
+  });
+
+  // ─── UC-12: DetalharOrdemServicoUseCase ──────────────────────────────────
+
+  describe('DetalharOrdemServicoUseCase', () => {
+    it('deve retornar OS pelo ID', async () => {
+      mockOsRepository.findOne.mockResolvedValue(mockOs);
+
+      const uc = new DetalharOrdemServicoUseCase(mockOsRepository as any);
+      const result = await uc.execute('os-1');
+
+      expect(mockOsRepository.findOne).toHaveBeenCalledWith('os-1');
+      expect(result).toBe(mockOs);
+    });
+  });
+
+  // ─── DeletarOrdemServicoUseCase ───────────────────────────────────────────
+
+  describe('DeletarOrdemServicoUseCase', () => {
+    it('deve deletar e retornar a OS removida', async () => {
+      mockOsRepository.remove.mockResolvedValue(mockOs);
+
+      const uc = new DeletarOrdemServicoUseCase(mockOsRepository as any);
+      const result = await uc.execute('os-1');
+
+      expect(mockOsRepository.remove).toHaveBeenCalledWith('os-1');
+      expect(result).toBe(mockOs);
     });
   });
 });
