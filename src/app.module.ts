@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './shared/infrastructure/database/database.module';
@@ -11,6 +12,7 @@ import { OrdemServicoModule } from './modules/ordem-servico/ordem-servico.module
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    EventEmitterModule.forRoot(),
     DatabaseModule,
     AuthModule,
     CadastroModule,

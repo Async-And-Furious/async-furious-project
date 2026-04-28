@@ -1,8 +1,11 @@
-import { OrdemDeServico } from '../entities/ordem-servico.entity';
+import { OrdemDeServico, OSStatus } from '../entities/ordem-servico.entity';
 
 export type OrdemServicoUpdateData = {
-  status?: OrdemDeServico['status'];
+  status?: OSStatus;
   descricao?: string;
+  iniciada_em?: Date | null;
+  finalizada_em?: Date | null;
+  entregue_em?: Date | null;
 };
 
 export interface IOrdemServicoRepository {
@@ -14,7 +17,7 @@ export interface IOrdemServicoRepository {
   findAll(
     page?: number,
     limit?: number,
-    search?: string
+    search?: string,
   ): Promise<{
     data: OrdemDeServico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };

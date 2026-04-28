@@ -1,0 +1,1216 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: Async Furious API
+meta:
+  id: wrk_8b0d960b6162401295aee414c5f6b3df
+  created: 1777152773556
+  modified: 1777152773556
+  description: ""
+collection:
+  - name: Servicos
+    meta:
+      id: fld_15b04939fe6c4d1eb1cd714519845fbc
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000070
+      description: Service management endpoints
+    children:
+      - url: "{{ base_url }}/servicos"
+        name: List Servicos
+        meta:
+          id: req_00996e488ba14e86a3be63988beaa60a
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000072
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            disabled: true
+          - name: limit
+            value: "10"
+            disabled: true
+          - name: search
+            value: ""
+            disabled: true
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/servicos/{{ servico_id }}"
+        name: Update Servico
+        meta:
+          id: req_6b025cdfae60414c938a70bc262c79d1
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000074
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "Lavagem premium",
+              "descricao": "Lavagem completa com cera e higienização interna",
+              "preco": 150.00
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/servicos/{{ servico_id }}"
+        name: Delete Servico
+        meta:
+          id: req_b6b9f386a574448f86208030f8919bc4
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000075
+        method: DELETE
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/servicos"
+        name: Create Servico
+        meta:
+          id: req_cefc3c63a526448c8f93d3f1600ecfb2
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000071
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "Lavagem completa",
+              "descricao": "Lavagem interna e externa com aspiração",
+              "preco": 120.50
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/servicos/{{ servico_id }}"
+        name: Get Servico by ID
+        meta:
+          id: req_d463371f69bd4b3881137f8e094e5d97
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000073
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Ordens Servico
+    meta:
+      id: fld_1c55793f64ab43c492079ef8cab0fc6d
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000050
+      description: Service order management endpoints
+    children:
+      - url: "{{ base_url }}/ordens-servico"
+        name: List Ordens Servico
+        meta:
+          id: req_2aa3211886a4456c9a2ed4a73eb2ce86
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000052
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            disabled: true
+          - name: limit
+            value: "10"
+            disabled: true
+          - name: search
+            value: ""
+            disabled: true
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico"
+        name: Create Ordem Servico
+        meta:
+          id: req_3721f9c8762749209679ac1a5f5f2c17
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000051
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "veiculoId": "{{ veiculo_id }}",
+              "clienteId": "{{ cliente_id }}",
+              "descricao": "Troca de óleo e revisão completa"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}"
+        name: Delete Ordem Servico
+        meta:
+          id: req_3e1db80f736d4aa2a25d22d6a8da771c
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000055
+        method: DELETE
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}"
+        name: Get Ordem Servico by ID
+        meta:
+          id: req_df70499206c14b91af8df325a4ee1541
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000053
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/assumir"
+        name: Assumir Ordem Servico
+        meta:
+          id: req_assumir_ordem_servico_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Mecânico assume a OS — status muda para Em Diagnóstico (UNDER_DIAGNOSIS)"
+          sortKey: -1745628000055b
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/analisar"
+        name: Analisar Veiculo
+        meta:
+          id: req_analisar_veiculo_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Registra análise do veículo (UNDER_DIAGNOSIS). Evento VeiculoAnalisado emitido."
+          sortKey: -1745628000056b
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/servicos-insumos"
+        name: Listar Servicos e Insumos (gera orçamento)
+        meta:
+          id: req_servicos_insumos_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Registra serviços e insumos. Gera orçamento e atualiza OS para Aguardando Aprovação (AWAITING_APPROVAL)"
+          sortKey: -1745628000057
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "valor_total_servicos": 250.00,
+              "valor_total_pecas": 150.00
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/orcamento/aprovar"
+        name: Aprovar Orcamento
+        meta:
+          id: req_aprovar_orcamento_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Aprova orçamento pendente — status da OS muda para Em Execução (IN_PROGRESS)"
+          sortKey: -1745628000058
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/orcamento/recusar"
+        name: Recusar Orcamento
+        meta:
+          id: req_recusar_orcamento_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Recusa orçamento pendente — OS → Encerrada Sem Execução (CLOSED_WITHOUT_EXECUTION)"
+          sortKey: -1745628000059
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/finalizar-execucao"
+        name: Finalizar Execucao
+        meta:
+          id: req_finalizar_execucao_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Mecânico finaliza a execução do serviço (IN_PROGRESS → FINISHED)"
+          sortKey: -1745628000060
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/aprovar-servico"
+        name: Aprovar Servico Prestado
+        meta:
+          id: req_aprovar_servico_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Cliente aprova o serviço prestado — OS → Entregue (DELIVERED)"
+          sortKey: -1745628000061
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/status"
+        name: Consultar Status OS
+        meta:
+          id: req_consultar_status_001
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: "Consulta o status atual da OS (endpoint para o cliente)"
+          sortKey: -1745628000062
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Error Mocks
+    meta:
+      id: fld_2ca1001bc402474892318310f6085cdc
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000080
+      description: Expected error response examples for validation and edge cases
+    children:
+      - url: "{{ base_url }}/clientes"
+        name: CPF Wrong Length (400)
+        meta:
+          id: req_20d07cb88f7e43738d3006258824d773
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: 'Expected 400 — { "statusCode": 400, "message": "CPF deve conter 11
+            digitos", "error": "Bad Request", "path": "/api/v1/clientes" }'
+          sortKey: -1745628000082
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "João Silva",
+              "email": "joao@example.com",
+              "documento": "12345",
+              "tipoDocumento": "CPF"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes"
+        name: CNPJ Invalid (400)
+        meta:
+          id: req_25b4903ff2e249d8b7c813eca655468c
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: 'Expected 400 — { "statusCode": 400, "message": "CNPJ invalido",
+            "error": "Bad Request", "path": "/api/v1/clientes" }'
+          sortKey: -1745628000083
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "Empresa XPTO",
+              "email": "empresa@example.com",
+              "documento": "12345678000100",
+              "tipoDocumento": "CNPJ"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes/00000000-0000-0000-0000-000000000000"
+        name: Not Found (404)
+        meta:
+          id: req_3ec5289a7ac9422eac5682002d6e994f
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: 'Expected 404 — { "statusCode": 404, "message": "Cliente not
+            found", "error": "Not Found", "path":
+            "/api/v1/clientes/00000000-0000-0000-0000-000000000000" }'
+          sortKey: -1745628000086
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes"
+        name: CPF Invalid (400)
+        meta:
+          id: req_8deddc6c762744c8ab0c1684e739db1b
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: 'Expected 400 — { "statusCode": 400, "message": "CPF invalido",
+            "error": "Bad Request", "path": "/api/v1/clientes" }'
+          sortKey: -1745628000081
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "João Silva",
+              "email": "joao@example.com",
+              "telefone": "11999999999",
+              "documento": "12345678900",
+              "tipoDocumento": "CPF"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes"
+        name: Validation Error (400)
+        meta:
+          id: req_920ec5d2b2a44f48aaf402b3772a55e0
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: 'Expected 400 — { "statusCode": 400, "message": ["email must be an
+            email", "nome must be longer than 2 characters"], "error": "Bad
+            Request", "path": "/api/v1/clientes" }'
+          sortKey: -1745628000084
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "AB",
+              "email": "notanemail"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes"
+        name: Unauthorized (401)
+        meta:
+          id: req_ee8d65f5abf04bcbabf76ca8309c0209
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: 'Expected 401 — { "statusCode": 401, "message": "Unauthorized",
+            "error": "Unauthorized", "path": "/api/v1/clientes" }'
+          sortKey: -1745628000085
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "João Silva",
+              "email": "joao@example.com",
+              "documento": "12345678901",
+              "tipoDocumento": "CPF"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Health
+    meta:
+      id: fld_3acced7415074ce4bc15a24bbf6cad09
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000010
+      description: Health check endpoint
+    children:
+      - url: "{{ base_url }}/"
+        name: Health Check
+        meta:
+          id: req_7111f533dad64c048453c0287d2aa614
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000010
+        method: GET
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Veiculos
+    meta:
+      id: fld_7fc2c101205e465994ea46523ebb8968
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000040
+      description: Vehicle management endpoints
+    children:
+      - url: "{{ base_url }}/veiculos/{{ veiculo_id }}"
+        name: Update Veiculo
+        meta:
+          id: req_278d1706fbcf44c7a3807c679da2b82d
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000044
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "marca": "Honda",
+              "modelo": "Civic",
+              "ano": 2025,
+              "cor": "Preto"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/veiculos"
+        name: List Veiculos
+        meta:
+          id: req_973ea335126c4445989ead1269a6c5db
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000042
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            disabled: true
+          - name: limit
+            value: "10"
+            disabled: true
+          - name: search
+            value: Toyota
+            disabled: true
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/veiculos/{{ veiculo_id }}"
+        name: Get Veiculo by ID
+        meta:
+          id: req_9ca646e0e4044305a1d3f97ec7b3a1c6
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000043
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/veiculos/{{ veiculo_id }}"
+        name: Delete Veiculo
+        meta:
+          id: req_c3058565af254ff2a135ed7b2afd8952
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000045
+        method: DELETE
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/veiculos"
+        name: Create Veiculo
+        meta:
+          id: req_e9a4fe4cf99d43449ef4414ee4b5f427
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000041
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "placa": "ABC-1234",
+              "marca": "Toyota",
+              "modelo": "Corolla",
+              "ano": 2024,
+              "cor": "Prata",
+              "clienteId": "{{ cliente_id }}"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Pecas Insumos
+    meta:
+      id: fld_a146d86d20a04ec2a81506648e562ae9
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000060
+      description: Parts and supplies management endpoints
+    children:
+      - url: "{{ base_url }}/pecas/{{ peca_id }}"
+        name: Update Peca Insumo
+        meta:
+          id: req_02dc97d298bd45abb38bb495266aecb8
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000064
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "Filtro de Óleo Premium",
+              "descricao": "Filtro de óleo sintético",
+              "preco": 59.90,
+              "quantidade_minima": 15
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/pecas/{{ peca_id }}"
+        name: Get Peca Insumo by ID
+        meta:
+          id: req_0a445abd82da408fa1ee171ed8d3e059
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000063
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/pecas/{{ peca_id }}"
+        name: Delete Peca Insumo
+        meta:
+          id: req_2098c9feef9f45dab132c5f56a037a3c
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000066
+        method: DELETE
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/pecas/{{ peca_id }}/estoque"
+        name: Update Estoque Peca
+        meta:
+          id: req_56d2e11872cb4e68b11c1d6c81ea4936
+          created: 1745628000000
+          modified: 1777152851319
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000065
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "quantidade": 50
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/pecas"
+        name: List Pecas Insumos
+        meta:
+          id: req_dd31007a861d4ff3acc73bef72d8ce07
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000062
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            disabled: true
+          - name: limit
+            value: "10"
+            disabled: true
+          - name: search
+            value: ""
+            disabled: true
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/pecas"
+        name: Create Peca Insumo
+        meta:
+          id: req_dd911258c50a45768099df115282ff87
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000061
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "Filtro de Óleo",
+              "codigo": "FO-001",
+              "descricao": "Filtro de óleo original Toyota",
+              "preco": 45.90,
+              "quantidade_estoque": 100,
+              "quantidade_minima": 10
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Clientes
+    meta:
+      id: fld_d8a06ff6c66348fcbe2e6db2a3fcb576
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000030
+      description: Customer management endpoints
+    children:
+      - url: "{{ base_url }}/clientes"
+        name: List Clientes
+        meta:
+          id: req_01ca68ede5bb4fe3ad75fd9e1ed03ffb
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000032
+        method: GET
+        parameters:
+          - name: page
+            value: "1"
+            disabled: true
+          - name: limit
+            value: "10"
+            disabled: true
+          - name: search
+            value: João
+            disabled: true
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes"
+        name: Create Cliente
+        meta:
+          id: req_11c16487e63044fba670920f62cb5e0a
+          created: 1745628000000
+          modified: 1777153032281
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000031
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "João Silva",
+              "email": "joao@example.com",
+              "telefone": "11999999999",
+              "documento": "51259628809",
+              "tipoDocumento": "CPF"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+          prefix: Bearer
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes/{{ cliente_id }}"
+        name: Get Cliente by ID
+        meta:
+          id: req_7db4a9598f1e43b7adb4e60fd3d56443
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000033
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes/{{ cliente_id }}"
+        name: Delete Cliente
+        meta:
+          id: req_94674df4ba5e4b4084b5f90d8b408aff
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000035
+        method: DELETE
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/clientes/{{ cliente_id }}"
+        name: Update Cliente
+        meta:
+          id: req_e45baa6f56cd435b9f864fabc359e4cf
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000034
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "nome": "João Silva Updated",
+              "email": "newemail@example.com",
+              "telefone": "11988888888"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Auth
+    meta:
+      id: fld_fb9d8d9028b046f1b8c6a35b31c3bc9d
+      created: 1745628000000
+      modified: 1745628000000
+      sortKey: -1745628000020
+      description: Authentication endpoints
+    children:
+      - url: "{{ base_url }}/auth/login"
+        name: Login
+        meta:
+          id: req_09d16b87c51946f79e4505bca62f2c71
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000022
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "email": "{{ admin_email }}",
+              "password": "{{ admin_password }}"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/auth/register"
+        name: Register
+        meta:
+          id: req_a6e31eda43ce4643accfde08c72b7ff7
+          created: 1745628000000
+          modified: 1745628000000
+          isPrivate: false
+          description: ""
+          sortKey: -1745628000021
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "email": "novousuario@example.com",
+              "password": "senha123456",
+              "name": "João Silva"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_a7badd6971cb023b0dc22445d21cf1cd51caaba0
+    created: 1777152773685
+    modified: 1777152773685
+environments:
+  name: Local
+  meta:
+    id: env_1a0d0c9b9e2241db88fe461fe79d8aad
+    created: 1745628000000
+    modified: 1777153011232
+    isPrivate: false
+  data:
+    base_url: http://localhost:5000/api/v1
+    admin_email: admin@example.com
+    admin_password: senha123456
+    token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjY2ZjNmYxYi04ZjkxLTQzNGMtYTVjNS03YWI3ZjU4OWE1NDEiLCJlbWFpbCI6Im5vdm91c3VhcmlvQGV4YW1wbGUuY29tIiwibmFtZSI6Ikpvw6NvIFNpbHZhIiwiaWF0IjoxNzc3MTUyOTA5LCJleHAiOjE3NzcxNTY1MDl9.eskNjLP9uhhuvBiblXnKyl5i-Bjxkv_w2bcZO-iEbNI
