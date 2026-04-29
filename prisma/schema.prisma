@@ -17,10 +17,8 @@ enum SOStatus {
   UNDER_DIAGNOSIS
   AWAITING_APPROVAL
   IN_PROGRESS
-  AWAITING_PARTS
   FINISHED
   DELIVERED
-  CLOSED_WITHOUT_EXECUTION
 }
 
 enum EstimateStatus {
@@ -30,69 +28,72 @@ enum EstimateStatus {
 }
 
 model User {
-  id         String   @id @default(uuid())
-  email      String   @unique
-  password   String
-  name       String
-  role       String   @default("admin")
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   @default("admin")
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 }
 
 model Cliente {
   id             String    @id @default(uuid())
-  nome           String
+  nome           String    @map("name")
   email          String    @unique
-  telefone       String?
-  documento      String    @unique
-  tipo_documento TaxIdType
+  telefone       String?   @map("phone")
+  documento      String    @unique @map("tax_id")
+  tipo_documento TaxIdType @map("tax_id_type")
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 
-  veiculos      Veiculo[]
-  ordensServico OrdemServico[]
+  veiculos        Veiculo[]
+  ordensServico   OrdemServico[]
+
+  @@map("Customer")
 }
 
 model Veiculo {
   id         String   @id @default(uuid())
-  placa      String   @unique
-  marca      String
-  modelo     String
-  ano        Int
-  cor        String?
+  placa      String   @unique @map("license_plate")
+  marca      String   @map("brand")
+  modelo     String   @map("model")
+  ano        Int      @map("year")
+  cor        String?  @map("color")
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  id_cliente    String
-  cliente       Cliente        @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
-  ordensServico OrdemServico[]
+  cliente         Cliente        @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  id_cliente      String         @map("customer_id")
+  ordensServico   OrdemServico[]
+
+  @@map("Vehicle")
 }
 
 model OrdemServico {
-  id            String    @id @default(uuid())
-  id_veiculo    String
-  id_cliente    String
-  status        SOStatus  @default(RECEIVED)
-  descricao     String?
-  iniciada_em   DateTime?
-  finalizada_em DateTime?
-  entregue_em   DateTime?
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  id          String    @id @default(uuid())
+  id_veiculo  String    @map("vehicle_id")
+  id_cliente  String    @map("customer_id")
+  status      SOStatus  @default(RECEIVED)
+  descricao   String?   @map("description")
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
+  entregue_em DateTime? @map("delivered_at")
 
   veiculo   Veiculo    @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
   cliente   Cliente    @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
   orcamento Orcamento?
-  osPecas   OsPeca[]
+
+  @@map("ServiceOrder")
 }
 
 model Orcamento {
   id                   String         @id @default(uuid())
-  id_ordem_servico     String         @unique
-  valor_total_servicos Decimal        @default(0) @db.Decimal(10, 2)
-  valor_total_pecas    Decimal        @default(0) @db.Decimal(10, 2)
-  valor_total_geral    Decimal        @default(0) @db.Decimal(10, 2)
-  status               EstimateStatus @default(PENDING)
+  id_ordem_servico     String         @unique @map("service_order_id")
+  valor_total_servicos Decimal        @default(0) @db.Decimal(10, 2) @map("total_services_value")
+  valor_total_pecas    Decimal        @default(0) @db.Decimal(10, 2) @map("total_parts_value")
+  valor_total_geral    Decimal        @default(0) @db.Decimal(10, 2) @map("total_general_value")
+  status               EstimateStatus @default(PENDING) @map("estimate_status")
   created_at           DateTime       @default(now())
   updated_at           DateTime       @updatedAt
 
@@ -109,63 +110,13 @@ model Peca {
   quantidade_minima  Int      @default(1)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
-
-  osPecas               OsPeca[]
-  pedidoFornecedorItens PedidoFornecedorItem[]
 }
 
 model Servico {
-  id         String   @id @default(uuid())
-  nome       String
-  descricao  String?
-  preco      Decimal  @db.Decimal(10, 2)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-}
-
-model OsPeca {
-  id               String   @id @default(uuid())
-  id_ordem_servico String
-  id_peca          String
-  quantidade       Int
-  preco_unitario   Decimal  @db.Decimal(10, 2)
-  valor_total      Decimal  @db.Decimal(10, 2)
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
-
-  ordem_servico OrdemServico @relation(fields: [id_ordem_servico], references: [id], onDelete: Cascade)
-  peca          Peca         @relation(fields: [id_peca], references: [id], onDelete: Restrict)
-
-  @@unique([id_ordem_servico, id_peca])
-}
-
-model PedidoFornecedor {
-  id            String   @id @default(uuid())
-  fornecedor_id String
-  status        String   @default("PENDENTE") // PENDENTE | RECEBIDO
-  criado_em     DateTime @default(now())
-  atualizado_em DateTime @updatedAt
-
-  itens PedidoFornecedorItem[]
-}
-
-model PedidoFornecedorItem {
-  id                    String @id @default(uuid())
-  id_pedido_fornecedor  String
-  id_peca               String
-  quantidade_solicitada Int
-  quantidade_recebida   Int    @default(0)
-
-  pedido_fornecedor PedidoFornecedor @relation(fields: [id_pedido_fornecedor], references: [id], onDelete: Cascade)
-  peca              Peca             @relation(fields: [id_peca], references: [id], onDelete: Restrict)
-}
-
-model ReservaEstoque {
-  id           String   @id @default(uuid())
-  ordem_id     String
-  peca_id      String
-  quantidade   Int
-  reservado_em DateTime @default(now())
-
-  @@unique([ordem_id, peca_id])
+  id          String   @id @default(uuid())
+  nome        String
+  descricao   String?
+  preco       Decimal  @db.Decimal(10, 2)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
 }

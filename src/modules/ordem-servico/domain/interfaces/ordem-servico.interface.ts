@@ -1,11 +1,8 @@
-import { OrdemDeServico, OSStatus } from '../entities/ordem-servico.entity';
+import { OrdemDeServico } from '../entities/ordem-servico.entity';
 
 export type OrdemServicoUpdateData = {
-  status?: OSStatus;
+  status?: OrdemDeServico['status'];
   descricao?: string;
-  iniciada_em?: Date | null;
-  finalizada_em?: Date | null;
-  entregue_em?: Date | null;
 };
 
 export interface IOrdemServicoRepository {

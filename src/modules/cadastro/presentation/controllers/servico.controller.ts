@@ -21,9 +21,9 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { CreateServicoDto, UpdateServicoDto, ListQueryDto } from '../dto/servico.dto';
-import { Roles } from '../../../../auth/decorators/roles.decorator';
-import { Role } from '../../../../auth/enums/role.enum';
+import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
+import { Roles } from '../../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../../../auth/types/auth.types';
 import {
@@ -37,6 +37,7 @@ import {
 @Controller('servicos')
 @ApiTags('Servicos')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 export class ServicoController {
   constructor(
     @Inject(CreateServicoUseCase) private readonly createUseCase: CreateServicoUseCase,
@@ -48,10 +49,10 @@ export class ServicoController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('admin')
   @ApiOperation({
     summary: 'Criar novo servico',
-    description: 'Cria um novo servico no sistema. Requer role de ADMIN.',
+    description: 'Cria um novo servico no sistema. Requer role de admin.',
   })
   @ApiBody({
     type: CreateServicoDto,
@@ -69,7 +70,7 @@ export class ServicoController {
   @ApiResponse({ status: 201, description: 'Servico criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Validacao falhou - dados invalidos' })
   @ApiResponse({ status: 401, description: 'Nao autorizado - token invalido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   create(@Body() dto: CreateServicoDto) {
     return this.createUseCase.execute(dto);
   }
@@ -96,7 +97,6 @@ export class ServicoController {
   @ApiOperation({ summary: 'Obter servico por ID' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Servico encontrado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Nao autorizado - token invalido ou expirado' })
   @ApiResponse({ status: 404, description: 'Servico nao encontrado' })
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
     return this.getUseCase.execute(id);
@@ -104,13 +104,11 @@ export class ServicoController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('admin')
   @ApiOperation({ summary: 'Atualizar servico' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: UpdateServicoDto })
   @ApiResponse({ status: 200, description: 'Servico atualizado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Nao autorizado - token invalido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Servico nao encontrado' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateServicoDto) {
     return this.updateUseCase.execute(id, dto);
@@ -118,12 +116,10 @@ export class ServicoController {
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('admin')
   @ApiOperation({ summary: 'Deletar servico' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Servico deletado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Nao autorizado - token invalido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Servico nao encontrado' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.deleteUseCase.execute(id);

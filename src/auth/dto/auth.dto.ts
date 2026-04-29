@@ -1,15 +1,6 @@
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsString,
-  MinLength,
-  MaxLength,
-  IsEnum,
-  IsOptional,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, MinLength, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { Role } from '../enums/role.enum';
 
 export class LoginDto {
   @ApiProperty({
@@ -72,14 +63,4 @@ export class RegisterDto {
   @IsNotEmpty()
   @MaxLength(100)
   name: string;
-
-  @ApiProperty({
-    example: 'RECEPCIONISTA',
-    description: 'Papel do usuário (ADMIN, RECEPCIONISTA, MECANICO)',
-    enum: Role,
-    required: false,
-  })
-  @IsEnum(Role)
-  @IsOptional()
-  role?: Role;
 }

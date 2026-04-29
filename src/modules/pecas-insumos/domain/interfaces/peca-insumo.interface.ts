@@ -18,16 +18,6 @@ export interface IPecaInsumoRepository {
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }>;
   findOne(id: string): Promise<PecaInsumo>;
-  findByOrdemServicoId(ordemServicoId: string): Promise<
-    Array<{
-      id_peca: string;
-      quantidade: number;
-      preco_unitario: number;
-      valor_total: number;
-      quantidade_estoque: number;
-      quantidade_minima: number;
-    }>
-  >;
   update(
     id: string,
     data: {

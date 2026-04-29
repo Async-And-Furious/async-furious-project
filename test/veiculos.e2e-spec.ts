@@ -6,7 +6,6 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
-import { createAdminToken } from './support/fixtures';
 
 function generateValidPlaca(prefix: string = 'ABC'): string {
   const suffix = Date.now().toString().slice(-4);
@@ -23,7 +22,7 @@ describe('VeiculosController (e2e)', () => {
   let testClienteId: string;
   let testVeiculoId: string;
   const testUser = {
-    email: 'veiculos-recepcionista@example.com',
+    email: 'veiculos-admin@example.com',
     password: 'admin123',
     name: 'Veiculos Test Admin',
   };
@@ -67,7 +66,7 @@ describe('VeiculosController (e2e)', () => {
 
     const hashedPassword = await bcrypt.hash(testUser.password, 10);
     const user = await prismaService.user.create({
-      data: { ...testUser, password: hashedPassword, role: 'RECEPCIONISTA' },
+      data: { ...testUser, password: hashedPassword },
     });
 
     authToken = jwtService.sign({ sub: user.id, email: user.email, role: user.role });
@@ -90,7 +89,6 @@ describe('VeiculosController (e2e)', () => {
       await prismaService.cliente.deleteMany({ where: { id: testClienteId } });
     }
     await prismaService.user.deleteMany({ where: { email: testUser.email } });
-    await prismaService.user.deleteMany({ where: { email: 'veiculos-admin@example.com' } });
     await app.close();
   });
 
@@ -340,16 +338,6 @@ describe('VeiculosController (e2e)', () => {
   describe('DELETE /veiculos/:id', () => {
     let veiculoToDeleteId: string;
     let placaToDelete: string;
-    let adminToken: string;
-    const adminEmail = 'veiculos-admin@example.com';
-
-    beforeAll(async () => {
-      adminToken = await createAdminToken(prismaService, jwtService, adminEmail);
-    });
-
-    afterAll(async () => {
-      await prismaService.user.deleteMany({ where: { email: adminEmail } });
-    });
 
     beforeEach(async () => {
       placaToDelete = generateValidPlaca('DEL');
@@ -373,7 +361,7 @@ describe('VeiculosController (e2e)', () => {
     it('should delete a veiculo', async () => {
       await server
         .delete(`/veiculos/${veiculoToDeleteId}`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       await server
@@ -404,7 +392,7 @@ describe('VeiculosController (e2e)', () => {
 
       await server
         .delete(`/veiculos/${veiculo.id}`)
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(200);
 
       const ordens = await prismaService.ordemServico.findMany({
@@ -418,7 +406,7 @@ describe('VeiculosController (e2e)', () => {
     it('should return 404 for nonexistent veiculo', async () => {
       await server
         .delete('/veiculos/00000000-0000-0000-0000-000000000000')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${authToken}`)
         .expect(404);
     });
 

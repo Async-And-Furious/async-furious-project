@@ -1,17 +1,4 @@
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsUUID,
-  IsEnum,
-  IsNumber,
-  Min,
-  IsArray,
-  ValidateNested,
-  IsInt,
-  IsPositive,
-} from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum, IsNumber, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateOrdemServicoDto {
@@ -87,37 +74,12 @@ export class ListQueryDto {
   search?: string;
 }
 
-export class ItemPecaDto {
-  @ApiProperty({ example: 'uuid-da-peca', description: 'ID da peça' })
-  @IsUUID()
-  id_peca: string;
-
-  @ApiProperty({ example: 2, description: 'Quantidade utilizada' })
-  @IsInt()
-  @IsPositive()
-  quantidade: number;
-
-  @ApiProperty({ example: 150.0, description: 'Preço unitário da peça' })
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  preco_unitario: number;
-}
-
 export class GerarOrcamentoDto {
-  @ApiProperty({ example: 300.0, description: 'Valor total dos serviços' })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   valor_total_servicos: number;
 
-  @ApiProperty({ example: 150.0, description: 'Valor total das peças' })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   valor_total_pecas: number;
-
-  @ApiPropertyOptional({ type: [ItemPecaDto], description: 'Peças utilizadas na OS' })
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => ItemPecaDto)
-  pecas?: ItemPecaDto[];
 }

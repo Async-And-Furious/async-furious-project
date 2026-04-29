@@ -16,8 +16,6 @@ import {
 } from '../dto/peca-insumo.dto';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import { AuthUser } from '../../../../auth/types/auth.types';
-import { SolicitarPecasFornecedorPolicy } from '../../application/policies/solicitar-pecas-fornecedor.policy';
-import { ReceberPecasFornecedorPolicy } from '../../application/policies/receber-pecas-fornecedor.policy';
 
 describe('PecaInsumoController', () => {
   let controller: PecaInsumoController;
@@ -27,8 +25,6 @@ describe('PecaInsumoController', () => {
   let mockUpdateUseCase: jest.Mocked<UpdatePecaInsumoUseCase>;
   let mockUpdateEstoqueUseCase: jest.Mocked<UpdateEstoquePecaInsumoUseCase>;
   let mockDeleteUseCase: jest.Mocked<DeletePecaInsumoUseCase>;
-  let mockSolicitarPolicy: jest.Mocked<SolicitarPecasFornecedorPolicy>;
-  let mockReceberPolicy: jest.Mocked<ReceberPecasFornecedorPolicy>;
 
   const mockAuthUser: AuthUser = {
     id: 'user-123',
@@ -64,12 +60,6 @@ describe('PecaInsumoController', () => {
     mockDeleteUseCase = {
       execute: jest.fn(),
     } as unknown as jest.Mocked<DeletePecaInsumoUseCase>;
-    mockSolicitarPolicy = {
-      execute: jest.fn(),
-    } as unknown as jest.Mocked<SolicitarPecasFornecedorPolicy>;
-    mockReceberPolicy = {
-      execute: jest.fn(),
-    } as unknown as jest.Mocked<ReceberPecasFornecedorPolicy>;
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PecaInsumoController],
@@ -80,8 +70,6 @@ describe('PecaInsumoController', () => {
         { provide: UpdatePecaInsumoUseCase, useValue: mockUpdateUseCase },
         { provide: UpdateEstoquePecaInsumoUseCase, useValue: mockUpdateEstoqueUseCase },
         { provide: DeletePecaInsumoUseCase, useValue: mockDeleteUseCase },
-        { provide: SolicitarPecasFornecedorPolicy, useValue: mockSolicitarPolicy },
-        { provide: ReceberPecasFornecedorPolicy, useValue: mockReceberPolicy },
       ],
     }).compile();
 

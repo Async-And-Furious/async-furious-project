@@ -21,9 +21,9 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { CreateVeiculoDto, UpdateVeiculoDto, ListQueryDto } from '../dto/veiculo.dto';
-import { Roles } from '../../../../auth/decorators/roles.decorator';
-import { Role } from '../../../../auth/enums/role.enum';
+import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
+import { Roles } from '../../../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../../../auth/types/auth.types';
 import {
@@ -37,6 +37,7 @@ import {
 @ApiTags('Veiculos')
 @ApiBearerAuth()
 @Controller('veiculos')
+@UseGuards(JwtAuthGuard)
 export class VeiculoController {
   constructor(
     @Inject(CreateVeiculoUseCase) private readonly createUseCase: CreateVeiculoUseCase,
@@ -48,10 +49,10 @@ export class VeiculoController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.RECEPCIONISTA)
+  @Roles('admin')
   @ApiOperation({
     summary: 'Criar novo veículo',
-    description: 'Cria um novo veículo no sistema. Requer role de RECEPCIONISTA.',
+    description: 'Cria um novo veículo no sistema. Requer role de admin.',
   })
   @ApiBody({ type: CreateVeiculoDto })
   @ApiResponse({ status: 201, description: 'Veículo criado com sucesso' })
@@ -60,7 +61,7 @@ export class VeiculoController {
     description: 'Validação falhou - dados inválidos ou placa duplicada',
   })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   create(@Body() dto: CreateVeiculoDto) {
     return this.createUseCase.execute(dto);
@@ -96,13 +97,13 @@ export class VeiculoController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.RECEPCIONISTA)
+  @Roles('admin')
   @ApiOperation({ summary: 'Atualizar veículo' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: UpdateVeiculoDto })
   @ApiResponse({ status: 200, description: 'Veículo atualizado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateVeiculoDto) {
     return this.updateUseCase.execute(id, dto);
@@ -110,12 +111,12 @@ export class VeiculoController {
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('admin')
   @ApiOperation({ summary: 'Deletar veículo' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Veículo deletado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.deleteUseCase.execute(id);

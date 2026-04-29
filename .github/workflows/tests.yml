@@ -32,25 +32,17 @@ jobs:
       - name: Checkout código
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
-        with:
-          version: 9
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Instalar dependências
-        run: pnpm install --frozen-lockfile
-
-      - name: Gerar cliente Prisma
-        run: npx prisma generate
+        run: npm ci
 
       - name: Run unit tests
-        run: pnpm test
+        run: npm test
 
       - name: Push database schema
         run: npx prisma db push --skip-generate
@@ -58,13 +50,13 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run e2e tests
-        run: pnpm run test:e2e
+        run: npm run test:e2e
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run lint
-        run: pnpm run lint
+        run: npm run lint
 
       - name: Run build
-        run: pnpm run build
+        run: npm run build

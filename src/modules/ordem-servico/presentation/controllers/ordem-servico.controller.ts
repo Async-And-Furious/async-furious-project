@@ -29,25 +29,19 @@ import {
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
-import { Public } from '../../../../auth/decorators/public.decorator';
-import { Role } from '../../../../auth/enums/role.enum';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../../../auth/types/auth.types';
 import {
-  CriarOrdemServicoUseCase,
-  AssumirOrdemServicoUseCase,
-  AnalisarVeiculoUseCase,
-  ListarServicosInsumosNaOsUseCase,
-  FinalizarExecucaoUseCase,
-  AprovarServicoPrestadoUseCase,
-  ConsultarStatusOrdemServicoUseCase,
-  ListarOrdensServicoUseCase,
-  DetalharOrdemServicoUseCase,
-  DeletarOrdemServicoUseCase,
+  CreateOrdemServicoUseCase,
+  ListOrdensServicoUseCase,
+  GetOrdemServicoUseCase,
+  UpdateOrdemServicoUseCase,
+  DeleteOrdemServicoUseCase,
 } from '../../application/use-cases/ordem-servico.use-cases';
 import {
+  GerarOrcamentoUseCase,
   AprovarOrcamentoUseCase,
-  RecusarOrcamentoUseCase,
+  RejeitarOrcamentoUseCase,
 } from '../../application/use-cases/orcamento.use-cases';
 
 @ApiTags('Ordens Servico')
@@ -56,58 +50,53 @@ import {
 @UseGuards(JwtAuthGuard)
 export class OrdemServicoController {
   constructor(
-    @Inject(CriarOrdemServicoUseCase)
-    private readonly criarUseCase: CriarOrdemServicoUseCase,
-    @Inject(AssumirOrdemServicoUseCase)
-    private readonly assumirUseCase: AssumirOrdemServicoUseCase,
-    @Inject(AnalisarVeiculoUseCase)
-    private readonly analisarVeiculoUseCase: AnalisarVeiculoUseCase,
-    @Inject(ListarServicosInsumosNaOsUseCase)
-    private readonly listarServicosInsumosUseCase: ListarServicosInsumosNaOsUseCase,
+    @Inject(CreateOrdemServicoUseCase)
+    private readonly createUseCase: CreateOrdemServicoUseCase,
+    @Inject(ListOrdensServicoUseCase)
+    private readonly listUseCase: ListOrdensServicoUseCase,
+    @Inject(GetOrdemServicoUseCase)
+    private readonly getUseCase: GetOrdemServicoUseCase,
+    @Inject(UpdateOrdemServicoUseCase)
+    private readonly updateUseCase: UpdateOrdemServicoUseCase,
+    @Inject(DeleteOrdemServicoUseCase)
+    private readonly deleteUseCase: DeleteOrdemServicoUseCase,
+    @Inject(GerarOrcamentoUseCase)
+    private readonly gerarOrcamentoUseCase: GerarOrcamentoUseCase,
     @Inject(AprovarOrcamentoUseCase)
     private readonly aprovarOrcamentoUseCase: AprovarOrcamentoUseCase,
-    @Inject(RecusarOrcamentoUseCase)
-    private readonly recusarOrcamentoUseCase: RecusarOrcamentoUseCase,
-    @Inject(FinalizarExecucaoUseCase)
-    private readonly finalizarExecucaoUseCase: FinalizarExecucaoUseCase,
-    @Inject(AprovarServicoPrestadoUseCase)
-    private readonly aprovarServicoPrestadoUseCase: AprovarServicoPrestadoUseCase,
-    @Inject(ConsultarStatusOrdemServicoUseCase)
-    private readonly consultarStatusUseCase: ConsultarStatusOrdemServicoUseCase,
-    @Inject(ListarOrdensServicoUseCase)
-    private readonly listarUseCase: ListarOrdensServicoUseCase,
-    @Inject(DetalharOrdemServicoUseCase)
-    private readonly detalharUseCase: DetalharOrdemServicoUseCase,
-    @Inject(DeletarOrdemServicoUseCase)
-    private readonly deletarUseCase: DeletarOrdemServicoUseCase
+    @Inject(RejeitarOrcamentoUseCase)
+    private readonly rejeitarOrcamentoUseCase: RejeitarOrcamentoUseCase
   ) {}
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.RECEPCIONISTA)
+  @Roles('admin')
   @ApiOperation({
     summary: 'Criar nova ordem de serviço',
-    description: 'Cria uma nova ordem de serviço. Requer role de RECEPCIONISTA.',
+    description: 'Cria uma nova ordem de serviço. Requer role de admin.',
   })
   @ApiBody({ type: CreateOrdemServicoDto })
   @ApiResponse({ status: 201, description: 'Ordem de serviço criada com sucesso' })
   @ApiResponse({ status: 400, description: 'Validação falhou - dados inválidos' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   @ApiResponse({ status: 404, description: 'Veículo ou cliente não encontrado' })
-  criar(@Body() dto: CreateOrdemServicoDto) {
-    return this.criarUseCase.execute(dto);
+  create(@Body() dto: CreateOrdemServicoDto) {
+    return this.createUseCase.execute(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas as ordens de serviço (paginado)' })
+  @ApiOperation({
+    summary: 'Listar todas as ordens de serviço',
+    description: 'Retorna lista paginada de ordens de serviço',
+  })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
   @ApiQuery({ name: 'search', type: String, required: false, example: 'troca' })
-  @ApiResponse({ status: 200, description: 'Lista retornada com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  listar(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
-    return this.listarUseCase.execute(
+  @ApiResponse({ status: 200, description: 'Lista de ordens de serviço retornada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  findAll(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
+    return this.listUseCase.execute(
       Number(query.page) || 1,
       Number(query.limit) || 10,
       query.search
@@ -115,153 +104,63 @@ export class OrdemServicoController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalhar ordem de serviço' })
+  @ApiOperation({ summary: 'Obter ordem de serviço por ID' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Ordem de serviço encontrada' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 200, description: 'Ordem de serviço encontrada com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  detalhar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
-    return this.detalharUseCase.execute(id);
-  }
-
-  @Get(':id/status')
-  @ApiOperation({ summary: 'Consultar status da OS (para o cliente)' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  consultarStatus(@Param('id', ParseUUIDPipe) id: string) {
-    return this.consultarStatusUseCase.execute(id);
+  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
+    return this.getUseCase.execute(id);
   }
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('admin')
   @ApiOperation({
     summary: 'Atualizar ordem de serviço',
-    description: 'Atualiza status ou descrição. Requer role de ADMIN.',
+    description: 'Atualiza status ou descrição. Requer role de admin.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: UpdateOrdemServicoDto })
   @ApiResponse({ status: 200, description: 'Ordem de serviço atualizada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  atualizar(@Param('id', ParseUUIDPipe) id: string, @Body() _dto: UpdateOrdemServicoDto) {
-    return this.detalharUseCase.execute(id);
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateOrdemServicoDto) {
+    return this.updateUseCase.execute(id, dto);
   }
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles('admin')
   @ApiOperation({ summary: 'Deletar ordem de serviço' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Ordem de serviço deletada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  deletar(@Param('id', ParseUUIDPipe) id: string) {
-    return this.deletarUseCase.execute(id);
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.deleteUseCase.execute(id);
   }
 
-  @Patch(':id/assumir')
+  @Patch(':id/orcamento/gerar')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({
-    summary: 'Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'OS assumida. Status → Em Diagnóstico' })
-  @ApiResponse({ status: 400, description: 'OS não está no status Recebida' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  assumir(@Param('id', ParseUUIDPipe) id: string) {
-    return this.assumirUseCase.execute(id);
-  }
-
-  @Patch(':id/analisar')
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Registrar análise do veículo (UNDER_DIAGNOSIS)' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Análise registrada' })
-  @ApiResponse({ status: 400, description: 'OS não está Em Diagnóstico' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  analisarVeiculo(@Param('id', ParseUUIDPipe) id: string) {
-    return this.analisarVeiculoUseCase.execute(id);
-  }
-
-  @Patch(':id/servicos-insumos')
-  @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({
-    summary: 'Listar serviços e insumos — gera orçamento (UNDER_DIAGNOSIS → AWAITING_APPROVAL)',
-    description:
-      'Registra valores de serviços e peças. Gera orçamento e atualiza OS para Aguardando Aprovação.',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiBody({ type: GerarOrcamentoDto })
-  @ApiResponse({ status: 200, description: 'Orçamento gerado. OS → Aguardando Aprovação' })
-  @ApiResponse({
-    status: 400,
-    description: 'OS não está em status válido ou orçamento já aprovado',
-  })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  listarServicosInsumos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GerarOrcamentoDto) {
-    return this.listarServicosInsumosUseCase.execute(id, dto);
+  @Roles('admin')
+  gerarOrcamento(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GerarOrcamentoDto) {
+    return this.gerarOrcamentoUseCase.execute(id, dto);
   }
 
   @Patch(':id/orcamento/aprovar')
-  @Public()
-  @ApiOperation({
-    summary: 'Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)',
-    description: 'Aprova o orçamento da ordem de serviço. Público.',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Orçamento aprovado. OS → Em Execução' })
-  @ApiResponse({ status: 400, description: 'Orçamento não está pendente ou sem valores' })
-  @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
+  @UseGuards(RolesGuard)
+  @Roles('admin')
   aprovarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
     return this.aprovarOrcamentoUseCase.execute(id);
   }
 
-  @Patch(':id/orcamento/recusar')
-  @Public()
-  @ApiOperation({
-    summary:
-      'Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)',
-    description: 'Recusa o orçamento da ordem de serviço. Público.',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Orçamento recusado. OS → Encerrada Sem Execução' })
-  @ApiResponse({ status: 400, description: 'Orçamento não está pendente' })
-  @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
-  recusarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
-    return this.recusarOrcamentoUseCase.execute(id);
-  }
-
-  @Patch(':id/finalizar-execucao')
+  @Patch(':id/orcamento/rejeitar')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({
-    summary: 'Mecânico finaliza execução do serviço (IN_PROGRESS → FINISHED)',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Execução finalizada. OS → Finalizada' })
-  @ApiResponse({ status: 400, description: 'OS não está Em Execução' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  finalizarExecucao(@Param('id', ParseUUIDPipe) id: string) {
-    return this.finalizarExecucaoUseCase.execute(id);
-  }
-
-  @Patch(':id/aprovar-servico')
-  @ApiOperation({
-    summary: 'Cliente aprova o serviço prestado — entrega o veículo (FINISHED → DELIVERED)',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Serviço aprovado. OS → Entregue' })
-  @ApiResponse({ status: 400, description: 'OS não está Finalizada' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  aprovarServicoPrestado(@Param('id', ParseUUIDPipe) id: string) {
-    return this.aprovarServicoPrestadoUseCase.execute(id);
+  @Roles('admin')
+  rejeitarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
+    return this.rejeitarOrcamentoUseCase.execute(id);
   }
 }

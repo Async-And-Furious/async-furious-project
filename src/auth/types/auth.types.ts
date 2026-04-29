@@ -1,22 +1,10 @@
-import { Role } from '../enums/role.enum';
-
-export interface AuthenticatedUser {
+export interface AuthUser {
   id: string;
   email: string;
-  role: Role;
+  name: string;
+  role: string;
 }
-
-export interface JwtPayload {
-  sub: string;
-  email: string;
-  role: Role;
-  iat?: number;
-  exp?: number;
-}
-
-// Keep AuthUser for backwards compat (deprecated - use AuthenticatedUser)
-export type AuthUser = AuthenticatedUser;
 
 export interface AuthRequest {
-  user?: AuthenticatedUser;
+  user?: AuthUser;
 }
