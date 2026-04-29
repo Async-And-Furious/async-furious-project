@@ -18,6 +18,7 @@ import {
 } from '../../src/modules/ordem-servico/application/use-cases/ordem-servico.use-cases';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
+import type { IOsPecaRepository } from '../../src/modules/ordem-servico/domain/interfaces/os-peca.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
@@ -25,6 +26,7 @@ import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/
 describe('OS + Orçamento Use Cases', () => {
   let mockOsRepository: jest.Mocked<IOrdemServicoRepository>;
   let mockOrcamentoRepository: jest.Mocked<IOrcamentoRepository>;
+  let mockOsPecaRepository: jest.Mocked<IOsPecaRepository>;
   let mockBarramento: jest.Mocked<EmissorEventos>;
 
   const mockOs: OrdemDeServico = {
@@ -64,6 +66,10 @@ describe('OS + Orçamento Use Cases', () => {
       findByOrdemServicoId: jest.fn(),
       update: jest.fn(),
     } as jest.Mocked<IOrcamentoRepository>;
+    mockOsPecaRepository = {
+      replaceAll: jest.fn(),
+      findByOrdemServicoId: jest.fn(),
+    } as jest.Mocked<IOsPecaRepository>;
     mockBarramento = {
       emitir: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<EmissorEventos>;
@@ -151,6 +157,7 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new ListarServicosInsumosNaOsUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
+        mockOsPecaRepository,
         mockBarramento
       );
       const result = await uc.execute('os-1', { valor_total_servicos: 100, valor_total_pecas: 50 });
@@ -167,6 +174,7 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new ListarServicosInsumosNaOsUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
+        mockOsPecaRepository,
         mockBarramento
       );
       await expect(
@@ -180,6 +188,7 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new ListarServicosInsumosNaOsUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
+        mockOsPecaRepository,
         mockBarramento
       );
       await expect(
