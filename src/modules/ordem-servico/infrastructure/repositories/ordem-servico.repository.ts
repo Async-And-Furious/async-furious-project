@@ -76,6 +76,9 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
       data: {
         ...(data.status && { status: data.status }),
         ...(data.descricao !== undefined && { descricao: data.descricao }),
+        ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
+        ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
+        ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
       },
     })) as unknown as OrdemDeServico;
   }

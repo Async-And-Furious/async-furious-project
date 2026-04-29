@@ -21,9 +21,9 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { CreateClienteDto, UpdateClienteDto, ListQueryDto } from '../dto/cliente.dto';
-import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../../auth/guards/roles.guard';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
+import { Role } from '../../../../auth/enums/role.enum';
+import { RolesGuard } from '../../../../auth/guards/roles.guard';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../../../auth/types/auth.types';
 import {
@@ -37,7 +37,6 @@ import {
 @Controller('clientes')
 @ApiTags('Clientes')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 export class ClienteController {
   constructor(
     @Inject(CreateClienteUseCase) private readonly createUseCase: CreateClienteUseCase,
@@ -49,10 +48,10 @@ export class ClienteController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles(Role.RECEPCIONISTA)
   @ApiOperation({
     summary: 'Criar novo cliente',
-    description: 'Cria um novo cliente no sistema. Requer role de admin.',
+    description: 'Cria um novo cliente no sistema. Requer role de RECEPCIONISTA.',
   })
   @ApiBody({
     type: CreateClienteDto,
@@ -81,7 +80,7 @@ export class ClienteController {
   @ApiResponse({ status: 201, description: 'Cliente criado com sucesso' })
   @ApiResponse({ status: 400, description: 'Validação falhou - dados inválidos' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
   create(@Body() dto: CreateClienteDto) {
     return this.createUseCase.execute(dto);
   }
@@ -108,6 +107,7 @@ export class ClienteController {
   @ApiOperation({ summary: 'Obter cliente por ID' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Cliente encontrado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
     return this.getUseCase.execute(id);
@@ -115,11 +115,13 @@ export class ClienteController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles(Role.RECEPCIONISTA)
   @ApiOperation({ summary: 'Atualizar cliente' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: UpdateClienteDto })
   @ApiResponse({ status: 200, description: 'Cliente atualizado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateClienteDto) {
     return this.updateUseCase.execute(id, dto);
@@ -127,10 +129,12 @@ export class ClienteController {
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Deletar cliente' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Cliente deletado com sucesso' })
+  @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.deleteUseCase.execute(id);
