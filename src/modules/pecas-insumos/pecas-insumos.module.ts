@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PecaInsumoController } from './presentation/controllers/peca-insumo.controller';
 import { PecaInsumoRepository } from './infrastructure/repositories/peca-insumo.repository';
+import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import {
   CreatePecaInsumoUseCase,
   ListPecasInsumoUseCase,
@@ -9,11 +10,38 @@ import {
   UpdateEstoquePecaInsumoUseCase,
   DeletePecaInsumoUseCase,
 } from './application/use-cases/peca-insumo.use-cases';
+import { VerificarDisponibilidadeEstoquePolicy } from './application/policies/verificar-disponibilidade-estoque.policy';
+import { DebitarEstoquePolicy } from './application/policies/debitar-estoque.policy';
+import { NotificarPecasIndisponiveisPolicy } from './application/policies/notificar-pecas-indisponiveis.policy';
+import { NotificarAdminReposicaoPolicy } from './application/policies/notificar-admin-reposicao.policy';
 
 @Module({
   controllers: [PecaInsumoController],
   providers: [
     PecaInsumoRepository,
+    EmissorEventos,
+    {
+      provide: VerificarDisponibilidadeEstoquePolicy,
+      useFactory: (repo: PecaInsumoRepository, emissor: EmissorEventos) =>
+        new VerificarDisponibilidadeEstoquePolicy(repo, emissor),
+      inject: [PecaInsumoRepository, EmissorEventos],
+    },
+    {
+      provide: DebitarEstoquePolicy,
+      useFactory: (repo: PecaInsumoRepository, emissor: EmissorEventos) =>
+        new DebitarEstoquePolicy(repo, emissor),
+      inject: [PecaInsumoRepository, EmissorEventos],
+    },
+    {
+      provide: NotificarPecasIndisponiveisPolicy,
+      useFactory: (emissor: EmissorEventos) => new NotificarPecasIndisponiveisPolicy(emissor),
+      inject: [EmissorEventos],
+    },
+    {
+      provide: NotificarAdminReposicaoPolicy,
+      useFactory: () => new NotificarAdminReposicaoPolicy(),
+      inject: [],
+    },
     {
       provide: CreatePecaInsumoUseCase,
       useFactory: (repo: PecaInsumoRepository) => new CreatePecaInsumoUseCase(repo),
