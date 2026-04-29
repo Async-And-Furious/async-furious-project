@@ -47,7 +47,7 @@ describe('ClientesController (e2e)', () => {
 
     const hashedPassword = await bcrypt.hash(testUser.password, 10);
     const user = await prismaService.user.create({
-      data: { ...testUser, password: hashedPassword },
+      data: { ...testUser, password: hashedPassword, role: 'RECEPCIONISTA' },
     });
 
     authToken = jwtService.sign({ sub: user.id, email: user.email, role: user.role });
@@ -195,10 +195,34 @@ describe('ClientesController (e2e)', () => {
   });
 
   describe('DELETE /clientes/:id', () => {
+    let adminToken: string;
+
+    beforeAll(async () => {
+      const adminUser = {
+        email: 'admin-delete-cliente@example.com',
+        password: 'admin123',
+        name: 'Admin Delete Cliente',
+      };
+      const hashedPassword = await bcrypt.hash(adminUser.password, 10);
+      await prismaService.user.deleteMany({ where: { email: adminUser.email } });
+      const admin = await prismaService.user.create({
+        data: { ...adminUser, password: hashedPassword, role: 'ADMIN' },
+      });
+      adminToken = jwtService.sign({ sub: admin.id, email: admin.email, role: admin.role });
+    });
+
+    afterAll(async () => {
+      if (adminToken) {
+        await prismaService.user.deleteMany({
+          where: { email: 'admin-delete-cliente@example.com' },
+        });
+      }
+    });
+
     it('should delete a cliente', async () => {
       await server
         .delete(`/clientes/${testClienteId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       await server
@@ -210,7 +234,7 @@ describe('ClientesController (e2e)', () => {
     it('should return 404 for nonexistent cliente', async () => {
       await server
         .delete('/clientes/00000000-0000-0000-0000-000000000000')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(404);
     });
   });

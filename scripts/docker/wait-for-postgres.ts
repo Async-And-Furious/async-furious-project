@@ -1,9 +1,11 @@
-import { exec } from 'node:child_process';
-const DOCKER_CMD = '/usr/bin/docker';
+import { execFile } from 'node:child_process';
 
 function checkPostgres() {
-  const cmd = `${DOCKER_CMD} exec workshop-postgres pg_isready --host localhost`;
-  exec(cmd, handleReturn);
+  execFile(
+    'docker',
+    ['exec', 'workshop-postgres', 'pg_isready', '--host', 'localhost'],
+    handleReturn
+  );
 
   function handleReturn(_error: Error | null, stdout: string) {
     if (stdout?.search('accepting connections') === -1) {
