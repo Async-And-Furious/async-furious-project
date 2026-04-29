@@ -35,6 +35,7 @@ import { FinalizarMonitoramentoTempoPolicy } from './application/policies/finali
 import { NotificarClienteConclusaoPolicy } from './application/policies/notificar-cliente-conclusao.policy';
 import { AtualizarStatusEntreguePolicy } from './application/policies/atualizar-status-entregue.policy';
 import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policies/atualizar-status-encerrada-sem-execucao.policy';
+import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atualizar-status-aguardando-pecas.policy';
 
 @Module({
   controllers: [OrdemServicoController],
@@ -80,6 +81,12 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
       useFactory: (osRepo: OrdemServicoRepository) =>
         new AtualizarStatusAguardandoAprovacaoPolicy(osRepo),
       inject: [OrdemServicoRepository],
+    },
+    {
+      provide: AtualizarStatusAguardandoPecasPolicy,
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+        new AtualizarStatusAguardandoPecasPolicy(osRepo, barramento),
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: VerificarNecessidadePecasPolicy,
