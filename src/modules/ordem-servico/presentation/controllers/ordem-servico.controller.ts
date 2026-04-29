@@ -26,9 +26,10 @@ import {
   ListQueryDto,
   GerarOrcamentoDto,
 } from '../dto/ordem-servico.dto';
-import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../../auth/guards/roles.guard';
+import { Public } from '../../../../auth/decorators/public.decorator';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
+import { Role } from '../../../../auth/enums/role.enum';
+import { RolesGuard } from '../../../../auth/guards/roles.guard';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
 import type { AuthUser } from '../../../../auth/types/auth.types';
 import {
@@ -47,7 +48,6 @@ import {
 @ApiTags('Ordens Servico')
 @ApiBearerAuth()
 @Controller('ordens-servico')
-@UseGuards(JwtAuthGuard)
 export class OrdemServicoController {
   constructor(
     @Inject(CreateOrdemServicoUseCase)
@@ -70,16 +70,16 @@ export class OrdemServicoController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles(Role.RECEPCIONISTA)
   @ApiOperation({
     summary: 'Criar nova ordem de serviço',
-    description: 'Cria uma nova ordem de serviço. Requer role de admin.',
+    description: 'Cria uma nova ordem de serviço. Requer role de RECEPCIONISTA.',
   })
   @ApiBody({ type: CreateOrdemServicoDto })
   @ApiResponse({ status: 201, description: 'Ordem de serviço criada com sucesso' })
   @ApiResponse({ status: 400, description: 'Validação falhou - dados inválidos' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
   @ApiResponse({ status: 404, description: 'Veículo ou cliente não encontrado' })
   create(@Body() dto: CreateOrdemServicoDto) {
     return this.createUseCase.execute(dto);
@@ -115,16 +115,16 @@ export class OrdemServicoController {
 
   @Patch(':id')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles(Role.ADMIN)
   @ApiOperation({
     summary: 'Atualizar ordem de serviço',
-    description: 'Atualiza status ou descrição. Requer role de admin.',
+    description: 'Atualiza status ou descrição. Requer role de ADMIN.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: UpdateOrdemServicoDto })
   @ApiResponse({ status: 200, description: 'Ordem de serviço atualizada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateOrdemServicoDto) {
     return this.updateUseCase.execute(id, dto);
@@ -132,12 +132,12 @@ export class OrdemServicoController {
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles(Role.ADMIN)
   @ApiOperation({ summary: 'Deletar ordem de serviço' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Ordem de serviço deletada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.deleteUseCase.execute(id);
@@ -145,21 +145,31 @@ export class OrdemServicoController {
 
   @Patch(':id/orcamento/gerar')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Roles(Role.ADMIN)
   gerarOrcamento(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GerarOrcamentoDto) {
     return this.gerarOrcamentoUseCase.execute(id, dto);
   }
 
   @Patch(':id/orcamento/aprovar')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Public()
+  @ApiOperation({
+    summary: 'Aprovar orçamento',
+    description: 'Aprova o orçamento da ordem de serviço. Público.',
+  })
+  @ApiResponse({ status: 200, description: 'Orçamento aprovado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   aprovarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
     return this.aprovarOrcamentoUseCase.execute(id);
   }
 
   @Patch(':id/orcamento/rejeitar')
-  @UseGuards(RolesGuard)
-  @Roles('admin')
+  @Public()
+  @ApiOperation({
+    summary: 'Rejeitar orçamento',
+    description: 'Rejeita o orçamento da ordem de serviço. Público.',
+  })
+  @ApiResponse({ status: 200, description: 'Orçamento rejeitado com sucesso' })
+  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   rejeitarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
     return this.rejeitarOrcamentoUseCase.execute(id);
   }

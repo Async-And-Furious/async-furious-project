@@ -1,338 +1,247 @@
-# AGENTS.md - Guia para Agentes de Código
+# AGENTS.md - Workshop Management API
 
-> Este arquivo contém diretrizes para agentes de código que operam neste repositório.
+> Compact operational guide for agents. Each line answers: "Would I likely miss this?"
 
 ---
 
-## 🚦 Comandos de Build, Lint e Test
-
-### Comandos Principais
+## 🚦 Commands
 
 ```bash
-# Desenvolvimento (inicia PostgreSQL + aplicação)
+# Development (PostgreSQL + app + tests on start)
 npm run dev
 
-# Build de produção
-npm run build
+# Manual alternatives
+npm run build          # Production build
+npm run prod           # Run built app (node dist/main)
+npm run lint           # ESLint + auto-fix
+npm run format         # Prettier format
 
-# Iniciar produção
-npm run prod
+# Tests
+npm run test           # All unit tests
+npm run test:watch     # Watch mode
+npm run test:cov       # Coverage
+npm run test:e2e       # E2E (requires DB)
+
+# Single test
+npm run test -- src/modules/cadastro/application/use-cases/cliente.use-cases.spec.ts
+npm run test -- --testNamePattern="CreateClienteUseCase"
+
+# Database
+npx prisma migrate dev   # Run migrations
+npx prisma generate     # Generate Prisma client
+npx prisma db push      # Push schema (skip generate)
 ```
 
-### Testes
-
-```bash
-# Todos os testes
-npm run test
-
-# Com cobertura de código
-npm run test:cov
-
-# Modo watch (re executa ao modificar)
-npm run test:watch
-
-# Teste específico por nome
-npm run test -- --testNamePattern="Cliente"
-
-# Teste específico por arquivo
-npm run test -- src/modules/clientes/application/use-cases/cliente.use-cases.spec.ts
-
-# Debug de teste
-npm run test:debug
-
-# Testes E2E
-npm run test:e2e
-```
-
-### Lint e Formatação
-
-```bash
-# Executar ESLint com auto-fix
-npm run lint
-
-# Formatar com Prettier
-npm run format
-```
+**NOTE:** `npm run dev` runs all tests on every file change — disruptive for TDD. Use `nest start --watch` manually during active development.
 
 ---
 
-## 🏗️ Arquitetura (Clean Architecture)
+## 🏗️ Architecture
 
-### Estrutura de Diretórios
+### Modules (4 domain modules)
 
-```
-src/
-├── modules/
-│   └── [modulo]/
-│       ├── domain/                 # Regras de negócio (ZERO dependências externas)
-│       │   ├── entities/           # Entidades (objetos de negócio)
-│       │   │   └── cliente.entity.ts
-│       │   └── interfaces/         # Contratos (repositórios)
-│       │       └── i-cliente.repository.ts
-│       ├── application/            # Casos de uso
-│       │   └── use-cases/
-│       │       └── cliente.use-cases.ts
-│       ├── infrastructure/         # Implementações externas
-│       │   └── repositories/
-│       │       └── prisma-cliente.repository.ts
-│       ├── presentation/           # Adaptadores de interface
-│       │   ├── controllers/
-│       │   │   └── cliente.controller.ts
-│       │   └── dto/
-│       │       └── cliente.dto.ts
-│       └── [modulo].module.ts
-├── shared/                         # Recursos compartilhados
-│   ├── auth/                       # Autenticação/JWT
-│   └── infrastructure/
-│       └── database/               # Prisma
-├── app.controller.ts
-├── app.service.ts
-├── app.module.ts
-└── main.ts
-```
+| Module | Path | Entities |
+|--------|------|----------|
+| `cadastro` | `src/modules/cadastro/` | Cliente, Veiculo, Servico |
+| `pecas-insumos` | `src/modules/pecas-insumos/` | Peca |
+| `ordem-servico` | `src/modules/ordem-servico/` | OrdemServico, Orcamento |
+| `auth` | `src/auth/` | User (JWT) |
 
-### Fluxo de Dependências
+### Shared
+- `src/shared/domain/exceptions/` — Domain exceptions
+- `src/shared/infrastructure/database/` — PrismaModule
+- `src/shared/infrastructure/filters/` — GlobalExceptionFilter
+
+### Layer Rules (strict)
 
 ```
 presentation → application → domain
                               ↕
-                         infrastructure (implementa interfaces do domain)
+                    infrastructure (implements domain interfaces)
 ```
 
-**Regras:**
+- **Domain**: ZERO external dependencies. No PrismaService, no JwtService.
+- **Application**: Depends only on domain.
+- **Infrastructure**: Implements domain interfaces.
+- **Presentation**: Depends on application.
 
-- Domain: SEM dependências externas (sem Prisma, sem JWT)
-- Application: Depende APENAS do Domain
-- Infrastructure: Implementa interfaces do Domain
-- Presentation: Depende do Application
+### Entry Points
+- API prefix: `api/v1`
+- Swagger: `/api/docs`
+- Health check: `GET /` → `AppController`
 
 ---
 
-## 📝 Convenções de Código
+## 📦 Tech Stack
 
-### Estrutura de Arquivos
-
-| Camada                         | Conteúdo                                        |
-| ------------------------------ | ----------------------------------------------- |
-| `domain/entities/`             | Entidades de negócio (`Cliente`, `Veiculo`)     |
-| `domain/interfaces/`           | Contratos de repositório (`IClienteRepository`) |
-| `application/use-cases/`       | Casos de uso (`CreateClienteUseCase`)           |
-| `infrastructure/repositories/` | Implementações (`PrismaClienteRepository`)      |
-| `presentation/controllers/`    | Controladores HTTP                              |
-| `presentation/dto/`            | DTOs de request/response                        |
-
-### Nomeclatura
-
-| Tipo       | Convenção                  | Exemplo                                     |
-| ---------- | -------------------------- | ------------------------------------------- |
-| Arquivos   | kebab-case                 | `cliente.controller.ts`                     |
-| Classes    | PascalCase                 | `ClienteRepository`, `CreateClienteUseCase` |
-| Interfaces | PascalCase com prefixo I   | `IClienteRepository`                        |
-| Entidades  | PascalCase                 | `Cliente`, `Veiculo`                        |
-| Métodos    | camelCase                  | `findAll()`, `create()`                     |
-| Variáveis  | camelCase                  | `const clienteId`                           |
-| Constantes | UPPER_SNAKE_CASE           | `DEFAULT_PAGE_SIZE`                         |
-| Enums      | PascalCase + valores UPPER | `UserRole.ADMIN`                            |
-
-### Imports
-
-```typescript
-// 1. Imports externos (NestJS, libs)
-import { Controller, Get, Post } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-
-// 2. Imports internos (mesma camada)
-import { CreateClienteUseCase } from '../application/use-cases/cliente.use-cases';
-import { Cliente } from '../domain/entities/cliente.entity';
-
-// 3. Imports de tipos
-import type { AuthUser } from '../../../shared/auth/types/auth.types';
-
-// Use paths alias quando disponível
-import { Cliente } from '@/modules/clientes/domain/entities/cliente.entity';
-```
-
-### TypeScript
-
-```typescript
-// ✅ Use tipos explícitos para retornos
-async findAll(): Promise<Cliente[]> { }
-
-// ✅ Use interfaces para contratos
-interface IClienteRepository {
-  create(data: CreateClienteDto): Promise<Cliente>;
-}
-
-// ✅ Use type para unions/tuplas
-type OrderStatus = 'RECEIVED' | 'IN_PROGRESS' | 'DELIVERED';
-
-// ❌ Evite 'any' - use 'unknown' se necessário
-function process(data: unknown): string {
-  if (typeof data === 'string') return data;
-  return '';
-}
-
-// ✅ Retornos de use cases referenciam entidade
-export class CreateClienteUseCase {
-  async execute(data: CreateClienteDto): Promise<Cliente> { }
-}
-```
-
-### Decoradores NestJS
-
-```typescript
-// Controllers - use prefixo claro em português
-@Controller('clientes')
-@Controller('veiculos')
-@Controller('ordens-servico')
-
-// Roteamento - HTTP method adequado
-@Get()     // Ler / Listar
-@Post()    // Criar
-@Patch()   // Atualização parcial
-@Put()     // Substituição completa
-@Delete()  // Remover
-
-// Autenticação
-@UseGuards(JwtAuthGuard)
-@UseGuards(RolesGuard)
-@Roles('admin')
-
-// params de rota
-@Param('id', ParseUUIDPipe) id: string
-```
+| Concern | Tool |
+|---------|------|
+| Framework | NestJS 10.x |
+| Runtime | Node.js 20 (.nvmrc) |
+| Package manager | pnpm (Dockerfile uses pnpm, not npm) |
+| Database | PostgreSQL 15 (docker-compose.dependencies.yml) |
+| ORM | Prisma 5.x |
+| Auth | JWT + bcrypt |
+| API docs | Swagger/OpenAPI |
+| Testing | Jest + supertest |
+| Lint | typescript-eslint + prettier |
 
 ---
 
-## 🎯 Error Handling
+## 🗄️ Database
 
-```typescript
-// ✅ Use exceptions nativos do NestJS
-import { NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
+### Prisma Schema
+- Location: `prisma/schema.prisma`
+- Uses **snake_case** column names (mapped via `@map`)
+- ORM entities in `infrastructure/persistence/` (not plain Prisma)
 
-async findOne(id: string) {
-  const cliente = await this.repository.findOne(id);
-  if (!cliente) {
-    throw new NotFoundException(`Cliente ${id} not found`);
-  }
-  return cliente;
-}
-
-// ✅ Tratamento centralizado
-catch (error) {
-  if (error instanceof ValidationError) {
-    throw new BadRequestException(error.message);
-  }
-  throw new InternalServerErrorException('Unexpected error');
-}
+### Migrations
+```bash
+npx prisma migrate dev   # Development
+npx prisma migrate deploy # Production
 ```
+
+### Key Models
+- `Cliente` → `Customer` table (with `nome`, `documento`, `tipo_documento`)
+- `Veiculo` → `Vehicle` table (with `placa`, `marca`, `modelo`, `ano`)
+- `OrdemServico` → `ServiceOrder` table (with `id_veiculo`, `id_cliente`)
+- `Orcamento` → `Estimate` table (1:1 with OrdemServico)
+- `Peca` → `Part` table
+- `Servico` → `Service` table
+
+### Enums
+- `TaxIdType`: `CPF`, `CNPJ`
+- `SOStatus`: `RECEIVED`, `UNDER_DIAGNOSIS`, `AWAITING_APPROVAL`, `IN_PROGRESS`, `FINISHED`, `DELIVERED`
+- `EstimateStatus`: `PENDING`, `APPROVED`, `REJECTED`
 
 ---
 
-## 💾 Banco de Dados (Prisma)
+## 🔐 Auth
 
-```prisma
-// Schema naming: snake_case para tabelas/campos
-model Customer {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  vehicles  Vehicle[]
-}
-```
-
-```typescript
-// Repositório implementa interface do domain
-@Injectable()
-export class PrismaClienteRepository implements IClienteRepository {
-  constructor(private prisma: PrismaService) {}
-
-  async create(data: CreateClienteDto): Promise<Cliente> {
-    return (await this.prisma.customer.create({ data })) as unknown as Cliente;
-  }
-}
-```
+- JWT via `@nestjs/jwt` + `@nestjs/passport`
+- Passport strategy: JWT Bearer
+- Guards: `JwtAuthGuard`, `RolesGuard`
+- Auth endpoints: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`
+- Protected routes require `Authorization: Bearer <token>`
+- Cookie-based auth also supported (cookie-parser enabled)
 
 ---
 
-## 🧪 Padrões de Testes
-
-### Estrutura de Teste
+## 🧪 Testing Patterns
 
 ```typescript
+// Unit test structure (use-cases)
 describe('CreateClienteUseCase', () => {
   let useCase: CreateClienteUseCase;
-  let mockRepository: jest.Mocked<IClienteRepository>;
+  let mockRepo: jest.Mocked<IClienteRepository>;
 
   beforeEach(() => {
-    mockRepository = {
-      create: jest.fn(),
-    } as unknown as jest.Mocked<IClienteRepository>;
-    useCase = new CreateClienteUseCase(mockRepository);
+    mockRepo = { create: jest.fn() } as unknown as jest.Mocked<IClienteRepository>;
+    useCase = new CreateClienteUseCase(mockRepo);
   });
 
-  it('should create a cliente with valid data', async () => {
-    const input = {
-      name: 'Test',
-      email: 'test@test.com',
-      tax_id: '12345678901',
-      tax_id_type: 'CPF' as const,
-    };
-    mockRepository.create.mockResolvedValue({ id: '1', ...input } as Cliente);
-
+  it('should create cliente', async () => {
+    mockRepo.create.mockResolvedValue({ id: '1', ...input } as Cliente);
     const result = await useCase.execute(input);
-
-    expect(result.name).toBe('Test');
-    expect(mockRepository.create).toHaveBeenCalledWith(input);
+    expect(result.id).toBe('1');
   });
 });
 ```
 
+- Test files: `*.spec.ts` (co-located with source)
+- E2E tests: `test/jest-e2e.json`
+- Jest config: `jest.config.js`
+- `tsconfig.json` path alias: `@/*` → `./src/*`
+
 ---
 
-## 📋 Configurações
+## ⚠️ Critical Rules
 
-### Prettier
+1. **Never use `as any`** — Use `unknown` if type is uncertain
+2. **Never use `@ts-ignore`**
+3. **Domain has ZERO external imports** — No PrismaService, no JwtService
+4. **Repository interfaces live in domain** — Infrastructure implements them
+5. **Unused params: prefix with `_`** — `@Get() getOne(@Param('id') _id: string)`
+6. **Validate with class-validator** — DTOs in `presentation/dto/`
+7. **Use NestJS exceptions** — `NotFoundException`, `BadRequestException`, etc.
+8. **No passwords in commits** — Use `.env`, gitignored
 
-```json
-{
-  "semi": true,
-  "trailingComma": "es5",
-  "singleQuote": true,
-  "printWidth": 100,
-  "tabWidth": 2,
-  "useTabs": false,
-  "bracketSpacing": true
-}
-```
+---
+
+## 🎯 Code Conventions
+
+### Naming
+| Type | Convention | Example |
+|------|------------|---------|
+| Files | kebab-case | `cliente.controller.ts` |
+| Classes | PascalCase | `CreateClienteUseCase` |
+| Interfaces | PascalCase + I prefix | `IClienteRepository` |
+| Variables | camelCase | `clienteId` |
+| Constants | UPPER_SNAKE_CASE | `DEFAULT_PAGE_SIZE` |
+| DB columns | snake_case | `created_at`, `id_cliente` |
 
 ### TypeScript
+- Strict mode (but `noImplicitAny: false` — legacy)
+- Decorators enabled
+- Return types: always explicit for public methods
 
-- Target: ES2023
-- Strict mode: enabled
-- decorators: enabled
-- Path alias: `@/*` → `./src/*`
+### Decorators
+```typescript
+@Controller('clientes')           // Route prefix
+@Get() @Post() @Patch() @Put() @Delete()  // HTTP methods
+@UseGuards(JwtAuthGuard)         // Auth guard
+@Roles('admin')                   // Role check
+@Param('id', ParseUUIDPipe)      // Param with validation
+```
+
+### ValidationPipe (global, main.ts)
+```typescript
+whitelist: true,           // Strip non-decorated props
+forbidNonWhitelisted: true, // Error on extra props
+transform: true            // Auto-transform payloads
+```
 
 ---
 
-## ⚠️ Regras Importantes
+## 📁 Key Files
 
-1. **Domain SEM dependências externas** - Não importe PrismaService, JwtService no domain
-2. **Use repository interface** - Domain define contrato, infrastructure implementa
-3. **Nunca use `as any`** - Use tipos adequados ou `unknown`
-4. **Nunca use `@ts-ignore`** - Corrija o tipo ou use verificação
-5. **Sempre valide entrada** - Use class-validator em DTOs (presentation/dto)
-6. **Trate erros adequadamente** - Use exceptions do NestJS
-7. **Não commite senhas** - Use `.env` e `.gitignore`
-8. **Testes são obrigatórios** - Mantenha cobertura mínima de 85%
-9. **Parâmetros não usados** - Use prefixo `_` (ex: `@CurrentUser() _user`)
+| File | Purpose |
+|------|---------|
+| `src/main.ts` | Bootstrap: CORS, helmet, cookie-parser, Swagger, ValidationPipe, GlobalExceptionFilter |
+| `src/app.module.ts` | Root module imports |
+| `src/modules/*/presentation/controllers/*.ts` | HTTP handlers |
+| `src/modules/*/domain/entities/*.ts` | Business entities |
+| `src/modules/*/application/use-cases/*.ts` | Use cases |
+| `src/modules/*/infrastructure/repositories/*.ts` | Repository implementations |
+| `scripts/docker/wait-for-postgres.ts` | Dev script to wait for Postgres |
 
 ---
 
-## 📚 Recursos
+## 🔧 Dev Setup
+
+### Requirements
+- Node.js 20 (see `.nvmrc`)
+- Docker + Docker Compose
+- PostgreSQL 15
+
+### Quick Start (with Docker)
+```bash
+docker compose -f docker-compose.dependencies.yml up -d  # Postgres only
+npx prisma migrate dev
+npm run dev
+```
+
+### Environment
+```env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workshop
+JWT_SECRET=your-secret
+PORT=3000
+```
+
+---
+
+## 📚 Resources
 
 - NestJS: https://docs.nestjs.com/
-- Prisma: https://www.prisma.io/docs/
+- Prisma: https://prisma.io/docs/
 - Clean Architecture: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
