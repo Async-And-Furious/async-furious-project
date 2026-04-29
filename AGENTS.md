@@ -7,32 +7,35 @@
 ## 🚦 Commands
 
 ```bash
-# Development (PostgreSQL + app + tests on start)
-npm run dev
+# Development (PostgreSQL + migrations + seed + app on start)
+pnpm run dev
 
 # Manual alternatives
-npm run build          # Production build
-npm run prod           # Run built app (node dist/main)
-npm run lint           # ESLint + auto-fix
-npm run format         # Prettier format
+pnpm run build          # Production build
+pnpm run prod           # Run built app (node dist/main)
+pnpm run lint           # ESLint + auto-fix
+pnpm run format         # Prettier format
 
 # Tests
-npm run test           # All unit tests
-npm run test:watch     # Watch mode
-npm run test:cov       # Coverage
-npm run test:e2e       # E2E (requires DB)
+pnpm run test           # All unit tests
+pnpm run test:watch     # Watch mode
+pnpm run test:cov       # Coverage
+pnpm run test:e2e       # E2E (requires DB)
 
 # Single test
-npm run test -- src/modules/cadastro/application/use-cases/cliente.use-cases.spec.ts
-npm run test -- --testNamePattern="CreateClienteUseCase"
+pnpm run test -- src/modules/cadastro/application/use-cases/cliente.use-cases.spec.ts
+pnpm run test -- --testNamePattern="CreateClienteUseCase"
 
 # Database
 npx prisma migrate dev   # Run migrations
-npx prisma generate     # Generate Prisma client
-npx prisma db push      # Push schema (skip generate)
+npx prisma generate      # Generate Prisma client
+npx prisma db push       # Push schema (skip generate)
+
+# Seed (runs automatically during dev, manual:
+pnpm ts-node scripts/seed.ts
 ```
 
-**NOTE:** `npm run dev` runs all tests on every file change — disruptive for TDD. Use `nest start --watch` manually during active development.
+**NOTE:** `pnpm run dev` runs migrations + seed + app — disruptive for TDD. Use `nest start --watch` manually during active development.
 
 ---
 

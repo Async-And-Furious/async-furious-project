@@ -9,7 +9,7 @@
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
-    "dev": "docker compose -f docker-compose.dependencies.yml down -v && docker compose -f docker-compose.dependencies.yml up -d && pnpm ts-node ./scripts/docker/wait-for-postgres.ts && prisma migrate dev && pnpm test && nest start --watch",
+    "dev": "docker compose -f docker-compose.dependencies.yml down -v && docker compose -f docker-compose.dependencies.yml up -d && pnpm ts-node ./scripts/docker/wait-for-postgres.ts && prisma migrate dev && pnpm ts-node ./scripts/seed.ts && nest start --watch",
     "debug": "nest start --debug --watch",
     "prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
@@ -17,9 +17,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed": "ts-node src/shared/infrastructure/database/seed.ts",
-    "db:reset": "prisma migrate reset --force && npm run seed"
+    "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.0",

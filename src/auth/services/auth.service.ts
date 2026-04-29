@@ -5,7 +5,6 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../shared/infrastructure/database/prisma.service';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { Role } from '../enums/role.enum';
-import { AuthenticatedUser } from '../types/auth.types';
 
 @Injectable()
 export class AuthService {
@@ -29,7 +28,7 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const saltRounds = this.config.get<number>('BCRYPT_SALT_ROUNDS') ?? 10;
+    const saltRounds = Number(this.config.get<number>('BCRYPT_SALT_ROUNDS') ?? '10');
     const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
 
     const user = await this.prisma.user.create({
@@ -80,7 +79,7 @@ export class AuthService {
     };
   }
 
-  async validateUser(userId: string): Promise<AuthenticatedUser | null> {
+  async validateUser(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, role: true },
@@ -89,7 +88,7 @@ export class AuthService {
     return { id: user.id, email: user.email, role: user.role as Role };
   }
 
-  async findById(id: string): Promise<AuthenticatedUser | null> {
+  async findById(id: string) {
     return this.validateUser(id);
   }
 }
