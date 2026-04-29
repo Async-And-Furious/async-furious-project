@@ -4,8 +4,8 @@ name: Async Furious API
 meta:
   id: wrk_8b0d960b6162401295aee414c5f6b3df
   created: 1777152773556
-  modified: 1785500000000
-  description: "Updated with RBAC - Roles: ADMIN, RECEPCIONISTA, MECANICO"
+  modified: 1785500000001
+  description: "Updated with RBAC + Supplier Loop P-22→P-25"
 collection:
   - name: Servicos
     meta:
@@ -708,9 +708,9 @@ collection:
     meta:
       id: fld_a146d86d20a04ec2a81506648e562ae9
       created: 1745628000000
-      modified: 1745628000000
+      modified: 1785500000001
       sortKey: -1745628000060
-      description: Parts and supplies management endpoints - Requires ADMIN role
+      description: Parts and supplies management endpoints - Requires ADMIN role. Supplier loop P-22→P-25 added.
     children:
       - url: "{{ base_url }}/pecas/{{ peca_id }}"
         name: Update Peca Insumo
@@ -883,11 +883,76 @@ collection:
             send: true
             store: true
           rebuildPath: true
+  - name: Pecas Insumos - Fornecedor
+    meta:
+      id: fld_p22p23000001
+      created: 1785500000000
+      modified: 1785500000000
+      sortKey: -1745628000067
+      description: Supplier loop endpoints P-22→P-25 - Requires ADMIN role
+    children:
+      - url: "{{ base_url }}/pecas/fornecedor/solicitar"
+        name: Solicitar Pecas Fornecedor (P-22)
+        meta:
+          id: req_p22solicitar
+          created: 1785500000000
+          modified: 1785500000000
+          isPrivate: false
+          description: "Solicitar peças a fornecedor (P-22) - Requires ADMIN role"
+          sortKey: -1745628000067
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "fornecedorId": "{{ fornecedor_id }}",
+              "pecas": [
+                {
+                  "pecaId": "{{ peca_id }}",
+                  "quantidadeSolicitada": 50
+                }
+              ]
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ admin_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/pecas/fornecedor/pedidos/{{ pedido_fornecedor_id }}/receber"
+        name: Receber Pecas Fornecedor (P-23)
+        meta:
+          id: req_p23receber
+          created: 1785500000000
+          modified: 1785500000000
+          isPrivate: false
+          description: "Confirmar recebimento de peças do fornecedor (P-23) - Requires ADMIN role"
+          sortKey: -1745628000068
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ admin_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
   - name: Clientes
     meta:
       id: fld_d8a06ff6c66348fcbe2e6db2a3fcb576
       created: 1745628000000
-      modified: 1745628000000
+      modified: 1785500000000
       sortKey: -1745628000030
       description: Customer management endpoints
     children:
@@ -1127,3 +1192,5 @@ environments:
     receptionist_token: ""
     mecanico_token: ""
     token: "{{ admin_token }}"
+    fornecedor_id: ""
+    pedido_fornecedor_id: ""
