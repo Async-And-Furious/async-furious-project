@@ -26,24 +26,6 @@ export class AuthController {
   @ApiBody({
     type: RegisterDto,
     description: 'Dados do novo usuário',
-    examples: {
-      'Exemplo Admin': {
-        value: {
-          email: 'admin@example.com',
-          password: 'senha123456',
-          name: 'Admin User',
-          role: 'ADMIN',
-        },
-      },
-      'Exemplo User': {
-        value: {
-          email: 'user@example.com',
-          password: 'senha123456',
-          name: 'Regular User',
-          role: 'RECEPCIONISTA',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 201,
@@ -79,14 +61,6 @@ export class AuthController {
   @ApiBody({
     type: LoginDto,
     description: 'Credenciais do usuário',
-    examples: {
-      'Exemplo Login': {
-        value: {
-          email: 'admin@example.com',
-          password: 'senha123456',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,

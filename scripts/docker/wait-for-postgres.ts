@@ -1,9 +1,11 @@
 import { exec } from 'node:child_process';
+const DOCKER_CMD = '/usr/bin/docker';
 
 function checkPostgres() {
-  exec('docker exec workshop-postgres pg_isready --host localhost', handleReturn);
-  function handleReturn(_error, stdout) {
-    //eslint-disable-next-line
+  const cmd = `${DOCKER_CMD} exec workshop-postgres pg_isready --host localhost`;
+  exec(cmd, handleReturn);
+
+  function handleReturn(_error: Error | null, stdout: string) {
     if (stdout?.search('accepting connections') === -1) {
       process.stdout.write('.');
       checkPostgres();
@@ -14,5 +16,5 @@ function checkPostgres() {
   }
 }
 
-process.stdout.write('\n\n🔴 Aguardando Postgres aceitar conexões');
+console.log('\n\n🔴 Aguardando Postgres aceitar conexões');
 checkPostgres();
