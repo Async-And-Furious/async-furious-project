@@ -5,6 +5,7 @@ import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity'
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
+import type { IOsPecaRepository } from '../../domain/interfaces/os-peca.interface';
 import { OrdemServicoCriada } from '../../domain/events/ordem-servico-criada.event';
 import { OrdemServicoAssumida } from '../../domain/events/ordem-servico-assumida.event';
 import { VeiculoAnalisado } from '../../domain/events/veiculo-analisado.event';
@@ -16,7 +17,7 @@ import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado
 export class CriarOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(data: {
@@ -34,14 +35,14 @@ export class CriarOrdemServicoUseCase {
 export class AssumirOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
     if (os.status !== 'RECEIVED') {
       throw new DomainException(
-        `OS deve estar no status Recebida para ser assumida. Status atual: ${os.status}`,
+        `OS deve estar no status Recebida para ser assumida. Status atual: ${os.status}`
       );
     }
     await this.emissor.emitir(new OrdemServicoAssumida(id));
@@ -53,14 +54,14 @@ export class AssumirOrdemServicoUseCase {
 export class AnalisarVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
     if (os.status !== 'UNDER_DIAGNOSIS') {
       throw new DomainException(
-        `OS deve estar Em Diagnóstico para analisar o veículo. Status atual: ${os.status}`,
+        `OS deve estar Em Diagnóstico para analisar o veículo. Status atual: ${os.status}`
       );
     }
     await this.emissor.emitir(new VeiculoAnalisado(id));
@@ -73,21 +74,39 @@ export class ListarServicosInsumosNaOsUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly osPecaRepository: IOsPecaRepository,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(
     id: string,
-    data: { valor_total_servicos: number; valor_total_pecas: number },
+    data: {
+      valor_total_servicos: number;
+      valor_total_pecas: number;
+      pecas?: Array<{ id_peca: string; quantidade: number; preco_unitario: number }>;
+    }
   ): Promise<Orcamento> {
     const os = await this.ordemServicoRepository.findOne(id);
     if (!['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {
       throw new DomainException(
-        `OS deve estar Em Diagnóstico ou Aguardando Aprovação. Status atual: ${os.status}`,
+        `OS deve estar Em Diagnóstico ou Aguardando Aprovação. Status atual: ${os.status}`
       );
     }
+
+    if (data.pecas && data.pecas.length > 0) {
+      await this.osPecaRepository.replaceAll(
+        id,
+        data.pecas.map((p) => ({
+          id_peca: p.id_peca,
+          quantidade: p.quantidade,
+          preco_unitario: p.preco_unitario,
+          valor_total: p.quantidade * p.preco_unitario,
+        }))
+      );
+    }
+
     await this.emissor.emitir(
-      new ServicosEInsumosListados(id, data.valor_total_servicos, data.valor_total_pecas),
+      new ServicosEInsumosListados(id, data.valor_total_servicos, data.valor_total_pecas)
     );
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id);
     if (!orcamento) {
@@ -101,14 +120,14 @@ export class ListarServicosInsumosNaOsUseCase {
 export class FinalizarExecucaoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
     if (os.status !== 'IN_PROGRESS') {
       throw new DomainException(
-        `OS deve estar Em Execução para ser finalizada. Status atual: ${os.status}`,
+        `OS deve estar Em Execução para ser finalizada. Status atual: ${os.status}`
       );
     }
     await this.emissor.emitir(new ServicoConcluidoPeloMecanico(id));
@@ -120,14 +139,14 @@ export class FinalizarExecucaoUseCase {
 export class AprovarServicoPrestadoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
     if (os.status !== 'FINISHED') {
       throw new DomainException(
-        `OS deve estar Finalizada para aprovação do serviço pelo cliente. Status atual: ${os.status}`,
+        `OS deve estar Finalizada para aprovação do serviço pelo cliente. Status atual: ${os.status}`
       );
     }
     await this.emissor.emitir(new ServicoAprovadoPeloCliente(id));
@@ -152,7 +171,7 @@ export class ListarOrdensServicoUseCase {
   async execute(
     page?: number,
     limit?: number,
-    search?: string,
+    search?: string
   ): Promise<{
     data: OrdemDeServico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
