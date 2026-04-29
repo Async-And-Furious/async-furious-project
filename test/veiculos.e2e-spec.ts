@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
+import { createAdminToken } from './support/fixtures';
 
 function generateValidPlaca(prefix: string = 'ABC'): string {
   const suffix = Date.now().toString().slice(-4);
@@ -340,25 +341,14 @@ describe('VeiculosController (e2e)', () => {
     let veiculoToDeleteId: string;
     let placaToDelete: string;
     let adminToken: string;
+    const adminEmail = 'veiculos-admin@example.com';
 
     beforeAll(async () => {
-      const adminUser = {
-        email: 'veiculos-admin@example.com',
-        password: 'admin123',
-        name: 'Veiculos Test Admin',
-      };
-      const hashedPassword = await bcrypt.hash(adminUser.password, 10);
-      await prismaService.user.deleteMany({ where: { email: adminUser.email } });
-      const admin = await prismaService.user.create({
-        data: { ...adminUser, password: hashedPassword, role: 'ADMIN' },
-      });
-      adminToken = jwtService.sign({ sub: admin.id, email: admin.email, role: admin.role });
+      adminToken = await createAdminToken(prismaService, jwtService, adminEmail);
     });
 
     afterAll(async () => {
-      if (adminToken) {
-        await prismaService.user.deleteMany({ where: { email: 'veiculos-admin@example.com' } });
-      }
+      await prismaService.user.deleteMany({ where: { email: adminEmail } });
     });
 
     beforeEach(async () => {

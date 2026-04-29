@@ -6,13 +6,15 @@ import {
 } from '../../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
 import { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
+import { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
+import { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 
 describe('Orcamento Use Cases', () => {
   let gerarUseCase: GerarOrcamentoUseCase;
   let aprovarUseCase: AprovarOrcamentoUseCase;
   let rejeitarUseCase: RejeitarOrcamentoUseCase;
-  let mockOsRepository: any;
-  let mockOrcamentoRepository: any;
+  let mockOsRepository: jest.Mocked<IOrdemServicoRepository>;
+  let mockOrcamentoRepository: jest.Mocked<IOrcamentoRepository>;
 
   const mockOs: OrdemDeServico = {
     id: 'os-1',

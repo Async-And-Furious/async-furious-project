@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
+import { createAdminToken } from './support/fixtures';
 
 describe('ClientesController (e2e)', () => {
   let app: INestApplication;
@@ -196,27 +197,14 @@ describe('ClientesController (e2e)', () => {
 
   describe('DELETE /clientes/:id', () => {
     let adminToken: string;
+    const adminEmail = 'admin-delete-cliente@example.com';
 
     beforeAll(async () => {
-      const adminUser = {
-        email: 'admin-delete-cliente@example.com',
-        password: 'admin123',
-        name: 'Admin Delete Cliente',
-      };
-      const hashedPassword = await bcrypt.hash(adminUser.password, 10);
-      await prismaService.user.deleteMany({ where: { email: adminUser.email } });
-      const admin = await prismaService.user.create({
-        data: { ...adminUser, password: hashedPassword, role: 'ADMIN' },
-      });
-      adminToken = jwtService.sign({ sub: admin.id, email: admin.email, role: admin.role });
+      adminToken = await createAdminToken(prismaService, jwtService, adminEmail);
     });
 
     afterAll(async () => {
-      if (adminToken) {
-        await prismaService.user.deleteMany({
-          where: { email: 'admin-delete-cliente@example.com' },
-        });
-      }
+      await prismaService.user.deleteMany({ where: { email: adminEmail } });
     });
 
     it('should delete a cliente', async () => {

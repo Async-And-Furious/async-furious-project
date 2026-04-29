@@ -40,7 +40,7 @@ describe('JwtAuthGuard', () => {
       getClass: jest.fn(),
     } as unknown as ExecutionContext;
 
-    guard.canActivate(mockContext);
+    void guard.canActivate(mockContext);
     expect(superCanActivateSpy).toHaveBeenCalledTimes(1);
   });
 });

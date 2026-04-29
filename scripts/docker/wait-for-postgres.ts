@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 
 function checkPostgres() {
   execFile(
-    'docker',
+    '/usr/bin/docker',
     ['exec', 'workshop-postgres', 'pg_isready', '--host', 'localhost'],
     handleReturn
   );
