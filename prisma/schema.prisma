@@ -110,16 +110,17 @@ model Peca {
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
 
-  osPecas OsPeca[]
+  osPecas               OsPeca[]
+  pedidoFornecedorItens PedidoFornecedorItem[]
 }
 
 model Servico {
-  id          String   @id @default(uuid())
-  nome        String
-  descricao   String?
-  preco       Decimal  @db.Decimal(10, 2)
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id         String   @id @default(uuid())
+  nome       String
+  descricao  String?
+  preco      Decimal  @db.Decimal(10, 2)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 }
 
 model OsPeca {
@@ -136,4 +137,35 @@ model OsPeca {
   peca          Peca         @relation(fields: [id_peca], references: [id], onDelete: Restrict)
 
   @@unique([id_ordem_servico, id_peca])
+}
+
+model PedidoFornecedor {
+  id            String   @id @default(uuid())
+  fornecedor_id String
+  status        String   @default("PENDENTE") // PENDENTE | RECEBIDO
+  criado_em     DateTime @default(now())
+  atualizado_em DateTime @updatedAt
+
+  itens PedidoFornecedorItem[]
+}
+
+model PedidoFornecedorItem {
+  id                    String @id @default(uuid())
+  id_pedido_fornecedor  String
+  id_peca               String
+  quantidade_solicitada Int
+  quantidade_recebida   Int    @default(0)
+
+  pedido_fornecedor PedidoFornecedor @relation(fields: [id_pedido_fornecedor], references: [id], onDelete: Cascade)
+  peca              Peca             @relation(fields: [id_peca], references: [id], onDelete: Restrict)
+}
+
+model ReservaEstoque {
+  id           String   @id @default(uuid())
+  ordem_id     String
+  peca_id      String
+  quantidade   Int
+  reservado_em DateTime @default(now())
+
+  @@unique([ordem_id, peca_id])
 }

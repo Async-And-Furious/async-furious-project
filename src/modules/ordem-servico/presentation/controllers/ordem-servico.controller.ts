@@ -20,11 +20,7 @@ import {
   ApiBody,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import {
-  CreateOrdemServicoDto,
-  ListQueryDto,
-  GerarOrcamentoDto,
-} from '../dto/ordem-servico.dto';
+import { CreateOrdemServicoDto, ListQueryDto, GerarOrcamentoDto } from '../dto/ordem-servico.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
@@ -76,7 +72,7 @@ export class OrdemServicoController {
     @Inject(DetalharOrdemServicoUseCase)
     private readonly detalharUseCase: DetalharOrdemServicoUseCase,
     @Inject(DeletarOrdemServicoUseCase)
-    private readonly deletarUseCase: DeletarOrdemServicoUseCase,
+    private readonly deletarUseCase: DeletarOrdemServicoUseCase
   ) {}
 
   @Post()
@@ -101,7 +97,11 @@ export class OrdemServicoController {
   @ApiResponse({ status: 200, description: 'Lista retornada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   listar(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
-    return this.listarUseCase.execute(Number(query.page) || 1, Number(query.limit) || 10, query.search);
+    return this.listarUseCase.execute(
+      Number(query.page) || 1,
+      Number(query.limit) || 10,
+      query.search
+    );
   }
 
   @Get(':id')
@@ -139,7 +139,9 @@ export class OrdemServicoController {
   @Patch(':id/assumir')
   @UseGuards(RolesGuard)
   @Roles('admin')
-  @ApiOperation({ summary: 'Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)' })
+  @ApiOperation({
+    summary: 'Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'OS assumida. Status → Em Diagnóstico' })
   @ApiResponse({ status: 400, description: 'OS não está no status Recebida' })
@@ -165,12 +167,16 @@ export class OrdemServicoController {
   @Roles('admin')
   @ApiOperation({
     summary: 'Listar serviços e insumos — gera orçamento (UNDER_DIAGNOSIS → AWAITING_APPROVAL)',
-    description: 'Registra valores de serviços e peças. Gera orçamento e atualiza OS para Aguardando Aprovação.',
+    description:
+      'Registra valores de serviços e peças. Gera orçamento e atualiza OS para Aguardando Aprovação.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: GerarOrcamentoDto })
   @ApiResponse({ status: 200, description: 'Orçamento gerado. OS → Aguardando Aprovação' })
-  @ApiResponse({ status: 400, description: 'OS não está em status válido ou orçamento já aprovado' })
+  @ApiResponse({
+    status: 400,
+    description: 'OS não está em status válido ou orçamento já aprovado',
+  })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   listarServicosInsumos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GerarOrcamentoDto) {
     return this.listarServicosInsumosUseCase.execute(id, dto);
@@ -190,7 +196,8 @@ export class OrdemServicoController {
 
   @Patch(':id/orcamento/recusar')
   @ApiOperation({
-    summary: 'Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)',
+    summary:
+      'Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Orçamento recusado. OS → Encerrada Sem Execução' })

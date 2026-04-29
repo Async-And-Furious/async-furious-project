@@ -4,7 +4,7 @@ export class OrcamentoAprovado extends DomainEvent {
   constructor(
     public readonly ordemServicoId: string,
     public readonly orcamentoId: string,
-    public readonly valorTotalPecas: number,
+    public readonly valorTotalPecas: number
   ) {
     super();
   }

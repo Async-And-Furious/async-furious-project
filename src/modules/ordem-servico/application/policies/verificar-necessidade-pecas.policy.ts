@@ -14,7 +14,7 @@ export class VerificarNecessidadePecasPolicy {
     if (evento.valorTotalPecas > 0) {
       // Emit event for pecas-insumos module to reserve stock (P-18 listener)
       await this.emissor.emitir(
-        new OrcamentoAprovadoComPecas(evento.ordemServicoId, evento.orcamentoId),
+        new OrcamentoAprovadoComPecas(evento.ordemServicoId, evento.orcamentoId)
       );
     } else {
       await this.emissor.emitir(new OsSemPecasConfirmada(evento.ordemServicoId));

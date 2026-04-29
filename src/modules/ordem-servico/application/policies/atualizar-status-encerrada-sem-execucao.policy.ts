@@ -9,7 +9,7 @@ import { StatusAtualizadoEncerradaSemExecucao } from '../../domain/events/status
 export class AtualizarStatusEncerradaSemExecucaoPolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   @OnEvent('OrcamentoRecusado')
@@ -17,8 +17,6 @@ export class AtualizarStatusEncerradaSemExecucaoPolicy {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'CLOSED_WITHOUT_EXECUTION',
     });
-    await this.emissor.emitir(
-      new StatusAtualizadoEncerradaSemExecucao(evento.ordemServicoId),
-    );
+    await this.emissor.emitir(new StatusAtualizadoEncerradaSemExecucao(evento.ordemServicoId));
   }
 }

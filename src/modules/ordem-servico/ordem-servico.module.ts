@@ -4,6 +4,8 @@ import { OrdemServicoRepository } from './infrastructure/repositories/ordem-serv
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
 import { OsPecaRepository } from './infrastructure/repositories/os-peca.repository';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { OrdemServicoBacklogAdapter } from './infrastructure/adapters/ordem-servico-backlog.adapter';
+import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
 import {
   CriarOrdemServicoUseCase,
   AssumirOrdemServicoUseCase,
@@ -213,7 +215,13 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
       useFactory: (osRepo: OrdemServicoRepository) => new DeletarOrdemServicoUseCase(osRepo),
       inject: [OrdemServicoRepository],
     },
+
+    // ACL Adapter for pecas-insumos
+    {
+      provide: ORDEM_SERVICO_BACKLOG_PORT,
+      useClass: OrdemServicoBacklogAdapter,
+    },
   ],
-  exports: [OrdemServicoRepository, OrcamentoRepository],
+  exports: [OrdemServicoRepository, OrcamentoRepository, ORDEM_SERVICO_BACKLOG_PORT],
 })
 export class OrdemServicoModule {}
