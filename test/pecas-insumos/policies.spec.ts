@@ -140,11 +140,11 @@ describe('PecasInsumos Policies', () => {
   });
 
   describe('NotificarAdminReposicaoPolicy (P-21)', () => {
-    it('deve registrar aviso para reposicao quando PecasIndisponiveis ocorrer', async () => {
+    it('deve registrar aviso para reposicao quando PecasIndisponiveis ocorrer', () => {
       const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       const policy = new NotificarAdminReposicaoPolicy();
 
-      await policy.handle(new PecasIndisponiveis('os-1', ['peca-1']));
+      policy.handle(new PecasIndisponiveis('os-1', ['peca-1']));
 
       expect(warnSpy).toHaveBeenCalled();
       warnSpy.mockRestore();

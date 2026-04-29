@@ -21,7 +21,10 @@ import { ReceberPecasFornecedorPolicy } from './application/policies/receber-pec
 import { ValidarBacklogOrdensPendentesPolicy } from './application/policies/validar-backlog-ordens-pendentes.policy';
 import { LiberarOrdensAguardandoPecasPolicy } from './application/policies/liberar-ordens-aguardando-pecas.policy';
 import { OrdemServicoModule } from '../ordem-servico/ordem-servico.module';
-import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
+import {
+  ORDEM_SERVICO_BACKLOG_PORT,
+  IOrdemServicoBacklogPort,
+} from '../../shared/domain/interfaces/ordem-servico-backlog.port';
 
 @Module({
   imports: [OrdemServicoModule],
@@ -77,8 +80,11 @@ import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem
     },
     {
       provide: ValidarBacklogOrdensPendentesPolicy,
-      useFactory: (backlogPort: any, pecaRepo: PecaInsumoRepository, emissor: EmissorEventos) =>
-        new ValidarBacklogOrdensPendentesPolicy(backlogPort, pecaRepo, emissor),
+      useFactory: (
+        backlogPort: IOrdemServicoBacklogPort,
+        pecaRepo: PecaInsumoRepository,
+        emissor: EmissorEventos
+      ) => new ValidarBacklogOrdensPendentesPolicy(backlogPort, pecaRepo, emissor),
       inject: [ORDEM_SERVICO_BACKLOG_PORT, PecaInsumoRepository, EmissorEventos],
     },
     {

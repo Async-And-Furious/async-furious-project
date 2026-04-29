@@ -7,7 +7,7 @@ export class NotificarAdminReposicaoPolicy {
   private readonly logger = new Logger(NotificarAdminReposicaoPolicy.name);
 
   @OnEvent('PecasIndisponiveis')
-  async handle(evento: PecasIndisponiveis): Promise<void> {
+  handle(evento: PecasIndisponiveis): void {
     this.logger.warn(
       `OS ${evento.ordemServicoId} com pecas indisponiveis (${evento.idsPecasIndisponiveis.join(', ')}). Acionar reposicao.`
     );

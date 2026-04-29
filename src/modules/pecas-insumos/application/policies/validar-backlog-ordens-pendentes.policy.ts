@@ -18,7 +18,7 @@ export class ValidarBacklogOrdensPendentesPolicy {
   ) {}
 
   @OnEvent('EstoqueAtualizadoAposRecebimento')
-  async handle(event: EstoqueAtualizadoAposRecebimento): Promise<void> {
+  async handle(_event: EstoqueAtualizadoAposRecebimento): Promise<void> {
     const ordens = await this.backlogPort.findAllAguardandoPecas();
 
     for (const ordem of ordens) {

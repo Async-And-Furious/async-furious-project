@@ -68,12 +68,12 @@ export class PedidoFornecedorRepository implements IPedidoFornecedorRepository {
     raw: Prisma.PedidoFornecedorGetPayload<{ include: { itens: true } }>
   ): PedidoFornecedor {
     return {
-      id: raw!.id,
-      fornecedor_id: raw!.fornecedor_id,
-      status: raw!.status as 'PENDENTE' | 'RECEBIDO',
-      criado_em: raw!.criado_em,
-      atualizado_em: raw!.atualizado_em,
-      itens: raw!.itens.map((item) => ({
+      id: raw.id,
+      fornecedor_id: raw.fornecedor_id,
+      status: raw.status as 'PENDENTE' | 'RECEBIDO',
+      criado_em: raw.criado_em,
+      atualizado_em: raw.atualizado_em,
+      itens: raw.itens.map((item) => ({
         id: item.id,
         id_pedido_fornecedor: item.id_pedido_fornecedor,
         id_peca: item.id_peca,
