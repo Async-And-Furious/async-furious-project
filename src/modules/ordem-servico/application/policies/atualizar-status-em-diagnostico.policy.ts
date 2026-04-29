@@ -9,7 +9,7 @@ import { StatusAtualizadoEmDiagnostico } from '../../domain/events/status-atuali
 export class AtualizarStatusEmDiagnosticoPolicy {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   @OnEvent('OrdemServicoAssumida')

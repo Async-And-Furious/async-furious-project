@@ -12,7 +12,7 @@ export class AprovarOrcamentoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {
@@ -33,7 +33,7 @@ export class AprovarOrcamentoUseCase {
 
     const approved = await this.orcamentoRepository.update(orcamento.id, { status: 'APPROVED' });
     await this.emissor.emitir(
-      new OrcamentoAprovado(id_ordem_servico, approved.id, approved.valor_total_pecas),
+      new OrcamentoAprovado(id_ordem_servico, approved.id, approved.valor_total_pecas)
     );
     return approved;
   }
@@ -44,7 +44,7 @@ export class RecusarOrcamentoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly emissor: EmissorEventos,
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {

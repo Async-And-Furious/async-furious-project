@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { OrdemServicoController } from './presentation/controllers/ordem-servico.controller';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
+import { OsPecaRepository } from './infrastructure/repositories/os-peca.repository';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { OrdemServicoBacklogAdapter } from './infrastructure/adapters/ordem-servico-backlog.adapter';
+import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
 import {
   CriarOrdemServicoUseCase,
   AssumirOrdemServicoUseCase,
@@ -34,12 +37,14 @@ import { FinalizarMonitoramentoTempoPolicy } from './application/policies/finali
 import { NotificarClienteConclusaoPolicy } from './application/policies/notificar-cliente-conclusao.policy';
 import { AtualizarStatusEntreguePolicy } from './application/policies/atualizar-status-entregue.policy';
 import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policies/atualizar-status-encerrada-sem-execucao.policy';
+import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atualizar-status-aguardando-pecas.policy';
 
 @Module({
   controllers: [OrdemServicoController],
   providers: [
     OrdemServicoRepository,
     OrcamentoRepository,
+    OsPecaRepository,
     EmissorEventos,
 
     // Policies (registered as NestJS providers — @OnEvent listeners)
@@ -64,7 +69,7 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos,
+        barramento: EmissorEventos
       ) => new GerarOrcamentoPolicy(osRepo, orcRepo, barramento),
       inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
     },
@@ -78,6 +83,12 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
       useFactory: (osRepo: OrdemServicoRepository) =>
         new AtualizarStatusAguardandoAprovacaoPolicy(osRepo),
       inject: [OrdemServicoRepository],
+    },
+    {
+      provide: AtualizarStatusAguardandoPecasPolicy,
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+        new AtualizarStatusAguardandoPecasPolicy(osRepo, barramento),
+      inject: [OrdemServicoRepository, EmissorEventos],
     },
     {
       provide: VerificarNecessidadePecasPolicy,
@@ -103,14 +114,12 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
     },
     {
       provide: FinalizarMonitoramentoTempoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository) =>
-        new FinalizarMonitoramentoTempoPolicy(osRepo),
+      useFactory: (osRepo: OrdemServicoRepository) => new FinalizarMonitoramentoTempoPolicy(osRepo),
       inject: [OrdemServicoRepository],
     },
     {
       provide: NotificarClienteConclusaoPolicy,
-      useFactory: (barramento: EmissorEventos) =>
-        new NotificarClienteConclusaoPolicy(barramento),
+      useFactory: (barramento: EmissorEventos) => new NotificarClienteConclusaoPolicy(barramento),
       inject: [EmissorEventos],
     },
     {
@@ -150,16 +159,17 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos,
-      ) => new ListarServicosInsumosNaOsUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
+        osPecaRepo: OsPecaRepository,
+        barramento: EmissorEventos
+      ) => new ListarServicosInsumosNaOsUseCase(osRepo, orcRepo, osPecaRepo, barramento),
+      inject: [OrdemServicoRepository, OrcamentoRepository, OsPecaRepository, EmissorEventos],
     },
     {
       provide: AprovarOrcamentoUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos,
+        barramento: EmissorEventos
       ) => new AprovarOrcamentoUseCase(osRepo, orcRepo, barramento),
       inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
     },
@@ -168,7 +178,7 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos,
+        barramento: EmissorEventos
       ) => new RecusarOrcamentoUseCase(osRepo, orcRepo, barramento),
       inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
     },
@@ -205,7 +215,13 @@ import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policie
       useFactory: (osRepo: OrdemServicoRepository) => new DeletarOrdemServicoUseCase(osRepo),
       inject: [OrdemServicoRepository],
     },
+
+    // ACL Adapter for pecas-insumos
+    {
+      provide: ORDEM_SERVICO_BACKLOG_PORT,
+      useClass: OrdemServicoBacklogAdapter,
+    },
   ],
-  exports: [OrdemServicoRepository, OrcamentoRepository],
+  exports: [OrdemServicoRepository, OrcamentoRepository, ORDEM_SERVICO_BACKLOG_PORT],
 })
 export class OrdemServicoModule {}
