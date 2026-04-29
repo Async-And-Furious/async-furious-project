@@ -83,6 +83,7 @@ model OrdemServico {
   veiculo   Veiculo    @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
   cliente   Cliente    @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
   orcamento Orcamento?
+  osPecas   OsPeca[]
 }
 
 model Orcamento {
@@ -108,6 +109,8 @@ model Peca {
   quantidade_minima  Int      @default(1)
   created_at         DateTime @default(now())
   updated_at         DateTime @updatedAt
+
+  osPecas OsPeca[]
 }
 
 model Servico {
@@ -117,4 +120,20 @@ model Servico {
   preco       Decimal  @db.Decimal(10, 2)
   created_at  DateTime @default(now())
   updated_at  DateTime @updatedAt
+}
+
+model OsPeca {
+  id               String   @id @default(uuid())
+  id_ordem_servico String
+  id_peca          String
+  quantidade       Int
+  preco_unitario   Decimal  @db.Decimal(10, 2)
+  valor_total      Decimal  @db.Decimal(10, 2)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  ordem_servico OrdemServico @relation(fields: [id_ordem_servico], references: [id], onDelete: Cascade)
+  peca          Peca         @relation(fields: [id_peca], references: [id], onDelete: Restrict)
+
+  @@unique([id_ordem_servico, id_peca])
 }
