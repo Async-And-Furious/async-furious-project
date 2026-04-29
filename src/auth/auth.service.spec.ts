@@ -61,6 +61,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         password: 'hashed-password',
+        role: 'RECEPCIONISTA',
       });
 
       const result = await service.register(registerDto);
@@ -69,7 +70,7 @@ describe('AuthService', () => {
       expect(result.user).toEqual({
         id: 'user-id',
         email: 'test@example.com',
-        name: 'Test User',
+        role: 'RECEPCIONISTA',
       });
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
@@ -92,6 +93,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         password: 'hashed-password',
+        role: 'RECEPCIONISTA',
       });
 
       await service.register({ ...registerDto, email: 'TEST@EXAMPLE.COM' });
@@ -114,6 +116,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         password: 'hashed-password',
+        role: 'ADMIN',
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
 
@@ -123,7 +126,7 @@ describe('AuthService', () => {
       expect(result.user).toEqual({
         id: 'user-id',
         email: 'test@example.com',
-        name: 'Test User',
+        role: 'ADMIN',
       });
     });
 
@@ -175,10 +178,14 @@ describe('AuthService', () => {
 
       const result = await service.validateUser('user-id');
 
-      expect(result).toEqual(user);
+      expect(result).toEqual({
+        id: 'user-id',
+        email: 'test@example.com',
+        role: 'admin',
+      });
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-id' },
-        select: { id: true, email: true, name: true, role: true },
+        select: { id: true, email: true, role: true },
       });
     });
   });
