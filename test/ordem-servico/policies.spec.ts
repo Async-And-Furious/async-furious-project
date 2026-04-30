@@ -13,6 +13,7 @@ import { FinalizarMonitoramentoTempoPolicy } from '../../src/modules/ordem-servi
 import { NotificarClienteConclusaoPolicy } from '../../src/modules/ordem-servico/application/policies/notificar-cliente-conclusao.policy';
 import { AtualizarStatusEntreguePolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-entregue.policy';
 import { AtualizarStatusEncerradaSemExecucaoPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-encerrada-sem-execucao.policy';
+import { AtualizarStatusAguardandoPecasPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-aguardando-pecas.policy';
 import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-criada.event';
 import { OrdemServicoAssumida } from '../../src/modules/ordem-servico/domain/events/ordem-servico-assumida.event';
 import { StatusAtualizadoEmDiagnostico } from '../../src/modules/ordem-servico/domain/events/status-atualizado-em-diagnostico.event';
@@ -25,7 +26,9 @@ import { StatusAtualizadoEmExecucao } from '../../src/modules/ordem-servico/doma
 import { ServicoConcluidoPeloMecanico } from '../../src/modules/ordem-servico/domain/events/servico-concluido-pelo-mecanico.event';
 import { StatusAtualizadoFinalizada } from '../../src/modules/ordem-servico/domain/events/status-atualizado-finalizada.event';
 import { ServicoAprovadoPeloCliente } from '../../src/modules/ordem-servico/domain/events/servico-aprovado-pelo-cliente.event';
+import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
+import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/events/pecas-indisponiveis.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
@@ -328,7 +331,7 @@ describe('OS Policies', () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'DELIVERED' }));
       const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
 
-      await policy.handle(new ServicoAprovadoPeloCliente('os-1'));
+      await policy.handle(new PagamentoRegistrado('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', {
         status: 'DELIVERED',
@@ -351,6 +354,21 @@ describe('OS Policies', () => {
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'CLOSED_WITHOUT_EXECUTION' });
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('StatusAtualizadoEncerradaSemExecucao');
+    });
+  });
+
+  // ─── P-15 ────────────────────────────────────────────────────────────────
+
+  describe('P-15 AtualizarStatusAguardandoPecasPolicy', () => {
+    it('deve atualizar para AWAITING_PARTS quando PecasIndisponiveis ocorrer', async () => {
+      osRepo.update.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
+      const policy = new AtualizarStatusAguardandoPecasPolicy(osRepo, emissor);
+
+      await policy.handle(new PecasIndisponiveis('os-1', ['peca-1']));
+
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_PARTS' });
+      const emitido = emissor.emitir.mock.calls[0][0];
+      expect(emitido.constructor.name).toBe('StatusAtualizadoAguardandoPecas');
     });
   });
 });

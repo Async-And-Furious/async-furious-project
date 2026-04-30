@@ -38,8 +38,10 @@ import {
   AssumirOrdemServicoUseCase,
   AnalisarVeiculoUseCase,
   ListarServicosInsumosNaOsUseCase,
+  AtualizarOrdemServicoUseCase,
   FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
+  RegistrarEntregaVeiculoUseCase,
   ConsultarStatusOrdemServicoUseCase,
   ListarOrdensServicoUseCase,
   DetalharOrdemServicoUseCase,
@@ -64,6 +66,8 @@ export class OrdemServicoController {
     private readonly analisarVeiculoUseCase: AnalisarVeiculoUseCase,
     @Inject(ListarServicosInsumosNaOsUseCase)
     private readonly listarServicosInsumosUseCase: ListarServicosInsumosNaOsUseCase,
+    @Inject(AtualizarOrdemServicoUseCase)
+    private readonly atualizarOrdemServicoUseCase: AtualizarOrdemServicoUseCase,
     @Inject(AprovarOrcamentoUseCase)
     private readonly aprovarOrcamentoUseCase: AprovarOrcamentoUseCase,
     @Inject(RecusarOrcamentoUseCase)
@@ -72,6 +76,8 @@ export class OrdemServicoController {
     private readonly finalizarExecucaoUseCase: FinalizarExecucaoUseCase,
     @Inject(AprovarServicoPrestadoUseCase)
     private readonly aprovarServicoPrestadoUseCase: AprovarServicoPrestadoUseCase,
+    @Inject(RegistrarEntregaVeiculoUseCase)
+    private readonly registrarEntregaVeiculoUseCase: RegistrarEntregaVeiculoUseCase,
     @Inject(ConsultarStatusOrdemServicoUseCase)
     private readonly consultarStatusUseCase: ConsultarStatusOrdemServicoUseCase,
     @Inject(ListarOrdensServicoUseCase)
@@ -138,17 +144,22 @@ export class OrdemServicoController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
   @ApiOperation({
-    summary: 'Atualizar ordem de serviço',
-    description: 'Atualiza status ou descrição. Requer role de ADMIN.',
+    summary: 'Atualizar ordem de serviço antes da execução',
+    description:
+      'Atualiza status ou descrição somente enquanto a OS estiver em Recebida, Em Diagnóstico ou Aguardando Aprovação. Requer role de ADMIN.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: UpdateOrdemServicoDto })
   @ApiResponse({ status: 200, description: 'Ordem de serviço atualizada com sucesso' })
+  @ApiResponse({
+    status: 400,
+    description: 'OS já entrou em execução ou o status informado não é permitido',
+  })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   atualizar(@Param('id', ParseUUIDPipe) id: string, @Body() _dto: UpdateOrdemServicoDto) {
-    return this.detalharUseCase.execute(id);
+    return this.atualizarOrdemServicoUseCase.execute(id, _dto);
   }
 
   @Delete(':id')
@@ -255,13 +266,30 @@ export class OrdemServicoController {
 
   @Patch(':id/aprovar-servico')
   @ApiOperation({
-    summary: 'Cliente aprova o serviço prestado — entrega o veículo (FINISHED → DELIVERED)',
+    summary: 'Cliente aprova o serviço prestado',
+    description:
+      'Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção após o pagamento.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Serviço aprovado. OS → Entregue' })
+  @ApiResponse({ status: 200, description: 'Serviço aprovado. OS permanece Finalizada' })
   @ApiResponse({ status: 400, description: 'OS não está Finalizada' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   aprovarServicoPrestado(@Param('id', ParseUUIDPipe) id: string) {
     return this.aprovarServicoPrestadoUseCase.execute(id);
+  }
+
+  @Patch(':id/registrar-entrega')
+  @UseGuards(RolesGuard)
+  @Roles(Role.RECEPCIONISTA)
+  @ApiOperation({
+    summary: 'Registrar entrega do veículo',
+    description: 'Registra a entrega após o pagamento e move a OS para Entregue.',
+  })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Entrega registrada. OS → Entregue' })
+  @ApiResponse({ status: 400, description: 'OS não está Finalizada' })
+  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
+  registrarEntrega(@Param('id', ParseUUIDPipe) id: string) {
+    return this.registrarEntregaVeiculoUseCase.execute(id);
   }
 }

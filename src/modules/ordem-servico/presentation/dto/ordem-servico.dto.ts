@@ -3,13 +3,13 @@ import {
   IsNotEmpty,
   IsOptional,
   IsUUID,
-  IsEnum,
   IsNumber,
   Min,
   IsArray,
   ValidateNested,
   IsInt,
   IsPositive,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -36,33 +36,16 @@ export class CreateOrdemServicoDto {
 
 export class UpdateOrdemServicoDto {
   @ApiPropertyOptional({
-    enum: [
-      'RECEIVED',
-      'UNDER_DIAGNOSIS',
-      'AWAITING_APPROVAL',
-      'IN_PROGRESS',
-      'FINISHED',
-      'DELIVERED',
-    ],
-    example: 'IN_PROGRESS',
+    enum: ['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'],
+    example: 'AWAITING_APPROVAL',
     description: 'Novo status da ordem de serviço',
   })
-  @IsEnum([
-    'RECEIVED',
-    'UNDER_DIAGNOSIS',
-    'AWAITING_APPROVAL',
-    'IN_PROGRESS',
-    'FINISHED',
-    'DELIVERED',
-  ])
+  @IsIn(['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'])
   @IsOptional()
   status?:
     | 'RECEIVED'
     | 'UNDER_DIAGNOSIS'
-    | 'AWAITING_APPROVAL'
-    | 'IN_PROGRESS'
-    | 'FINISHED'
-    | 'DELIVERED';
+    | 'AWAITING_APPROVAL';
 
   @ApiPropertyOptional({
     example: 'Serviço iniciado - troca de óleo em andamento',
