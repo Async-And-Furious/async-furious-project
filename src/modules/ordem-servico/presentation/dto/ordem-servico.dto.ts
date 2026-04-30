@@ -42,10 +42,7 @@ export class UpdateOrdemServicoDto {
   })
   @IsIn(['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'])
   @IsOptional()
-  status?:
-    | 'RECEIVED'
-    | 'UNDER_DIAGNOSIS'
-    | 'AWAITING_APPROVAL';
+  status?: 'RECEIVED' | 'UNDER_DIAGNOSIS' | 'AWAITING_APPROVAL';
 
   @ApiPropertyOptional({
     example: 'Serviço iniciado - troca de óleo em andamento',

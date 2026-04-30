@@ -25,7 +25,7 @@ import { OsSemPecasConfirmada } from '../../src/modules/ordem-servico/domain/eve
 import { StatusAtualizadoEmExecucao } from '../../src/modules/ordem-servico/domain/events/status-atualizado-em-execucao.event';
 import { ServicoConcluidoPeloMecanico } from '../../src/modules/ordem-servico/domain/events/servico-concluido-pelo-mecanico.event';
 import { StatusAtualizadoFinalizada } from '../../src/modules/ordem-servico/domain/events/status-atualizado-finalizada.event';
-import { ServicoAprovadoPeloCliente } from '../../src/modules/ordem-servico/domain/events/servico-aprovado-pelo-cliente.event';
+// `ServicoAprovadoPeloCliente` removed: not used in tests
 import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
 import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/events/pecas-indisponiveis.event';

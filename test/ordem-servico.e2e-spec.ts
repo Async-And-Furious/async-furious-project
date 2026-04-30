@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
+import type { Application } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
@@ -47,7 +48,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
     );
     await app.init();
 
-    server = request(app.getHttpServer());
+    server = request(app.getHttpServer() as unknown as Application);
     prismaService = moduleFixture.get<PrismaService>(PrismaService) as unknown as PrismaTestClient;
     jwtService = moduleFixture.get<JwtService>(JwtService);
 
