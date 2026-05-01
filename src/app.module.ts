@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { CadastroModule } from './modules/cadastro/cadastro.module';
 import { PecasInsumosModule } from './modules/pecas-insumos/pecas-insumos.module';
 import { OrdemServicoModule } from './modules/ordem-servico/ordem-servico.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { OrdemServicoModule } from './modules/ordem-servico/ordem-servico.module
     CadastroModule,
     PecasInsumosModule,
     OrdemServicoModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService],
