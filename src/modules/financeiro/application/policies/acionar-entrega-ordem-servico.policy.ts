@@ -18,7 +18,7 @@ export class AcionarEntregaOrdemServicoPolicy {
     );
 
     // Ação: Instanciamos a classe oficial de Integração (O Comunicado Oficial)
-    const eventoIntegracao = new PagamentoRegistrado(evento.pagamentoId, evento.ordemServicoId);
+    const eventoIntegracao = new PagamentoRegistrado(evento.ordemServicoId, evento.pagamentoId);
 
     // Disparamos para o mundo (O módulo de OS do seu colega vai ouvir isso aqui)
     await this.emissor.emitir(eventoIntegracao);
