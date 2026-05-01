@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../shared/infrastructure/database/prisma.service';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
+import { Role } from '../enums/role.enum';
 
 @Injectable()
 export class AuthService {
@@ -15,12 +16,6 @@ export class AuthService {
     private readonly config: ConfigService
   ) {}
 
-  /**
-   * Registers a new user with the system.
-   * @param dto - Registration data containing email, password, and name
-   * @returns JWT token and user information
-   * @throws ConflictException if email is already registered
-   */
   async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase().trim();
 
@@ -33,7 +28,7 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
-    const saltRounds = this.config.get<number>('BCRYPT_SALT_ROUNDS') ?? 10;
+    const saltRounds = Number(this.config.get<number>('BCRYPT_SALT_ROUNDS') ?? '10');
     const hashedPassword = await bcrypt.hash(dto.password, saltRounds);
 
     const user = await this.prisma.user.create({
@@ -41,6 +36,7 @@ export class AuthService {
         email,
         password: hashedPassword,
         name: dto.name.trim(),
+        role: dto.role ?? Role.RECEPCIONISTA,
       },
     });
 
@@ -48,12 +44,6 @@ export class AuthService {
     return this.generateToken(user);
   }
 
-  /**
-   * Authenticates a user and returns a JWT token.
-   * @param dto - Login credentials containing email and password
-   * @returns JWT token and user information
-   * @throws UnauthorizedException if credentials are invalid
-   */
   async login(dto: LoginDto) {
     const email = dto.email.toLowerCase().trim();
 
@@ -77,32 +67,28 @@ export class AuthService {
     return this.generateToken(user);
   }
 
-  /**
-   * Generates a JWT token for the authenticated user.
-   * @param user - User object containing id, email, and name
-   * @returns JWT token and user information
-   */
-  private generateToken(user: { id: string; email: string; name: string }) {
-    const payload = { sub: user.id, email: user.email, name: user.name };
+  private generateToken(user: { id: string; email: string; role: string }) {
+    const payload = { sub: user.id, email: user.email, role: user.role as Role };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        role: user.role,
       },
     };
   }
 
-  /**
-   * Validates a user by their ID for JWT authentication.
-   * @param userId - The user's ID to validate
-   * @returns User object with id, email, name, and role if found
-   */
   async validateUser(userId: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, role: true },
+      select: { id: true, email: true, role: true },
     });
+    if (!user) return null;
+    return { id: user.id, email: user.email, role: user.role as Role };
+  }
+
+  async findById(id: string) {
+    return this.validateUser(id);
   }
 }

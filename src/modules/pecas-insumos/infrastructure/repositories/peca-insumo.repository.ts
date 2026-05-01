@@ -55,6 +55,31 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
     return peca as unknown as PecaInsumo;
   }
 
+  async findByOrdemServicoId(ordemServicoId: string): Promise<
+    Array<{
+      id_peca: string;
+      quantidade: number;
+      preco_unitario: number;
+      valor_total: number;
+      quantidade_estoque: number;
+      quantidade_minima: number;
+    }>
+  > {
+    const itens = await this.prisma.osPeca.findMany({
+      where: { id_ordem_servico: ordemServicoId },
+      include: { peca: true },
+    });
+
+    return itens.map((item) => ({
+      id_peca: item.id_peca,
+      quantidade: item.quantidade,
+      preco_unitario: Number(item.preco_unitario),
+      valor_total: Number(item.valor_total),
+      quantidade_estoque: item.peca.quantidade_estoque,
+      quantidade_minima: item.peca.quantidade_minima,
+    }));
+  }
+
   async update(
     id: string,
     data: { nome?: string; descricao?: string; preco?: number; quantidade_minima?: number }
