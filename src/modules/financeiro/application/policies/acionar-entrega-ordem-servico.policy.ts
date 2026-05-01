@@ -10,17 +10,14 @@ export class AcionarEntregaOrdemServicoPolicy {
 
   constructor(private readonly emissor: EmissorEventos) {}
 
-  // O gatilho: Ouvimos o evento interno da P-26
   @OnEvent(PagamentoRegistradoEvent.name)
   async handle(evento: PagamentoRegistradoEvent): Promise<void> {
     this.logger.log(
       `[P-27] Pagamento interno da OS ${evento.ordemServicoId} detectado. Preparando integração.`
     );
 
-    // Ação: Instanciamos a classe oficial de Integração (O Comunicado Oficial)
     const eventoIntegracao = new PagamentoRegistrado(evento.ordemServicoId, evento.pagamentoId);
 
-    // Disparamos para o mundo (O módulo de OS do seu colega vai ouvir isso aqui)
     await this.emissor.emitir(eventoIntegracao);
 
     this.logger.log("[P-27] Evento de Integração 'PagamentoRegistrado' despachado com sucesso!");

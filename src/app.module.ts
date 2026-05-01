@@ -9,7 +9,6 @@ import { AuthModule } from './auth/auth.module';
 import { CadastroModule } from './modules/cadastro/cadastro.module';
 import { PecasInsumosModule } from './modules/pecas-insumos/pecas-insumos.module';
 import { OrdemServicoModule } from './modules/ordem-servico/ordem-servico.module';
-import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -22,7 +21,6 @@ import { RolesGuard } from './auth/guards/roles.guard';
     CadastroModule,
     PecasInsumosModule,
     OrdemServicoModule,
-    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [
