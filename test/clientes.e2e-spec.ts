@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
+import { createAdminToken } from './support/fixtures';
 
 describe('ClientesController (e2e)', () => {
   let app: INestApplication;
@@ -47,7 +48,7 @@ describe('ClientesController (e2e)', () => {
 
     const hashedPassword = await bcrypt.hash(testUser.password, 10);
     const user = await prismaService.user.create({
-      data: { ...testUser, password: hashedPassword },
+      data: { ...testUser, password: hashedPassword, role: 'RECEPCIONISTA' },
     });
 
     authToken = jwtService.sign({ sub: user.id, email: user.email, role: user.role });
@@ -195,10 +196,21 @@ describe('ClientesController (e2e)', () => {
   });
 
   describe('DELETE /clientes/:id', () => {
+    let adminToken: string;
+    const adminEmail = 'admin-delete-cliente@example.com';
+
+    beforeAll(async () => {
+      adminToken = await createAdminToken(prismaService, jwtService, adminEmail);
+    });
+
+    afterAll(async () => {
+      await prismaService.user.deleteMany({ where: { email: adminEmail } });
+    });
+
     it('should delete a cliente', async () => {
       await server
         .delete(`/clientes/${testClienteId}`)
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
       await server
@@ -210,7 +222,7 @@ describe('ClientesController (e2e)', () => {
     it('should return 404 for nonexistent cliente', async () => {
       await server
         .delete('/clientes/00000000-0000-0000-0000-000000000000')
-        .set('Authorization', `Bearer ${authToken}`)
+        .set('Authorization', `Bearer ${adminToken}`)
         .expect(404);
     });
   });

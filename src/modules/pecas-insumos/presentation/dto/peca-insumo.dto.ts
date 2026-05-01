@@ -90,3 +90,30 @@ export class ListQueryDto {
   @IsOptional()
   search?: string;
 }
+
+export class ItemSolicitacaoReposicaoDto {
+  @ApiProperty({ example: 'uuid-da-peca', description: 'ID da peça' })
+  @IsString()
+  @IsNotEmpty()
+  pecaId: string;
+
+  @ApiProperty({ example: 50, description: 'Quantidade solicitada ao fornecedor' })
+  @IsNumber()
+  @IsPositive()
+  @Type(() => Number)
+  quantidadeSolicitada: number;
+}
+
+export class SolicitarReposicaoDto {
+  @ApiProperty({ example: 'uuid-do-fornecedor', description: 'ID do fornecedor' })
+  @IsString()
+  @IsNotEmpty()
+  fornecedorId: string;
+
+  @ApiProperty({
+    type: [ItemSolicitacaoReposicaoDto],
+    description: 'Lista de peças para solicitar',
+  })
+  @IsNotEmpty()
+  pecas: ItemSolicitacaoReposicaoDto[];
+}
