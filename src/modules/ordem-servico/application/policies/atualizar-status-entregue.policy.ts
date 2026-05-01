@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
-import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado-pelo-cliente.event';
+import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.event';
 import { StatusAtualizadoEntregue } from '../../domain/events/status-atualizado-entregue.event';
 
 @Injectable()
@@ -12,8 +12,8 @@ export class AtualizarStatusEntreguePolicy {
     private readonly emissor: EmissorEventos
   ) {}
 
-  @OnEvent('ServicoAprovadoPeloCliente')
-  async handle(evento: ServicoAprovadoPeloCliente): Promise<void> {
+  @OnEvent('PagamentoRegistrado')
+  async handle(evento: PagamentoRegistrado): Promise<void> {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'DELIVERED',
       entregue_em: new Date(),

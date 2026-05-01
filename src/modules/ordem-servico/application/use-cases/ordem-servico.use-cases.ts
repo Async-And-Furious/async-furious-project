@@ -12,6 +12,7 @@ import { VeiculoAnalisado } from '../../domain/events/veiculo-analisado.event';
 import { ServicosEInsumosListados } from '../../domain/events/servicos-e-insumos-listados.event';
 import { ServicoConcluidoPeloMecanico } from '../../domain/events/servico-concluido-pelo-mecanico.event';
 import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado-pelo-cliente.event';
+import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.event';
 
 // UC-01
 export class CriarOrdemServicoUseCase {
@@ -116,6 +117,32 @@ export class ListarServicosInsumosNaOsUseCase {
   }
 }
 
+// UC-01A / PATCH administrativo antes da execução
+export class AtualizarOrdemServicoUseCase {
+  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
+
+  async execute(
+    id: string,
+    data: {
+      status?: 'RECEIVED' | 'UNDER_DIAGNOSIS' | 'AWAITING_APPROVAL';
+      descricao?: string;
+    }
+  ): Promise<OrdemDeServico> {
+    const os = await this.ordemServicoRepository.findOne(id);
+
+    if (!['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {
+      throw new DomainException(
+        `A ordem de serviço só pode ser atualizada até Aguardando Aprovação. Status atual: ${os.status}`
+      );
+    }
+
+    return this.ordemServicoRepository.update(id, {
+      ...(data.status && { status: data.status }),
+      ...(data.descricao !== undefined && { descricao: data.descricao }),
+    });
+  }
+}
+
 // UC-07
 export class FinalizarExecucaoUseCase {
   constructor(
@@ -150,6 +177,26 @@ export class AprovarServicoPrestadoUseCase {
       );
     }
     await this.emissor.emitir(new ServicoAprovadoPeloCliente(id));
+    return this.ordemServicoRepository.findOne(id);
+  }
+}
+
+// UC-09
+export class RegistrarEntregaVeiculoUseCase {
+  constructor(
+    private readonly ordemServicoRepository: IOrdemServicoRepository,
+    private readonly emissor: EmissorEventos
+  ) {}
+
+  async execute(id: string): Promise<OrdemDeServico> {
+    const os = await this.ordemServicoRepository.findOne(id);
+    if (os.status !== 'FINISHED') {
+      throw new DomainException(
+        `OS deve estar Finalizada para registrar a entrega. Status atual: ${os.status}`
+      );
+    }
+
+    await this.emissor.emitir(new PagamentoRegistrado(id));
     return this.ordemServicoRepository.findOne(id);
   }
 }

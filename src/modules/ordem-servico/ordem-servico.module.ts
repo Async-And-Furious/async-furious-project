@@ -11,8 +11,10 @@ import {
   AssumirOrdemServicoUseCase,
   AnalisarVeiculoUseCase,
   ListarServicosInsumosNaOsUseCase,
+  AtualizarOrdemServicoUseCase,
   FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
+  RegistrarEntregaVeiculoUseCase,
   ConsultarStatusOrdemServicoUseCase,
   ListarOrdensServicoUseCase,
   DetalharOrdemServicoUseCase,
@@ -165,6 +167,11 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
       inject: [OrdemServicoRepository, OrcamentoRepository, OsPecaRepository, EmissorEventos],
     },
     {
+      provide: AtualizarOrdemServicoUseCase,
+      useFactory: (osRepo: OrdemServicoRepository) => new AtualizarOrdemServicoUseCase(osRepo),
+      inject: [OrdemServicoRepository],
+    },
+    {
       provide: AprovarOrcamentoUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
@@ -192,6 +199,12 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
       provide: AprovarServicoPrestadoUseCase,
       useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
         new AprovarServicoPrestadoUseCase(osRepo, barramento),
+      inject: [OrdemServicoRepository, EmissorEventos],
+    },
+    {
+      provide: RegistrarEntregaVeiculoUseCase,
+      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+        new RegistrarEntregaVeiculoUseCase(osRepo, barramento),
       inject: [OrdemServicoRepository, EmissorEventos],
     },
     {

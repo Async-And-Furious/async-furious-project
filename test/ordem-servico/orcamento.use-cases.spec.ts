@@ -9,8 +9,10 @@ import {
   AssumirOrdemServicoUseCase,
   AnalisarVeiculoUseCase,
   ListarServicosInsumosNaOsUseCase,
+  AtualizarOrdemServicoUseCase,
   FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
+  RegistrarEntregaVeiculoUseCase,
   ConsultarStatusOrdemServicoUseCase,
   ListarOrdensServicoUseCase,
   DetalharOrdemServicoUseCase,
@@ -173,6 +175,40 @@ describe('OS + Orçamento Use Cases', () => {
     });
   });
 
+  describe('AtualizarOrdemServicoUseCase', () => {
+    it('deve atualizar a OS quando estiver até AWAITING_APPROVAL', async () => {
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APPROVAL' });
+      mockOsRepository.update.mockResolvedValue({
+        ...mockOs,
+        status: 'AWAITING_APPROVAL',
+        descricao: 'Nova descrição',
+      });
+
+      const uc = new AtualizarOrdemServicoUseCase(mockOsRepository);
+      const result = await uc.execute('os-1', {
+        descricao: 'Nova descrição',
+        status: 'AWAITING_APPROVAL',
+      });
+
+      expect(mockOsRepository.update).toHaveBeenCalledWith('os-1', {
+        descricao: 'Nova descrição',
+        status: 'AWAITING_APPROVAL',
+      });
+      expect(result.descricao).toBe('Nova descrição');
+    });
+
+    it('deve bloquear atualização quando a OS já entrou em execução', async () => {
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'IN_PROGRESS' });
+
+      const uc = new AtualizarOrdemServicoUseCase(mockOsRepository);
+
+      await expect(
+        uc.execute('os-1', { descricao: 'Tentativa de edição', status: 'AWAITING_APPROVAL' })
+      ).rejects.toThrow(DomainException);
+      expect(mockOsRepository.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('AprovarOrcamentoUseCase', () => {
     it('deve aprovar orçamento pendente e emitir OrcamentoAprovado', async () => {
       const orcamentoAprovado = { ...mockOrcamento, status: 'APPROVED' as const };
@@ -278,14 +314,36 @@ describe('OS + Orçamento Use Cases', () => {
   });
 
   describe('AprovarServicoPrestadoUseCase', () => {
-    it('deve emitir ServicoAprovadoPeloCliente quando OS está FINISHED', async () => {
+    it('deve emitir ServicoAprovadoPeloCliente quando OS está FINISHED e manter o status', async () => {
+      const osFinalizada = { ...mockOs, status: 'FINISHED' as const };
+      mockOsRepository.findOne
+        .mockResolvedValueOnce(osFinalizada)
+        .mockResolvedValueOnce(osFinalizada);
+
+      const uc = new AprovarServicoPrestadoUseCase(mockOsRepository, mockBarramento);
+      const result = await uc.execute('os-1');
+
+      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
+      expect(result.status).toBe('FINISHED');
+    });
+
+    it('deve lançar DomainException quando OS não está FINISHED', async () => {
+      mockOsRepository.findOne.mockResolvedValue(mockOs);
+
+      const uc = new AprovarServicoPrestadoUseCase(mockOsRepository, mockBarramento);
+      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+    });
+  });
+
+  describe('RegistrarEntregaVeiculoUseCase', () => {
+    it('deve emitir PagamentoRegistrado e retornar a OS entregue', async () => {
       const osFinalizada = { ...mockOs, status: 'FINISHED' as const };
       const osEntregue = { ...mockOs, status: 'DELIVERED' as const };
       mockOsRepository.findOne
         .mockResolvedValueOnce(osFinalizada)
         .mockResolvedValueOnce(osEntregue);
 
-      const uc = new AprovarServicoPrestadoUseCase(mockOsRepository, mockBarramento);
+      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, mockBarramento);
       const result = await uc.execute('os-1');
 
       expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
@@ -295,7 +353,7 @@ describe('OS + Orçamento Use Cases', () => {
     it('deve lançar DomainException quando OS não está FINISHED', async () => {
       mockOsRepository.findOne.mockResolvedValue(mockOs);
 
-      const uc = new AprovarServicoPrestadoUseCase(mockOsRepository, mockBarramento);
+      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, mockBarramento);
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
   });
@@ -331,6 +389,21 @@ describe('OS + Orçamento Use Cases', () => {
 
       expect(mockOsRepository.findAll).toHaveBeenCalledWith(1, 10, 'troca');
       expect(result).toBe(paginado);
+    });
+
+    it('deve retornar OS recusada sem filtrar status CLOSED_WITHOUT_EXECUTION', async () => {
+      const osRecusada = { ...mockOs, status: 'CLOSED_WITHOUT_EXECUTION' as const };
+      const paginado = {
+        data: [osRecusada],
+        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      };
+      mockOsRepository.findAll.mockResolvedValue(paginado);
+
+      const uc = new ListarOrdensServicoUseCase(mockOsRepository);
+      const result = await uc.execute(1, 10);
+
+      expect(mockOsRepository.findAll).toHaveBeenCalledWith(1, 10, undefined);
+      expect(result.data[0].status).toBe('CLOSED_WITHOUT_EXECUTION');
     });
   });
 

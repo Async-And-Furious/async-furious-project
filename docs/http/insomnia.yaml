@@ -245,37 +245,6 @@ collection:
             store: true
           rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}"
-        name: Update Ordem Servico
-        meta:
-          id: req_9714a09ded8d45a98eb4c6e18151d1b2
-          created: 1745628000000
-          modified: 1745628000000
-          isPrivate: false
-          description: "Requires ADMIN role"
-          sortKey: -1745628000054
-        method: PATCH
-        body:
-          mimeType: application/json
-          text: |-
-            {
-              "status": "IN_PROGRESS",
-              "descricao": "Troca de óleo iniciada"
-            }
-        headers:
-          - name: Content-Type
-            value: application/json
-        authentication:
-          type: bearer
-          token: "{{ admin_token }}"
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}"
         name: Get Ordem Servico by ID
         meta:
           id: req_df70499206c14b91af8df325a4ee1541
@@ -296,6 +265,79 @@ collection:
             send: true
             store: true
           rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/assumir"
+        name: Assumir Ordem Servico
+        meta:
+          id: req_os_assumir
+          created: 1785600000000
+          modified: 1785600000000
+          isPrivate: false
+          description: "Requires MECANICO role"
+          sortKey: -1745628000056
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ mecanico_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/analisar"
+        name: Analisar Veiculo
+        meta:
+          id: req_os_analisar
+          created: 1785600000000
+          modified: 1785600000000
+          isPrivate: false
+          description: "Requires MECANICO role"
+          sortKey: -1745628000057
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ mecanico_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/servicos-insumos"
+        name: Listar Servicos e Insumos na OS
+        meta:
+          id: req_os_servicos_insumos
+          created: 1785600000000
+          modified: 1785600000000
+          isPrivate: false
+          description: "Requires MECANICO role"
+          sortKey: -1745628000058
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "valor_total_servicos": 250.00,
+              "valor_total_pecas": 80.00
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ mecanico_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/orcamento/aprovar"
         name: Aprovar Orcamento (PUBLIC)
         meta:
@@ -304,7 +346,7 @@ collection:
           modified: 1785500000000
           isPrivate: false
           description: "PUBLIC - No auth required"
-          sortKey: -1745628000056
+          sortKey: -1745628000059
         method: PATCH
         authentication: {}
         settings:
@@ -315,17 +357,78 @@ collection:
             send: true
             store: true
           rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/orcamento/rejeitar"
-        name: Rejeitar Orcamento (PUBLIC)
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/orcamento/recusar"
+        name: Recusar Orcamento (PUBLIC)
         meta:
-          id: req_new_rejeitar
-          created: 1785500000000
-          modified: 1785500000000
+          id: req_new_recusar
+          created: 1785600000000
+          modified: 1785600000000
           isPrivate: false
           description: "PUBLIC - No auth required"
-          sortKey: -1745628000057
+          sortKey: -1745628000060
         method: PATCH
         authentication: {}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/finalizar-execucao"
+        name: Finalizar Execucao
+        meta:
+          id: req_os_finalizar_execucao
+          created: 1785600000000
+          modified: 1785600000000
+          isPrivate: false
+          description: "Requires MECANICO role"
+          sortKey: -1745628000061
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ mecanico_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/aprovar-servico"
+        name: Aprovar Servico Prestado
+        meta:
+          id: req_os_aprovar_servico
+          created: 1785600000000
+          modified: 1785600000000
+          isPrivate: false
+          description: "PUBLIC - No auth required (client approval)"
+          sortKey: -1745628000062
+        method: PATCH
+        authentication: {}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/status"
+        name: Consultar Status Ordem Servico
+        meta:
+          id: req_os_status
+          created: 1785600000000
+          modified: 1785600000000
+          isPrivate: false
+          description: "Any authenticated user"
+          sortKey: -1745628000063
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ token }}"
         settings:
           renderRequestBody: true
           encodeUrl: true
