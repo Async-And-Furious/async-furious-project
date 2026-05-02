@@ -1,4 +1,4 @@
-import { PrismaClient, TaxIdType } from '@prisma/client';
+import { PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -544,6 +544,140 @@ async function seedPecasInsumos(): Promise<void> {
   console.log(`  ✅ Peças/Insumos: ${criados} criados, ${pulados} já existiam`);
 }
 
+async function seedOrdensServico(clienteIds: string[]): Promise<void> {
+  const veiculos = await prisma.veiculo.findMany({ take: 10 });
+  if (veiculos.length === 0) return;
+
+  const OS_TEMPLATES = [
+    {
+      descricao: 'Troca de óleo e revisão completa do motor',
+      status: SOStatus.RECEIVED,
+      orcamento: null,
+    },
+    {
+      descricao: 'Barulho na suspensão dianteira',
+      status: SOStatus.UNDER_DIAGNOSIS,
+      orcamento: null,
+    },
+    {
+      descricao: 'Falha no sistema de freios — pastilhas desgastadas',
+      status: SOStatus.AWAITING_APPROVAL,
+      orcamento: {
+        valor_total_servicos: 280.0,
+        valor_total_pecas: 89.9,
+        status: EstimateStatus.PENDING,
+      },
+    },
+    {
+      descricao: 'Revisão dos 30.000 km',
+      status: SOStatus.IN_PROGRESS,
+      orcamento: {
+        valor_total_servicos: 850.0,
+        valor_total_pecas: 230.0,
+        status: EstimateStatus.APPROVED,
+      },
+    },
+    {
+      descricao: 'Troca de correia dentada e tensor',
+      status: SOStatus.FINISHED,
+      orcamento: {
+        valor_total_servicos: 450.0,
+        valor_total_pecas: 185.0,
+        status: EstimateStatus.APPROVED,
+      },
+    },
+    {
+      descricao: 'Higienização do ar condicionado',
+      status: SOStatus.DELIVERED,
+      orcamento: {
+        valor_total_servicos: 200.0,
+        valor_total_pecas: 0.0,
+        status: EstimateStatus.APPROVED,
+      },
+    },
+    {
+      descricao: 'Diagnóstico eletrônico — luz de injeção acesa',
+      status: SOStatus.AWAITING_APPROVAL,
+      orcamento: {
+        valor_total_servicos: 150.0,
+        valor_total_pecas: 49.9,
+        status: EstimateStatus.REJECTED,
+      },
+    },
+    {
+      descricao: 'Troca de bateria e verificação elétrica',
+      status: SOStatus.DELIVERED,
+      orcamento: {
+        valor_total_servicos: 190.0,
+        valor_total_pecas: 280.0,
+        status: EstimateStatus.APPROVED,
+      },
+    },
+    {
+      descricao: 'Alinhamento, balanceamento e geometria',
+      status: SOStatus.IN_PROGRESS,
+      orcamento: {
+        valor_total_servicos: 430.0,
+        valor_total_pecas: 0.0,
+        status: EstimateStatus.APPROVED,
+      },
+    },
+    {
+      descricao: 'Reparo no escapamento com vazamento',
+      status: SOStatus.DELIVERED,
+      orcamento: {
+        valor_total_servicos: 310.0,
+        valor_total_pecas: 0.0,
+        status: EstimateStatus.REJECTED,
+      },
+    },
+  ];
+
+  let criadas = 0;
+  let puladas = 0;
+
+  for (let i = 0; i < OS_TEMPLATES.length; i++) {
+    const template = OS_TEMPLATES[i];
+    const veiculo = veiculos[i % veiculos.length];
+    const clienteId = clienteIds[i % clienteIds.length];
+
+    const existing = await prisma.ordemServico.findFirst({
+      where: { id_veiculo: veiculo.id, descricao: template.descricao },
+    });
+
+    if (existing) {
+      puladas++;
+      continue;
+    }
+
+    const os = await prisma.ordemServico.create({
+      data: {
+        id_veiculo: veiculo.id,
+        id_cliente: clienteId,
+        status: template.status,
+        descricao: template.descricao,
+      },
+    });
+
+    if (template.orcamento) {
+      const { valor_total_servicos, valor_total_pecas, status } = template.orcamento;
+      await prisma.orcamento.create({
+        data: {
+          id_ordem_servico: os.id,
+          valor_total_servicos,
+          valor_total_pecas,
+          valor_total_geral: valor_total_servicos + valor_total_pecas,
+          status,
+        },
+      });
+    }
+
+    criadas++;
+  }
+
+  console.log(`  ✅ Ordens de Serviço: ${criadas} criadas, ${puladas} já existiam`);
+}
+
 async function seed(): Promise<void> {
   console.log('🌱 Seedando banco de dados...\n');
 
@@ -552,6 +686,7 @@ async function seed(): Promise<void> {
   await seedVeiculos(clienteIds);
   await seedServicos();
   await seedPecasInsumos();
+  await seedOrdensServico(clienteIds);
 
   console.log('\n🎉 Seed concluído com sucesso!');
 }
