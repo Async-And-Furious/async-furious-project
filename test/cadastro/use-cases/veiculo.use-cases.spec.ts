@@ -21,7 +21,9 @@ function makeVeiculo(overrides: Partial<Parameters<typeof Veiculo.criar>[0]> = {
   });
 }
 
-function makePagination(overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}) {
+function makePagination(
+  overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}
+) {
   return { page: 1, limit: 10, total: 2, totalPages: 1, ...overrides };
 }
 
@@ -80,7 +82,11 @@ describe('Veiculo Use Cases', () => {
         clienteId: '123e4567-e89b-12d3-a456-426614174000',
       };
 
-      const veiculoCriado = makeVeiculo({ id: '456e7890-e89b-12d3-a456-426614174002', ...input, cor: undefined });
+      const veiculoCriado = makeVeiculo({
+        id: '456e7890-e89b-12d3-a456-426614174002',
+        ...input,
+        cor: undefined,
+      });
       mockRepository.create.mockResolvedValue(veiculoCriado);
 
       const resultado = await useCase.execute(input);
@@ -91,7 +97,13 @@ describe('Veiculo Use Cases', () => {
     });
 
     it('deve propagar erro do repositório', async () => {
-      const input = { placa: 'ABC-1234', marca: 'Toyota', modelo: 'Corolla', ano: 2020, clienteId: '123e4567-e89b-12d3-a456-426614174000' };
+      const input = {
+        placa: 'ABC-1234',
+        marca: 'Toyota',
+        modelo: 'Corolla',
+        ano: 2020,
+        clienteId: '123e4567-e89b-12d3-a456-426614174000',
+      };
       mockRepository.create.mockRejectedValue(new Error('Erro ao criar veículo'));
 
       await expect(useCase.execute(input)).rejects.toThrow('Erro ao criar veículo');
@@ -109,7 +121,15 @@ describe('Veiculo Use Cases', () => {
     it('deve listar veículos sem parâmetros', async () => {
       const veiculos = [
         makeVeiculo({ id: '1', clienteId: 'cliente1' }),
-        makeVeiculo({ id: '2', placa: 'XYZ-9876', marca: 'Honda', modelo: 'Civic', ano: 2019, cor: undefined, clienteId: 'cliente2' }),
+        makeVeiculo({
+          id: '2',
+          placa: 'XYZ-9876',
+          marca: 'Honda',
+          modelo: 'Civic',
+          ano: 2019,
+          cor: undefined,
+          clienteId: 'cliente2',
+        }),
       ];
 
       mockRepository.findAll.mockResolvedValue({ data: veiculos, pagination: makePagination() });
@@ -124,7 +144,10 @@ describe('Veiculo Use Cases', () => {
     it('deve listar veículos com paginação', async () => {
       const veiculos = [makeVeiculo({ id: '1' })];
 
-      mockRepository.findAll.mockResolvedValue({ data: veiculos, pagination: makePagination({ page: 2, limit: 5, total: 10, totalPages: 2 }) });
+      mockRepository.findAll.mockResolvedValue({
+        data: veiculos,
+        pagination: makePagination({ page: 2, limit: 5, total: 10, totalPages: 2 }),
+      });
 
       const resultado = await useCase.execute(2, 5);
 
@@ -136,7 +159,10 @@ describe('Veiculo Use Cases', () => {
     it('deve listar veículos com busca', async () => {
       const veiculos = [makeVeiculo({ id: '1' })];
 
-      mockRepository.findAll.mockResolvedValue({ data: veiculos, pagination: makePagination({ total: 1, totalPages: 1 }) });
+      mockRepository.findAll.mockResolvedValue({
+        data: veiculos,
+        pagination: makePagination({ total: 1, totalPages: 1 }),
+      });
 
       const resultado = await useCase.execute(1, 10, 'Toyota');
 
@@ -146,7 +172,10 @@ describe('Veiculo Use Cases', () => {
     });
 
     it('deve retornar lista vazia quando não há veículos', async () => {
-      mockRepository.findAll.mockResolvedValue({ data: [], pagination: makePagination({ total: 0, totalPages: 0 }) });
+      mockRepository.findAll.mockResolvedValue({
+        data: [],
+        pagination: makePagination({ total: 0, totalPages: 0 }),
+      });
 
       const resultado = await useCase.execute();
 
@@ -231,7 +260,7 @@ describe('Veiculo Use Cases', () => {
       mockRepository.update.mockRejectedValue(new Error('Veículo não encontrado para atualização'));
 
       await expect(useCase.execute(veiculoId, updateData)).rejects.toThrow(
-        'Veículo não encontrado para atualização',
+        'Veículo não encontrado para atualização'
       );
       expect(mockRepository.update).toHaveBeenCalledWith(veiculoId, updateData);
     });
@@ -261,16 +290,20 @@ describe('Veiculo Use Cases', () => {
       const veiculoId = 'id-inexistente';
       mockRepository.remove.mockRejectedValue(new Error('Veículo não encontrado para deleção'));
 
-      await expect(useCase.execute(veiculoId)).rejects.toThrow('Veículo não encontrado para deleção');
+      await expect(useCase.execute(veiculoId)).rejects.toThrow(
+        'Veículo não encontrado para deleção'
+      );
       expect(mockRepository.remove).toHaveBeenCalledWith(veiculoId);
     });
 
     it('deve propagar erro de integridade referencial', async () => {
       const veiculoId = '123e4567-e89b-12d3-a456-426614174000';
-      mockRepository.remove.mockRejectedValue(new Error('Veículo está sendo usado em ordens de serviço'));
+      mockRepository.remove.mockRejectedValue(
+        new Error('Veículo está sendo usado em ordens de serviço')
+      );
 
       await expect(useCase.execute(veiculoId)).rejects.toThrow(
-        'Veículo está sendo usado em ordens de serviço',
+        'Veículo está sendo usado em ordens de serviço'
       );
       expect(mockRepository.remove).toHaveBeenCalledWith(veiculoId);
     });

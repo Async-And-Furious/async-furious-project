@@ -9,7 +9,7 @@ const VALID_REGISTER = { ...VALID_LOGIN, name: 'João Silva', role: Role.ADMIN }
 async function expectFieldError<T extends object>(
   DtoClass: new () => T,
   data: object,
-  property: string,
+  property: string
 ): Promise<void> {
   const dto = plainToClass(DtoClass, data);
   const errors = await validate(dto as object);
@@ -17,7 +17,10 @@ async function expectFieldError<T extends object>(
   expect(errors[0].property).toBe(property);
 }
 
-async function expectNoErrors<T extends object>(DtoClass: new () => T, data: object): Promise<void> {
+async function expectNoErrors<T extends object>(
+  DtoClass: new () => T,
+  data: object
+): Promise<void> {
   const dto = plainToClass(DtoClass, data);
   const errors = await validate(dto as object);
   expect(errors.length).toBe(0);
@@ -37,7 +40,11 @@ describe('AuthDto', () => {
     });
 
     it('deve validar formato de email', async () => {
-      await expectFieldError(LoginDto, { email: 'email-invalido', password: 'password123' }, 'email');
+      await expectFieldError(
+        LoginDto,
+        { email: 'email-invalido', password: 'password123' },
+        'email'
+      );
     });
 
     it('deve validar password obrigatório', async () => {
@@ -64,7 +71,11 @@ describe('AuthDto', () => {
     });
 
     it('deve validar email obrigatório', async () => {
-      await expectFieldError(RegisterDto, { password: 'password123', name: 'João Silva', role: Role.ADMIN }, 'email');
+      await expectFieldError(
+        RegisterDto,
+        { password: 'password123', name: 'João Silva', role: Role.ADMIN },
+        'email'
+      );
     });
 
     it('deve validar formato de email', async () => {
@@ -72,7 +83,11 @@ describe('AuthDto', () => {
     });
 
     it('deve validar password obrigatório', async () => {
-      await expectFieldError(RegisterDto, { email: 'test@example.com', name: 'João Silva', role: Role.ADMIN }, 'password');
+      await expectFieldError(
+        RegisterDto,
+        { email: 'test@example.com', name: 'João Silva', role: Role.ADMIN },
+        'password'
+      );
     });
 
     it('deve validar tamanho mínimo da password', async () => {
@@ -84,16 +99,19 @@ describe('AuthDto', () => {
     });
 
     it('deve validar valores permitidos para role', async () => {
-      await expectFieldError(RegisterDto, { ...VALID_REGISTER, role: 'invalid-role' as unknown as Role }, 'role');
+      await expectFieldError(
+        RegisterDto,
+        { ...VALID_REGISTER, role: 'invalid-role' as unknown as Role },
+        'role'
+      );
     });
 
-    it.each([
-      [Role.ADMIN],
-      [Role.RECEPCIONISTA],
-      [Role.MECANICO],
-    ])('deve aceitar role "%s"', async (role) => {
-      await expectNoErrors(RegisterDto, { ...VALID_REGISTER, role });
-    });
+    it.each([[Role.ADMIN], [Role.RECEPCIONISTA], [Role.MECANICO]])(
+      'deve aceitar role "%s"',
+      async (role) => {
+        await expectNoErrors(RegisterDto, { ...VALID_REGISTER, role });
+      }
+    );
 
     it('deve aceitar RegisterDto sem role (opcional)', async () => {
       const data = { ...VALID_LOGIN, name: 'João Silva' };

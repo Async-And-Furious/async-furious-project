@@ -56,7 +56,7 @@ describe('CpfCnpjVo', () => {
         ['tipo null', '11144477735', null as any],
       ])('deve lançar erro para %s', (_label, value, tipo) => {
         expect(() => CpfCnpjVo.criar(value, tipo)).toThrow(
-          new DomainException('Tipo de documento invalido'),
+          new DomainException('Tipo de documento invalido')
         );
       });
     });

@@ -21,7 +21,9 @@ function makeCliente(overrides: Partial<Parameters<typeof Cliente.criar>[0]> = {
   });
 }
 
-function makePagination(overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}) {
+function makePagination(
+  overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}
+) {
   return { page: 1, limit: 10, total: 2, totalPages: 1, ...overrides };
 }
 
@@ -108,7 +110,13 @@ describe('Cliente Use Cases', () => {
     it('deve listar clientes sem parâmetros', async () => {
       const clientes = [
         makeCliente({ id: '1', nome: 'Cliente 1', email: 'cliente1@email.com' }),
-        makeCliente({ id: '2', nome: 'Cliente 2', documento: '22255588846', email: 'cliente2@email.com', telefone: '11888888888' }),
+        makeCliente({
+          id: '2',
+          nome: 'Cliente 2',
+          documento: '22255588846',
+          email: 'cliente2@email.com',
+          telefone: '11888888888',
+        }),
       ];
 
       mockRepository.findAll.mockResolvedValue({ data: clientes, pagination: makePagination() });
@@ -123,7 +131,10 @@ describe('Cliente Use Cases', () => {
     it('deve listar clientes com paginação', async () => {
       const clientes = [makeCliente({ id: '1', email: 'cliente1@email.com' })];
 
-      mockRepository.findAll.mockResolvedValue({ data: clientes, pagination: makePagination({ page: 2, limit: 5, total: 10, totalPages: 2 }) });
+      mockRepository.findAll.mockResolvedValue({
+        data: clientes,
+        pagination: makePagination({ page: 2, limit: 5, total: 10, totalPages: 2 }),
+      });
 
       const resultado = await useCase.execute(2, 5);
 
@@ -135,7 +146,10 @@ describe('Cliente Use Cases', () => {
     it('deve listar clientes com busca', async () => {
       const clientes = [makeCliente({ id: '1' })];
 
-      mockRepository.findAll.mockResolvedValue({ data: clientes, pagination: makePagination({ total: 1, totalPages: 1 }) });
+      mockRepository.findAll.mockResolvedValue({
+        data: clientes,
+        pagination: makePagination({ total: 1, totalPages: 1 }),
+      });
 
       const resultado = await useCase.execute(1, 10, 'João');
 
@@ -145,7 +159,10 @@ describe('Cliente Use Cases', () => {
     });
 
     it('deve retornar lista vazia quando não há clientes', async () => {
-      mockRepository.findAll.mockResolvedValue({ data: [], pagination: makePagination({ total: 0, totalPages: 0 }) });
+      mockRepository.findAll.mockResolvedValue({
+        data: [],
+        pagination: makePagination({ total: 0, totalPages: 0 }),
+      });
 
       const resultado = await useCase.execute();
 
@@ -191,7 +208,11 @@ describe('Cliente Use Cases', () => {
 
     it('deve atualizar cliente com sucesso', async () => {
       const clienteId = '123e4567-e89b-12d3-a456-426614174000';
-      const updateData = { nome: 'João Silva Atualizado', email: 'joao.novo@email.com', telefone: '11888888888' };
+      const updateData = {
+        nome: 'João Silva Atualizado',
+        email: 'joao.novo@email.com',
+        telefone: '11888888888',
+      };
       const clienteAtualizado = makeCliente({ id: clienteId, ...updateData });
       mockRepository.update.mockResolvedValue(clienteAtualizado);
 
@@ -220,7 +241,7 @@ describe('Cliente Use Cases', () => {
       mockRepository.update.mockRejectedValue(new Error('Cliente não encontrado para atualização'));
 
       await expect(useCase.execute(clienteId, updateData)).rejects.toThrow(
-        'Cliente não encontrado para atualização',
+        'Cliente não encontrado para atualização'
       );
       expect(mockRepository.update).toHaveBeenCalledWith(clienteId, updateData);
     });
@@ -249,7 +270,9 @@ describe('Cliente Use Cases', () => {
       const clienteId = 'id-inexistente';
       mockRepository.remove.mockRejectedValue(new Error('Cliente não encontrado para deleção'));
 
-      await expect(useCase.execute(clienteId)).rejects.toThrow('Cliente não encontrado para deleção');
+      await expect(useCase.execute(clienteId)).rejects.toThrow(
+        'Cliente não encontrado para deleção'
+      );
       expect(mockRepository.remove).toHaveBeenCalledWith(clienteId);
     });
 
@@ -257,7 +280,9 @@ describe('Cliente Use Cases', () => {
       const clienteId = '123e4567-e89b-12d3-a456-426614174000';
       mockRepository.remove.mockRejectedValue(new Error('Cliente possui veículos associados'));
 
-      await expect(useCase.execute(clienteId)).rejects.toThrow('Cliente possui veículos associados');
+      await expect(useCase.execute(clienteId)).rejects.toThrow(
+        'Cliente possui veículos associados'
+      );
       expect(mockRepository.remove).toHaveBeenCalledWith(clienteId);
     });
   });

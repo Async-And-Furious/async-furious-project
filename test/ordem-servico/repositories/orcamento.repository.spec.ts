@@ -42,7 +42,7 @@ describe('OrcamentoRepository', () => {
     }).compile();
 
     repository = module.get<OrcamentoRepository>(OrcamentoRepository);
-    orcamento = module.get<PrismaService>(PrismaService).orcamento as typeof orcamento;
+    orcamento = module.get<PrismaService>(PrismaService).orcamento as unknown as typeof orcamento;
   });
 
   describe('create', () => {
@@ -104,7 +104,9 @@ describe('OrcamentoRepository', () => {
 
       const result = await repository.findByOrdemServicoId(idOrdemServico);
 
-      expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id_ordem_servico: idOrdemServico } });
+      expect(orcamento.findUnique).toHaveBeenCalledWith({
+        where: { id_ordem_servico: idOrdemServico },
+      });
       expect(result).toEqual(mockOrcamento);
     });
 
@@ -114,7 +116,9 @@ describe('OrcamentoRepository', () => {
 
       const result = await repository.findByOrdemServicoId(idOrdemServico);
 
-      expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id_ordem_servico: idOrdemServico } });
+      expect(orcamento.findUnique).toHaveBeenCalledWith({
+        where: { id_ordem_servico: idOrdemServico },
+      });
       expect(result).toBeNull();
     });
   });
@@ -122,7 +126,12 @@ describe('OrcamentoRepository', () => {
   describe('update', () => {
     it('deve atualizar um orçamento existente', async () => {
       const id = 'orc-123';
-      const updateData = { valor_total_servicos: 400.0, valor_total_pecas: 300.0, valor_total_geral: 700.0, status: 'APPROVED' as const };
+      const updateData = {
+        valor_total_servicos: 400.0,
+        valor_total_pecas: 300.0,
+        valor_total_geral: 700.0,
+        status: 'APPROVED' as const,
+      };
       const updatedOrcamento = { ...mockOrcamento, ...updateData };
 
       orcamento.findUnique.mockResolvedValue(mockOrcamento);
@@ -170,7 +179,7 @@ describe('OrcamentoRepository', () => {
       orcamento.findUnique.mockResolvedValue(null);
 
       await expect(repository.update(id, updateData)).rejects.toThrow(
-        new NotFoundException(`Orçamento com ID ${id} não encontrado`),
+        new NotFoundException(`Orçamento com ID ${id} não encontrado`)
       );
 
       expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id } });

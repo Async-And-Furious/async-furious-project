@@ -9,10 +9,7 @@ describe('JwtAuthGuard', () => {
   let mockContext: jest.Mocked<ExecutionContext>;
 
   function setupSuperSpy(returnValue: unknown = true): jest.SpyInstance {
-    const spy = jest.spyOn(
-      Object.getPrototypeOf(Object.getPrototypeOf(guard)),
-      'canActivate',
-    );
+    const spy = jest.spyOn(Object.getPrototypeOf(Object.getPrototypeOf(guard)), 'canActivate');
     spy.mockReturnValue(returnValue);
     return spy;
   }
@@ -166,7 +163,7 @@ describe('JwtAuthGuard', () => {
       mockContext.getClass.mockReturnValue(mockClass);
       reflector.getAllAndOverride.mockReturnValue(true);
 
-      guard.canActivate(mockContext);
+      void guard.canActivate(mockContext);
 
       expect(mockContext.getHandler).toHaveBeenCalled();
       expect(mockContext.getClass).toHaveBeenCalled();
