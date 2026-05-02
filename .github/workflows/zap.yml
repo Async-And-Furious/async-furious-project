@@ -74,29 +74,32 @@ jobs:
           done
           echo "❌ App não respondeu após 90s" && exit 1
 
+      - name: Criar diretório de output para o ZAP
+        run: mkdir -p ${{ github.workspace }}/zap-output && chmod 777 ${{ github.workspace }}/zap-output
+
       - name: ZAP Baseline Scan (PR)
         if: github.event_name == 'pull_request'
         run: |
           docker run --network="host" \
-            -v ${{ github.workspace }}:/zap/wrk/output:rw \
+            -v ${{ github.workspace }}/zap-output:/zap/wrk:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:5000/api/docs-json \
-            -r output/report_html.html \
-            -J output/report_json.json \
+            -r report_html.html \
+            -J report_json.json \
             -I
 
       - name: ZAP Full API Scan (Schedule / Manual)
         if: github.event_name != 'pull_request'
         run: |
           docker run --network="host" \
-            -v ${{ github.workspace }}:/zap/wrk/output:rw \
+            -v ${{ github.workspace }}/zap-output:/zap/wrk:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-api-scan.py \
             -t http://localhost:5000/api/docs-json \
             -f openapi \
-            -r output/report_html.html \
-            -J output/report_json.json \
+            -r report_html.html \
+            -J report_json.json \
             -a \
             -I
 
@@ -106,6 +109,57 @@ jobs:
         with:
           name: zap-reports-${{ github.event_name }}-${{ github.run_id }}
           path: |
-            ${{ github.workspace }}/report_html.html
-            ${{ github.workspace }}/report_json.json
+            ${{ github.workspace }}/zap-output/report_html.html
+            ${{ github.workspace }}/zap-output/report_json.json
           retention-days: 30
+
+      - name: Comentar resumo no PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let body;
+
+            try {
+              const json = JSON.parse(
+                fs.readFileSync('${{ github.workspace }}/zap-output/report_json.json', 'utf8')
+              );
+
+              const alerts = json.site?.[0]?.alerts ?? [];
+              const high   = alerts.filter(a => a.riskcode === '3').length;
+              const medium = alerts.filter(a => a.riskcode === '2').length;
+              const low    = alerts.filter(a => a.riskcode === '1').length;
+              const info   = alerts.filter(a => a.riskcode === '0').length;
+
+              const icon = high > 0 ? '🔴' : medium > 0 ? '🟡' : '🟢';
+
+              body = [
+                `## ${icon} OWASP ZAP Baseline Scan`,
+                '',
+                '| Severidade | Total |',
+                '|---|---|',
+                `| 🔴 High   | ${high}   |`,
+                `| 🟡 Medium | ${medium} |`,
+                `| 🔵 Low    | ${low}    |`,
+                `| ℹ️ Info   | ${info}   |`,
+                '',
+                `> Relatório completo disponível nos [artifacts desta run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).`,
+              ].join('\n');
+            } catch (e) {
+              body = [
+                '## ⚠️ OWASP ZAP Baseline Scan',
+                '',
+                'Não foi possível ler o relatório JSON. Verifique os logs da run.',
+                '',
+                `> [Ver logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+              ].join('\n');
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
