@@ -135,7 +135,7 @@ describe('Main Bootstrap', () => {
   describe('Configuração de CORS com variáveis de ambiente', () => {
     it('deve usar origins específicos quando ALLOWED_ORIGINS está definido', () => {
       const originalOrigins = process.env.ALLOWED_ORIGINS;
-      process.env.ALLOWED_ORIGINS = 'http://localhost:3000,https://example.com';
+      process.env.ALLOWED_ORIGINS = 'https://localhost:3000,https://example.com';
 
       const enableCorsSpy = jest.spyOn(app, 'enableCors');
 
@@ -148,7 +148,7 @@ describe('Main Bootstrap', () => {
       });
 
       expect(enableCorsSpy).toHaveBeenCalledWith({
-        origin: ['http://localhost:3000', 'https://example.com'],
+        origin: ['https://localhost:3000', 'https://example.com'],
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
         credentials: true,
       });
