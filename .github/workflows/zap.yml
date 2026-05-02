@@ -63,7 +63,7 @@ jobs:
           SEED_ADMIN_PASSWORD: changeme123
 
       - name: Iniciar aplicação
-        run: pnpm run start &
+        run: pnpm run start > app.log 2>&1 & echo $! > app.pid
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
           JWT_SECRET: zap-test-jwt-secret-key
@@ -71,11 +71,13 @@ jobs:
 
       - name: Aguardar aplicação ficar pronta
         run: |
+          APP_PID=$(cat app.pid)
           for i in $(seq 1 30); do
+            kill -0 "$APP_PID" 2>/dev/null || { echo "❌ App morreu"; cat app.log; exit 1; }
             curl -sf http://localhost:5000/api/v1/ && echo "App pronta!" && exit 0
             echo "Aguardando... ($i/30)" && sleep 3
           done
-          echo "❌ App não respondeu após 90s" && exit 1
+          echo "❌ App não respondeu após 90s" && cat app.log && exit 1
 
       - name: Criar diretório de output para o ZAP
         run: mkdir -p ${{ github.workspace }}/zap-output && chmod 777 ${{ github.workspace }}/zap-output

@@ -6,26 +6,7 @@ import {
   DeleteVeiculoUseCase,
 } from '@/modules/cadastro/application/use-cases/veiculo.use-cases';
 import { IVeiculoRepository } from '@/modules/cadastro/domain/interfaces/veiculo.interface';
-import { Veiculo } from '@/modules/cadastro/domain/entities/veiculo.entity';
-
-function makeVeiculo(overrides: Partial<Parameters<typeof Veiculo.criar>[0]> = {}): Veiculo {
-  return Veiculo.criar({
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    placa: 'ABC-1234',
-    marca: 'Toyota',
-    modelo: 'Corolla',
-    ano: 2020,
-    cor: 'Branco',
-    clienteId: 'cliente1',
-    ...overrides,
-  });
-}
-
-function makePagination(
-  overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}
-) {
-  return { page: 1, limit: 10, total: 2, totalPages: 1, ...overrides };
-}
+import { makeVeiculo, makePagination } from '../../support/test-factories';
 
 describe('Veiculo Use Cases', () => {
   let mockRepository: jest.Mocked<IVeiculoRepository>;

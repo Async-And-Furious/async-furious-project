@@ -1,30 +1,11 @@
-import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
+import { validate } from 'class-validator';
 import { LoginDto, RegisterDto } from '@/auth/dto/auth.dto';
 import { Role } from '@/auth/enums/role.enum';
+import { expectFieldError, expectNoErrors } from '../../support/test-factories';
 
 const VALID_LOGIN = { email: 'test@example.com', password: 'password123' };
 const VALID_REGISTER = { ...VALID_LOGIN, name: 'João Silva', role: Role.ADMIN };
-
-async function expectFieldError<T extends object>(
-  DtoClass: new () => T,
-  data: object,
-  property: string
-): Promise<void> {
-  const dto = plainToClass(DtoClass, data);
-  const errors = await validate(dto as object);
-  expect(errors.length).toBeGreaterThan(0);
-  expect(errors[0].property).toBe(property);
-}
-
-async function expectNoErrors<T extends object>(
-  DtoClass: new () => T,
-  data: object
-): Promise<void> {
-  const dto = plainToClass(DtoClass, data);
-  const errors = await validate(dto as object);
-  expect(errors.length).toBe(0);
-}
 
 describe('AuthDto', () => {
   describe('LoginDto', () => {

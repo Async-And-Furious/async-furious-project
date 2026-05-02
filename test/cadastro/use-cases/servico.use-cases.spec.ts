@@ -6,24 +6,7 @@ import {
   DeleteServicoUseCase,
 } from '@/modules/cadastro/application/use-cases/servico.use-cases';
 import { IServicoRepository } from '@/modules/cadastro/domain/interfaces/servico.interface';
-import { Servico } from '@/modules/cadastro/domain/entities/servico.entity';
-
-function makeServico(overrides: Partial<Servico> = {}): Servico {
-  const s = new Servico();
-  s.id = overrides.id ?? '123e4567-e89b-12d3-a456-426614174000';
-  s.nome = overrides.nome ?? 'Troca de Óleo';
-  s.descricao = 'descricao' in overrides ? (overrides.descricao ?? null) : 'Troca de óleo do motor';
-  s.preco = overrides.preco ?? 50.0;
-  s.created_at = overrides.created_at ?? new Date();
-  s.updated_at = overrides.updated_at ?? new Date();
-  return s;
-}
-
-function makePagination(
-  overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}
-) {
-  return { page: 1, limit: 10, total: 2, totalPages: 1, ...overrides };
-}
+import { makeServico, makePagination } from '../../support/test-factories';
 
 describe('Servico Use Cases', () => {
   let mockRepository: jest.Mocked<IServicoRepository>;

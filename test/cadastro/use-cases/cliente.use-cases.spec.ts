@@ -6,26 +6,8 @@ import {
   DeleteClienteUseCase,
 } from '@/modules/cadastro/application/use-cases/cliente.use-cases';
 import { IClienteRepository } from '@/modules/cadastro/domain/interfaces/cliente.interface';
-import { Cliente } from '@/modules/cadastro/domain/entities/cliente.entity';
 import { TipoDocumento } from '@/modules/cadastro/domain/value-objects/cpf-cnpj.vo';
-
-function makeCliente(overrides: Partial<Parameters<typeof Cliente.criar>[0]> = {}): Cliente {
-  return Cliente.criar({
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    nome: 'João Silva',
-    documento: '11144477735',
-    tipoDocumento: 'CPF',
-    email: 'joao@email.com',
-    telefone: '11999999999',
-    ...overrides,
-  });
-}
-
-function makePagination(
-  overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}
-) {
-  return { page: 1, limit: 10, total: 2, totalPages: 1, ...overrides };
-}
+import { makeCliente, makePagination } from '../../support/test-factories';
 
 describe('Cliente Use Cases', () => {
   let mockRepository: jest.Mocked<IClienteRepository>;
