@@ -13,6 +13,9 @@ jobs:
   zap-scan:
     name: ZAP ${{ github.event_name == 'pull_request' && 'Baseline (PR)' || 'Full API Scan' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # necessário para postar comentário no PR
 
     services:
       postgres:
