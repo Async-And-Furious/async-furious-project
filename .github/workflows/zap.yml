@@ -1,13 +1,17 @@
 name: DAST - OWASP ZAP
 
 on:
+  pull_request:
+    branches:
+      - main
+      - develop
   schedule:
     - cron: '0 3 * * 1'
   workflow_dispatch:
 
 jobs:
   zap-scan:
-    name: ZAP API Scan
+    name: ZAP ${{ github.event_name == 'pull_request' && 'Baseline (PR)' || 'Full API Scan' }}
     runs-on: ubuntu-latest
 
     services:
@@ -65,14 +69,27 @@ jobs:
       - name: Aguardar aplicação ficar pronta
         run: |
           for i in $(seq 1 30); do
-            curl -sf http://localhost:5000/api/v1/ && echo "App pronta!" && break
+            curl -sf http://localhost:5000/api/v1/ && echo "App pronta!" && exit 0
             echo "Aguardando... ($i/30)" && sleep 3
           done
+          echo "❌ App não respondeu após 90s" && exit 1
 
-      - name: ZAP API Scan
+      - name: ZAP Baseline Scan (PR)
+        if: github.event_name == 'pull_request'
         run: |
           docker run --network="host" \
-            -v ${{ github.workspace }}/.zap:/zap/wrk/.zap:ro \
+            -v ${{ github.workspace }}:/zap/wrk/output:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:5000/api/docs-json \
+            -r output/report_html.html \
+            -J output/report_json.json \
+            -I
+
+      - name: ZAP Full API Scan (Schedule / Manual)
+        if: github.event_name != 'pull_request'
+        run: |
+          docker run --network="host" \
             -v ${{ github.workspace }}:/zap/wrk/output:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-api-scan.py \
@@ -80,7 +97,6 @@ jobs:
             -f openapi \
             -r output/report_html.html \
             -J output/report_json.json \
-            -c /zap/wrk/.zap/rules.tsv \
             -a \
             -I
 
@@ -88,8 +104,8 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: zap-reports
+          name: zap-reports-${{ github.event_name }}-${{ github.run_id }}
           path: |
-            report_html.html
-            report_json.json
+            ${{ github.workspace }}/report_html.html
+            ${{ github.workspace }}/report_json.json
           retention-days: 30
