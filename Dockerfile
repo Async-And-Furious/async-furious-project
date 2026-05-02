@@ -23,12 +23,6 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-
-# Install ALL dependencies (prisma CLI needed)
-RUN corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
-
 # Copy all files from builder
 COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/prisma ./prisma/

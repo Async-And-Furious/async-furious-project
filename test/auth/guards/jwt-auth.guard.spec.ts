@@ -107,12 +107,12 @@ describe('JwtAuthGuard', () => {
 
     it('deve lançar UnauthorizedException quando não há usuário', () => {
       expect(() => guard.handleRequest(null, null)).toThrow(UnauthorizedException);
-      expect(() => guard.handleRequest(null, null)).toThrow('Authentication required');
+      expect(() => guard.handleRequest(null, null)).toThrow('Autenticação necessária');
     });
 
     it('deve lançar UnauthorizedException quando usuário é undefined', () => {
       expect(() => guard.handleRequest(null, undefined)).toThrow(UnauthorizedException);
-      expect(() => guard.handleRequest(null, undefined)).toThrow('Authentication required');
+      expect(() => guard.handleRequest(null, undefined)).toThrow('Autenticação necessária');
     });
 
     it('deve lançar erro original quando há erro e usuário', () => {
