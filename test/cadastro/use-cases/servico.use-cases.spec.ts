@@ -8,6 +8,21 @@ import {
 import { IServicoRepository } from '@/modules/cadastro/domain/interfaces/servico.interface';
 import { Servico } from '@/modules/cadastro/domain/entities/servico.entity';
 
+function makeServico(overrides: Partial<Servico> = {}): Servico {
+  const s = new Servico();
+  s.id = overrides.id ?? '123e4567-e89b-12d3-a456-426614174000';
+  s.nome = overrides.nome ?? 'Troca de Óleo';
+  s.descricao = 'descricao' in overrides ? (overrides.descricao ?? null) : 'Troca de óleo do motor';
+  s.preco = overrides.preco ?? 50.0;
+  s.created_at = overrides.created_at ?? new Date();
+  s.updated_at = overrides.updated_at ?? new Date();
+  return s;
+}
+
+function makePagination(overrides: Partial<{ page: number; limit: number; total: number; totalPages: number }> = {}) {
+  return { page: 1, limit: 10, total: 2, totalPages: 1, ...overrides };
+}
+
 describe('Servico Use Cases', () => {
   let mockRepository: jest.Mocked<IServicoRepository>;
 
@@ -29,20 +44,8 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve criar um serviço com sucesso', async () => {
-      const input = {
-        nome: 'Troca de Óleo',
-        descricao: 'Troca de óleo do motor',
-        preco: 50.0,
-      };
-
-      const servicoCriado = new Servico();
-      servicoCriado.id = '123e4567-e89b-12d3-a456-426614174000';
-      servicoCriado.nome = input.nome;
-      servicoCriado.descricao = input.descricao;
-      servicoCriado.preco = input.preco;
-      servicoCriado.created_at = new Date();
-      servicoCriado.updated_at = new Date();
-
+      const input = { nome: 'Troca de Óleo', descricao: 'Troca de óleo do motor', preco: 50.0 };
+      const servicoCriado = makeServico({ id: '123e4567-e89b-12d3-a456-426614174000', ...input });
       mockRepository.create.mockResolvedValue(servicoCriado);
 
       const resultado = await useCase.execute(input);
@@ -55,19 +58,8 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve criar serviço sem descrição', async () => {
-      const input = {
-        nome: 'Alinhamento',
-        preco: 80.0,
-      };
-
-      const servicoCriado = new Servico();
-      servicoCriado.id = '456e7890-e89b-12d3-a456-426614174001';
-      servicoCriado.nome = input.nome;
-      servicoCriado.descricao = null;
-      servicoCriado.preco = input.preco;
-      servicoCriado.created_at = new Date();
-      servicoCriado.updated_at = new Date();
-
+      const input = { nome: 'Alinhamento', preco: 80.0 };
+      const servicoCriado = makeServico({ id: '456e7890-e89b-12d3-a456-426614174001', nome: input.nome, descricao: null, preco: input.preco });
       mockRepository.create.mockResolvedValue(servicoCriado);
 
       const resultado = await useCase.execute(input);
@@ -78,13 +70,8 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve propagar erro do repositório', async () => {
-      const input = {
-        nome: 'Serviço Teste',
-        preco: 100.0,
-      };
-
-      const erro = new Error('Erro ao criar serviço');
-      mockRepository.create.mockRejectedValue(erro);
+      const input = { nome: 'Serviço Teste', preco: 100.0 };
+      mockRepository.create.mockRejectedValue(new Error('Erro ao criar serviço'));
 
       await expect(useCase.execute(input)).rejects.toThrow('Erro ao criar serviço');
       expect(mockRepository.create).toHaveBeenCalledWith(input);
@@ -99,35 +86,12 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve listar serviços sem parâmetros', async () => {
-      const servico1 = new Servico();
-      servico1.id = '1';
-      servico1.nome = 'Troca de Óleo';
-      servico1.descricao = 'Troca de óleo do motor';
-      servico1.preco = 50.0;
-      servico1.created_at = new Date();
-      servico1.updated_at = new Date();
+      const servicos = [
+        makeServico({ id: '1', descricao: 'Troca de óleo do motor' }),
+        makeServico({ id: '2', nome: 'Alinhamento', descricao: 'Alinhamento das rodas', preco: 80.0 }),
+      ];
 
-      const servico2 = new Servico();
-      servico2.id = '2';
-      servico2.nome = 'Alinhamento';
-      servico2.descricao = 'Alinhamento das rodas';
-      servico2.preco = 80.0;
-      servico2.created_at = new Date();
-      servico2.updated_at = new Date();
-
-      const servicos = [servico1, servico2];
-
-      const pagination = {
-        page: 1,
-        limit: 10,
-        total: 2,
-        totalPages: 1,
-      };
-
-      mockRepository.findAll.mockResolvedValue({
-        data: servicos,
-        pagination,
-      });
+      mockRepository.findAll.mockResolvedValue({ data: servicos, pagination: makePagination() });
 
       const resultado = await useCase.execute();
 
@@ -137,27 +101,9 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve listar serviços com paginação', async () => {
-      const servico = new Servico();
-      servico.id = '1';
-      servico.nome = 'Troca de Óleo';
-      servico.descricao = null;
-      servico.preco = 50.0;
-      servico.created_at = new Date();
-      servico.updated_at = new Date();
+      const servicos = [makeServico({ id: '1', descricao: null })];
 
-      const servicos = [servico];
-
-      const pagination = {
-        page: 2,
-        limit: 5,
-        total: 10,
-        totalPages: 2,
-      };
-
-      mockRepository.findAll.mockResolvedValue({
-        data: servicos,
-        pagination,
-      });
+      mockRepository.findAll.mockResolvedValue({ data: servicos, pagination: makePagination({ page: 2, limit: 5, total: 10, totalPages: 2 }) });
 
       const resultado = await useCase.execute(2, 5);
 
@@ -167,27 +113,9 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve listar serviços com busca', async () => {
-      const servico = new Servico();
-      servico.id = '1';
-      servico.nome = 'Troca de Óleo';
-      servico.descricao = 'Troca de óleo do motor';
-      servico.preco = 50.0;
-      servico.created_at = new Date();
-      servico.updated_at = new Date();
+      const servicos = [makeServico({ id: '1' })];
 
-      const servicos = [servico];
-
-      const pagination = {
-        page: 1,
-        limit: 10,
-        total: 1,
-        totalPages: 1,
-      };
-
-      mockRepository.findAll.mockResolvedValue({
-        data: servicos,
-        pagination,
-      });
+      mockRepository.findAll.mockResolvedValue({ data: servicos, pagination: makePagination({ total: 1, totalPages: 1 }) });
 
       const resultado = await useCase.execute(1, 10, 'óleo');
 
@@ -197,17 +125,7 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve retornar lista vazia quando não há serviços', async () => {
-      const pagination = {
-        page: 1,
-        limit: 10,
-        total: 0,
-        totalPages: 0,
-      };
-
-      mockRepository.findAll.mockResolvedValue({
-        data: [],
-        pagination,
-      });
+      mockRepository.findAll.mockResolvedValue({ data: [], pagination: makePagination({ total: 0, totalPages: 0 }) });
 
       const resultado = await useCase.execute();
 
@@ -216,8 +134,7 @@ describe('Servico Use Cases', () => {
     });
 
     it('deve propagar erro do repositório', async () => {
-      const erro = new Error('Erro ao listar serviços');
-      mockRepository.findAll.mockRejectedValue(erro);
+      mockRepository.findAll.mockRejectedValue(new Error('Erro ao listar serviços'));
 
       await expect(useCase.execute()).rejects.toThrow('Erro ao listar serviços');
     });
@@ -232,14 +149,7 @@ describe('Servico Use Cases', () => {
 
     it('deve buscar serviço por ID com sucesso', async () => {
       const servicoId = '123e4567-e89b-12d3-a456-426614174000';
-      const servico = new Servico();
-      servico.id = servicoId;
-      servico.nome = 'Troca de Óleo';
-      servico.descricao = 'Troca de óleo do motor';
-      servico.preco = 50.0;
-      servico.created_at = new Date();
-      servico.updated_at = new Date();
-
+      const servico = makeServico({ id: servicoId });
       mockRepository.findOne.mockResolvedValue(servico);
 
       const resultado = await useCase.execute(servicoId);
@@ -251,9 +161,7 @@ describe('Servico Use Cases', () => {
 
     it('deve propagar erro quando serviço não encontrado', async () => {
       const servicoId = 'id-inexistente';
-      const erro = new Error('Serviço não encontrado');
-
-      mockRepository.findOne.mockRejectedValue(erro);
+      mockRepository.findOne.mockRejectedValue(new Error('Serviço não encontrado'));
 
       await expect(useCase.execute(servicoId)).rejects.toThrow('Serviço não encontrado');
       expect(mockRepository.findOne).toHaveBeenCalledWith(servicoId);
@@ -269,20 +177,8 @@ describe('Servico Use Cases', () => {
 
     it('deve atualizar serviço com sucesso', async () => {
       const servicoId = '123e4567-e89b-12d3-a456-426614174000';
-      const updateData = {
-        nome: 'Troca de Óleo Premium',
-        descricao: 'Troca de óleo sintético premium',
-        preco: 75.0,
-      };
-
-      const servicoAtualizado = new Servico();
-      servicoAtualizado.id = servicoId;
-      servicoAtualizado.nome = updateData.nome;
-      servicoAtualizado.descricao = updateData.descricao;
-      servicoAtualizado.preco = updateData.preco;
-      servicoAtualizado.created_at = new Date('2024-01-01');
-      servicoAtualizado.updated_at = new Date();
-
+      const updateData = { nome: 'Troca de Óleo Premium', descricao: 'Troca de óleo sintético premium', preco: 75.0 };
+      const servicoAtualizado = makeServico({ id: servicoId, ...updateData, created_at: new Date('2024-01-01') });
       mockRepository.update.mockResolvedValue(servicoAtualizado);
 
       const resultado = await useCase.execute(servicoId, updateData);
@@ -296,18 +192,8 @@ describe('Servico Use Cases', () => {
 
     it('deve atualizar apenas campos fornecidos', async () => {
       const servicoId = '123e4567-e89b-12d3-a456-426614174000';
-      const updateData = {
-        preco: 60.0,
-      };
-
-      const servicoAtualizado = new Servico();
-      servicoAtualizado.id = servicoId;
-      servicoAtualizado.nome = 'Troca de Óleo';
-      servicoAtualizado.descricao = 'Troca de óleo do motor';
-      servicoAtualizado.preco = updateData.preco;
-      servicoAtualizado.created_at = new Date('2024-01-01');
-      servicoAtualizado.updated_at = new Date();
-
+      const updateData = { preco: 60.0 };
+      const servicoAtualizado = makeServico({ id: servicoId, preco: updateData.preco, created_at: new Date('2024-01-01') });
       mockRepository.update.mockResolvedValue(servicoAtualizado);
 
       const resultado = await useCase.execute(servicoId, updateData);
@@ -319,12 +205,10 @@ describe('Servico Use Cases', () => {
     it('deve propagar erro do repositório', async () => {
       const servicoId = 'id-inexistente';
       const updateData = { nome: 'Novo Nome' };
-      const erro = new Error('Serviço não encontrado para atualização');
-
-      mockRepository.update.mockRejectedValue(erro);
+      mockRepository.update.mockRejectedValue(new Error('Serviço não encontrado para atualização'));
 
       await expect(useCase.execute(servicoId, updateData)).rejects.toThrow(
-        'Serviço não encontrado para atualização'
+        'Serviço não encontrado para atualização',
       );
       expect(mockRepository.update).toHaveBeenCalledWith(servicoId, updateData);
     });
@@ -339,14 +223,7 @@ describe('Servico Use Cases', () => {
 
     it('deve deletar serviço com sucesso', async () => {
       const servicoId = '123e4567-e89b-12d3-a456-426614174000';
-      const servicoDeletado = new Servico();
-      servicoDeletado.id = servicoId;
-      servicoDeletado.nome = 'Troca de Óleo';
-      servicoDeletado.descricao = 'Troca de óleo do motor';
-      servicoDeletado.preco = 50.0;
-      servicoDeletado.created_at = new Date('2024-01-01');
-      servicoDeletado.updated_at = new Date();
-
+      const servicoDeletado = makeServico({ id: servicoId, created_at: new Date('2024-01-01') });
       mockRepository.remove.mockResolvedValue(servicoDeletado);
 
       const resultado = await useCase.execute(servicoId);
@@ -358,24 +235,18 @@ describe('Servico Use Cases', () => {
 
     it('deve propagar erro quando serviço não encontrado para deleção', async () => {
       const servicoId = 'id-inexistente';
-      const erro = new Error('Serviço não encontrado para deleção');
+      mockRepository.remove.mockRejectedValue(new Error('Serviço não encontrado para deleção'));
 
-      mockRepository.remove.mockRejectedValue(erro);
-
-      await expect(useCase.execute(servicoId)).rejects.toThrow(
-        'Serviço não encontrado para deleção'
-      );
+      await expect(useCase.execute(servicoId)).rejects.toThrow('Serviço não encontrado para deleção');
       expect(mockRepository.remove).toHaveBeenCalledWith(servicoId);
     });
 
     it('deve propagar erro de integridade referencial', async () => {
       const servicoId = '123e4567-e89b-12d3-a456-426614174000';
-      const erro = new Error('Serviço está sendo usado em ordens de serviço');
-
-      mockRepository.remove.mockRejectedValue(erro);
+      mockRepository.remove.mockRejectedValue(new Error('Serviço está sendo usado em ordens de serviço'));
 
       await expect(useCase.execute(servicoId)).rejects.toThrow(
-        'Serviço está sendo usado em ordens de serviço'
+        'Serviço está sendo usado em ordens de serviço',
       );
       expect(mockRepository.remove).toHaveBeenCalledWith(servicoId);
     });

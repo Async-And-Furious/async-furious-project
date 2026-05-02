@@ -86,16 +86,8 @@ describe('PedidoFornecedorRepository', () => {
           itens: {
             createMany: {
               data: [
-                {
-                  id_peca: 'peca-1',
-                  quantidade_solicitada: 10,
-                  quantidade_recebida: 0,
-                },
-                {
-                  id_peca: 'peca-2',
-                  quantidade_solicitada: 5,
-                  quantidade_recebida: 0,
-                },
+                { id_peca: 'peca-1', quantidade_solicitada: 10, quantidade_recebida: 0 },
+                { id_peca: 'peca-2', quantidade_solicitada: 5, quantidade_recebida: 0 },
               ],
             },
           },
@@ -103,29 +95,7 @@ describe('PedidoFornecedorRepository', () => {
         include: { itens: true },
       });
 
-      expect(resultado).toEqual({
-        id: 'pedido-1',
-        fornecedor_id: 'fornecedor-1',
-        status: 'PENDENTE',
-        criado_em: new Date('2024-01-01'),
-        atualizado_em: new Date('2024-01-01'),
-        itens: [
-          {
-            id: 'item-1',
-            id_pedido_fornecedor: 'pedido-1',
-            id_peca: 'peca-1',
-            quantidade_solicitada: 10,
-            quantidade_recebida: 0,
-          },
-          {
-            id: 'item-2',
-            id_pedido_fornecedor: 'pedido-1',
-            id_peca: 'peca-2',
-            quantidade_solicitada: 5,
-            quantidade_recebida: 0,
-          },
-        ],
-      });
+      expect(resultado).toEqual(mockPrismaData);
     });
 
     it('deve criar pedido com um único item', async () => {
@@ -136,11 +106,7 @@ describe('PedidoFornecedorRepository', () => {
         criado_em: new Date('2024-01-01'),
       };
 
-      const mockDataUmItem = {
-        ...mockPrismaData,
-        itens: [mockPrismaData.itens[0]],
-      };
-
+      const mockDataUmItem = { ...mockPrismaData, itens: [mockPrismaData.itens[0]] };
       prismaService.pedidoFornecedor.create.mockResolvedValue(mockDataUmItem);
 
       const resultado = await repository.create(createData);
@@ -152,13 +118,7 @@ describe('PedidoFornecedorRepository', () => {
           criado_em: createData.criado_em,
           itens: {
             createMany: {
-              data: [
-                {
-                  id_peca: 'peca-1',
-                  quantidade_solicitada: 15,
-                  quantidade_recebida: 0,
-                },
-              ],
+              data: [{ id_peca: 'peca-1', quantidade_solicitada: 15, quantidade_recebida: 0 }],
             },
           },
         },
@@ -181,29 +141,7 @@ describe('PedidoFornecedorRepository', () => {
         include: { itens: true },
       });
 
-      expect(resultado).toEqual({
-        id: 'pedido-1',
-        fornecedor_id: 'fornecedor-1',
-        status: 'PENDENTE',
-        criado_em: new Date('2024-01-01'),
-        atualizado_em: new Date('2024-01-01'),
-        itens: [
-          {
-            id: 'item-1',
-            id_pedido_fornecedor: 'pedido-1',
-            id_peca: 'peca-1',
-            quantidade_solicitada: 10,
-            quantidade_recebida: 0,
-          },
-          {
-            id: 'item-2',
-            id_pedido_fornecedor: 'pedido-1',
-            id_peca: 'peca-2',
-            quantidade_solicitada: 5,
-            quantidade_recebida: 0,
-          },
-        ],
-      });
+      expect(resultado).toEqual(mockPrismaData);
     });
 
     it('deve retornar null quando pedido não encontrado', async () => {
@@ -236,17 +174,13 @@ describe('PedidoFornecedorRepository', () => {
         status: 'RECEBIDO',
         atualizado_em: new Date('2024-01-02'),
       };
-
       prismaService.pedidoFornecedor.update.mockResolvedValue(mockUpdatedData);
 
       const resultado = await repository.save(pedidoParaAtualizar);
 
       expect(prismaService.pedidoFornecedor.update).toHaveBeenCalledWith({
         where: { id: 'pedido-1' },
-        data: {
-          status: 'RECEBIDO',
-          atualizado_em: expect.any(Date),
-        },
+        data: { status: 'RECEBIDO', atualizado_em: expect.any(Date) },
         include: { itens: true },
       });
 
@@ -264,12 +198,10 @@ describe('PedidoFornecedorRepository', () => {
         itens: [],
       };
 
-      const mockUpdatedData = {
+      prismaService.pedidoFornecedor.update.mockResolvedValue({
         ...mockPrismaData,
         status: 'RECEBIDO',
-      };
-
-      prismaService.pedidoFornecedor.update.mockResolvedValue(mockUpdatedData);
+      });
 
       const resultado = await repository.save(pedidoParaAtualizar);
 
@@ -281,11 +213,7 @@ describe('PedidoFornecedorRepository', () => {
     it('deve retornar todos os pedidos ordenados por data de criação', async () => {
       const mockMultiplosPedidos = [
         mockPrismaData,
-        {
-          ...mockPrismaData,
-          id: 'pedido-2',
-          criado_em: new Date('2024-01-02'),
-        },
+        { ...mockPrismaData, id: 'pedido-2', criado_em: new Date('2024-01-02') },
       ];
 
       prismaService.pedidoFornecedor.findMany.mockResolvedValue(mockMultiplosPedidos);
@@ -316,19 +244,12 @@ describe('PedidoFornecedorRepository', () => {
       const resultado = await repository.findAll();
 
       expect(resultado[0].itens).toHaveLength(2);
-      expect(resultado[0].itens[0]).toEqual({
-        id: 'item-1',
-        id_pedido_fornecedor: 'pedido-1',
-        id_peca: 'peca-1',
-        quantidade_solicitada: 10,
-        quantidade_recebida: 0,
-      });
+      expect(resultado[0].itens[0]).toEqual(mockPrismaData.itens[0]);
     });
   });
 
   describe('mapToEntity', () => {
     it('deve mapear dados do Prisma para entidade corretamente', async () => {
-      // Testamos o mapeamento através do método create
       const createData = {
         fornecedor_id: 'fornecedor-1',
         itens: [{ id_peca: 'peca-1', quantidade_solicitada: 10 }],
@@ -340,7 +261,6 @@ describe('PedidoFornecedorRepository', () => {
 
       const resultado = await repository.create(createData);
 
-      // Verifica se todos os campos foram mapeados corretamente
       expect(resultado.id).toBe(mockPrismaData.id);
       expect(resultado.fornecedor_id).toBe(mockPrismaData.fornecedor_id);
       expect(resultado.status).toBe(mockPrismaData.status);
@@ -350,11 +270,7 @@ describe('PedidoFornecedorRepository', () => {
     });
 
     it('deve mapear status RECEBIDO corretamente', async () => {
-      const mockDataRecebido = {
-        ...mockPrismaData,
-        status: 'RECEBIDO',
-      };
-
+      const mockDataRecebido = { ...mockPrismaData, status: 'RECEBIDO' };
       prismaService.pedidoFornecedor.findUnique.mockResolvedValue(mockDataRecebido);
 
       const resultado = await repository.findById('pedido-1');

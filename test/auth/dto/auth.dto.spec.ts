@@ -3,255 +3,109 @@ import { plainToClass } from 'class-transformer';
 import { LoginDto, RegisterDto } from '@/auth/dto/auth.dto';
 import { Role } from '@/auth/enums/role.enum';
 
+const VALID_LOGIN = { email: 'test@example.com', password: 'password123' };
+const VALID_REGISTER = { ...VALID_LOGIN, name: 'João Silva', role: Role.ADMIN };
+
+async function expectFieldError<T extends object>(
+  DtoClass: new () => T,
+  data: object,
+  property: string,
+): Promise<void> {
+  const dto = plainToClass(DtoClass, data);
+  const errors = await validate(dto as object);
+  expect(errors.length).toBeGreaterThan(0);
+  expect(errors[0].property).toBe(property);
+}
+
+async function expectNoErrors<T extends object>(DtoClass: new () => T, data: object): Promise<void> {
+  const dto = plainToClass(DtoClass, data);
+  const errors = await validate(dto as object);
+  expect(errors.length).toBe(0);
+}
+
 describe('AuthDto', () => {
   describe('LoginDto', () => {
     it('deve criar LoginDto com dados válidos', () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: 'password123',
-      };
+      const dto = plainToClass(LoginDto, VALID_LOGIN);
 
-      const loginDto = plainToClass(LoginDto, loginData);
-
-      expect(loginDto.email).toBe('test@example.com');
-      expect(loginDto.password).toBe('password123');
+      expect(dto.email).toBe(VALID_LOGIN.email);
+      expect(dto.password).toBe(VALID_LOGIN.password);
     });
 
     it('deve validar email obrigatório', async () => {
-      const loginData = {
-        password: 'password123',
-      };
-
-      const loginDto = plainToClass(LoginDto, loginData);
-      const errors = await validate(loginDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('email');
+      await expectFieldError(LoginDto, { password: 'password123' }, 'email');
     });
 
     it('deve validar formato de email', async () => {
-      const loginData = {
-        email: 'email-invalido',
-        password: 'password123',
-      };
-
-      const loginDto = plainToClass(LoginDto, loginData);
-      const errors = await validate(loginDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('email');
+      await expectFieldError(LoginDto, { email: 'email-invalido', password: 'password123' }, 'email');
     });
 
     it('deve validar password obrigatório', async () => {
-      const loginData = {
-        email: 'test@example.com',
-      };
-
-      const loginDto = plainToClass(LoginDto, loginData);
-      const errors = await validate(loginDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('password');
+      await expectFieldError(LoginDto, { email: 'test@example.com' }, 'password');
     });
 
     it('deve validar tamanho mínimo da password', async () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: '1234567', // 7 caracteres - menor que o mínimo de 8
-      };
-
-      const loginDto = plainToClass(LoginDto, loginData);
-      const errors = await validate(loginDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('password');
+      await expectFieldError(LoginDto, { ...VALID_LOGIN, password: '1234567' }, 'password');
     });
 
     it('deve passar na validação com dados corretos', async () => {
-      const loginData = {
-        email: 'test@example.com',
-        password: 'password123',
-      };
-
-      const loginDto = plainToClass(LoginDto, loginData);
-      const errors = await validate(loginDto);
-
-      expect(errors.length).toBe(0);
+      await expectNoErrors(LoginDto, VALID_LOGIN);
     });
   });
 
   describe('RegisterDto', () => {
     it('deve criar RegisterDto com dados válidos', () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'João Silva',
-        role: Role.ADMIN,
-      };
+      const dto = plainToClass(RegisterDto, VALID_REGISTER);
 
-      const registerDto = plainToClass(RegisterDto, registerData);
-
-      expect(registerDto.email).toBe('test@example.com');
-      expect(registerDto.password).toBe('password123');
-      expect(registerDto.name).toBe('João Silva');
-      expect(registerDto.role).toBe(Role.ADMIN);
+      expect(dto.email).toBe(VALID_REGISTER.email);
+      expect(dto.password).toBe(VALID_REGISTER.password);
+      expect(dto.name).toBe(VALID_REGISTER.name);
+      expect(dto.role).toBe(Role.ADMIN);
     });
 
     it('deve validar email obrigatório', async () => {
-      const registerData = {
-        password: 'password123',
-        name: 'João Silva',
-        role: Role.ADMIN,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('email');
+      await expectFieldError(RegisterDto, { password: 'password123', name: 'João Silva', role: Role.ADMIN }, 'email');
     });
 
     it('deve validar formato de email', async () => {
-      const registerData = {
-        email: 'email-invalido',
-        password: 'password123',
-        name: 'João Silva',
-        role: Role.ADMIN,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('email');
+      await expectFieldError(RegisterDto, { ...VALID_REGISTER, email: 'email-invalido' }, 'email');
     });
 
     it('deve validar password obrigatório', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        name: 'João Silva',
-        role: Role.ADMIN,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('password');
+      await expectFieldError(RegisterDto, { email: 'test@example.com', name: 'João Silva', role: Role.ADMIN }, 'password');
     });
 
     it('deve validar tamanho mínimo da password', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: '1234567', // 7 caracteres - menor que o mínimo de 8
-        name: 'João Silva',
-        role: Role.ADMIN,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('password');
+      await expectFieldError(RegisterDto, { ...VALID_REGISTER, password: '1234567' }, 'password');
     });
 
     it('deve validar name obrigatório', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        role: Role.ADMIN,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('name');
+      await expectFieldError(RegisterDto, { ...VALID_LOGIN, role: Role.ADMIN }, 'name');
     });
 
     it('deve validar valores permitidos para role', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'João Silva',
-        role: 'invalid-role' as unknown as Role,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBeGreaterThan(0);
-      expect(errors[0].property).toBe('role');
+      await expectFieldError(RegisterDto, { ...VALID_REGISTER, role: 'invalid-role' as unknown as Role }, 'role');
     });
 
-    it('deve aceitar role "ADMIN"', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'João Silva',
-        role: Role.ADMIN,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBe(0);
-    });
-
-    it('deve aceitar role "RECEPCIONISTA"', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'João Silva',
-        role: Role.RECEPCIONISTA,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBe(0);
-    });
-
-    it('deve aceitar role "MECANICO"', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'João Silva',
-        role: Role.MECANICO,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBe(0);
+    it.each([
+      [Role.ADMIN],
+      [Role.RECEPCIONISTA],
+      [Role.MECANICO],
+    ])('deve aceitar role "%s"', async (role) => {
+      await expectNoErrors(RegisterDto, { ...VALID_REGISTER, role });
     });
 
     it('deve aceitar RegisterDto sem role (opcional)', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'João Silva',
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
+      const data = { ...VALID_LOGIN, name: 'João Silva' };
+      const dto = plainToClass(RegisterDto, data);
+      const errors = await validate(dto);
 
       expect(errors.length).toBe(0);
-      expect(registerDto.role).toBeUndefined();
+      expect(dto.role).toBeUndefined();
     });
 
     it('deve passar na validação com dados corretos', async () => {
-      const registerData = {
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'João Silva',
-        role: Role.ADMIN,
-      };
-
-      const registerDto = plainToClass(RegisterDto, registerData);
-      const errors = await validate(registerDto);
-
-      expect(errors.length).toBe(0);
+      await expectNoErrors(RegisterDto, VALID_REGISTER);
     });
   });
 });

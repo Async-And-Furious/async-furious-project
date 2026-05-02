@@ -446,6 +446,25 @@ async function seedAdmin(): Promise<void> {
   console.log(`  ✅ Admin criado: ${email}`);
 }
 
+async function seedLoop<T>(
+  label: string,
+  items: T[],
+  findExisting: (item: T) => Promise<unknown>,
+  createItem: (item: T) => Promise<unknown>
+): Promise<void> {
+  let criados = 0;
+  let pulados = 0;
+  for (const item of items) {
+    if (await findExisting(item)) {
+      pulados++;
+      continue;
+    }
+    await createItem(item);
+    criados++;
+  }
+  console.log(`  ✅ ${label}: ${criados} criados, ${pulados} já existiam`);
+}
+
 async function seedClientes(): Promise<string[]> {
   const ids: string[] = [];
   let criados = 0;
@@ -500,48 +519,31 @@ async function seedVeiculos(clienteIds: string[]): Promise<void> {
 }
 
 async function seedServicos(): Promise<void> {
-  let criados = 0;
-  let pulados = 0;
-  for (const s of SERVICOS) {
-    const existing = await prisma.servico.findFirst({ where: { nome: s.nome } });
-    if (existing) {
-      pulados++;
-      continue;
-    }
-    await prisma.servico.create({
-      data: {
-        nome: s.nome,
-        descricao: s.descricao,
-        preco: s.preco,
-      },
-    });
-    criados++;
-  }
-  console.log(`  ✅ Serviços: ${criados} criados, ${pulados} já existiam`);
+  await seedLoop(
+    'Serviços',
+    SERVICOS,
+    (s) => prisma.servico.findFirst({ where: { nome: s.nome } }),
+    (s) => prisma.servico.create({ data: { nome: s.nome, descricao: s.descricao, preco: s.preco } })
+  );
 }
 
 async function seedPecasInsumos(): Promise<void> {
-  let criados = 0;
-  let pulados = 0;
-  for (const p of PECAS_INSUMOS) {
-    const existing = await prisma.peca.findFirst({ where: { codigo: p.codigo } });
-    if (existing) {
-      pulados++;
-      continue;
-    }
-    await prisma.peca.create({
-      data: {
-        nome: p.nome,
-        codigo: p.codigo,
-        descricao: p.descricao,
-        preco: p.preco,
-        quantidade_estoque: p.quantidade_estoque,
-        quantidade_minima: p.quantidade_minima,
-      },
-    });
-    criados++;
-  }
-  console.log(`  ✅ Peças/Insumos: ${criados} criados, ${pulados} já existiam`);
+  await seedLoop(
+    'Peças/Insumos',
+    PECAS_INSUMOS,
+    (p) => prisma.peca.findFirst({ where: { codigo: p.codigo } }),
+    (p) =>
+      prisma.peca.create({
+        data: {
+          nome: p.nome,
+          codigo: p.codigo,
+          descricao: p.descricao,
+          preco: p.preco,
+          quantidade_estoque: p.quantidade_estoque,
+          quantidade_minima: p.quantidade_minima,
+        },
+      })
+  );
 }
 
 async function seedOrdensServico(clienteIds: string[]): Promise<void> {

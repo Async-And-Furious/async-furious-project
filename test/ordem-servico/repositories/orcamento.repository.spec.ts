@@ -5,7 +5,11 @@ import { PrismaService } from '@/shared/infrastructure/database/prisma.service';
 
 describe('OrcamentoRepository', () => {
   let repository: OrcamentoRepository;
-  let prismaService: PrismaService;
+  let orcamento: {
+    create: jest.Mock;
+    findUnique: jest.Mock;
+    update: jest.Mock;
+  };
 
   const mockOrcamento = {
     id: 'orc-123',
@@ -38,7 +42,7 @@ describe('OrcamentoRepository', () => {
     }).compile();
 
     repository = module.get<OrcamentoRepository>(OrcamentoRepository);
-    prismaService = module.get<PrismaService>(PrismaService);
+    orcamento = module.get<PrismaService>(PrismaService).orcamento as typeof orcamento;
   });
 
   describe('create', () => {
@@ -50,13 +54,11 @@ describe('OrcamentoRepository', () => {
         valor_total_geral: 500.0,
       };
 
-      (prismaService.orcamento.create as jest.Mock).mockResolvedValue(mockOrcamento);
+      orcamento.create.mockResolvedValue(mockOrcamento);
 
       const result = await repository.create(createData);
 
-      expect(prismaService.orcamento.create).toHaveBeenCalledWith({
-        data: createData,
-      });
+      expect(orcamento.create).toHaveBeenCalledWith({ data: createData });
       expect(result).toEqual(mockOrcamento);
     });
 
@@ -69,13 +71,11 @@ describe('OrcamentoRepository', () => {
       };
 
       const orcamentoZero = { ...mockOrcamento, ...createData };
-      (prismaService.orcamento.create as jest.Mock).mockResolvedValue(orcamentoZero);
+      orcamento.create.mockResolvedValue(orcamentoZero);
 
       const result = await repository.create(createData);
 
-      expect(prismaService.orcamento.create).toHaveBeenCalledWith({
-        data: createData,
-      });
+      expect(orcamento.create).toHaveBeenCalledWith({ data: createData });
       expect(result).toEqual(orcamentoZero);
     });
 
@@ -88,13 +88,11 @@ describe('OrcamentoRepository', () => {
       };
 
       const orcamentoDecimal = { ...mockOrcamento, ...createData };
-      (prismaService.orcamento.create as jest.Mock).mockResolvedValue(orcamentoDecimal);
+      orcamento.create.mockResolvedValue(orcamentoDecimal);
 
       const result = await repository.create(createData);
 
-      expect(prismaService.orcamento.create).toHaveBeenCalledWith({
-        data: createData,
-      });
+      expect(orcamento.create).toHaveBeenCalledWith({ data: createData });
       expect(result).toEqual(orcamentoDecimal);
     });
   });
@@ -102,25 +100,21 @@ describe('OrcamentoRepository', () => {
   describe('findByOrdemServicoId', () => {
     it('deve retornar orçamento por ID da ordem de serviço', async () => {
       const idOrdemServico = 'os-456';
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
+      orcamento.findUnique.mockResolvedValue(mockOrcamento);
 
       const result = await repository.findByOrdemServicoId(idOrdemServico);
 
-      expect(prismaService.orcamento.findUnique).toHaveBeenCalledWith({
-        where: { id_ordem_servico: idOrdemServico },
-      });
+      expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id_ordem_servico: idOrdemServico } });
       expect(result).toEqual(mockOrcamento);
     });
 
     it('deve retornar null quando orçamento não encontrado', async () => {
       const idOrdemServico = 'os-inexistente';
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(null);
+      orcamento.findUnique.mockResolvedValue(null);
 
       const result = await repository.findByOrdemServicoId(idOrdemServico);
 
-      expect(prismaService.orcamento.findUnique).toHaveBeenCalledWith({
-        where: { id_ordem_servico: idOrdemServico },
-      });
+      expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id_ordem_servico: idOrdemServico } });
       expect(result).toBeNull();
     });
   });
@@ -128,87 +122,59 @@ describe('OrcamentoRepository', () => {
   describe('update', () => {
     it('deve atualizar um orçamento existente', async () => {
       const id = 'orc-123';
-      const updateData = {
-        valor_total_servicos: 400.0,
-        valor_total_pecas: 300.0,
-        valor_total_geral: 700.0,
-        status: 'APPROVED' as const,
-      };
-
+      const updateData = { valor_total_servicos: 400.0, valor_total_pecas: 300.0, valor_total_geral: 700.0, status: 'APPROVED' as const };
       const updatedOrcamento = { ...mockOrcamento, ...updateData };
 
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
-      (prismaService.orcamento.update as jest.Mock).mockResolvedValue(updatedOrcamento);
+      orcamento.findUnique.mockResolvedValue(mockOrcamento);
+      orcamento.update.mockResolvedValue(updatedOrcamento);
 
       const result = await repository.update(id, updateData);
 
-      expect(prismaService.orcamento.findUnique).toHaveBeenCalledWith({
-        where: { id },
-      });
-      expect(prismaService.orcamento.update).toHaveBeenCalledWith({
-        where: { id },
-        data: updateData,
-      });
+      expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id } });
+      expect(orcamento.update).toHaveBeenCalledWith({ where: { id }, data: updateData });
       expect(result).toEqual(updatedOrcamento);
     });
 
     it('deve atualizar apenas o status do orçamento', async () => {
       const id = 'orc-123';
-      const updateData = {
-        status: 'REJECTED' as const,
-      };
-
+      const updateData = { status: 'REJECTED' as const };
       const updatedOrcamento = { ...mockOrcamento, status: 'REJECTED' };
 
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
-      (prismaService.orcamento.update as jest.Mock).mockResolvedValue(updatedOrcamento);
+      orcamento.findUnique.mockResolvedValue(mockOrcamento);
+      orcamento.update.mockResolvedValue(updatedOrcamento);
 
       const result = await repository.update(id, updateData);
 
-      expect(prismaService.orcamento.update).toHaveBeenCalledWith({
-        where: { id },
-        data: updateData,
-      });
+      expect(orcamento.update).toHaveBeenCalledWith({ where: { id }, data: updateData });
       expect(result).toEqual(updatedOrcamento);
     });
 
     it('deve atualizar apenas valores monetários', async () => {
       const id = 'orc-123';
-      const updateData = {
-        valor_total_servicos: 250.0,
-        valor_total_geral: 450.0,
-      };
-
+      const updateData = { valor_total_servicos: 250.0, valor_total_geral: 450.0 };
       const updatedOrcamento = { ...mockOrcamento, ...updateData };
 
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
-      (prismaService.orcamento.update as jest.Mock).mockResolvedValue(updatedOrcamento);
+      orcamento.findUnique.mockResolvedValue(mockOrcamento);
+      orcamento.update.mockResolvedValue(updatedOrcamento);
 
       const result = await repository.update(id, updateData);
 
-      expect(prismaService.orcamento.update).toHaveBeenCalledWith({
-        where: { id },
-        data: updateData,
-      });
+      expect(orcamento.update).toHaveBeenCalledWith({ where: { id }, data: updateData });
       expect(result).toEqual(updatedOrcamento);
     });
 
     it('deve lançar NotFoundException quando orçamento não encontrado', async () => {
       const id = 'orc-inexistente';
-      const updateData = {
-        status: 'APPROVED' as const,
-      };
+      const updateData = { status: 'APPROVED' as const };
 
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(null);
+      orcamento.findUnique.mockResolvedValue(null);
 
       await expect(repository.update(id, updateData)).rejects.toThrow(
-        new NotFoundException(`Orçamento com ID ${id} não encontrado`)
+        new NotFoundException(`Orçamento com ID ${id} não encontrado`),
       );
 
-      expect(prismaService.orcamento.findUnique).toHaveBeenCalledWith({
-        where: { id },
-      });
-      expect(prismaService.orcamento.update).not.toHaveBeenCalled();
+      expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id } });
+      expect(orcamento.update).not.toHaveBeenCalled();
     });
   });
 
@@ -223,12 +189,10 @@ describe('OrcamentoRepository', () => {
 
       const novoOrcamento = { ...mockOrcamento, ...createData };
 
-      // Simula criação
-      (prismaService.orcamento.create as jest.Mock).mockResolvedValue(novoOrcamento);
+      orcamento.create.mockResolvedValue(novoOrcamento);
       const created = await repository.create(createData);
 
-      // Simula busca
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(novoOrcamento);
+      orcamento.findUnique.mockResolvedValue(novoOrcamento);
       const found = await repository.findByOrdemServicoId(createData.id_ordem_servico);
 
       expect(created).toEqual(novoOrcamento);
@@ -247,13 +211,11 @@ describe('OrcamentoRepository', () => {
       const updateData = { status: 'APPROVED' as const };
       const orcamentoAtualizado = { ...orcamentoCriado, ...updateData };
 
-      // Simula criação
-      (prismaService.orcamento.create as jest.Mock).mockResolvedValue(orcamentoCriado);
+      orcamento.create.mockResolvedValue(orcamentoCriado);
       const created = await repository.create(createData);
 
-      // Simula atualização
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(orcamentoCriado);
-      (prismaService.orcamento.update as jest.Mock).mockResolvedValue(orcamentoAtualizado);
+      orcamento.findUnique.mockResolvedValue(orcamentoCriado);
+      orcamento.update.mockResolvedValue(orcamentoAtualizado);
       const updated = await repository.update(created.id, updateData);
 
       expect(created.status).toBe('PENDING');

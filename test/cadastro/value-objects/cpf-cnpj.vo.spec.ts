@@ -48,74 +48,36 @@ describe('CpfCnpjVo', () => {
     });
 
     describe('validações de entrada', () => {
-      it('deve lançar erro para valor vazio', () => {
-        expect(() => CpfCnpjVo.criar('', 'CPF')).toThrow(
-          new DomainException('Tipo de documento invalido')
-        );
-      });
-
-      it('deve lançar erro para valor null', () => {
-        expect(() => CpfCnpjVo.criar(null as unknown as string, 'CPF')).toThrow(
-          new DomainException('Tipo de documento invalido')
-        );
-      });
-
-      it('deve lançar erro para valor undefined', () => {
-        expect(() => CpfCnpjVo.criar(undefined as unknown as string, 'CPF')).toThrow(
-          new DomainException('Tipo de documento invalido')
-        );
-      });
-
-      it('deve lançar erro para tipo inválido', () => {
-        expect(() => CpfCnpjVo.criar('11144477735', 'INVALID' as any)).toThrow(
-          new DomainException('Tipo de documento invalido')
-        );
-      });
-
-      it('deve lançar erro para tipo null', () => {
-        expect(() => CpfCnpjVo.criar('11144477735', null as any)).toThrow(
-          new DomainException('Tipo de documento invalido')
+      it.each([
+        ['valor vazio', '', 'CPF'],
+        ['valor null', null as unknown as string, 'CPF'],
+        ['valor undefined', undefined as unknown as string, 'CPF'],
+        ['tipo inválido', '11144477735', 'INVALID' as any],
+        ['tipo null', '11144477735', null as any],
+      ])('deve lançar erro para %s', (_label, value, tipo) => {
+        expect(() => CpfCnpjVo.criar(value, tipo)).toThrow(
+          new DomainException('Tipo de documento invalido'),
         );
       });
     });
 
     describe('validações de CPF', () => {
-      it('deve lançar erro para CPF inválido', () => {
-        expect(() => CpfCnpjVo.criar('12345678901', 'CPF')).toThrow(
-          new DomainException('CPF invalido')
-        );
-      });
-
-      it('deve lançar erro para CPF com todos os dígitos iguais', () => {
-        expect(() => CpfCnpjVo.criar('11111111111', 'CPF')).toThrow(
-          new DomainException('CPF invalido')
-        );
-      });
-
-      it('deve lançar erro para CPF com formato inválido', () => {
-        expect(() => CpfCnpjVo.criar('123.456.789-00', 'CPF')).toThrow(
-          new DomainException('CPF invalido')
-        );
+      it.each([
+        ['CPF inválido', '12345678901'],
+        ['todos os dígitos iguais', '11111111111'],
+        ['formato inválido', '123.456.789-00'],
+      ])('deve lançar erro para CPF com %s', (_label, cpf) => {
+        expect(() => CpfCnpjVo.criar(cpf, 'CPF')).toThrow(new DomainException('CPF invalido'));
       });
     });
 
     describe('validações de CNPJ', () => {
-      it('deve lançar erro para CNPJ inválido', () => {
-        expect(() => CpfCnpjVo.criar('12345678000100', 'CNPJ')).toThrow(
-          new DomainException('CNPJ invalido')
-        );
-      });
-
-      it('deve lançar erro para CNPJ com todos os dígitos iguais', () => {
-        expect(() => CpfCnpjVo.criar('11111111111111', 'CNPJ')).toThrow(
-          new DomainException('CNPJ invalido')
-        );
-      });
-
-      it('deve lançar erro para CNPJ com formato inválido', () => {
-        expect(() => CpfCnpjVo.criar('12.345.678/0001-00', 'CNPJ')).toThrow(
-          new DomainException('CNPJ invalido')
-        );
+      it.each([
+        ['CNPJ inválido', '12345678000100'],
+        ['todos os dígitos iguais', '11111111111111'],
+        ['formato inválido', '12.345.678/0001-00'],
+      ])('deve lançar erro para CNPJ com %s', (_label, cnpj) => {
+        expect(() => CpfCnpjVo.criar(cnpj, 'CNPJ')).toThrow(new DomainException('CNPJ invalido'));
       });
     });
   });
@@ -180,7 +142,6 @@ describe('CpfCnpjVo', () => {
     });
 
     it('deve retornar false para valor igual mas tipo diferente', () => {
-      // Usando um número que poderia ser válido para ambos os tipos
       const cpf = CpfCnpjVo.criar('11144477735', 'CPF');
       const cnpj = CpfCnpjVo.criar('11222333000181', 'CNPJ');
 
