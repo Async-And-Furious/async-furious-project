@@ -224,4 +224,44 @@ describe('AuthService', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('config with default values', () => {
+    it('should use default salt rounds when config is undefined', async () => {
+      const mockPrismaWithDefault = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({
+            id: 'user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+            password: 'hashed-password',
+            role: 'RECEPCIONISTA',
+          }),
+        },
+      };
+
+      const mockConfigService = {
+        get: jest.fn().mockReturnValue(undefined),
+      };
+
+      const testModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: mockPrismaWithDefault },
+          { provide: JwtService, useValue: mockJwtService },
+          { provide: ConfigService, useValue: mockConfigService },
+        ],
+      }).compile();
+
+      const testService = testModule.get<AuthService>(AuthService);
+
+      await testService.register({
+        email: 'test@example.com',
+        password: 'password123',
+        name: 'Test User',
+      });
+
+      expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
+    });
+  });
 });

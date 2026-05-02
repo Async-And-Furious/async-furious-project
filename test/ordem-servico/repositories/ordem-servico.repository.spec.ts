@@ -178,7 +178,7 @@ describe('OrdemServicoRepository', () => {
 
       expect(prismaService.ordemServico.findMany).toHaveBeenCalledWith({
         where: {},
-        skip: 10, // (3-1) * 5
+        skip: 10,
         take: 5,
         orderBy: { created_at: 'desc' },
         include: {

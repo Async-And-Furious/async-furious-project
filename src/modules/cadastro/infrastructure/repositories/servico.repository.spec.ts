@@ -29,10 +29,7 @@ describe('ServicoRepository', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ServicoRepository,
-        { provide: PrismaService, useValue: mockPrismaService },
-      ],
+      providers: [ServicoRepository, { provide: PrismaService, useValue: mockPrismaService }],
     }).compile();
 
     repository = module.get<ServicoRepository>(ServicoRepository);
@@ -82,6 +79,13 @@ describe('ServicoRepository', () => {
       const result = await repository.findAll(3, 5);
       expect(result.pagination.totalPages).toBe(5);
     });
+
+    it('should use default parameters when not provided', async () => {
+      mockPrismaService.servico.findMany.mockResolvedValue([mockServico]);
+      mockPrismaService.servico.count.mockResolvedValue(1);
+      const result = await repository.findAll();
+      expect(result.data).toHaveLength(1);
+    });
   });
 
   describe('findOne', () => {
@@ -107,7 +111,9 @@ describe('ServicoRepository', () => {
 
     it('should throw NotFoundException when updating nonexistent', async () => {
       mockPrismaService.servico.findUnique.mockResolvedValue(null);
-      await expect(repository.update('invalid', { nome: 'Test' })).rejects.toThrow(NotFoundException);
+      await expect(repository.update('invalid', { nome: 'Test' })).rejects.toThrow(
+        NotFoundException
+      );
     });
   });
 

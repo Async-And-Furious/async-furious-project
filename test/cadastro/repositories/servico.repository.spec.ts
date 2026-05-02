@@ -141,6 +141,20 @@ describe('ServicoRepository', () => {
         expect.objectContaining({ skip: 10 })
       );
     });
+
+    it('should handle findAll without search parameter', async () => {
+      mockPrismaService.servico.findMany.mockResolvedValue([mockOrmServico]);
+      mockPrismaService.servico.count.mockResolvedValue(1);
+
+      const result = await repository.findAll(1, 10);
+
+      expect(result.data).toHaveLength(1);
+      expect(mockPrismaService.servico.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {},
+        })
+      );
+    });
   });
 
   describe('findOne', () => {

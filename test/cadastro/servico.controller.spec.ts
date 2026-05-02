@@ -352,4 +352,38 @@ describe('ServicoController', () => {
       expect(mockDeleteUseCase.execute).toHaveBeenCalledWith('servico-1');
     });
   });
+
+  describe('error handling', () => {
+    it('should handle create error', async () => {
+      mockCreateUseCase.execute.mockRejectedValue(new Error('Validation failed'));
+
+      await expect(controller.create({} as CreateServicoDto)).rejects.toThrow('Validation failed');
+    });
+
+    it('should handle findAll error', async () => {
+      mockListUseCase.execute.mockRejectedValue(new Error('Database error'));
+
+      await expect(controller.findAll({} as ListQueryDto)).rejects.toThrow('Database error');
+    });
+
+    it('should handle findOne error', async () => {
+      mockGetUseCase.execute.mockRejectedValue(new Error('Not found'));
+
+      await expect(controller.findOne('invalid')).rejects.toThrow('Not found');
+    });
+
+    it('should handle update error', async () => {
+      mockUpdateUseCase.execute.mockRejectedValue(new Error('Conflict'));
+
+      await expect(controller.update('invalid', {} as UpdateServicoDto)).rejects.toThrow(
+        'Conflict'
+      );
+    });
+
+    it('should handle remove error', async () => {
+      mockDeleteUseCase.execute.mockRejectedValue(new Error('Not found'));
+
+      await expect(controller.remove('invalid')).rejects.toThrow('Not found');
+    });
+  });
 });

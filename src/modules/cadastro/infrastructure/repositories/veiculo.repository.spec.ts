@@ -265,4 +265,47 @@ describe('VeiculoRepository', () => {
       await expect(repository.remove('nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
+
+  describe('findById edge cases', () => {
+    it('should handle veiculo with null cor', async () => {
+      const ormWithoutCor = { ...mockOrmVeiculo, cor: null };
+      mockPrismaService.veiculo.findUnique.mockResolvedValue(ormWithoutCor as never);
+
+      const result = await repository.findById('123');
+
+      expect(result.cor).toBeNull();
+    });
+  });
+
+  describe('update edge cases', () => {
+    it('should update with only marca', async () => {
+      const updateData = { marca: 'Honda' };
+      mockPrismaService.veiculo.findUnique.mockResolvedValue(mockOrmVeiculo);
+      mockPrismaService.veiculo.update.mockResolvedValue({ ...mockOrmVeiculo, ...updateData });
+
+      const result = await repository.update('123', updateData);
+
+      expect(result.marca).toBe('Honda');
+    });
+
+    it('should update with only modelo', async () => {
+      const updateData = { modelo: 'Civic' };
+      mockPrismaService.veiculo.findUnique.mockResolvedValue(mockOrmVeiculo);
+      mockPrismaService.veiculo.update.mockResolvedValue({ ...mockOrmVeiculo, ...updateData });
+
+      const result = await repository.update('123', updateData);
+
+      expect(result.modelo).toBe('Civic');
+    });
+
+    it('should update with only ano', async () => {
+      const updateData = { ano: 2022 };
+      mockPrismaService.veiculo.findUnique.mockResolvedValue(mockOrmVeiculo);
+      mockPrismaService.veiculo.update.mockResolvedValue({ ...mockOrmVeiculo, ...updateData });
+
+      const result = await repository.update('123', updateData);
+
+      expect(result.ano).toBe(2022);
+    });
+  });
 });

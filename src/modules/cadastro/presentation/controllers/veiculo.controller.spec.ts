@@ -176,7 +176,9 @@ describe('VeiculoController', () => {
     it('should handle findAll error', async () => {
       mockListUseCase.execute.mockRejectedValue(new Error('Database error'));
 
-      await expect(controller.findAll({} as ListQueryDto, mockAuthUser)).rejects.toThrow('Database error');
+      await expect(controller.findAll({} as ListQueryDto, mockAuthUser)).rejects.toThrow(
+        'Database error'
+      );
     });
 
     it('should handle findOne error', async () => {
@@ -188,7 +190,9 @@ describe('VeiculoController', () => {
     it('should handle update error', async () => {
       mockUpdateUseCase.execute.mockRejectedValue(new Error('Conflict'));
 
-      await expect(controller.update('invalid', {} as UpdateVeiculoDto)).rejects.toThrow('Conflict');
+      await expect(controller.update('invalid', {} as UpdateVeiculoDto)).rejects.toThrow(
+        'Conflict'
+      );
     });
   });
 });

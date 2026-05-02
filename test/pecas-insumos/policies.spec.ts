@@ -278,6 +278,24 @@ describe('PecasInsumos Policies', () => {
       expect(reservaRepo.save).not.toHaveBeenCalled();
       expect(emissor.emitir).not.toHaveBeenCalled();
     });
+
+    it('deve throw NotFoundException quando peca nao for encontrada', async () => {
+      const policy = new LiberarOrdensAguardandoPecasPolicy(
+        repo as unknown as PecaInsumoRepository,
+        reservaRepo,
+        emissor
+      );
+
+      reservaRepo.existsByOrdemId.mockResolvedValue(false);
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        policy.handle({
+          ordemId: 'os-1',
+          pecas: [{ pecaId: 'peca-inexistente', quantidadeNecessaria: 1 }],
+        })
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 
   describe('SolicitarPecasFornecedorPolicy', () => {
@@ -439,6 +457,14 @@ describe('PecasInsumos Policies', () => {
           constructor: EstoqueAtualizadoAposRecebimento,
         })
       );
+    });
+  });
+
+  describe('P-24 NotificarAdminReposicaoPolicy', () => {
+    it('should handle PecasIndisponiveis event without throwing', () => {
+      const policy = new NotificarAdminReposicaoPolicy();
+
+      expect(() => policy.handle(new PecasIndisponiveis('os-1', ['peca-1']))).not.toThrow();
     });
   });
 });
