@@ -80,7 +80,9 @@ jobs:
           echo "❌ App não respondeu após 90s" && cat app.log && exit 1
 
       - name: Criar diretório de output para o ZAP
-        run: mkdir -p ${{ github.workspace }}/zap-output && chmod 777 ${{ github.workspace }}/zap-output
+        run: |
+          mkdir -p ${{ github.workspace }}/zap-output && chmod 777 ${{ github.workspace }}/zap-output
+          cp .github/zap.conf ${{ github.workspace }}/zap-output/zap.conf
 
       - name: ZAP Baseline Scan (PR)
         if: github.event_name == 'pull_request'
@@ -90,6 +92,7 @@ jobs:
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
             -t http://localhost:5000/api/docs-json \
+            -c zap.conf \
             -r report_html.html \
             -J report_json.json \
             -I
@@ -103,6 +106,7 @@ jobs:
             zap-api-scan.py \
             -t http://localhost:5000/api/docs-json \
             -f openapi \
+            -c zap.conf \
             -r report_html.html \
             -J report_json.json \
             -a \
