@@ -1,10 +1,12 @@
-import { Logger } from '@nestjs/common';
+import { Logger, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { VerificarDisponibilidadeEstoquePolicy } from '../../src/modules/pecas-insumos/application/policies/verificar-disponibilidade-estoque.policy';
 import { DebitarEstoquePolicy } from '../../src/modules/pecas-insumos/application/policies/debitar-estoque.policy';
 import { NotificarPecasIndisponiveisPolicy } from '../../src/modules/pecas-insumos/application/policies/notificar-pecas-indisponiveis.policy';
 import { NotificarAdminReposicaoPolicy } from '../../src/modules/pecas-insumos/application/policies/notificar-admin-reposicao.policy';
 import { ValidarBacklogOrdensPendentesPolicy } from '../../src/modules/pecas-insumos/application/policies/validar-backlog-ordens-pendentes.policy';
 import { LiberarOrdensAguardandoPecasPolicy } from '../../src/modules/pecas-insumos/application/policies/liberar-ordens-aguardando-pecas.policy';
+import { SolicitarPecasFornecedorPolicy } from '../../src/modules/pecas-insumos/application/policies/solicitar-pecas-fornecedor.policy';
+import { ReceberPecasFornecedorPolicy } from '../../src/modules/pecas-insumos/application/policies/receber-pecas-fornecedor.policy';
 import { OrcamentoAprovadoComPecas } from '../../src/modules/ordem-servico/domain/events/orcamento-aprovado-com-pecas.event';
 import { PecasEmEstoqueConfirmadas } from '../../src/modules/pecas-insumos/domain/events/pecas-em-estoque-confirmadas.event';
 import { PecasNaoExistem } from '../../src/modules/pecas-insumos/domain/events/pecas-nao-existem.event';
@@ -19,6 +21,7 @@ import type { PecaInsumo } from '../../src/modules/pecas-insumos/domain/entities
 import type { IOrdemServicoBacklogPort } from '../../src/shared/domain/interfaces/ordem-servico-backlog.port';
 import { PecaInsumoRepository } from '../../src/modules/pecas-insumos/infrastructure/repositories/peca-insumo.repository';
 import { ReservaEstoqueRepository } from '../../src/modules/pecas-insumos/infrastructure/repositories/reserva-estoque.repository';
+import { PedidoFornecedorRepository } from '../../src/modules/pecas-insumos/infrastructure/repositories/pedido-fornecedor.repository';
 
 const mockPeca = (overrides: Partial<PecaInsumo> = {}): PecaInsumo => ({
   id: 'peca-1',
@@ -274,6 +277,168 @@ describe('PecasInsumos Policies', () => {
       expect(repo.findOne).not.toHaveBeenCalled();
       expect(reservaRepo.save).not.toHaveBeenCalled();
       expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('SolicitarPecasFornecedorPolicy', () => {
+    let pedidoFornecedorRepo: jest.Mocked<PedidoFornecedorRepository>;
+
+    beforeEach(() => {
+      pedidoFornecedorRepo = {
+        create: jest.fn(),
+        findById: jest.fn(),
+        save: jest.fn(),
+      } as unknown as jest.Mocked<PedidoFornecedorRepository>;
+    });
+
+    it('deve criar pedido e emitir evento quando pecas sao validas', async () => {
+      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1' }));
+      pedidoFornecedorRepo.create.mockResolvedValue({
+        id: 'pedido-1',
+        fornecedor_id: 'fornecedor-1',
+        itens: [{ id_peca: 'peca-1', quantidade_solicitada: 5 }],
+        status: 'PENDENTE',
+        criado_em: new Date(),
+      });
+
+      await policy.execute({
+        fornecedorId: 'fornecedor-1',
+        pecas: [{ pecaId: 'peca-1', quantidadeSolicitada: 5 }],
+      });
+
+      expect(pedidoFornecedorRepo.create).toHaveBeenCalled();
+      expect(emissor.emitir).toHaveBeenCalled();
+    });
+
+    it('deve lancar BadRequestException quando lista de pecas vazia', async () => {
+      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+
+      await expect(
+        policy.execute({
+          fornecedorId: 'fornecedor-1',
+          pecas: [],
+        })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('deve lancar BadRequestException quando pecas undefined', async () => {
+      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+
+      await expect(
+        policy.execute({
+          fornecedorId: 'fornecedor-1',
+          pecas: undefined as any,
+        })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('deve lancar NotFoundException quando peca nao existe no catalogo', async () => {
+      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        policy.execute({
+          fornecedorId: 'fornecedor-1',
+          pecas: [{ pecaId: 'peca-inexistente', quantidadeSolicitada: 5 }],
+        })
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('deve validar todas as pecas antes de criar pedido', async () => {
+      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      repo.findOne.mockResolvedValueOnce(mockPeca({ id: 'peca-1' }));
+      repo.findOne.mockResolvedValueOnce(mockPeca({ id: 'peca-2' }));
+      pedidoFornecedorRepo.create.mockResolvedValue({
+        id: 'pedido-1',
+        fornecedor_id: 'fornecedor-1',
+        itens: [],
+        status: 'PENDENTE',
+        criado_em: new Date(),
+      });
+
+      await policy.execute({
+        fornecedorId: 'fornecedor-1',
+        pecas: [
+          { pecaId: 'peca-1', quantidadeSolicitada: 2 },
+          { pecaId: 'peca-2', quantidadeSolicitada: 3 },
+        ],
+      });
+
+      expect(repo.findOne).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('ReceberPecasFornecedorPolicy', () => {
+    let pedidoFornecedorRepo: jest.Mocked<PedidoFornecedorRepository>;
+
+    beforeEach(() => {
+      pedidoFornecedorRepo = {
+        create: jest.fn(),
+        findById: jest.fn(),
+        save: jest.fn(),
+      } as unknown as jest.Mocked<PedidoFornecedorRepository>;
+    });
+
+    it('deve atualizar estoque e emitir evento quando pedido valido', async () => {
+      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      pedidoFornecedorRepo.findById.mockResolvedValue({
+        id: 'pedido-1',
+        fornecedor_id: 'fornecedor-1',
+        itens: [{ id_peca: 'peca-1', quantidade_solicitada: 5 }],
+        status: 'PENDENTE',
+        criado_em: new Date(),
+      });
+      repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 10 }));
+      repo.updateEstoque.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 15 }));
+      pedidoFornecedorRepo.save.mockResolvedValue({} as any);
+
+      await policy.execute({ pedidoId: 'pedido-1' });
+
+      expect(repo.updateEstoque).toHaveBeenCalled();
+      expect(emissor.emitir).toHaveBeenCalled();
+    });
+
+    it('deve lancar NotFoundException quando pedido nao existe', async () => {
+      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      pedidoFornecedorRepo.findById.mockResolvedValue(null);
+
+      await expect(policy.execute({ pedidoId: 'pedido-inexistente' })).rejects.toThrow(
+        NotFoundException
+      );
+    });
+
+    it('deve lancar ConflictException quando pedido ja foi recebido', async () => {
+      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      pedidoFornecedorRepo.findById.mockResolvedValue({
+        id: 'pedido-1',
+        fornecedor_id: 'fornecedor-1',
+        itens: [],
+        status: 'RECEBIDO',
+        criado_em: new Date(),
+      });
+
+      await expect(policy.execute({ pedidoId: 'pedido-1' })).rejects.toThrow(ConflictException);
+    });
+
+    it('deve continuar quando peca nao existe no catalogo (skip)', async () => {
+      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      pedidoFornecedorRepo.findById.mockResolvedValue({
+        id: 'pedido-1',
+        fornecedor_id: 'fornecedor-1',
+        itens: [{ id_peca: 'peca-inexistente', quantidade_solicitada: 5 }],
+        status: 'PENDENTE',
+        criado_em: new Date(),
+      });
+      repo.findOne.mockResolvedValue(null);
+
+      await policy.execute({ pedidoId: 'pedido-1' });
+
+      expect(emissor.emitir).toHaveBeenCalledWith(
+        expect.objectContaining({
+          constructor: EstoqueAtualizadoAposRecebimento,
+        })
+      );
     });
   });
 });

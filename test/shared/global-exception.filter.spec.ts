@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ArgumentsHost, HttpStatus } from '@nestjs/common';
+import { ArgumentsHost, HttpStatus, HttpException } from '@nestjs/common';
 import { GlobalExceptionFilter } from '../../src/shared/infrastructure/filters/global-exception.filter';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 
@@ -123,12 +123,83 @@ describe('GlobalExceptionFilter', () => {
 
   describe('normalizeErrorName', () => {
     it('deve normalizar nomes de erro conhecidos', () => {
-      // Testamos indiretamente através do comportamento do filtro
       const error = new Error('Test error');
       filter.catch(error, mockArgumentsHost);
 
       const responseCall = mockResponse.json.mock.calls[0][0];
       expect(responseCall.error).toBe('Internal Server Error');
+    });
+
+    it('deve tratar HttpException com resposta string', () => {
+      const httpException = new HttpException('Not Found', HttpStatus.NOT_FOUND);
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+      const responseCall = mockResponse.json.mock.calls[0][0];
+      expect(responseCall.message).toBe('Not Found');
+    });
+
+    it('deve tratar HttpException com resposta objeto', () => {
+      const httpException = new HttpException(
+        { message: 'Validation failed', error: 'Bad Request' },
+        HttpStatus.BAD_REQUEST
+      );
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+      const responseCall = mockResponse.json.mock.calls[0][0];
+      expect(responseCall.message).toBe('Validation failed');
+      expect(responseCall.error).toBe('Bad Request');
+    });
+
+    it('deve normalizar erro desconhecido para Error', () => {
+      const httpException = new HttpException(
+        { message: 'Unknown error' },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      const responseCall = mockResponse.json.mock.calls[0][0];
+      expect(responseCall.error).toBe('Error');
+    });
+
+    it('deve normalizar erro conhecido Unauthorized', () => {
+      const httpException = new HttpException(
+        { message: 'Unauthorized', error: 'Unauthorized' },
+        HttpStatus.UNAUTHORIZED
+      );
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      const responseCall = mockResponse.json.mock.calls[0][0];
+      expect(responseCall.error).toBe('Unauthorized');
+    });
+
+    it('deve normalizar erro conhecido Forbidden', () => {
+      const httpException = new HttpException(
+        { message: 'Forbidden', error: 'Forbidden' },
+        HttpStatus.FORBIDDEN
+      );
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      const responseCall = mockResponse.json.mock.calls[0][0];
+      expect(responseCall.error).toBe('Forbidden');
+    });
+
+    it('deve normalizar erro conhecido Conflict', () => {
+      const httpException = new HttpException(
+        { message: 'Conflict', error: 'Conflict' },
+        HttpStatus.CONFLICT
+      );
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      const responseCall = mockResponse.json.mock.calls[0][0];
+      expect(responseCall.error).toBe('Conflict');
     });
   });
 });

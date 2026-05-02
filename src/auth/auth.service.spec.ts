@@ -188,5 +188,40 @@ describe('AuthService', () => {
         select: { id: true, email: true, role: true },
       });
     });
+
+    it('should return null when user not found', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.validateUser('nonexistent-id');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findById', () => {
+    it('should return user by id', async () => {
+      const user = {
+        id: 'user-id',
+        email: 'test@example.com',
+        role: 'admin',
+      };
+      mockPrisma.user.findUnique.mockResolvedValue(user);
+
+      const result = await service.findById('user-id');
+
+      expect(result).toEqual({
+        id: 'user-id',
+        email: 'test@example.com',
+        role: 'admin',
+      });
+    });
+
+    it('should return null when user not found by id', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.findById('nonexistent-id');
+
+      expect(result).toBeNull();
+    });
   });
 });

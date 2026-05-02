@@ -253,12 +253,54 @@ describe('OS + Orçamento Use Cases', () => {
       );
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
+
+    it('deve lançar NotFoundException quando orçamento não existe', async () => {
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APPROVAL' });
+      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(null);
+
+      const uc = new AprovarOrcamentoUseCase(
+        mockOsRepository,
+        mockOrcamentoRepository,
+        mockBarramento
+      );
+      await expect(uc.execute('os-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('deve lançar DomainException quando valor_total_geral é zero', async () => {
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APPROVAL' });
+      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
+        ...mockOrcamento,
+        valor_total_geral: 0,
+      });
+
+      const uc = new AprovarOrcamentoUseCase(
+        mockOsRepository,
+        mockOrcamentoRepository,
+        mockBarramento
+      );
+      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+    });
+
+    it('deve lançar DomainException quando valor_total_geral é negativo', async () => {
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APPROVAL' });
+      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
+        ...mockOrcamento,
+        valor_total_geral: -10,
+      });
+
+      const uc = new AprovarOrcamentoUseCase(
+        mockOsRepository,
+        mockOrcamentoRepository,
+        mockBarramento
+      );
+      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+    });
   });
 
   describe('RecusarOrcamentoUseCase', () => {
     it('deve recusar orçamento pendente e emitir OrcamentoRecusado', async () => {
       const orcamentoRecusado = { ...mockOrcamento, status: 'REJECTED' as const };
-      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APPROVAL' });
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APROVAL' });
       mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
       mockOrcamentoRepository.update.mockResolvedValue(orcamentoRecusado);
 
@@ -275,7 +317,7 @@ describe('OS + Orçamento Use Cases', () => {
     });
 
     it('deve lançar DomainException quando orçamento não está PENDING', async () => {
-      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APPROVAL' });
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APROVAL' });
       mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
         ...mockOrcamento,
         status: 'APPROVED',
@@ -287,6 +329,18 @@ describe('OS + Orçamento Use Cases', () => {
         mockBarramento
       );
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+    });
+
+    it('deve lançar NotFoundException quando orçamento não existe', async () => {
+      mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APROVAL' });
+      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(null);
+
+      const uc = new RecusarOrcamentoUseCase(
+        mockOsRepository,
+        mockOrcamentoRepository,
+        mockBarramento
+      );
+      await expect(uc.execute('os-1')).rejects.toThrow(NotFoundException);
     });
   });
 
