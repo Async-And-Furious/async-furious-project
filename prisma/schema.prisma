@@ -169,3 +169,13 @@ model ReservaEstoque {
 
   @@unique([ordem_id, peca_id])
 }
+
+model Pagamento {
+  id             String   @id @default(uuid())
+  ordemServicoId String
+  valor          Decimal  @db.Decimal(10, 2)
+  status         String
+  createdAt      DateTime @default(now())
+
+  @@map("pagamentos")
+}
