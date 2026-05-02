@@ -3,38 +3,38 @@ import { NotFoundException } from '@nestjs/common';
 import { OrcamentoRepository } from '@/modules/ordem-servico/infrastructure/repositories/orcamento.repository';
 import { PrismaService } from '@/shared/infrastructure/database/prisma.service';
 
+const BASE_DATE = new Date('2024-01-15');
+
+const MOCK_ORCAMENTO = {
+  id: 'orc-123',
+  id_ordem_servico: 'os-456',
+  valor_total_servicos: 300.0,
+  valor_total_pecas: 200.0,
+  valor_total_geral: 500.0,
+  status: 'PENDING',
+  created_at: BASE_DATE,
+  updated_at: BASE_DATE,
+};
+
+function createMockPrismaService() {
+  return {
+    orcamento: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+    },
+  };
+}
+
 describe('OrcamentoRepository', () => {
   let repository: OrcamentoRepository;
   let prismaService: PrismaService;
 
-  const mockOrcamento = {
-    id: 'orc-123',
-    id_ordem_servico: 'os-456',
-    valor_total_servicos: 300.0,
-    valor_total_pecas: 200.0,
-    valor_total_geral: 500.0,
-    status: 'PENDING',
-    created_at: new Date('2024-01-15'),
-    updated_at: new Date('2024-01-15'),
-  };
-
   beforeEach(async () => {
-    const mockPrismaService = {
-      orcamento: {
-        create: jest.fn(),
-        findUnique: jest.fn(),
-        update: jest.fn(),
-      },
-    };
+    const mockPrismaService = createMockPrismaService();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OrcamentoRepository,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
-      ],
+      providers: [OrcamentoRepository, { provide: PrismaService, useValue: mockPrismaService }],
     }).compile();
 
     repository = module.get<OrcamentoRepository>(OrcamentoRepository);
@@ -50,14 +50,14 @@ describe('OrcamentoRepository', () => {
         valor_total_geral: 500.0,
       };
 
-      (prismaService.orcamento.create as jest.Mock).mockResolvedValue(mockOrcamento);
+      (prismaService.orcamento.create as jest.Mock).mockResolvedValue(MOCK_ORCAMENTO);
 
       const result = await repository.create(createData);
 
       expect(prismaService.orcamento.create).toHaveBeenCalledWith({
         data: createData,
       });
-      expect(result).toEqual(mockOrcamento);
+      expect(result).toEqual(MOCK_ORCAMENTO);
     });
 
     it('deve criar orçamento com valores zero', async () => {
@@ -68,7 +68,7 @@ describe('OrcamentoRepository', () => {
         valor_total_geral: 0,
       };
 
-      const orcamentoZero = { ...mockOrcamento, ...createData };
+      const orcamentoZero = { ...MOCK_ORCAMENTO, ...createData };
       (prismaService.orcamento.create as jest.Mock).mockResolvedValue(orcamentoZero);
 
       const result = await repository.create(createData);
@@ -87,7 +87,7 @@ describe('OrcamentoRepository', () => {
         valor_total_geral: 191.34,
       };
 
-      const orcamentoDecimal = { ...mockOrcamento, ...createData };
+      const orcamentoDecimal = { ...MOCK_ORCAMENTO, ...createData };
       (prismaService.orcamento.create as jest.Mock).mockResolvedValue(orcamentoDecimal);
 
       const result = await repository.create(createData);
@@ -102,14 +102,14 @@ describe('OrcamentoRepository', () => {
   describe('findByOrdemServicoId', () => {
     it('deve retornar orçamento por ID da ordem de serviço', async () => {
       const idOrdemServico = 'os-456';
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
+      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(MOCK_ORCAMENTO);
 
       const result = await repository.findByOrdemServicoId(idOrdemServico);
 
       expect(prismaService.orcamento.findUnique).toHaveBeenCalledWith({
         where: { id_ordem_servico: idOrdemServico },
       });
-      expect(result).toEqual(mockOrcamento);
+      expect(result).toEqual(MOCK_ORCAMENTO);
     });
 
     it('deve retornar null quando orçamento não encontrado', async () => {
@@ -135,9 +135,9 @@ describe('OrcamentoRepository', () => {
         status: 'APPROVED' as const,
       };
 
-      const updatedOrcamento = { ...mockOrcamento, ...updateData };
+      const updatedOrcamento = { ...MOCK_ORCAMENTO, ...updateData };
 
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
+      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(MOCK_ORCAMENTO);
       (prismaService.orcamento.update as jest.Mock).mockResolvedValue(updatedOrcamento);
 
       const result = await repository.update(id, updateData);
@@ -158,9 +158,9 @@ describe('OrcamentoRepository', () => {
         status: 'REJECTED' as const,
       };
 
-      const updatedOrcamento = { ...mockOrcamento, status: 'REJECTED' };
+      const updatedOrcamento = { ...MOCK_ORCAMENTO, status: 'REJECTED' };
 
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
+      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(MOCK_ORCAMENTO);
       (prismaService.orcamento.update as jest.Mock).mockResolvedValue(updatedOrcamento);
 
       const result = await repository.update(id, updateData);
@@ -179,9 +179,9 @@ describe('OrcamentoRepository', () => {
         valor_total_geral: 450.0,
       };
 
-      const updatedOrcamento = { ...mockOrcamento, ...updateData };
+      const updatedOrcamento = { ...MOCK_ORCAMENTO, ...updateData };
 
-      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(mockOrcamento);
+      (prismaService.orcamento.findUnique as jest.Mock).mockResolvedValue(MOCK_ORCAMENTO);
       (prismaService.orcamento.update as jest.Mock).mockResolvedValue(updatedOrcamento);
 
       const result = await repository.update(id, updateData);
@@ -221,7 +221,7 @@ describe('OrcamentoRepository', () => {
         valor_total_geral: 250.0,
       };
 
-      const novoOrcamento = { ...mockOrcamento, ...createData };
+      const novoOrcamento = { ...MOCK_ORCAMENTO, ...createData };
 
       // Simula criação
       (prismaService.orcamento.create as jest.Mock).mockResolvedValue(novoOrcamento);
@@ -243,7 +243,7 @@ describe('OrcamentoRepository', () => {
         valor_total_geral: 150.0,
       };
 
-      const orcamentoCriado = { ...mockOrcamento, ...createData };
+      const orcamentoCriado = { ...MOCK_ORCAMENTO, ...createData };
       const updateData = { status: 'APPROVED' as const };
       const orcamentoAtualizado = { ...orcamentoCriado, ...updateData };
 

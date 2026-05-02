@@ -3,6 +3,43 @@ import { PedidoFornecedorRepository } from '@/modules/pecas-insumos/infrastructu
 import { PrismaService } from '@/shared/infrastructure/database/prisma.service';
 import { PedidoFornecedor } from '@/modules/pecas-insumos/domain/entities/pedido-fornecedor.entity';
 
+const BASE_DATE = new Date('2024-01-01');
+
+const MOCK_PRISMA_DATA = {
+  id: 'pedido-1',
+  fornecedor_id: 'fornecedor-1',
+  status: 'PENDENTE',
+  criado_em: BASE_DATE,
+  atualizado_em: BASE_DATE,
+  itens: [
+    {
+      id: 'item-1',
+      id_pedido_fornecedor: 'pedido-1',
+      id_peca: 'peca-1',
+      quantidade_solicitada: 10,
+      quantidade_recebida: 0,
+    },
+    {
+      id: 'item-2',
+      id_pedido_fornecedor: 'pedido-1',
+      id_peca: 'peca-2',
+      quantidade_solicitada: 5,
+      quantidade_recebida: 0,
+    },
+  ],
+};
+
+function createMockPrismaService() {
+  return {
+    pedidoFornecedor: {
+      create: jest.fn(),
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      findMany: jest.fn(),
+    },
+  };
+}
+
 describe('PedidoFornecedorRepository', () => {
   let repository: PedidoFornecedorRepository;
   let prismaService: {
@@ -14,47 +51,13 @@ describe('PedidoFornecedorRepository', () => {
     };
   };
 
-  const mockPrismaData = {
-    id: 'pedido-1',
-    fornecedor_id: 'fornecedor-1',
-    status: 'PENDENTE',
-    criado_em: new Date('2024-01-01'),
-    atualizado_em: new Date('2024-01-01'),
-    itens: [
-      {
-        id: 'item-1',
-        id_pedido_fornecedor: 'pedido-1',
-        id_peca: 'peca-1',
-        quantidade_solicitada: 10,
-        quantidade_recebida: 0,
-      },
-      {
-        id: 'item-2',
-        id_pedido_fornecedor: 'pedido-1',
-        id_peca: 'peca-2',
-        quantidade_solicitada: 5,
-        quantidade_recebida: 0,
-      },
-    ],
-  };
-
   beforeEach(async () => {
-    const mockPrismaService = {
-      pedidoFornecedor: {
-        create: jest.fn(),
-        findUnique: jest.fn(),
-        update: jest.fn(),
-        findMany: jest.fn(),
-      },
-    };
+    const mockPrismaService = createMockPrismaService();
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PedidoFornecedorRepository,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
+        { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
@@ -74,7 +77,7 @@ describe('PedidoFornecedorRepository', () => {
         criado_em: new Date('2024-01-01'),
       };
 
-      prismaService.pedidoFornecedor.create.mockResolvedValue(mockPrismaData);
+      prismaService.pedidoFornecedor.create.mockResolvedValue(MOCK_PRISMA_DATA);
 
       const resultado = await repository.create(createData);
 
@@ -137,8 +140,8 @@ describe('PedidoFornecedorRepository', () => {
       };
 
       const mockDataUmItem = {
-        ...mockPrismaData,
-        itens: [mockPrismaData.itens[0]],
+        ...MOCK_PRISMA_DATA,
+        itens: [MOCK_PRISMA_DATA.itens[0]],
       };
 
       prismaService.pedidoFornecedor.create.mockResolvedValue(mockDataUmItem);
@@ -172,7 +175,7 @@ describe('PedidoFornecedorRepository', () => {
 
   describe('findById', () => {
     it('deve retornar pedido quando encontrado', async () => {
-      prismaService.pedidoFornecedor.findUnique.mockResolvedValue(mockPrismaData);
+      prismaService.pedidoFornecedor.findUnique.mockResolvedValue(MOCK_PRISMA_DATA);
 
       const resultado = await repository.findById('pedido-1');
 
@@ -232,7 +235,7 @@ describe('PedidoFornecedorRepository', () => {
       };
 
       const mockUpdatedData = {
-        ...mockPrismaData,
+        ...MOCK_PRISMA_DATA,
         status: 'RECEBIDO',
         atualizado_em: new Date('2024-01-02'),
       };
@@ -265,7 +268,7 @@ describe('PedidoFornecedorRepository', () => {
       };
 
       const mockUpdatedData = {
-        ...mockPrismaData,
+        ...MOCK_PRISMA_DATA,
         status: 'RECEBIDO',
       };
 
@@ -280,9 +283,9 @@ describe('PedidoFornecedorRepository', () => {
   describe('findAll', () => {
     it('deve retornar todos os pedidos ordenados por data de criação', async () => {
       const mockMultiplosPedidos = [
-        mockPrismaData,
+        MOCK_PRISMA_DATA,
         {
-          ...mockPrismaData,
+          ...MOCK_PRISMA_DATA,
           id: 'pedido-2',
           criado_em: new Date('2024-01-02'),
         },
@@ -311,7 +314,7 @@ describe('PedidoFornecedorRepository', () => {
     });
 
     it('deve retornar pedidos com itens mapeados corretamente', async () => {
-      prismaService.pedidoFornecedor.findMany.mockResolvedValue([mockPrismaData]);
+      prismaService.pedidoFornecedor.findMany.mockResolvedValue([MOCK_PRISMA_DATA]);
 
       const resultado = await repository.findAll();
 
@@ -336,22 +339,22 @@ describe('PedidoFornecedorRepository', () => {
         criado_em: new Date('2024-01-01'),
       };
 
-      prismaService.pedidoFornecedor.create.mockResolvedValue(mockPrismaData);
+      prismaService.pedidoFornecedor.create.mockResolvedValue(MOCK_PRISMA_DATA);
 
       const resultado = await repository.create(createData);
 
       // Verifica se todos os campos foram mapeados corretamente
-      expect(resultado.id).toBe(mockPrismaData.id);
-      expect(resultado.fornecedor_id).toBe(mockPrismaData.fornecedor_id);
-      expect(resultado.status).toBe(mockPrismaData.status);
-      expect(resultado.criado_em).toBe(mockPrismaData.criado_em);
-      expect(resultado.atualizado_em).toBe(mockPrismaData.atualizado_em);
-      expect(resultado.itens).toHaveLength(mockPrismaData.itens.length);
+      expect(resultado.id).toBe(MOCK_PRISMA_DATA.id);
+      expect(resultado.fornecedor_id).toBe(MOCK_PRISMA_DATA.fornecedor_id);
+      expect(resultado.status).toBe(MOCK_PRISMA_DATA.status);
+      expect(resultado.criado_em).toBe(MOCK_PRISMA_DATA.criado_em);
+      expect(resultado.atualizado_em).toBe(MOCK_PRISMA_DATA.atualizado_em);
+      expect(resultado.itens).toHaveLength(MOCK_PRISMA_DATA.itens.length);
     });
 
     it('deve mapear status RECEBIDO corretamente', async () => {
       const mockDataRecebido = {
-        ...mockPrismaData,
+        ...MOCK_PRISMA_DATA,
         status: 'RECEBIDO',
       };
 
