@@ -230,6 +230,27 @@ describe('PecasInsumos Policies', () => {
       expect(backlogPort.findAllAguardandoPecas).toHaveBeenCalledTimes(1);
       expect(emissor.emitir).not.toHaveBeenCalled();
     });
+
+    it('não deve emitir evento quando peca não for encontrada no estoque', async () => {
+      const policy = new ValidarBacklogOrdensPendentesPolicy(
+        backlogPort,
+        repo as unknown as PecaInsumoRepository,
+        emissor
+      );
+      backlogPort.findAllAguardandoPecas.mockResolvedValue([
+        {
+          ordemId: 'os-1',
+          pecas: [{ pecaId: 'peca-inexistente', quantidadeNecessaria: 1 }],
+        },
+      ]);
+      repo.findOne.mockResolvedValue(null);
+
+      await policy.handle(
+        new EstoqueAtualizadoAposRecebimento([{ pecaId: 'peca-inexistente', novaQuantidade: 0 }])
+      );
+
+      expect(emissor.emitir).not.toHaveBeenCalled();
+    });
   });
 
   describe('LiberarOrdensAguardandoPecasPolicy (P-25)', () => {

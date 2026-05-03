@@ -1,4 +1,3 @@
-import { Injectable } from '@nestjs/common';
 import {
   ClienteResponseDto,
   ClienteListResponseDto,
@@ -9,7 +8,6 @@ import type {
   UpdateClienteInput,
 } from '../../domain/interfaces/cliente.interface';
 
-@Injectable()
 export class CreateClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
@@ -19,7 +17,6 @@ export class CreateClienteUseCase {
   }
 }
 
-@Injectable()
 export class ListClientesUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
@@ -29,7 +26,6 @@ export class ListClientesUseCase {
   }
 }
 
-@Injectable()
 export class GetClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
@@ -39,7 +35,6 @@ export class GetClienteUseCase {
   }
 }
 
-@Injectable()
 export class UpdateClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
@@ -49,7 +44,6 @@ export class UpdateClienteUseCase {
   }
 }
 
-@Injectable()
 export class DeleteClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 

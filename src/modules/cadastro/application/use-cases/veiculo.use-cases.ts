@@ -1,4 +1,3 @@
-import { Injectable } from '@nestjs/common';
 import {
   VeiculoResponseDto,
   VeiculoListResponseDto,
@@ -9,7 +8,6 @@ import type {
   UpdateVeiculoInput,
 } from '../../domain/interfaces/veiculo.interface';
 
-@Injectable()
 export class CreateVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
@@ -19,7 +17,6 @@ export class CreateVeiculoUseCase {
   }
 }
 
-@Injectable()
 export class ListVeiculosUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
@@ -29,7 +26,6 @@ export class ListVeiculosUseCase {
   }
 }
 
-@Injectable()
 export class GetVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
@@ -39,7 +35,6 @@ export class GetVeiculoUseCase {
   }
 }
 
-@Injectable()
 export class UpdateVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
@@ -49,7 +44,6 @@ export class UpdateVeiculoUseCase {
   }
 }
 
-@Injectable()
 export class DeleteVeiculoUseCase {
   constructor(private readonly repository: IVeiculoRepository) {}
 
