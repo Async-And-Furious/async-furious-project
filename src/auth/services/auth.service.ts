@@ -25,7 +25,7 @@ export class AuthService {
 
     if (existing) {
       this.logger.warn(`Registration attempt for existing email: ${email}`);
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('E-mail já cadastrado');
     }
 
     const saltRounds = Number(this.config.get<number>('BCRYPT_SALT_ROUNDS') ?? '10');
@@ -53,14 +53,14 @@ export class AuthService {
 
     if (!user) {
       this.logger.warn(`Login attempt for non-existent email: ${email}`);
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
     if (!isPasswordValid) {
       this.logger.warn(`Invalid password attempt for user: ${user.id}`);
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenciais inválidas');
     }
 
     this.logger.log(`User logged in: ${user.id}`);

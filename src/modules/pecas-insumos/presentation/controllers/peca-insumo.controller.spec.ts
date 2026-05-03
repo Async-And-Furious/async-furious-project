@@ -203,4 +203,59 @@ describe('PecaInsumoController', () => {
       expect(mockDeleteUseCase.execute).toHaveBeenCalledWith('123');
     });
   });
+
+  describe('solicitarReposicao', () => {
+    it('should call policy to request parts from supplier', async () => {
+      const dto = {
+        fornecedorId: 'fornecedor-1',
+        pecas: [
+          { pecaId: 'peca-1', quantidadeSolicitada: 10 },
+          { pecaId: 'peca-2', quantidadeSolicitada: 5 },
+        ],
+      };
+
+      mockSolicitarPolicy.execute.mockResolvedValue(undefined);
+
+      await controller.solicitarReposicao(dto);
+
+      expect(mockSolicitarPolicy.execute).toHaveBeenCalledWith({
+        fornecedorId: 'fornecedor-1',
+        pecas: [
+          { pecaId: 'peca-1', quantidadeSolicitada: 10 },
+          { pecaId: 'peca-2', quantidadeSolicitada: 5 },
+        ],
+      });
+    });
+
+    it('should handle single peca request', async () => {
+      const dto = {
+        fornecedorId: 'fornecedor-1',
+        pecas: [{ pecaId: 'peca-1', quantidadeSolicitada: 3 }],
+      };
+
+      mockSolicitarPolicy.execute.mockResolvedValue(undefined);
+
+      await controller.solicitarReposicao(dto);
+
+      expect(mockSolicitarPolicy.execute).toHaveBeenCalled();
+    });
+  });
+
+  describe('receberPecas', () => {
+    it('should call policy to confirm receipt from supplier', async () => {
+      mockReceberPolicy.execute.mockResolvedValue(undefined);
+
+      await controller.receberPecas('pedido-123');
+
+      expect(mockReceberPolicy.execute).toHaveBeenCalledWith({ pedidoId: 'pedido-123' });
+    });
+
+    it('should handle different pedido IDs', async () => {
+      mockReceberPolicy.execute.mockResolvedValue(undefined);
+
+      await controller.receberPecas('pedido-456');
+
+      expect(mockReceberPolicy.execute).toHaveBeenCalledWith({ pedidoId: 'pedido-456' });
+    });
+  });
 });

@@ -31,7 +31,7 @@ export class RolesGuard implements CanActivate {
 
     if (!user?.role) {
       this.logger.warn('Authorization failed: user role not found');
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenException('Permissões insuficientes');
     }
 
     const hasRole = requiredRoles.includes(user.role);
@@ -40,7 +40,7 @@ export class RolesGuard implements CanActivate {
       this.logger.warn(
         `Authorization failed: user ${user.id} lacks required roles, required=[${requiredRoles.join(', ')}]`
       );
-      throw new ForbiddenException('Insufficient permissions');
+      throw new ForbiddenException('Permissões insuficientes');
     }
 
     return true;

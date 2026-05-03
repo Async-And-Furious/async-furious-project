@@ -71,5 +71,23 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
       expect(eventoPublicado.pagamentoId).toBe('pag-id');
       expect(eventoPublicado.eventId).toBeDefined();
     });
+
+    it('deve cobrir branches do logger na criação do evento', async () => {
+      const eventoInterno = new PagamentoRegistradoEvent('os-123', 'pag-456');
+      mockEmissor.emitir.mockResolvedValue(undefined);
+
+      await policy.handle(eventoInterno);
+
+      expect(mockEmissor.emitir).toHaveBeenCalled();
+    });
+
+    it('deve cobrir branches do logger após emissão', async () => {
+      const eventoInterno = new PagamentoRegistradoEvent('os-789', 'pag-101');
+      mockEmissor.emitir.mockResolvedValue(undefined);
+
+      await policy.handle(eventoInterno);
+
+      expect(mockEmissor.emitir).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -71,4 +71,12 @@ describe('RolesGuard', () => {
 
     expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
   });
+
+  it('should handle multiple required roles and match one of them', () => {
+    setMetadata([Role.ADMIN, Role.MECANICO]);
+    const request = { user: { id: '1', email: 'mecanico@test.com', role: Role.MECANICO } };
+    mockContext.switchToHttp().getRequest.mockReturnValue(request);
+
+    expect(guard.canActivate(mockContext)).toBe(true);
+  });
 });
