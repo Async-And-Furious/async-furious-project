@@ -9,6 +9,7 @@ import { CadastroModule } from './modules/cadastro/cadastro.module';
 import { PecasInsumosModule } from './modules/pecas-insumos/pecas-insumos.module';
 import { OrdemServicoModule } from './modules/ordem-servico/ordem-servico.module';
 import { FinanceiroModule } from './modules/financeiro/financeiro.module';
+import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 
@@ -23,6 +24,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
     PecasInsumosModule,
     OrdemServicoModule,
     FinanceiroModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
