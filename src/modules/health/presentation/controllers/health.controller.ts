@@ -1,5 +1,6 @@
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Controller, Get } from '@nestjs/common';
+import { Public } from '../../../../auth/decorators/public.decorator';
 import { HealthService } from '../../application/services/health.service';
 import { HealthResponseDto } from '../../application/dto/health-response.dto';
 
@@ -8,6 +9,7 @@ import { HealthResponseDto } from '../../application/dto/health-response.dto';
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
+  @Public()
   @Get()
   @ApiOperation({
     summary: 'Health check',
