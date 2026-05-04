@@ -45,7 +45,7 @@ describe('ServicosController (e2e)', () => {
 
     const hashedPassword = await bcrypt.hash(testUser.password, 10);
     const user = await prismaService.user.create({
-      data: { ...testUser, password: hashedPassword },
+      data: { ...testUser, password: hashedPassword, role: 'ADMIN' },
     });
 
     authToken = jwtService.sign({ sub: user.id, email: user.email, role: user.role });

@@ -1,4 +1,17 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsEnum, IsNumber, Min } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  IsNumber,
+  Min,
+  IsArray,
+  ValidateNested,
+  IsInt,
+  IsPositive,
+  IsIn,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateOrdemServicoDto {
@@ -23,33 +36,13 @@ export class CreateOrdemServicoDto {
 
 export class UpdateOrdemServicoDto {
   @ApiPropertyOptional({
-    enum: [
-      'RECEIVED',
-      'UNDER_DIAGNOSIS',
-      'AWAITING_APPROVAL',
-      'IN_PROGRESS',
-      'FINISHED',
-      'DELIVERED',
-    ],
-    example: 'IN_PROGRESS',
+    enum: ['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'],
+    example: 'AWAITING_APPROVAL',
     description: 'Novo status da ordem de serviço',
   })
-  @IsEnum([
-    'RECEIVED',
-    'UNDER_DIAGNOSIS',
-    'AWAITING_APPROVAL',
-    'IN_PROGRESS',
-    'FINISHED',
-    'DELIVERED',
-  ])
+  @IsIn(['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'])
   @IsOptional()
-  status?:
-    | 'RECEIVED'
-    | 'UNDER_DIAGNOSIS'
-    | 'AWAITING_APPROVAL'
-    | 'IN_PROGRESS'
-    | 'FINISHED'
-    | 'DELIVERED';
+  status?: 'RECEIVED' | 'UNDER_DIAGNOSIS' | 'AWAITING_APPROVAL';
 
   @ApiPropertyOptional({
     example: 'Serviço iniciado - troca de óleo em andamento',
@@ -74,12 +67,37 @@ export class ListQueryDto {
   search?: string;
 }
 
+export class ItemPecaDto {
+  @ApiProperty({ example: 'uuid-da-peca', description: 'ID da peça' })
+  @IsUUID()
+  id_peca: string;
+
+  @ApiProperty({ example: 2, description: 'Quantidade utilizada' })
+  @IsInt()
+  @IsPositive()
+  quantidade: number;
+
+  @ApiProperty({ example: 150.0, description: 'Preço unitário da peça' })
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  preco_unitario: number;
+}
+
 export class GerarOrcamentoDto {
+  @ApiProperty({ example: 300.0, description: 'Valor total dos serviços' })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   valor_total_servicos: number;
 
+  @ApiProperty({ example: 150.0, description: 'Valor total das peças' })
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   valor_total_pecas: number;
+
+  @ApiPropertyOptional({ type: [ItemPecaDto], description: 'Peças utilizadas na OS' })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ItemPecaDto)
+  pecas?: ItemPecaDto[];
 }

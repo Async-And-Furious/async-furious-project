@@ -9,8 +9,10 @@ COPY package.json pnpm-lock.yaml ./
 # Install dependencies
 RUN corepack enable pnpm && pnpm install --frozen-lockfile
 
-# Copy source code
-COPY . .
+# Copy only necessary files for build (explicit, not recursive)
+COPY src/ ./src/
+COPY prisma/ ./prisma/
+COPY nest-cli.json tsconfig.json tsconfig.build.json ./
 
 # Generate Prisma client
 RUN pnpm prisma generate
@@ -23,13 +25,7 @@ FROM node:20-alpine AS production
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-
-# Install ALL dependencies (prisma CLI needed)
-RUN corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
-
-# Copy all files from builder
+# Copy only built artifacts and runtime dependencies
 COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/prisma ./prisma/
 COPY --from=builder /app/dist ./dist/

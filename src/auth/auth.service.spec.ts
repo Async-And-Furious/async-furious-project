@@ -61,6 +61,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         password: 'hashed-password',
+        role: 'RECEPCIONISTA',
       });
 
       const result = await service.register(registerDto);
@@ -69,7 +70,7 @@ describe('AuthService', () => {
       expect(result.user).toEqual({
         id: 'user-id',
         email: 'test@example.com',
-        name: 'Test User',
+        role: 'RECEPCIONISTA',
       });
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: 'test@example.com' },
@@ -92,6 +93,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         password: 'hashed-password',
+        role: 'RECEPCIONISTA',
       });
 
       await service.register({ ...registerDto, email: 'TEST@EXAMPLE.COM' });
@@ -114,6 +116,7 @@ describe('AuthService', () => {
         email: 'test@example.com',
         name: 'Test User',
         password: 'hashed-password',
+        role: 'ADMIN',
       };
       mockPrisma.user.findUnique.mockResolvedValue(user);
 
@@ -123,7 +126,7 @@ describe('AuthService', () => {
       expect(result.user).toEqual({
         id: 'user-id',
         email: 'test@example.com',
-        name: 'Test User',
+        role: 'ADMIN',
       });
     });
 
@@ -175,11 +178,90 @@ describe('AuthService', () => {
 
       const result = await service.validateUser('user-id');
 
-      expect(result).toEqual(user);
+      expect(result).toEqual({
+        id: 'user-id',
+        email: 'test@example.com',
+        role: 'admin',
+      });
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: 'user-id' },
-        select: { id: true, email: true, name: true, role: true },
+        select: { id: true, email: true, role: true },
       });
+    });
+
+    it('should return null when user not found', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.validateUser('nonexistent-id');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('findById', () => {
+    it('should return user by id', async () => {
+      const user = {
+        id: 'user-id',
+        email: 'test@example.com',
+        role: 'admin',
+      };
+      mockPrisma.user.findUnique.mockResolvedValue(user);
+
+      const result = await service.findById('user-id');
+
+      expect(result).toEqual({
+        id: 'user-id',
+        email: 'test@example.com',
+        role: 'admin',
+      });
+    });
+
+    it('should return null when user not found by id', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await service.findById('nonexistent-id');
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('config with default values', () => {
+    it('should use default salt rounds when config is undefined', async () => {
+      const mockPrismaWithDefault = {
+        user: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: jest.fn().mockResolvedValue({
+            id: 'user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+            password: 'hashed-password',
+            role: 'RECEPCIONISTA',
+          }),
+        },
+      };
+
+      const mockConfigService = {
+        get: jest.fn().mockReturnValue(undefined),
+      };
+
+      const testModule = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: PrismaService, useValue: mockPrismaWithDefault },
+          { provide: JwtService, useValue: mockJwtService },
+          { provide: ConfigService, useValue: mockConfigService },
+        ],
+      }).compile();
+
+      const testService = testModule.get<AuthService>(AuthService);
+
+      await testService.register({
+        email: 'test@example.com',
+        password: 'password123',
+        name: 'Test User',
+      });
+
+      expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
     });
   });
 });

@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './shared/infrastructure/filters/global-exception.filter';
 
@@ -10,10 +11,48 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(cookieParser());
-  app.use(helmet());
+
+  app.use(
+    helmet({
+      crossOriginEmbedderPolicy: { policy: 'credentialless' },
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          baseUri: ["'self'"],
+          fontSrc: ["'self'", 'data:'],
+          formAction: ["'self'"],
+          frameAncestors: ["'self'"],
+          imgSrc: ["'self'", 'data:'],
+          objectSrc: ["'none'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrcAttr: ["'none'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          upgradeInsecureRequests: [],
+        },
+      },
+    })
+  );
+
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    next();
+  });
+
+  // Redirect root to API entry point (fixes ZAP spider on /)
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.path === '/' && req.method === 'GET') {
+      res.redirect(302, '/api/v1');
+      return;
+    }
+    next();
+  });
 
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || true,
+    origin: process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(',')
+      : process.env.NODE_ENV === 'production'
+        ? false
+        : true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     credentials: true,
   });
@@ -44,6 +83,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((err) => {
-  console.error('Failed to bootstrap application', err);
+  process.stderr.write(`Failed to bootstrap application: ${String(err)}\n`);
   process.exit(1);
 });

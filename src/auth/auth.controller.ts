@@ -1,8 +1,13 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './services/auth.service';
 import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { Public } from './decorators/public.decorator';
+import { Roles } from './decorators/roles.decorator';
+import { Role } from './enums/role.enum';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
 
 @Controller('auth')
 @ApiTags('Autenticação')
@@ -11,29 +16,16 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Registrar novo usuário',
-    description: 'Cria um novo usuário no sistema',
+    summary: 'Registrar novo usuário (ADMIN only)',
+    description: 'Cria um novo usuário no sistema. Apenas ADMIN pode criar usuários.',
   })
   @ApiBody({
     type: RegisterDto,
     description: 'Dados do novo usuário',
-    examples: {
-      'Exemplo Admin': {
-        value: {
-          email: 'admin@example.com',
-          password: 'senha123456',
-          name: 'Admin User',
-        },
-      },
-      'Exemplo User': {
-        value: {
-          email: 'user@example.com',
-          password: 'senha123456',
-          name: 'Regular User',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 201,
@@ -44,6 +36,14 @@ export class AuthController {
     description: 'Validação falhou - email já existe ou dados inválidos',
   })
   @ApiResponse({
+    status: 401,
+    description: 'Token inválido ou expirado',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Apenas ADMIN pode criar usuários',
+  })
+  @ApiResponse({
     status: 429,
     description: 'Muitas tentativas - aguarde antes de tentar novamente',
   })
@@ -52,6 +52,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Fazer login',
@@ -60,14 +61,6 @@ export class AuthController {
   @ApiBody({
     type: LoginDto,
     description: 'Credenciais do usuário',
-    examples: {
-      'Exemplo Login': {
-        value: {
-          email: 'admin@example.com',
-          password: 'senha123456',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,

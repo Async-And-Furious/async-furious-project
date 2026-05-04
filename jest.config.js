@@ -10,7 +10,18 @@ export default {
       },
     ],
   },
-  collectCoverageFrom: ['src/**/*.(t|j)s'],
+  collectCoverageFrom: [
+    'src/**/*.(t|j)s',
+    '!src/**/*module.ts',
+    '!src/main.ts',
+    '!src/**/events/*.ts',
+    '!src/**/value-objects/index.ts',
+    '!src/**/ports/*.ts',
+    '!src/auth/decorators/*.ts',
+    '!src/auth/dto/*.ts',
+    '!src/auth/strategies/*.ts',
+    '!src/auth/enums/*.ts',
+  ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/node_modules/', '/dist/', 'jest-e2e.json'],
@@ -19,4 +30,12 @@ export default {
   },
   transformIgnorePatterns: ['node_modules/(?!(bcrypt)/)'],
   coverageReporters: ['lcov', 'text', 'clover'],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+  },
 };
