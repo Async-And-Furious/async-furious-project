@@ -18,7 +18,11 @@ describe('AppController (e2e)', () => {
     server = request(app.getHttpServer() as unknown as App);
   });
 
-  it('/ (GET)', () => {
-    return server.get('/').expect(200).expect('Hello World!');
+  it('/ (GET) - health check', () => {
+    return server.get('/').expect(200).expect((res) => {
+      expect(res.body).toHaveProperty('status', 'ok');
+      expect(res.body).toHaveProperty('timestamp');
+      expect(res.body).toHaveProperty('version');
+    });
   });
 });

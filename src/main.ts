@@ -24,6 +24,10 @@ async function bootstrap() {
           frameAncestors: ["'self'"],
           imgSrc: ["'self'", 'data:'],
           objectSrc: ["'none'"],
+          // CSP: unsafe-inline required for Swagger UI / NestJS dev tools
+          // OWASP ZAP alert 10055: This is an accepted trade-off for browser-based API docs.
+          // Production APIs serving only mobile/desktop clients can remove unsafe-inline
+          // if Swagger UI is not exposed (set NODE_ENV=production or disable in config).
           scriptSrc: ["'self'", "'unsafe-inline'"],
           scriptSrcAttr: ["'none'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
