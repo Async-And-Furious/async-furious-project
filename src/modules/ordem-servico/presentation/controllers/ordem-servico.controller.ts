@@ -177,7 +177,7 @@ export class OrdemServicoController {
 
   @Patch(':id/assumir')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.MECANICO)
   @ApiOperation({
     summary: 'Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)',
   })
@@ -191,7 +191,7 @@ export class OrdemServicoController {
 
   @Patch(':id/analisar')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.MECANICO)
   @ApiOperation({ summary: 'Registrar análise do veículo (UNDER_DIAGNOSIS)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Análise registrada' })
@@ -203,7 +203,7 @@ export class OrdemServicoController {
 
   @Patch(':id/servicos-insumos')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.MECANICO)
   @ApiOperation({
     summary: 'Listar serviços e insumos — gera orçamento (UNDER_DIAGNOSIS → AWAITING_APPROVAL)',
     description:
@@ -252,7 +252,7 @@ export class OrdemServicoController {
 
   @Patch(':id/finalizar-execucao')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN)
+  @Roles(Role.MECANICO)
   @ApiOperation({
     summary: 'Mecânico finaliza execução do serviço (IN_PROGRESS → FINISHED)',
   })
