@@ -64,13 +64,6 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       role: 'RECEPCIONISTA',
     });
 
-    const admin = await createTestUser(prismaService, jwtService, {
-      email: adminEmail,
-      password: 'admin123',
-      name: 'Admin E2E',
-      role: 'ADMIN',
-    });
-
     const mecanico = await createTestUser(prismaService, jwtService, {
       email: mecanicoEmail,
       password: 'admin123',
