@@ -265,6 +265,37 @@ collection:
             send: true
             store: true
           rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}"
+        name: Update Ordem Servico
+        meta:
+          id: req_os_update
+          created: 1785600000010
+          modified: 1785600000010
+          isPrivate: false
+          description: "Requires ADMIN role — updates status/description before execution"
+          sortKey: -1745628000054
+        method: PATCH
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "status": "UNDER_DIAGNOSIS",
+              "descricao": "Revisão completa do motor"
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication:
+          type: bearer
+          token: "{{ admin_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/assumir"
         name: Assumir Ordem Servico
         meta:
@@ -272,7 +303,7 @@ collection:
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "Requires MECANICO role"
+          description: "Requires MECANICO role — RECEIVED → UNDER_DIAGNOSIS"
           sortKey: -1745628000056
         method: PATCH
         authentication:
@@ -293,7 +324,7 @@ collection:
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "Requires MECANICO role"
+          description: "Requires MECANICO role — registers vehicle analysis"
           sortKey: -1745628000057
         method: PATCH
         authentication:
@@ -308,13 +339,13 @@ collection:
             store: true
           rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/servicos-insumos"
-        name: Listar Servicos e Insumos na OS
+        name: Gerar Orcamento (servicos e insumos)
         meta:
           id: req_os_servicos_insumos
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "Requires MECANICO role"
+          description: "Requires MECANICO role — generates quote (UNDER_DIAGNOSIS → AWAITING_APPROVAL)"
           sortKey: -1745628000058
         method: PATCH
         body:
@@ -383,7 +414,7 @@ collection:
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "Requires MECANICO role"
+          description: "Requires MECANICO role — IN_PROGRESS → FINISHED"
           sortKey: -1745628000061
         method: PATCH
         authentication:
@@ -408,6 +439,27 @@ collection:
           sortKey: -1745628000062
         method: PATCH
         authentication: {}
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/registrar-entrega"
+        name: Registrar Entrega Veiculo
+        meta:
+          id: req_os_registrar_entrega
+          created: 1785600000010
+          modified: 1785600000010
+          isPrivate: false
+          description: "Requires RECEPCIONISTA role — FINISHED → DELIVERED"
+          sortKey: -1745628000064
+        method: PATCH
+        authentication:
+          type: bearer
+          token: "{{ receptionist_token }}"
         settings:
           renderRequestBody: true
           encodeUrl: true
@@ -1260,6 +1312,43 @@ collection:
         authentication:
           type: bearer
           token: "{{ admin_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
+  - name: Pagamentos
+    meta:
+      id: fld_pagamentos
+      created: 1785600000010
+      modified: 1785600000010
+      sortKey: -1745628000055
+      description: Payment registration endpoints
+    children:
+      - url: "{{ base_url }}/pagamentos/registrar"
+        name: Registrar Pagamento
+        meta:
+          id: req_pagamento_registrar
+          created: 1785600000010
+          modified: 1785600000010
+          isPrivate: false
+          description: "PUBLIC - No auth required — registers payment for an OS"
+          sortKey: -1745628000055
+        method: POST
+        body:
+          mimeType: application/json
+          text: |-
+            {
+              "ordemServicoId": "{{ ordem_id }}",
+              "valor": 330.00
+            }
+        headers:
+          - name: Content-Type
+            value: application/json
+        authentication: {}
         settings:
           renderRequestBody: true
           encodeUrl: true

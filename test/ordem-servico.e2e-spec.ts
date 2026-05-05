@@ -22,7 +22,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
   let jwtService: JwtService;
 
   let recepcionistaToken: string;
-  let adminToken: string;
+  let mecanicoToken: string;
 
   let clienteId: string;
   let veiculoId: string;
@@ -30,6 +30,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
   const recepcionistaEmail = 'e2e-os-recepcionista@example.com';
   const adminEmail = 'e2e-os-admin@example.com';
+  const mecanicoEmail = 'e2e-os-mecanico@example.com';
   const clienteDocumento = '39053344705';
   const clienteEmail = 'e2e-os-cliente@example.com';
 
@@ -70,8 +71,15 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       role: 'ADMIN',
     });
 
+    const mecanico = await createTestUser(prismaService, jwtService, {
+      email: mecanicoEmail,
+      password: 'admin123',
+      name: 'Mecanico E2E',
+      role: 'MECANICO',
+    });
+
     recepcionistaToken = recepcionista.token;
-    adminToken = admin.token;
+    mecanicoToken = mecanico.token;
   });
 
   afterAll(async () => {
@@ -89,6 +97,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     await cleanupTestUser(prismaService, recepcionistaEmail);
     await cleanupTestUser(prismaService, adminEmail);
+    await cleanupTestUser(prismaService, mecanicoEmail);
     await app.close();
   });
 
@@ -136,17 +145,17 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/assumir`)
-      .set('Authorization', `Bearer ${adminToken}`)
+      .set('Authorization', `Bearer ${mecanicoToken}`)
       .expect(200);
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/analisar`)
-      .set('Authorization', `Bearer ${adminToken}`)
+      .set('Authorization', `Bearer ${mecanicoToken}`)
       .expect(200);
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/servicos-insumos`)
-      .set('Authorization', `Bearer ${adminToken}`)
+      .set('Authorization', `Bearer ${mecanicoToken}`)
       .send({
         valor_total_servicos: 300,
         valor_total_pecas: 0,
@@ -157,7 +166,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/finalizar-execucao`)
-      .set('Authorization', `Bearer ${adminToken}`)
+      .set('Authorization', `Bearer ${mecanicoToken}`)
       .expect(200);
 
     await server
