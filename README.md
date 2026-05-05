@@ -1,98 +1,306 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Sistema de Gestão para Oficina Mecânica
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> API RESTful para gerenciamento de ordens de serviço, clientes, veículos e estoque de peças.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Objetivo do Projeto
 
-## Description
+Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech Challenge da pós-graduação em Arquitetura de Software (15SOAT — FIAP). Arquitetura: Clean Architecture + DDD.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+### Problema que Resolve
 
-## Project setup
+- **Centralização**: Substitui planilhas e processos manuais por um sistema unificado
+- **Rastreamento**: Clientes acompanham o status da ordem de serviço em tempo real
+- **Controle de Estoque**: Gerenciamento de peças com alertas de estoque mínimo e pedidos a fornecedores
+- **Validação**: CPF/CNPJ e placas veiculares seguem padrões brasileiros
 
-```bash
-$ pnpm install
-```
+### Funcionalidades Principais
 
-## Compile and run the project
+| Módulo                | Descrição                                                                      |
+| --------------------- | ------------------------------------------------------------------------------ |
+| **Ordens de Serviço** | Ciclo de vida completo (RECEIVED → DELIVERED), orçamento e aprovação pelo cliente |
+| **Clientes**          | CRUD com validação de CPF/CNPJ                                                 |
+| **Veículos**          | CRUD com validação de placa brasileira                                         |
+| **Serviços**          | Catálogo de serviços oferecidos pela oficina                                   |
+| **Peças e Insumos**   | CRUD com controle de estoque e pedidos a fornecedores                          |
+| **Pagamentos**        | Registro de pagamentos com disparo de entrega automática                       |
+| **Autenticação**      | JWT com papéis ADMIN, RECEPCIONISTA e MECÂNICO                                 |
 
-```bash
-# development
-$ pnpm run start
+---
 
-# watch mode
-$ pnpm run start:dev
+## Tecnologias
 
-# production mode
-$ pnpm run start:prod
-```
+| Camada         | Tecnologia           |
+| -------------- | -------------------- |
+| Framework      | NestJS 10.x          |
+| Linguagem      | TypeScript 5.x       |
+| Banco de Dados | PostgreSQL 15        |
+| ORM            | Prisma               |
+| Autenticação   | JWT + bcrypt         |
+| Documentação   | Swagger / OpenAPI    |
+| Container      | Docker Compose       |
+| Testes         | Jest                 |
+| Segurança DAST | OWASP ZAP            |
 
-## Run tests
+Utilizamos Node.js com NestJS pela arquitetura modular e suporte nativo a injeção de dependência, PostgreSQL pela robustez e consistência transacional, e Prisma como ORM por sua tipagem forte integrada ao TypeScript, garantindo segurança e produtividade no desenvolvimento.
+---
 
-```bash
-# unit tests
-$ pnpm run test
+## Pré-requisitos
 
-# e2e tests
-$ pnpm run test:e2e
+- Node.js 20+
+- pnpm (`npm install -g pnpm`)
+- Docker e Docker Compose
 
-# test coverage
-$ pnpm run test:cov
-```
+---
 
-## Deployment
+## Como Executar Localmente
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### 1. Clonar o repositório
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+git clone <repo-url>
+cd async-furious-project
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### 2. Configurar variáveis de ambiente
 
-## Resources
+```bash
+cp .env.example .env
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Edite o `.env`:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workshop"
+JWT_SECRET="sua-chave-secreta-aqui"
+PORT=5000
+BCRYPT_SALT_ROUNDS=10
+ALLOWED_ORIGINS=http://localhost:5000
+SEED_ADMIN_EMAIL="seu-email-admin"
+SEED_ADMIN_PASSWORD="sua-senha-admin"
+```
 
-## Support
+### 3. Iniciar com Docker (recomendado)
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```bash
+# Sobe somente o PostgreSQL
+docker compose -f docker-compose.dependencies.yml up -d
 
-## Stay in touch
+# Roda migrations + seed + aplicação em modo watch
+pnpm dev:local
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### 4. Ou iniciar com stack completa
 
-## License
+```bash
+# Sobe PostgreSQL + aplicação
+docker compose up -d
+```
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+A aplicação ficará disponível em `http://localhost:5000`.
+
+---
+
+## Documentação da API
+
+Após iniciar o projeto, acesse o Swagger em:
+
+```
+http://localhost:5000/api/docs
+```
+
+### Rotas
+
+#### Autenticação (`/api/v1/auth`)
+
+| Método | Endpoint         | Acesso           | Descrição               |
+| ------ | ---------------- | ---------------- | ----------------------- |
+| POST   | `/auth/register` | ADMIN            | Registrar novo usuário  |
+| POST   | `/auth/login`    | Público          | Fazer login, retorna JWT |
+
+#### Clientes (`/api/v1/clientes`)
+
+| Método | Endpoint         | Acesso        | Descrição          |
+| ------ | ---------------- | ------------- | ------------------ |
+| POST   | `/clientes`      | RECEPCIONISTA | Criar cliente      |
+| GET    | `/clientes`      | Autenticado   | Listar clientes    |
+| GET    | `/clientes/:id`  | Autenticado   | Detalhar cliente   |
+| PATCH  | `/clientes/:id`  | RECEPCIONISTA | Atualizar cliente  |
+| DELETE | `/clientes/:id`  | ADMIN         | Deletar cliente    |
+
+#### Veículos (`/api/v1/veiculos`)
+
+| Método | Endpoint         | Acesso        | Descrição          |
+| ------ | ---------------- | ------------- | ------------------ |
+| POST   | `/veiculos`      | RECEPCIONISTA | Criar veículo      |
+| GET    | `/veiculos`      | Autenticado   | Listar veículos    |
+| GET    | `/veiculos/:id`  | Autenticado   | Detalhar veículo   |
+| PATCH  | `/veiculos/:id`  | RECEPCIONISTA | Atualizar veículo  |
+| DELETE | `/veiculos/:id`  | ADMIN         | Deletar veículo    |
+
+#### Serviços (`/api/v1/servicos`)
+
+| Método | Endpoint         | Acesso      | Descrição          |
+| ------ | ---------------- | ----------- | ------------------ |
+| POST   | `/servicos`      | ADMIN       | Criar serviço      |
+| GET    | `/servicos`      | Autenticado | Listar serviços    |
+| GET    | `/servicos/:id`  | Autenticado | Detalhar serviço   |
+| PATCH  | `/servicos/:id`  | ADMIN       | Atualizar serviço  |
+| DELETE | `/servicos/:id`  | ADMIN       | Deletar serviço    |
+
+#### Ordens de Serviço (`/api/v1/ordens-servico`)
+
+| Método | Endpoint                              | Acesso        | Descrição                                      |
+| ------ | ------------------------------------- | ------------- | ---------------------------------------------- |
+| POST   | `/ordens-servico`                     | RECEPCIONISTA | Criar OS                                       |
+| GET    | `/ordens-servico`                     | Autenticado   | Listar OSs                                     |
+| GET    | `/ordens-servico/:id`                 | Autenticado   | Detalhar OS                                    |
+| GET    | `/ordens-servico/:id/status`          | Autenticado   | Consultar status (endpoint público para cliente) |
+| PATCH  | `/ordens-servico/:id`                 | ADMIN         | Atualizar OS                                   |
+| DELETE | `/ordens-servico/:id`                 | ADMIN         | Deletar OS                                     |
+| PATCH  | `/ordens-servico/:id/assumir`         | ADMIN         | Mecânico assume OS → UNDER_DIAGNOSIS           |
+| PATCH  | `/ordens-servico/:id/analisar`        | ADMIN         | Registrar análise diagnóstica                  |
+| PATCH  | `/ordens-servico/:id/servicos-insumos`| ADMIN         | Gerar orçamento → AWAITING_APPROVAL            |
+| PATCH  | `/ordens-servico/:id/orcamento/aprovar` | Público     | Cliente aprova orçamento → IN_PROGRESS         |
+| PATCH  | `/ordens-servico/:id/orcamento/recusar` | Público     | Cliente recusa → CLOSED_WITHOUT_EXECUTION      |
+| PATCH  | `/ordens-servico/:id/finalizar-execucao` | ADMIN      | Mecânico finaliza → FINISHED                   |
+| PATCH  | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega → DELIVERED               |
+
+#### Peças e Insumos (`/api/v1/pecas`)
+
+| Método | Endpoint                                   | Acesso      | Descrição                          |
+| ------ | ------------------------------------------ | ----------- | ---------------------------------- |
+| POST   | `/pecas`                                   | ADMIN       | Criar peça/insumo                  |
+| GET    | `/pecas`                                   | Autenticado | Listar peças/insumos               |
+| GET    | `/pecas/:id`                               | Autenticado | Detalhar peça/insumo               |
+| PATCH  | `/pecas/:id`                               | ADMIN       | Atualizar peça/insumo              |
+| PATCH  | `/pecas/:id/estoque`                       | ADMIN       | Atualizar estoque                  |
+| DELETE | `/pecas/:id`                               | ADMIN       | Deletar peça/insumo                |
+| POST   | `/pecas/fornecedor/solicitar`              | ADMIN       | Solicitar peças a fornecedor       |
+| PATCH  | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN    | Confirmar recebimento de peças     |
+
+#### Pagamentos (`/api/v1/pagamentos`)
+
+| Método | Endpoint               | Acesso      | Descrição                                    |
+| ------ | ---------------------- | ----------- | -------------------------------------------- |
+| POST   | `/pagamentos/registrar`| Autenticado | Registrar pagamento → dispara entrega da OS  |
+
+---
+
+## Ciclo de Vida da Ordem de Serviço
+
+```
+RECEIVED
+  └─► UNDER_DIAGNOSIS
+        └─► AWAITING_APPROVAL
+              ├─► CLOSED_WITHOUT_EXECUTION  (orçamento recusado)
+              └─► IN_PROGRESS
+                    ├─► AWAITING_PARTS  (peças indisponíveis)
+                    │     └─► IN_PROGRESS  (peças reservadas)
+                    └─► FINISHED
+                          └─► DELIVERED
+```
+
+---
+
+## Autenticação e Papéis
+
+Todos os endpoints (exceto `@Public()`) exigem header `Authorization: Bearer <token>`.
+
+| Role            | Permissões principais                                               |
+| --------------- | ------------------------------------------------------------------- |
+| `ADMIN`         | Acesso total: CRUD serviços e peças, ações do mecânico na OS        |
+| `RECEPCIONISTA` | Criar/atualizar clientes e veículos, criar OS, registrar entrega    |
+
+Token JWT expira em **1 hora**.
+
+---
+
+## Testes
+
+```bash
+# Todos os testes unitários
+pnpm test
+
+# Com relatório de cobertura
+pnpm test:cov
+
+# Modo watch
+pnpm test:watch
+
+# Testes E2E
+pnpm test:e2e
+
+# Arquivo específico
+pnpm test -- src/modules/cadastro/application/use-cases/cliente.use-cases.spec.ts
+
+# Por nome de teste
+pnpm test -- --testNamePattern="CreateClienteUseCase"
+```
+
+### Thresholds de Cobertura
+
+| Métrica    | Mínimo |
+| ---------- | ------ |
+| Statements | 85%    |
+| Lines      | 85%    |
+| Functions  | 80%    |
+| Branches   | 80%    |
+
+---
+
+## Estrutura do Projeto
+
+```
+src/
+├── auth/                    # JWT, guards, estratégias, decorators
+├── modules/
+│   ├── cadastro/            # Clientes, Veículos, Serviços
+│   │   ├── domain/          # Entidades, VOs, interfaces de repositório
+│   │   ├── application/     # Use cases
+│   │   ├── infrastructure/  # Prisma repositories
+│   │   └── presentation/    # Controllers, DTOs
+│   ├── ordem-servico/       # Ordens de Serviço + Orçamentos
+│   ├── pecas-insumos/       # Peças, estoque, pedidos a fornecedores
+│   └── financeiro/          # Pagamentos
+└── shared/
+    ├── domain/              # DomainEvent base, exceções, interfaces
+    └── infrastructure/      # PrismaService, EmissorEventos, filtros
+```
+
+Cada módulo segue a regra de dependência: `presentation → application → domain ← infrastructure`.
+
+---
+
+## Comandos Úteis
+
+```bash
+# Desenvolvimento (sobe container + migrate + seed + watch)
+pnpm dev
+
+# Desenvolvimento sem container
+pnpm dev:local
+
+# Reset completo do banco
+pnpm dev:reset-db
+
+# Build de produção
+pnpm build
+
+# Lint com auto-fix
+pnpm lint
+
+# Formatar código
+pnpm format
+```
+
+---
+
+## Convenções de Código
+
+Consulte [AGENTS.md](./AGENTS.md) para convenções de nomenclatura, padrões TypeScript/NestJS e políticas de imports.
+
+---
+
+## Licença
+
+Privado — Todos os direitos reservados.

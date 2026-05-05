@@ -1,0 +1,174 @@
+name: DAST - OWASP ZAP
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+jobs:
+  zap-scan:
+    name: ZAP ${{ github.event_name == 'pull_request' && 'Baseline (PR)' || 'Full API Scan' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write  # necessário para postar comentário no PR
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: workshop
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Instalar dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: Gerar cliente Prisma
+        run: npx prisma generate
+
+      - name: Preparar banco e seed
+        run: |
+          npx prisma db push --skip-generate
+          npx ts-node scripts/seed.ts
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
+          SEED_ADMIN_EMAIL: admin@oficina.com
+          SEED_ADMIN_PASSWORD: changeme123
+
+      - name: Iniciar aplicação
+        run: pnpm run start > app.log 2>&1 & echo $! > app.pid
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
+          JWT_SECRET: zap-test-jwt-secret-key
+          PORT: 5000
+
+      - name: Aguardar aplicação ficar pronta
+        run: |
+          APP_PID=$(cat app.pid)
+          for i in $(seq 1 30); do
+            kill -0 "$APP_PID" 2>/dev/null || { echo "❌ App morreu"; cat app.log; exit 1; }
+            curl -sf http://localhost:5000/api/v1/ && echo "App pronta!" && exit 0
+            echo "Aguardando... ($i/30)" && sleep 3
+          done
+          echo "❌ App não respondeu após 90s" && cat app.log && exit 1
+
+      - name: Criar diretório de output para o ZAP
+        run: |
+          mkdir -p ${{ github.workspace }}/zap-output && chmod 777 ${{ github.workspace }}/zap-output
+          cp .github/zap.conf ${{ github.workspace }}/zap-output/zap.conf
+
+      - name: ZAP Baseline Scan (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          docker run --network="host" \
+            -v ${{ github.workspace }}/zap-output:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:5000/api/docs-json \
+            -c zap.conf \
+            -r report_html.html \
+            -J report_json.json \
+            -I
+
+      - name: ZAP Full API Scan (Schedule / Manual)
+        if: github.event_name != 'pull_request'
+        run: |
+          docker run --network="host" \
+            -v ${{ github.workspace }}/zap-output:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-api-scan.py \
+            -t http://localhost:5000/api/docs-json \
+            -f openapi \
+            -c zap.conf \
+            -r report_html.html \
+            -J report_json.json \
+            -a \
+            -I
+
+      - name: Upload relatórios
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-reports-${{ github.event_name }}-${{ github.run_id }}
+          path: |
+            ${{ github.workspace }}/zap-output/report_html.html
+            ${{ github.workspace }}/zap-output/report_json.json
+          retention-days: 30
+
+      - name: Comentar resumo no PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            let body;
+
+            try {
+              const json = JSON.parse(
+                fs.readFileSync('${{ github.workspace }}/zap-output/report_json.json', 'utf8')
+              );
+
+              const alerts = json.site?.[0]?.alerts ?? [];
+              const high   = alerts.filter(a => a.riskcode === '3').length;
+              const medium = alerts.filter(a => a.riskcode === '2').length;
+              const low    = alerts.filter(a => a.riskcode === '1').length;
+              const info   = alerts.filter(a => a.riskcode === '0').length;
+
+              const icon = high > 0 ? '🔴' : medium > 0 ? '🟡' : '🟢';
+
+              body = [
+                `## ${icon} OWASP ZAP Baseline Scan`,
+                '',
+                '| Severidade | Total |',
+                '|---|---|',
+                `| 🔴 High   | ${high}   |`,
+                `| 🟡 Medium | ${medium} |`,
+                `| 🔵 Low    | ${low}    |`,
+                `| ℹ️ Info   | ${info}   |`,
+                '',
+                `> Relatório completo disponível nos [artifacts desta run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).`,
+              ].join('\n');
+            } catch (e) {
+              body = [
+                '## ⚠️ OWASP ZAP Baseline Scan',
+                '',
+                'Não foi possível ler o relatório JSON. Verifique os logs da run.',
+                '',
+                `> [Ver logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+              ].join('\n');
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
