@@ -24,6 +24,7 @@ import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
 } from './application/use-cases/orcamento.use-cases';
+import { ConsultarTempoMedioExecucaoUseCase } from './application/use-cases/tempo-medio-execucao.use-case';
 // Policies
 import { AtualizarStatusRecebidaPolicy } from './application/policies/atualizar-status-recebida.policy';
 import { AtualizarStatusEmDiagnosticoPolicy } from './application/policies/atualizar-status-em-diagnostico.policy';
@@ -226,6 +227,12 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     {
       provide: DeletarOrdemServicoUseCase,
       useFactory: (osRepo: OrdemServicoRepository) => new DeletarOrdemServicoUseCase(osRepo),
+      inject: [OrdemServicoRepository],
+    },
+    {
+      provide: ConsultarTempoMedioExecucaoUseCase,
+      useFactory: (osRepo: OrdemServicoRepository) =>
+        new ConsultarTempoMedioExecucaoUseCase(osRepo),
       inject: [OrdemServicoRepository],
     },
 

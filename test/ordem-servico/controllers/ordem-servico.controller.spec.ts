@@ -27,6 +27,7 @@ import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
 } from '../../../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
+import { ConsultarTempoMedioExecucaoUseCase } from '../../../src/modules/ordem-servico/application/use-cases/tempo-medio-execucao.use-case';
 
 describe('OrdemServicoController', () => {
   let controller: OrdemServicoController;
@@ -44,6 +45,7 @@ describe('OrdemServicoController', () => {
   let listarUseCase: jest.Mocked<ListarOrdensServicoUseCase>;
   let detalharUseCase: jest.Mocked<DetalharOrdemServicoUseCase>;
   let deletarUseCase: jest.Mocked<DeletarOrdemServicoUseCase>;
+  let tempoMedioExecucaoUseCase: jest.Mocked<ConsultarTempoMedioExecucaoUseCase>;
 
   const mockUseCases = {
     criarUseCase: { execute: jest.fn() },
@@ -60,6 +62,7 @@ describe('OrdemServicoController', () => {
     listarUseCase: { execute: jest.fn() },
     detalharUseCase: { execute: jest.fn() },
     deletarUseCase: { execute: jest.fn() },
+    tempoMedioExecucaoUseCase: { execute: jest.fn() },
   };
 
   const mockJwtAuthGuard = {
@@ -109,6 +112,10 @@ describe('OrdemServicoController', () => {
         { provide: ListarOrdensServicoUseCase, useValue: mockUseCases.listarUseCase },
         { provide: DetalharOrdemServicoUseCase, useValue: mockUseCases.detalharUseCase },
         { provide: DeletarOrdemServicoUseCase, useValue: mockUseCases.deletarUseCase },
+        {
+          provide: ConsultarTempoMedioExecucaoUseCase,
+          useValue: mockUseCases.tempoMedioExecucaoUseCase,
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -132,6 +139,7 @@ describe('OrdemServicoController', () => {
     listarUseCase = module.get(ListarOrdensServicoUseCase);
     detalharUseCase = module.get(DetalharOrdemServicoUseCase);
     deletarUseCase = module.get(DeletarOrdemServicoUseCase);
+    tempoMedioExecucaoUseCase = module.get(ConsultarTempoMedioExecucaoUseCase);
   });
 
   afterEach(() => {
@@ -396,6 +404,33 @@ describe('OrdemServicoController', () => {
     });
   });
 
+  describe('tempoMedioExecucao', () => {
+    it('deve retornar tempo médio de execução', async () => {
+      const resultadoEsperado = { tempoMedioMinutos: 90, totalOrdensConsideradas: 5 };
+      tempoMedioExecucaoUseCase.execute.mockResolvedValue(resultadoEsperado);
+
+      const resultado = await controller.tempoMedioExecucao();
+
+      expect(tempoMedioExecucaoUseCase.execute).toHaveBeenCalledTimes(1);
+      expect(resultado).toEqual(resultadoEsperado);
+    });
+
+    it('deve retornar zero quando não há ordens finalizadas', async () => {
+      const resultadoEsperado = { tempoMedioMinutos: 0, totalOrdensConsideradas: 0 };
+      tempoMedioExecucaoUseCase.execute.mockResolvedValue(resultadoEsperado);
+
+      const resultado = await controller.tempoMedioExecucao();
+
+      expect(resultado).toEqual(resultadoEsperado);
+    });
+
+    it('deve propagar erros do use case', async () => {
+      tempoMedioExecucaoUseCase.execute.mockRejectedValue(new Error('DB error'));
+
+      await expect(controller.tempoMedioExecucao()).rejects.toThrow('DB error');
+    });
+  });
+
   describe('tratamento de erros', () => {
     it('deve propagar erros dos use cases', async () => {
       const erro = new Error('Erro no banco de dados');
@@ -432,6 +467,7 @@ describe('OrdemServicoController', () => {
       expect(listarUseCase).toBeDefined();
       expect(detalharUseCase).toBeDefined();
       expect(deletarUseCase).toBeDefined();
+      expect(tempoMedioExecucaoUseCase).toBeDefined();
     });
   });
 });
