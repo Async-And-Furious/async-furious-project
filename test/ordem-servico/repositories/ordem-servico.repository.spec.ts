@@ -328,4 +328,37 @@ describe('OrdemServicoRepository', () => {
       );
     });
   });
+
+  describe('calcularTempoMedioExecucao', () => {
+    it('deve calcular a média corretamente com múltiplas ordens', async () => {
+      const inicio = new Date('2024-01-01T08:00:00Z');
+      const fim1 = new Date('2024-01-01T10:00:00Z'); // 120 min
+      const fim2 = new Date('2024-01-01T09:00:00Z'); // 60 min
+
+      (prismaService.ordemServico.findMany as jest.Mock).mockResolvedValue([
+        { iniciada_em: inicio, finalizada_em: fim1 },
+        { iniciada_em: inicio, finalizada_em: fim2 },
+      ]);
+
+      const result = await repository.calcularTempoMedioExecucao();
+
+      expect(prismaService.ordemServico.findMany).toHaveBeenCalledWith({
+        where: {
+          status: 'DELIVERED',
+          iniciada_em: { not: null },
+          finalizada_em: { not: null },
+        },
+        select: { iniciada_em: true, finalizada_em: true },
+      });
+      expect(result).toEqual({ totalMinutos: 180, total: 2 });
+    });
+
+    it('deve retornar zero quando não há ordens entregues', async () => {
+      (prismaService.ordemServico.findMany as jest.Mock).mockResolvedValue([]);
+
+      const result = await repository.calcularTempoMedioExecucao();
+
+      expect(result).toEqual({ totalMinutos: 0, total: 0 });
+    });
+  });
 });
