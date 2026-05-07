@@ -260,7 +260,7 @@ describe('OS Policies', () => {
     });
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
       osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
       const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
 
