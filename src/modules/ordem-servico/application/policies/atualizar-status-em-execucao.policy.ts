@@ -17,17 +17,23 @@ export class AtualizarStatusEmExecucaoPolicy {
 
   @OnEvent('OsSemPecasConfirmada')
   async handleSemPecas(evento: OsSemPecasConfirmada): Promise<void> {
-    await this.iniciarExecucao(evento.ordemServicoId, 'AWAITING_APPROVAL');
+    await this.iniciarExecucao(evento.ordemServicoId, ['AWAITING_APPROVAL']);
   }
 
+  // PecasReservadas vem de dois lugares:
+  // 1. DebitarEstoquePolicy (peças disponíveis imediatamente) → OS em AWAITING_APPROVAL
+  // 2. LiberarOrdensAguardandoPecasPolicy (peças recebidas do fornecedor) → OS em AWAITING_PARTS
   @OnEvent('PecasReservadas')
   async handlePecasReservadas(evento: { ordemServicoId: string }): Promise<void> {
-    await this.iniciarExecucao(evento.ordemServicoId, 'AWAITING_PARTS');
+    await this.iniciarExecucao(evento.ordemServicoId, ['AWAITING_APPROVAL', 'AWAITING_PARTS']);
   }
 
-  private async iniciarExecucao(ordemServicoId: string, expectedStatus: OSStatus): Promise<void> {
+  private async iniciarExecucao(
+    ordemServicoId: string,
+    expectedStatuses: OSStatus[]
+  ): Promise<void> {
     const os = await this.ordemServicoRepository.findOne(ordemServicoId);
-    if (os.status !== expectedStatus) {
+    if (!expectedStatuses.includes(os.status)) {
       this.logger.warn(
         `[P-08] OS ${ordemServicoId} em status inválido para iniciar execução: ${os.status}`
       );

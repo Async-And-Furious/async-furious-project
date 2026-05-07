@@ -259,7 +259,18 @@ describe('OS Policies', () => {
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
     });
 
-    it('deve atualizar para IN_PROGRESS via PecasReservadas', async () => {
+    it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_APPROVAL', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+      osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
+      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+
+      await policy.handlePecasReservadas({ ordemServicoId: 'os-1' });
+
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
+      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
+    });
+
+    it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_PARTS', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
       osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
       const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
