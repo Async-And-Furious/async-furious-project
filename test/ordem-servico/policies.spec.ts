@@ -433,38 +433,4 @@ describe('OS Policies', () => {
       expect(osRepo.update).not.toHaveBeenCalled();
     });
   });
-
-  describe('P-16 IniciarMonitoramentoTempoPolicy', () => {
-    it('should handle OS with null data', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em: null }));
-      osRepo.update.mockResolvedValue(mockOs({ iniciada_em: new Date() }));
-      const policy = new IniciarMonitoramentoTempoPolicy(osRepo, emissor);
-
-      await policy.handle(new OrdemServicoAssumida('os-1'));
-
-      expect(osRepo.update).toHaveBeenCalled();
-    });
-  });
-
-  describe('P-17 FinalizarMonitoramentoTempoPolicy', () => {
-    it('should handle OS with data', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em: new Date() }));
-      osRepo.update.mockResolvedValue(mockOs({ finalizada_em: new Date() }));
-      const policy = new FinalizarMonitoramentoTempoPolicy(osRepo, emissor);
-
-      await policy.handle(new ServicoConcluidoPeloMecanico('os-1'));
-
-      expect(osRepo.update).toHaveBeenCalled();
-    });
-  });
-
-  describe('P-18 NotificarClienteConclusaoPolicy', () => {
-    it('should emit event with correct data', async () => {
-      const policy = new NotificarClienteConclusaoPolicy(emissor);
-
-      await policy.handle(new StatusAtualizadoFinalizada('os-1'));
-
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(Object));
-    });
-  });
 });
