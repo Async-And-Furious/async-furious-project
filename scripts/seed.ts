@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -429,21 +430,56 @@ const PECAS_INSUMOS = [
 ];
 
 async function seedAdmin(): Promise<void> {
-  const existingAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
-  if (existingAdmin) {
-    console.log('  ⏭  Admin já existe, pulando');
-    return;
-  }
   const hashedPassword = await bcrypt.hash(password ?? '', 10);
-  await prisma.user.create({
-    data: {
+  await prisma.user.upsert({
+    where: { email: email?.toLowerCase()?.trim() ?? '' },
+    update: { password: hashedPassword },
+    create: {
       email: email?.toLowerCase()?.trim() ?? '',
       password: hashedPassword,
       name: 'Admin User',
       role: 'ADMIN',
     },
   });
-  console.log(`  ✅ Admin criado: ${email}`);
+  console.log(`  ✅ Admin criado/atualizado: ${email}`);
+}
+
+async function seedRecepcionista(): Promise<void> {
+  const recepEmail = 'recepcionista@oficina.com';
+  const existing = await prisma.user.findFirst({ where: { email: recepEmail } });
+  if (existing) {
+    console.log('  ⏭  Recepcionista já existe, pulando');
+    return;
+  }
+  const hashedPassword = await bcrypt.hash('recep123', 10);
+  await prisma.user.create({
+    data: {
+      email: recepEmail,
+      password: hashedPassword,
+      name: 'Recepcionista Padrão',
+      role: 'RECEPCIONISTA',
+    },
+  });
+  console.log(`  ✅ Recepcionista criada: ${recepEmail}`);
+}
+
+async function seedMecanico(): Promise<void> {
+  const mecEmail = 'mecanico@oficina.com';
+  const existing = await prisma.user.findFirst({ where: { email: mecEmail } });
+  if (existing) {
+    console.log('  ⏭  Mecânico já existe, pulando');
+    return;
+  }
+  const hashedPassword = await bcrypt.hash('mecanico123', 10);
+  await prisma.user.create({
+    data: {
+      email: mecEmail,
+      password: hashedPassword,
+      name: 'Mecânico Padrão',
+      role: 'MECANICO',
+    },
+  });
+  console.log(`  ✅ Mecânico criado: ${mecEmail}`);
 }
 
 async function seedLoop<T>(
@@ -684,6 +720,8 @@ async function seed(): Promise<void> {
   console.log('🌱 Seedando banco de dados...\n');
 
   await seedAdmin();
+  await seedRecepcionista();
+  await seedMecanico();
   const clienteIds = await seedClientes();
   await seedVeiculos(clienteIds);
   await seedServicos();

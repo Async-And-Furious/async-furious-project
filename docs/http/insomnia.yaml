@@ -244,6 +244,27 @@ collection:
             send: true
             store: true
           rebuildPath: true
+      - url: "{{ base_url }}/ordens-servico/tempo-medio"
+        name: Tempo Medio de Execucao
+        meta:
+          id: req_os_tempo_medio
+          created: 1785600000020
+          modified: 1785600000020
+          isPrivate: false
+          description: "Requires ADMIN role — average execution time (iniciada_em → finalizada_em) for DELIVERED OS"
+          sortKey: -1745628000065
+        method: GET
+        authentication:
+          type: bearer
+          token: "{{ admin_token }}"
+        settings:
+          renderRequestBody: true
+          encodeUrl: true
+          followRedirects: global
+          cookies:
+            send: true
+            store: true
+          rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}"
         name: Get Ordem Servico by ID
         meta:

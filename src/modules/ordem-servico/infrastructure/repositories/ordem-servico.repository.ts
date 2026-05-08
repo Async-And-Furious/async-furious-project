@@ -89,4 +89,24 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
       where: { id },
     })) as unknown as OrdemDeServico;
   }
+
+  async calcularTempoMedioExecucao(): Promise<{ totalMinutos: number; total: number }> {
+    const ordens = await this.prisma.ordemServico.findMany({
+      where: {
+        status: 'DELIVERED',
+        iniciada_em: { not: null },
+        finalizada_em: { not: null },
+      },
+      select: { iniciada_em: true, finalizada_em: true },
+    });
+
+    if (ordens.length === 0) return { totalMinutos: 0, total: 0 };
+
+    const totalMinutos = ordens.reduce((acc, os) => {
+      const diff = os.finalizada_em!.getTime() - os.iniciada_em!.getTime();
+      return acc + diff / 60000;
+    }, 0);
+
+    return { totalMinutos, total: ordens.length };
+  }
 }
