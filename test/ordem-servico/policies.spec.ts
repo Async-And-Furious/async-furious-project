@@ -74,6 +74,20 @@ async function shouldNotUpdateWhenStatusIs(
   expect(osRepo.update).not.toHaveBeenCalled();
 }
 
+/** Test helper: verifies policy updates OS to IN_PROGRESS and emits StatusAtualizadoEmExecucao */
+async function shouldUpdateToInProgress(
+  osRepo: jest.Mocked<IOrdemServicoRepository>,
+  emissor: jest.Mocked<EmissorEventos>,
+  status: string,
+  handler: () => Promise<void>,
+): Promise<void> {
+  osRepo.findOne.mockResolvedValue(mockOs({ status }));
+  osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
+  await handler();
+  expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
+  expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
+}
+
 describe('OS Policies', () => {
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
   let orcRepo: jest.Mocked<IOrcamentoRepository>;
@@ -254,41 +268,29 @@ describe('OS Policies', () => {
 
   describe('P-08 AtualizarStatusEmExecucaoPolicy', () => {
     it('deve atualizar para IN_PROGRESS e emitir StatusAtualizadoEmExecucao via OsSemPecasConfirmada', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
-      osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-
-      await policy.handleSemPecas(new OsSemPecasConfirmada('os-1'));
-
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
-    });
+          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+          await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
+            policy.handleSemPecas(new OsSemPecasConfirmada('os-1')),
+          );
+        });
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_APPROVAL', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
-      osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-
-      await policy.handlePecasReservadas({ ordemServicoId: 'os-1' });
-
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
-    });
+          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+          await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
+            policy.handlePecasReservadas({ ordemServicoId: 'os-1' }),
+          );
+        });
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_PARTS', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
-      osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-
-      await policy.handlePecasReservadas({ ordemServicoId: 'os-1' });
-
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
-    });
+          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+          await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_PARTS', () =>
+            policy.handlePecasReservadas({ ordemServicoId: 'os-1' }),
+          );
+        });
 
     it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
           const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new OsSemPecasConfirmada('os-1'), 'handleSemPecas');
+          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new OsSemPecasConfirmada('os-1'), 'handleSemPecas');
         });
   });
 
