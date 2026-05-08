@@ -61,6 +61,19 @@ const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
   ...overrides,
 });
 
+/** Test helper: verifies policy should NOT update when OS has wrong status */
+async function shouldNotUpdateWhenStatusIs(
+  osRepo: jest.Mocked<IOrdemServicoRepository>,
+  policy: unknown,
+  wrongStatus: string,
+  event: unknown,
+  methodName = 'handle',
+): Promise<void> {
+  osRepo.findOne.mockResolvedValue(mockOs({ status: wrongStatus }));
+  await (policy as Record<string, (e: unknown) => Promise<void>>)[methodName](event);
+  expect(osRepo.update).not.toHaveBeenCalled();
+}
+
 describe('OS Policies', () => {
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
   let orcRepo: jest.Mocked<IOrcamentoRepository>;
@@ -121,13 +134,9 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em RECEIVED', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo, emissor);
-
-      await policy.handle(new OrdemServicoAssumida('os-1'));
-
-      expect(osRepo.update).not.toHaveBeenCalled();
-    });
+          const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo, emissor);
+          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'UNDER_DIAGNOSIS', new OrdemServicoAssumida('os-1'));
+        });
   });
 
   // ─── P-03 ────────────────────────────────────────────────────────────────
@@ -214,13 +223,9 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS já não está UNDER_DIAGNOSIS', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
-      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
-
-      await policy.handle(new OrcamentoEnviado('os-1', 'orc-1'));
-
-      expect(osRepo.update).not.toHaveBeenCalled();
-    });
+          const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
+          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'AWAITING_APPROVAL', new OrcamentoEnviado('os-1', 'orc-1'));
+        });
   });
 
   // ─── P-07 ────────────────────────────────────────────────────────────────
@@ -282,13 +287,9 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-
-      await policy.handleSemPecas(new OsSemPecasConfirmada('os-1'));
-
-      expect(osRepo.update).not.toHaveBeenCalled();
-    });
+          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new OsSemPecasConfirmada('os-1'), 'handleSemPecas');
+        });
   });
 
   // ─── P-09 ────────────────────────────────────────────────────────────────
@@ -319,13 +320,9 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em IN_PROGRESS', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const policy = new AtualizarStatusFinalizadaPolicy(osRepo, emissor);
-
-      await policy.handle(new ServicoConcluidoPeloMecanico('os-1'));
-
-      expect(osRepo.update).not.toHaveBeenCalled();
-    });
+          const policy = new AtualizarStatusFinalizadaPolicy(osRepo, emissor);
+          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'RECEIVED', new ServicoConcluidoPeloMecanico('os-1'));
+        });
   });
 
   // ─── P-11 ────────────────────────────────────────────────────────────────
@@ -385,13 +382,9 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em FINISHED', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
-
-      await policy.handle(new PagamentoRegistrado('os-1'));
-
-      expect(osRepo.update).not.toHaveBeenCalled();
-    });
+          const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
+          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new PagamentoRegistrado('os-1'));
+        });
   });
 
   // ─── P-14 ────────────────────────────────────────────────────────────────
@@ -425,12 +418,8 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-      const policy = new AtualizarStatusAguardandoPecasPolicy(osRepo, emissor);
-
-      await policy.handle(new PecasIndisponiveis('os-1', ['peca-1']));
-
-      expect(osRepo.update).not.toHaveBeenCalled();
-    });
+          const policy = new AtualizarStatusAguardandoPecasPolicy(osRepo, emissor);
+          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new PecasIndisponiveis('os-1', ['peca-1']));
+        });
   });
 });
