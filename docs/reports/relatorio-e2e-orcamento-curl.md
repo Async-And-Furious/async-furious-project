@@ -5,6 +5,8 @@ Base URL: http://localhost:3000/api/v1
 
 ## Etapas
 
+> Nota: este relatório registra uma execução histórica de E2E. No estado atual da API, a etapa de geração de orçamento é acionada pelo endpoint `PATCH /ordens-servico/:id/servicos-insumos`.
+
 ### 1) Registrar usuario
 Comando:
 ```bash
