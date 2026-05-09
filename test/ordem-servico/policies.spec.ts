@@ -67,7 +67,7 @@ async function shouldNotUpdateWhenStatusIs(
   policy: unknown,
   wrongStatus: string,
   event: unknown,
-  methodName = 'handle',
+  methodName = 'handle'
 ): Promise<void> {
   osRepo.findOne.mockResolvedValue(mockOs({ status: wrongStatus }));
   await (policy as Record<string, (e: unknown) => Promise<void>>)[methodName](event);
@@ -79,7 +79,7 @@ async function shouldUpdateToInProgress(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
   emissor: jest.Mocked<EmissorEventos>,
   status: string,
-  handler: () => Promise<void>,
+  handler: () => Promise<void>
 ): Promise<void> {
   osRepo.findOne.mockResolvedValue(mockOs({ status }));
   osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
@@ -148,9 +148,14 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em RECEIVED', async () => {
-          const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo, emissor);
-          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'UNDER_DIAGNOSIS', new OrdemServicoAssumida('os-1'));
-        });
+      const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo, emissor);
+      await shouldNotUpdateWhenStatusIs(
+        osRepo,
+        policy,
+        'UNDER_DIAGNOSIS',
+        new OrdemServicoAssumida('os-1')
+      );
+    });
   });
 
   // ─── P-03 ────────────────────────────────────────────────────────────────
@@ -237,9 +242,14 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS já não está UNDER_DIAGNOSIS', async () => {
-          const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
-          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'AWAITING_APPROVAL', new OrcamentoEnviado('os-1', 'orc-1'));
-        });
+      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
+      await shouldNotUpdateWhenStatusIs(
+        osRepo,
+        policy,
+        'AWAITING_APPROVAL',
+        new OrcamentoEnviado('os-1', 'orc-1')
+      );
+    });
   });
 
   // ─── P-07 ────────────────────────────────────────────────────────────────
@@ -268,30 +278,36 @@ describe('OS Policies', () => {
 
   describe('P-08 AtualizarStatusEmExecucaoPolicy', () => {
     it('deve atualizar para IN_PROGRESS e emitir StatusAtualizadoEmExecucao via OsSemPecasConfirmada', async () => {
-          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-          await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
-            policy.handleSemPecas(new OsSemPecasConfirmada('os-1')),
-          );
-        });
+      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
+        policy.handleSemPecas(new OsSemPecasConfirmada('os-1'))
+      );
+    });
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_APPROVAL', async () => {
-          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-          await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
-            policy.handlePecasReservadas({ ordemServicoId: 'os-1' }),
-          );
-        });
+      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
+        policy.handlePecasReservadas({ ordemServicoId: 'os-1' })
+      );
+    });
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_PARTS', async () => {
-          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-          await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_PARTS', () =>
-            policy.handlePecasReservadas({ ordemServicoId: 'os-1' }),
-          );
-        });
+      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_PARTS', () =>
+        policy.handlePecasReservadas({ ordemServicoId: 'os-1' })
+      );
+    });
 
     it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-          const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
-          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new OsSemPecasConfirmada('os-1'), 'handleSemPecas');
-        });
+      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      await shouldNotUpdateWhenStatusIs(
+        osRepo,
+        policy,
+        'IN_PROGRESS',
+        new OsSemPecasConfirmada('os-1'),
+        'handleSemPecas'
+      );
+    });
   });
 
   // ─── P-09 ────────────────────────────────────────────────────────────────
@@ -322,9 +338,14 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em IN_PROGRESS', async () => {
-          const policy = new AtualizarStatusFinalizadaPolicy(osRepo, emissor);
-          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'RECEIVED', new ServicoConcluidoPeloMecanico('os-1'));
-        });
+      const policy = new AtualizarStatusFinalizadaPolicy(osRepo, emissor);
+      await shouldNotUpdateWhenStatusIs(
+        osRepo,
+        policy,
+        'RECEIVED',
+        new ServicoConcluidoPeloMecanico('os-1')
+      );
+    });
   });
 
   // ─── P-11 ────────────────────────────────────────────────────────────────
@@ -384,9 +405,14 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em FINISHED', async () => {
-          const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
-          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new PagamentoRegistrado('os-1'));
-        });
+      const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
+      await shouldNotUpdateWhenStatusIs(
+        osRepo,
+        policy,
+        'IN_PROGRESS',
+        new PagamentoRegistrado('os-1')
+      );
+    });
   });
 
   // ─── P-14 ────────────────────────────────────────────────────────────────
@@ -420,8 +446,13 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-          const policy = new AtualizarStatusAguardandoPecasPolicy(osRepo, emissor);
-          await shouldNotUpdateWhenStatusIs(osRepo, policy, 'IN_PROGRESS', new PecasIndisponiveis('os-1', ['peca-1']));
-        });
+      const policy = new AtualizarStatusAguardandoPecasPolicy(osRepo, emissor);
+      await shouldNotUpdateWhenStatusIs(
+        osRepo,
+        policy,
+        'IN_PROGRESS',
+        new PecasIndisponiveis('os-1', ['peca-1'])
+      );
+    });
   });
 });

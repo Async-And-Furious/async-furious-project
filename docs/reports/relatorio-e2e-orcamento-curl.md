@@ -1,7 +1,7 @@
 # Relatorio E2E via cURL - Fluxo Ate Aprovacao de Orcamento
 
 Data/Hora: 2026-04-25T12:39:36.920Z
-Base URL: http://localhost:3000/api/v1
+Base URL: http://localhost:5000/api/v1
 
 ## Etapas
 
@@ -10,7 +10,7 @@ Base URL: http://localhost:3000/api/v1
 ### 1) Registrar usuario
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -X POST "http://localhost:3000/api/v1/auth/register" -d '{"email":"e2e.user.1777120776790@example.com","password":"senha123456","name":"E2E User 1777120776790"}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -X POST "http://localhost:5000/api/v1/auth/register" -d '{"email":"e2e.user.1777120776790@example.com","password":"senha123456","name":"E2E User 1777120776790"}'
 ```
 Status: 201
 Resposta:
@@ -28,7 +28,7 @@ Resposta:
 ### 2) Login
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -X POST "http://localhost:3000/api/v1/auth/login" -d '{"email":"e2e.user.1777120776790@example.com","password":"senha123456"}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -X POST "http://localhost:5000/api/v1/auth/login" -d '{"email":"e2e.user.1777120776790@example.com","password":"senha123456"}'
 ```
 Status: 200
 Resposta:
@@ -46,7 +46,7 @@ Resposta:
 ### 3) Criar cliente
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X POST "http://localhost:3000/api/v1/clientes" -d '{"nome":"Cliente E2E 1777120776790","email":"e2e.cliente.1777120776790@example.com","telefone":"11999998888","documento":"76804512065","tipo_documento":"CPF"}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X POST "http://localhost:5000/api/v1/clientes" -d '{"nome":"Cliente E2E 1777120776790","email":"e2e.cliente.1777120776790@example.com","telefone":"11999998888","documento":"76804512065","tipo_documento":"CPF"}'
 ```
 Status: 201
 Resposta:
@@ -66,7 +66,7 @@ Resposta:
 ### 4) Criar veiculo
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X POST "http://localhost:3000/api/v1/veiculos" -d '{"placa":"ABC4D20","marca":"Toyota","modelo":"Corolla","ano":2020,"cor":"Preto","id_cliente":"de9e3275-23dd-4859-8c09-b213ab2a77fe"}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X POST "http://localhost:5000/api/v1/veiculos" -d '{"placa":"ABC4D20","marca":"Toyota","modelo":"Corolla","ano":2020,"cor":"Preto","id_cliente":"de9e3275-23dd-4859-8c09-b213ab2a77fe"}'
 ```
 Status: 201
 Resposta:
@@ -87,7 +87,7 @@ Resposta:
 ### 5) Criar ordem de servico
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X POST "http://localhost:3000/api/v1/ordens-servico" -d '{"id_veiculo":"16aba024-44bb-4e81-a348-1770e6bb953a","id_cliente":"de9e3275-23dd-4859-8c09-b213ab2a77fe","descricao":"Revisao geral E2E"}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X POST "http://localhost:5000/api/v1/ordens-servico" -d '{"id_veiculo":"16aba024-44bb-4e81-a348-1770e6bb953a","id_cliente":"de9e3275-23dd-4859-8c09-b213ab2a77fe","descricao":"Revisao geral E2E"}'
 ```
 Status: 201
 Resposta:
@@ -112,7 +112,7 @@ Resposta:
 ### 6) Gerar orcamento
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X PATCH "http://localhost:3000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe/orcamento/gerar" -d '{"valor_total_servicos":300.5,"valor_total_pecas":199.5}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X PATCH "http://localhost:5000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe/servicos-insumos" -d '{"valor_total_servicos":300.5,"valor_total_pecas":199.5}'
 ```
 Status: 200
 Resposta:
@@ -121,7 +121,7 @@ Resposta:
   "id": "0093411a-c3d5-4b79-a341-7b70dbe35cfe",
   "id_veiculo": "16aba024-44bb-4e81-a348-1770e6bb953a",
   "id_cliente": "de9e3275-23dd-4859-8c09-b213ab2a77fe",
-  "status": "RECEIVED",
+  "status": "AWAITING_APPROVAL",
   "descricao": "Revisao geral E2E",
   "valor_total_servicos": "300.5",
   "valor_total_pecas": "199.5",
@@ -137,7 +137,7 @@ Resposta:
 ### 7) Aprovar orcamento
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X PATCH "http://localhost:3000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe/orcamento/aprovar" -d '{}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X PATCH "http://localhost:5000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe/orcamento/aprovar" -d '{}'
 ```
 Status: 200
 Resposta:
@@ -162,7 +162,7 @@ Resposta:
 ### 8) Consultar OS final
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Authorization: Bearer <TOKEN>" -X GET "http://localhost:3000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe"
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Authorization: Bearer <TOKEN>" -X GET "http://localhost:5000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe"
 ```
 Status: 200
 Resposta:

@@ -164,7 +164,7 @@ docs/http/insomnia.yaml
 | POST   | `/ordens-servico`                     | RECEPCIONISTA | Criar OS                                       |
 | GET    | `/ordens-servico`                     | Autenticado   | Listar OSs                                     |
 | GET    | `/ordens-servico/:id`                 | Autenticado   | Detalhar OS                                    |
-| GET    | `/ordens-servico/:id/status`          | Autenticado   | Consultar status (endpoint público para cliente) |
+| GET    | `/ordens-servico/:id/status`          | Autenticado   | Consultar status da OS                            |
 | PATCH  | `/ordens-servico/:id`                 | ADMIN         | Atualizar OS                                   |
 | DELETE | `/ordens-servico/:id`                 | ADMIN         | Deletar OS                                     |
 | PATCH  | `/ordens-servico/:id/assumir`         | MECÂNICO      | Mecânico assume OS → UNDER_DIAGNOSIS           |

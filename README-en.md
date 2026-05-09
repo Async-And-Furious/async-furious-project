@@ -163,7 +163,7 @@ docs/http/insomnia.yaml
 | POST   | `/ordens-servico`                     | RECEPTIONIST  | Create service order                            |
 | GET    | `/ordens-servico`                     | Authenticated | List service orders                             |
 | GET    | `/ordens-servico/:id`                 | Authenticated | Get service order                               |
-| GET    | `/ordens-servico/:id/status`          | Authenticated | Get status (public endpoint for customer)        |
+| GET    | `/ordens-servico/:id/status`          | Authenticated | Get service order status                          |
 | PATCH  | `/ordens-servico/:id`                 | ADMIN         | Update service order                            |
 | DELETE | `/ordens-servico/:id`                 | ADMIN         | Delete service order                            |
 | PATCH  | `/ordens-servico/:id/assumir`         | MECHANIC      | Mechanic takes order → UNDER_DIAGNOSIS          |
