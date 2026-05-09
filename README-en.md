@@ -190,14 +190,13 @@ docs/http/insomnia.yaml
 
 | Method | Endpoint         | Access      | Description          |
 | ------ | ---------------- | ---------- | -------------------- |
-| POST   | `/pagamentos`    | ADMIN      | Register payment     |
-| GET    | `/pagamentos`    | ADMIN      | List payments        |
+| POST   | `/pagamentos/registrar` | Authenticated | Register payment and trigger service-order delivery flow |
 
 ---
 
 ## 🔐 Authentication
 
-- Endpoints under `/clientes`, `/veiculos`, `/servicos`, `/ordens-servico`, `/pecas`, `/pagamentos` require JWT token (except public endpoints)
+- Endpoints under `/clientes`, `/veiculos`, `/servicos`, `/ordens-servico`, `/pecas`, `/pagamentos/registrar` require JWT token (except public endpoints)
 - Endpoints under `/auth/*` are public
 - Token: Bearer with 1-hour expiry
 - Roles: ADMIN, RECEPTIONIST, MECHANIC
