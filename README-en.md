@@ -184,7 +184,10 @@ docs/http/insomnia.yaml
 | GET    | `/pecas`         | Authenticated | List parts       |
 | GET    | `/pecas/:id`     | Authenticated | Get part         |
 | PATCH  | `/pecas/:id`     | ADMIN      | Update part         |
+| PATCH  | `/pecas/:id/estoque` | ADMIN  | Update stock quantity |
 | DELETE | `/pecas/:id`     | ADMIN      | Delete part         |
+| POST   | `/pecas/fornecedor/solicitar` | ADMIN | Request part replenishment from supplier |
+| PATCH  | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirm supplier order receipt and update stock |
 
 #### Payments (`/api/v1/pagamentos`)
 
