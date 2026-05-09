@@ -79,6 +79,7 @@ SEED_ADMIN_EMAIL="seu-email-admin"
 SEED_ADMIN_PASSWORD="sua-senha-admin"
 ```
 
+
 ### 3. Iniciar com Docker (recomendado)
 
 ```bash
@@ -86,8 +87,9 @@ SEED_ADMIN_PASSWORD="sua-senha-admin"
 docker compose -f docker-compose.dependencies.yml up -d
 
 # Roda migrations + seed + aplicação em modo watch
-pnpm dev:local
+pnpm run dev
 ```
+
 
 ### 4. Ou iniciar com stack completa
 
@@ -99,6 +101,7 @@ docker compose up -d
 A aplicação ficará disponível em `http://localhost:5000`.
 
 ---
+
 
 ## Documentação da API
 
@@ -113,6 +116,7 @@ A coleção Insomnia com todas as rotas configuradas está em:
 ```
 docs/http/insomnia.yaml
 ```
+
 
 ### Rotas
 

@@ -297,7 +297,7 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 
 ---
 
-### 5.4. BC: Gestão Financeira (`financeiro`) — _não implementado_
+### 5.4. BC: Gestão Financeira (`financeiro`)
 
 #### Eventos de Domínio (3):
 
