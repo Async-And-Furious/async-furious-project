@@ -67,14 +67,14 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
           JWT_SECRET: zap-test-jwt-secret-key
-          PORT: 5000
+          PORT: 3000
 
       - name: Aguardar aplicação ficar pronta
         run: |
           APP_PID=$(cat app.pid)
           for i in $(seq 1 30); do
             kill -0 "$APP_PID" 2>/dev/null || { echo "❌ App morreu"; cat app.log; exit 1; }
-            curl -sf http://localhost:5000/api/v1/ && echo "App pronta!" && exit 0
+            curl -sf http://localhost:3000/api/v1/ && echo "App pronta!" && exit 0
             echo "Aguardando... ($i/30)" && sleep 3
           done
           echo "❌ App não respondeu após 90s" && cat app.log && exit 1
@@ -91,7 +91,7 @@ jobs:
             -v ${{ github.workspace }}/zap-output:/zap/wrk:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-baseline.py \
-            -t http://localhost:5000/api/docs-json \
+            -t http://localhost:3000/api/docs-json \
             -c zap.conf \
             -r report_html.html \
             -J report_json.json \
@@ -104,7 +104,7 @@ jobs:
             -v ${{ github.workspace }}/zap-output:/zap/wrk:rw \
             ghcr.io/zaproxy/zaproxy:stable \
             zap-api-scan.py \
-            -t http://localhost:5000/api/docs-json \
+            -t http://localhost:3000/api/docs-json \
             -f openapi \
             -c zap.conf \
             -r report_html.html \

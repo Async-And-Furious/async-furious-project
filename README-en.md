@@ -75,9 +75,9 @@ Edit `.env`:
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workshop"
 JWT_SECRET="your-secret-key-here"
-PORT=5000
+PORT=3000
 BCRYPT_SALT_ROUNDS=10
-ALLOWED_ORIGINS=http://localhost:5000
+ALLOWED_ORIGINS=http://localhost:3000
 SEED_ADMIN_EMAIL="your-admin-email"
 SEED_ADMIN_PASSWORD="your-admin-password"
 ```
@@ -99,7 +99,7 @@ pnpm run dev
 docker compose up -d
 ```
 
-The app will be available at `http://localhost:5000`.
+The app will be available at `http://localhost:3000`.
 
 ---
 
@@ -108,7 +108,7 @@ The app will be available at `http://localhost:5000`.
 After starting the project, access Swagger docs at:
 
 ```
-http://localhost:5000/api/docs
+http://localhost:3000/api/docs
 ```
 
 The Insomnia collection with all routes is at:

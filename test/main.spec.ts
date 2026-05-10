@@ -103,12 +103,12 @@ describe('Main Bootstrap', () => {
       expect(useGlobalFiltersSpy).toHaveBeenCalledWith(globalFilter);
     });
 
-    it('deve usar porta padrão 5000 quando PORT não está definido', () => {
+    it('deve usar porta padrão 3000 quando PORT não está definido', () => {
       const originalPort = process.env.PORT;
       delete process.env.PORT;
 
-      const port = process.env.PORT ?? 5000;
-      expect(port).toBe(5000);
+      const port = process.env.PORT ?? 3000;
+      expect(port).toBe(3000);
 
       // Restaura a variável de ambiente
       if (originalPort) {
@@ -120,7 +120,7 @@ describe('Main Bootstrap', () => {
       const originalPort = process.env.PORT;
       process.env.PORT = '3000';
 
-      const port = process.env.PORT ?? 5000;
+      const port = process.env.PORT ?? 3000;
       expect(port).toBe('3000');
 
       // Restaura a variável de ambiente
