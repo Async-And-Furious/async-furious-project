@@ -1392,7 +1392,7 @@ environments:
     modified: 1785500000000
     isPrivate: false
   data:
-    base_url: http://localhost:5000/api/v1
+    base_url: http://localhost:3000/api/v1
     admin_email: admin@oficina.com
     admin_password: changeme123
     receptionist_email: receptionist@oficina.com
