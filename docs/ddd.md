@@ -342,10 +342,10 @@ Este diagrama visualiza os eventos e comandos envolvidos na gestão de peças e 
 
 As imagens abaixo representam cenários complementares levantados na etapa de modelagem colaborativa:
 
-*   Consulta de OS: `docs/static/domainstorytelling.consultaOS_2026-03-27.png`
-*   Notificação de orçamento: `docs/static/domainstorytelling.notificacao_2026-03-27.png`
-*   Cadastro de peças: `docs/static/domainstorytelling.Peças_2026-03-27.png`
-*   Remoção de peças: `docs/static/domainstorytelling.PeçasRemover_2026-03-27.png`
-*   Cadastro de serviços: `docs/static/domainstorytelling.Servico_2026-03-27 (1).png`
+*   Consulta de OS:![](./static/domainstorytelling.consultaOS_2026-03-27.png)
+*   Notificação de orçamento: ![](./static/domainstorytelling.notificacao_2026-03-27.png)
+*   Cadastro de peças: ![](./static/domainstorytelling.Peças_2026-03-27.png)
+*   Remoção de peças: ![](./static/domainstorytelling.PeçasRemover_2026-03-27.png)
+*   Cadastro de serviços: ![](./static/domainstorytelling.Servico_2026-03-27 (1).png)
 
 
