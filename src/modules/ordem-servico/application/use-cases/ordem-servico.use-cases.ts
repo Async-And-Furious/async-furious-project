@@ -1,5 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
@@ -111,7 +111,7 @@ export class ListarServicosInsumosNaOsUseCase {
     );
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id);
     if (!orcamento) {
-      throw new NotFoundException('Orçamento não foi gerado após listar serviços e insumos.');
+      throw new EntityNotFoundException('Orcamento', id);
     }
     return orcamento;
   }

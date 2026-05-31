@@ -1,5 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
+import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
@@ -113,11 +113,11 @@ describe('OS + Orçamento Use Cases', () => {
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
 
-    it('deve lançar NotFoundException quando OS não existe', async () => {
-      mockOsRepository.findOne.mockRejectedValue(new NotFoundException('OS não encontrada'));
+    it('deve lançar EntityNotFoundException quando OS não existe', async () => {
+      mockOsRepository.findOne.mockRejectedValue(new EntityNotFoundException('OrdemDeServico', 'invalid'));
 
       const uc = new AssumirOrdemServicoUseCase(mockOsRepository, mockBarramento);
-      await expect(uc.execute('invalid')).rejects.toThrow(NotFoundException);
+      await expect(uc.execute('invalid')).rejects.toThrow(EntityNotFoundException);
     });
   });
 
@@ -228,15 +228,15 @@ describe('OS + Orçamento Use Cases', () => {
       expect(result.status).toBe('APPROVED');
     });
 
-    it('deve lançar NotFoundException quando OS não encontrada', async () => {
-      mockOsRepository.findOne.mockRejectedValue(new NotFoundException('OS não encontrada'));
+    it('deve lançar EntityNotFoundException quando OS não encontrada', async () => {
+      mockOsRepository.findOne.mockRejectedValue(new EntityNotFoundException('OrdemDeServico', 'invalid'));
 
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
         mockBarramento
       );
-      await expect(uc.execute('invalid')).rejects.toThrow(NotFoundException);
+      await expect(uc.execute('invalid')).rejects.toThrow(EntityNotFoundException);
     });
 
     it('deve lançar DomainException quando orçamento não está PENDING', async () => {
@@ -254,7 +254,7 @@ describe('OS + Orçamento Use Cases', () => {
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
 
-    it('deve lançar NotFoundException quando orçamento não existe', async () => {
+    it('deve lançar EntityNotFoundException quando orçamento não existe', async () => {
       mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APPROVAL' });
       mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(null);
 
@@ -263,7 +263,7 @@ describe('OS + Orçamento Use Cases', () => {
         mockOrcamentoRepository,
         mockBarramento
       );
-      await expect(uc.execute('os-1')).rejects.toThrow(NotFoundException);
+      await expect(uc.execute('os-1')).rejects.toThrow(EntityNotFoundException);
     });
 
     it('deve lançar DomainException quando valor_total_geral é zero', async () => {
@@ -331,7 +331,7 @@ describe('OS + Orçamento Use Cases', () => {
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
 
-    it('deve lançar NotFoundException quando orçamento não existe', async () => {
+    it('deve lançar EntityNotFoundException quando orçamento não existe', async () => {
       mockOsRepository.findOne.mockResolvedValue({ ...mockOs, status: 'AWAITING_APROVAL' });
       mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(null);
 
@@ -340,7 +340,7 @@ describe('OS + Orçamento Use Cases', () => {
         mockOrcamentoRepository,
         mockBarramento
       );
-      await expect(uc.execute('os-1')).rejects.toThrow(NotFoundException);
+      await expect(uc.execute('os-1')).rejects.toThrow(EntityNotFoundException);
     });
   });
 
@@ -422,11 +422,11 @@ describe('OS + Orçamento Use Cases', () => {
       expect(result).toEqual({ ordemServicoId: 'os-1', status: 'RECEIVED' });
     });
 
-    it('deve lançar NotFoundException quando OS não existe', async () => {
-      mockOsRepository.findOne.mockRejectedValue(new NotFoundException('OS não encontrada'));
+    it('deve lançar EntityNotFoundException quando OS não existe', async () => {
+      mockOsRepository.findOne.mockRejectedValue(new EntityNotFoundException('OrdemDeServico', 'invalid'));
 
       const uc = new ConsultarStatusOrdemServicoUseCase(mockOsRepository);
-      await expect(uc.execute('invalid')).rejects.toThrow(NotFoundException);
+      await expect(uc.execute('invalid')).rejects.toThrow(EntityNotFoundException);
     });
   });
 
