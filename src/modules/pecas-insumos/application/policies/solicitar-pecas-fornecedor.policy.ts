@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 import type { IPedidoFornecedorRepository } from '../../domain/interfaces/pedido-fornecedor.repository.interface';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import { PedidoFornecedorEnviado } from '../../domain/events/pedido-fornecedor-enviado.event';
@@ -16,7 +16,7 @@ export class SolicitarPecasFornecedorPolicy {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly pedidoFornecedorRepository: IPedidoFornecedorRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(cmd: SolicitarReposicaoCommand): Promise<void> {
