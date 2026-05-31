@@ -64,7 +64,7 @@ export class ClienteController {
           email: 'joao@example.com',
           telefone: '11999999999',
           documento: '12345678901',
-          tipo_documento: 'CPF',
+          tipoDocumento: 'CPF',
         },
       },
       'Exemplo com CNPJ': {
@@ -73,7 +73,7 @@ export class ClienteController {
           email: 'contato@empresa.com',
           telefone: '1133333333',
           documento: '12345678000190',
-          tipo_documento: 'CNPJ',
+          tipoDocumento: 'CNPJ',
         },
       },
     },

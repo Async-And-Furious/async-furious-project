@@ -1,13 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PagamentoRegistradoEvent } from '../../domain/events/pagamento-registrado.event';
 import { PagamentoRegistrado } from '../../../ordem-servico/domain/events/pagamento-registrado.event';
+import { PAGAMENTO_EVENT_PUBLISHER } from '../../domain/interfaces/pagamento.interface';
+import type { IPagamentoEventPublisher } from '../../domain/interfaces/pagamento.interface';
 
 @Injectable()
 export class AcionarEntregaOrdemServicoPolicy {
   private readonly logger = new Logger(AcionarEntregaOrdemServicoPolicy.name);
 
-  constructor(private readonly emissor: EmissorEventos) {}
+  constructor(
+    @Inject(PAGAMENTO_EVENT_PUBLISHER)
+    private readonly emissor: IPagamentoEventPublisher
+  ) {}
 
   async handle(evento: PagamentoRegistradoEvent): Promise<void> {
     this.logger.log(

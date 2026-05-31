@@ -18,7 +18,7 @@ import {
   PAGAMENTO_REPOSITORY,
 } from '../../src/modules/financeiro/domain/interfaces/pagamento.interface';
 import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/events/pagamento-registrado.event';
-import { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 
 describe('Módulo Financeiro: Policies de Fluxo', () => {
   let mockRepository: jest.Mocked<IPagamentoRepository>;
@@ -58,7 +58,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AcionarEntregaOrdemServicoPolicy,
-          { provide: EmissorEventos, useValue: mockEmissor },
+          { provide: PAGAMENTO_EVENT_PUBLISHER, useValue: mockEmissor },
         ],
       }).compile();
       policy = module.get<AcionarEntregaOrdemServicoPolicy>(AcionarEntregaOrdemServicoPolicy);
@@ -69,8 +69,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
 
       await policy.handle(eventoInterno);
 
-      // Usamos 'as any' para validar propriedades que o TypeScript ainda não conhece (Cross-Module)
-      const eventoPublicado = mockEmissor.emitir.mock.calls[0][0] as any;
+      const eventoPublicado = mockEmissor.emitir.mock.calls[0][0] as PagamentoRegistrado;
 
       expect(eventoPublicado.ordemServicoId).toBe('os-id');
       expect(eventoPublicado.pagamentoId).toBe('pag-id');
