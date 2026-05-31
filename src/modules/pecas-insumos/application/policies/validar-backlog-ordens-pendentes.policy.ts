@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import type { IOrdemServicoBacklogPort } from '@/shared/domain/interfaces/ordem-servico-backlog.port';
 import { ORDEM_SERVICO_BACKLOG_PORT } from '@/shared/domain/interfaces/ordem-servico-backlog.port';
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
-import { EmissorEventos } from '@/shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { EstoqueAtualizadoAposRecebimento } from '@/modules/pecas-insumos/domain/events/estoque-atualizado-apos-recebimento.event';
 import { BacklogValidadoPecasDisponiveis } from '@/modules/pecas-insumos/domain/events/backlog-validado-pecas-disponiveis.event';
 
@@ -13,7 +13,7 @@ export class ValidarBacklogOrdensPendentesPolicy {
     @Inject(ORDEM_SERVICO_BACKLOG_PORT)
     private readonly backlogPort: IOrdemServicoBacklogPort,
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   @OnEvent('EstoqueAtualizadoAposRecebimento')

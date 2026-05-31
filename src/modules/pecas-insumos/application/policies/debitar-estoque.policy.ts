@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { PecasEmEstoqueConfirmadas } from '../../domain/events/pecas-em-estoque-confirmadas.event';
 import { EstoqueDebitado } from '../../domain/events/estoque-debitado.event';
 import { PecasReservadas } from '../../domain/events/pecas-reservadas.event';
@@ -10,7 +10,7 @@ import { PecasReservadas } from '../../domain/events/pecas-reservadas.event';
 export class DebitarEstoquePolicy {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   @OnEvent('PecasEmEstoqueConfirmadas')

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 import type { IReservaEstoqueRepository } from '../../domain/interfaces/reserva-estoque.repository.interface';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import { PecasReservadas } from '../../domain/events/pecas-reservadas.event';
 
@@ -11,7 +11,7 @@ export class LiberarOrdensAguardandoPecasPolicy {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly reservaEstoqueRepository: IReservaEstoqueRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   @OnEvent('BacklogValidadoPecasDisponiveis')
