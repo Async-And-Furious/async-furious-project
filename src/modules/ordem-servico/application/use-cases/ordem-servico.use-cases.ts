@@ -1,6 +1,6 @@
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -18,7 +18,7 @@ import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.ev
 export class CriarOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(data: {
@@ -36,7 +36,7 @@ export class CriarOrdemServicoUseCase {
 export class AssumirOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -55,7 +55,7 @@ export class AssumirOrdemServicoUseCase {
 export class AnalisarVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -76,7 +76,7 @@ export class ListarServicosInsumosNaOsUseCase {
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
     private readonly osPecaRepository: IOsPecaRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(
@@ -147,7 +147,7 @@ export class AtualizarOrdemServicoUseCase {
 export class FinalizarExecucaoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -166,7 +166,7 @@ export class FinalizarExecucaoUseCase {
 export class AprovarServicoPrestadoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
@@ -185,7 +185,7 @@ export class AprovarServicoPrestadoUseCase {
 export class RegistrarEntregaVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
