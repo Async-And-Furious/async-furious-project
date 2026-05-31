@@ -16,8 +16,10 @@ import { VerificarDisponibilidadeEstoquePolicy } from './application/policies/ve
 import { DebitarEstoquePolicy } from './application/policies/debitar-estoque.policy';
 import { NotificarPecasIndisponiveisPolicy } from './application/policies/notificar-pecas-indisponiveis.policy';
 import { NotificarAdminReposicaoPolicy } from './application/policies/notificar-admin-reposicao.policy';
-import { SolicitarPecasFornecedorPolicy } from './application/policies/solicitar-pecas-fornecedor.policy';
-import { ReceberPecasFornecedorPolicy } from './application/policies/receber-pecas-fornecedor.policy';
+import {
+  SolicitarPecasAoFornecedorUseCase,
+  ReceberPecasDoFornecedorUseCase,
+} from './application/use-cases/fornecedor.use-cases';
 import { ValidarBacklogOrdensPendentesPolicy } from './application/policies/validar-backlog-ordens-pendentes.policy';
 import { LiberarOrdensAguardandoPecasPolicy } from './application/policies/liberar-ordens-aguardando-pecas.policy';
 import { OrdemServicoModule } from '../ordem-servico/ordem-servico.module';
@@ -61,24 +63,6 @@ import {
 
     // P-22 → P-25 policies
     {
-      provide: SolicitarPecasFornecedorPolicy,
-      useFactory: (
-        pecaRepo: PecaInsumoRepository,
-        pedidoRepo: PedidoFornecedorRepository,
-        emissor: EmissorEventos
-      ) => new SolicitarPecasFornecedorPolicy(pecaRepo, pedidoRepo, emissor),
-      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EmissorEventos],
-    },
-    {
-      provide: ReceberPecasFornecedorPolicy,
-      useFactory: (
-        pecaRepo: PecaInsumoRepository,
-        pedidoRepo: PedidoFornecedorRepository,
-        emissor: EmissorEventos
-      ) => new ReceberPecasFornecedorPolicy(pecaRepo, pedidoRepo, emissor),
-      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EmissorEventos],
-    },
-    {
       provide: ValidarBacklogOrdensPendentesPolicy,
       useFactory: (
         backlogPort: IOrdemServicoBacklogPort,
@@ -98,6 +82,26 @@ import {
     },
 
     // Use cases
+    // P-22: Solicitar peças ao fornecedor
+    {
+      provide: SolicitarPecasAoFornecedorUseCase,
+      useFactory: (
+        pecaRepo: PecaInsumoRepository,
+        pedidoRepo: PedidoFornecedorRepository,
+        emissor: EmissorEventos
+      ) => new SolicitarPecasAoFornecedorUseCase(pecaRepo, pedidoRepo, emissor),
+      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EmissorEventos],
+    },
+    // P-23: Receber peças do fornecedor
+    {
+      provide: ReceberPecasDoFornecedorUseCase,
+      useFactory: (
+        pecaRepo: PecaInsumoRepository,
+        pedidoRepo: PedidoFornecedorRepository,
+        emissor: EmissorEventos
+      ) => new ReceberPecasDoFornecedorUseCase(pecaRepo, pedidoRepo, emissor),
+      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EmissorEventos],
+    },
     {
       provide: CreatePecaInsumoUseCase,
       useFactory: (repo: PecaInsumoRepository) => new CreatePecaInsumoUseCase(repo),

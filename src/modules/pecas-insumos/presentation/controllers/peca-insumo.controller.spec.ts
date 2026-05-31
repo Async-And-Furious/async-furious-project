@@ -16,8 +16,10 @@ import {
 } from '../dto/peca-insumo.dto';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import { AuthUser } from '../../../../auth/types/auth.types';
-import { SolicitarPecasFornecedorPolicy } from '../../application/policies/solicitar-pecas-fornecedor.policy';
-import { ReceberPecasFornecedorPolicy } from '../../application/policies/receber-pecas-fornecedor.policy';
+import {
+  SolicitarPecasAoFornecedorUseCase,
+  ReceberPecasDoFornecedorUseCase,
+} from '../../application/use-cases/fornecedor.use-cases';
 
 describe('PecaInsumoController', () => {
   let controller: PecaInsumoController;
@@ -27,8 +29,8 @@ describe('PecaInsumoController', () => {
   let mockUpdateUseCase: jest.Mocked<UpdatePecaInsumoUseCase>;
   let mockUpdateEstoqueUseCase: jest.Mocked<UpdateEstoquePecaInsumoUseCase>;
   let mockDeleteUseCase: jest.Mocked<DeletePecaInsumoUseCase>;
-  let mockSolicitarPolicy: jest.Mocked<SolicitarPecasFornecedorPolicy>;
-  let mockReceberPolicy: jest.Mocked<ReceberPecasFornecedorPolicy>;
+  let mockSolicitarUseCase: jest.Mocked<SolicitarPecasAoFornecedorUseCase>;
+  let mockReceberUseCase: jest.Mocked<ReceberPecasDoFornecedorUseCase>;
 
   const mockAuthUser: AuthUser = {
     id: 'user-123',
@@ -64,12 +66,12 @@ describe('PecaInsumoController', () => {
     mockDeleteUseCase = {
       execute: jest.fn(),
     } as unknown as jest.Mocked<DeletePecaInsumoUseCase>;
-    mockSolicitarPolicy = {
+    mockSolicitarUseCase = {
       execute: jest.fn(),
-    } as unknown as jest.Mocked<SolicitarPecasFornecedorPolicy>;
-    mockReceberPolicy = {
+    } as unknown as jest.Mocked<SolicitarPecasAoFornecedorUseCase>;
+    mockReceberUseCase = {
       execute: jest.fn(),
-    } as unknown as jest.Mocked<ReceberPecasFornecedorPolicy>;
+    } as unknown as jest.Mocked<ReceberPecasDoFornecedorUseCase>;
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PecaInsumoController],
@@ -80,8 +82,8 @@ describe('PecaInsumoController', () => {
         { provide: UpdatePecaInsumoUseCase, useValue: mockUpdateUseCase },
         { provide: UpdateEstoquePecaInsumoUseCase, useValue: mockUpdateEstoqueUseCase },
         { provide: DeletePecaInsumoUseCase, useValue: mockDeleteUseCase },
-        { provide: SolicitarPecasFornecedorPolicy, useValue: mockSolicitarPolicy },
-        { provide: ReceberPecasFornecedorPolicy, useValue: mockReceberPolicy },
+        { provide: SolicitarPecasAoFornecedorUseCase, useValue: mockSolicitarUseCase },
+        { provide: ReceberPecasDoFornecedorUseCase, useValue: mockReceberUseCase },
       ],
     }).compile();
 
@@ -214,11 +216,11 @@ describe('PecaInsumoController', () => {
         ],
       };
 
-      mockSolicitarPolicy.execute.mockResolvedValue(undefined);
+      mockSolicitarUseCase.execute.mockResolvedValue(undefined);
 
       await controller.solicitarReposicao(dto);
 
-      expect(mockSolicitarPolicy.execute).toHaveBeenCalledWith({
+      expect(mockSolicitarUseCase.execute).toHaveBeenCalledWith({
         fornecedorId: 'fornecedor-1',
         pecas: [
           { pecaId: 'peca-1', quantidadeSolicitada: 10 },
@@ -233,29 +235,29 @@ describe('PecaInsumoController', () => {
         pecas: [{ pecaId: 'peca-1', quantidadeSolicitada: 3 }],
       };
 
-      mockSolicitarPolicy.execute.mockResolvedValue(undefined);
+      mockSolicitarUseCase.execute.mockResolvedValue(undefined);
 
       await controller.solicitarReposicao(dto);
 
-      expect(mockSolicitarPolicy.execute).toHaveBeenCalled();
+      expect(mockSolicitarUseCase.execute).toHaveBeenCalled();
     });
   });
 
   describe('receberPecas', () => {
     it('should call policy to confirm receipt from supplier', async () => {
-      mockReceberPolicy.execute.mockResolvedValue(undefined);
+      mockReceberUseCase.execute.mockResolvedValue(undefined);
 
       await controller.receberPecas('pedido-123');
 
-      expect(mockReceberPolicy.execute).toHaveBeenCalledWith({ pedidoId: 'pedido-123' });
+      expect(mockReceberUseCase.execute).toHaveBeenCalledWith({ pedidoId: 'pedido-123' });
     });
 
     it('should handle different pedido IDs', async () => {
-      mockReceberPolicy.execute.mockResolvedValue(undefined);
+      mockReceberUseCase.execute.mockResolvedValue(undefined);
 
       await controller.receberPecas('pedido-456');
 
-      expect(mockReceberPolicy.execute).toHaveBeenCalledWith({ pedidoId: 'pedido-456' });
+      expect(mockReceberUseCase.execute).toHaveBeenCalledWith({ pedidoId: 'pedido-456' });
     });
   });
 });
