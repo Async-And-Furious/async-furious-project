@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { PecaInsumoRepository } from '@/modules/pecas-insumos/infrastructure/repositories/peca-insumo.repository';
-import { PedidoFornecedorRepository } from '@/modules/pecas-insumos/infrastructure/repositories/pedido-fornecedor.repository';
-import { EmissorEventos } from '@/shared/infrastructure/emissor-eventos/emissor-eventos.service';
-import { PedidoFornecedorEnviado } from '@/modules/pecas-insumos/domain/events/pedido-fornecedor-enviado.event';
+import { Injectable } from '@nestjs/common';
+import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
+import type { IPedidoFornecedorRepository } from '../../domain/interfaces/pedido-fornecedor.repository.interface';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
+import { PedidoFornecedorEnviado } from '../../domain/events/pedido-fornecedor-enviado.event';
 
 export interface SolicitarReposicaoCommand {
   fornecedorId: string;
@@ -13,21 +14,20 @@ export interface SolicitarReposicaoCommand {
 @Injectable()
 export class SolicitarPecasFornecedorPolicy {
   constructor(
-    private readonly pecaInsumoRepository: PecaInsumoRepository,
-    private readonly pedidoFornecedorRepository: PedidoFornecedorRepository,
+    private readonly pecaInsumoRepository: IPecaInsumoRepository,
+    private readonly pedidoFornecedorRepository: IPedidoFornecedorRepository,
     private readonly emissor: EmissorEventos
   ) {}
 
-  @OnEvent('AdminSolicitaReposicao')
   async execute(cmd: SolicitarReposicaoCommand): Promise<void> {
     if (!cmd.pecas?.length) {
-      throw new BadRequestException('Lista de peças não pode estar vazia');
+      throw new DomainException('Lista de peças não pode estar vazia');
     }
 
     for (const item of cmd.pecas) {
       const exists = await this.pecaInsumoRepository.findOne(item.pecaId);
       if (!exists) {
-        throw new NotFoundException(`Peça ${item.pecaId} não encontrada no catálogo`);
+        throw new EntityNotFoundException('PecaInsumo', item.pecaId);
       }
     }
 

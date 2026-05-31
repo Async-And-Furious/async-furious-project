@@ -2,18 +2,17 @@ import { Injectable, Inject } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IOrdemServicoBacklogPort } from '@/shared/domain/interfaces/ordem-servico-backlog.port';
 import { ORDEM_SERVICO_BACKLOG_PORT } from '@/shared/domain/interfaces/ordem-servico-backlog.port';
-import { PecaInsumoRepository } from '@/modules/pecas-insumos/infrastructure/repositories/peca-insumo.repository';
+import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 import { EmissorEventos } from '@/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import { EstoqueAtualizadoAposRecebimento } from '@/modules/pecas-insumos/domain/events/estoque-atualizado-apos-recebimento.event';
 import { BacklogValidadoPecasDisponiveis } from '@/modules/pecas-insumos/domain/events/backlog-validado-pecas-disponiveis.event';
-import { PecaInsumo } from '@/modules/pecas-insumos/domain/entities/peca-insumo.entity';
 
 @Injectable()
 export class ValidarBacklogOrdensPendentesPolicy {
   constructor(
     @Inject(ORDEM_SERVICO_BACKLOG_PORT)
     private readonly backlogPort: IOrdemServicoBacklogPort,
-    private readonly pecaInsumoRepository: PecaInsumoRepository,
+    private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly emissor: EmissorEventos
   ) {}
 
@@ -42,9 +41,8 @@ export class ValidarBacklogOrdensPendentesPolicy {
     pecas: Array<{ pecaId: string; quantidadeNecessaria: number }>;
   }): Promise<boolean> {
     for (const item of ordem.pecas) {
-      const pecaRaw = await this.pecaInsumoRepository.findOne(item.pecaId);
-      if (!pecaRaw) return false;
-      const peca = pecaRaw as unknown as PecaInsumo;
+      const peca = await this.pecaInsumoRepository.findOne(item.pecaId);
+      if (!peca) return false;
       if (!peca.podeAtenderReserva(item.quantidadeNecessaria)) return false;
     }
     return true;
