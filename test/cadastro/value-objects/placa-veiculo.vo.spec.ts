@@ -28,7 +28,7 @@ describe('PlacaVeiculoVo', () => {
     });
 
     it('should throw for null', () => {
-      expect(() => PlacaVeiculoVo.criar(null as any)).toThrow(DomainException);
+      expect(() => PlacaVeiculoVo.criar(null as never)).toThrow(DomainException);
     });
 
     it('should throw for too short', () => {

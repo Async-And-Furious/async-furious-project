@@ -6,7 +6,7 @@ import {
 } from '../../../../shared/infrastructure/database/repository.utils';
 import { Servico } from '../../domain/entities/servico.entity';
 import { IServicoRepository } from '../../domain/interfaces/servico.interface';
-import { ServicoMapper, ServicoORMEntity } from '../persistence/servico.orm-entity';
+import { ServicoMapper } from '../persistence/servico.orm-entity';
 
 @Injectable()
 export class ServicoRepository implements IServicoRepository {

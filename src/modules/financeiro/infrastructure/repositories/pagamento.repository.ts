@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { Pagamento } from '../../domain/entities/pagamento.entity';
 import { IPagamentoRepository } from '../../domain/interfaces/pagamento.interface';
-import { PagamentoMapper, PagamentoORMEntity } from '../persistence/pagamento.orm.entity';
+import { PagamentoMapper } from '../persistence/pagamento.orm.entity';
 
 @Injectable()
 export class PagamentoRepository implements IPagamentoRepository {

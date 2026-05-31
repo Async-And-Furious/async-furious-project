@@ -12,10 +12,7 @@ import {
   UpdateVeiculoDto,
   ListQueryDto,
 } from '../../src/modules/cadastro/presentation/dto/veiculo.dto';
-import {
-  VeiculoResponseDto,
-  VeiculoListResponseDto,
-} from '../../src/modules/cadastro/presentation/dto/veiculo.response.dto';
+import { VeiculoResponseDto } from '../../src/modules/cadastro/presentation/dto/veiculo.response.dto';
 import { Veiculo } from '../../src/modules/cadastro/domain/entities/veiculo.entity';
 import { AuthUser } from '../../src/auth/types/auth.types';
 
