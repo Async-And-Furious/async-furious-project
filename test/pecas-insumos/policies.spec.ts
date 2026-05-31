@@ -488,6 +488,7 @@ describe('PecasInsumos Policies', () => {
       const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue({
         ...pedidoFornecedorPendente,
+        status: 'PENDENTE',
         itens: [
           {
             id: 'item-1',
