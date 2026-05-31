@@ -1,15 +1,23 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { VeiculoController } from './veiculo.controller';
+import { VeiculoController } from '../../src/modules/cadastro/presentation/controllers/veiculo.controller';
 import {
   CreateVeiculoUseCase,
   ListVeiculosUseCase,
   GetVeiculoUseCase,
   UpdateVeiculoUseCase,
   DeleteVeiculoUseCase,
-} from '../../application/use-cases/veiculo.use-cases';
-import { CreateVeiculoDto, UpdateVeiculoDto, ListQueryDto } from '../dto/veiculo.dto';
-import { VeiculoResponseDto, VeiculoListResponseDto } from '../dto/veiculo.response.dto';
-import { AuthUser } from '../../../../auth/types/auth.types';
+} from '../../src/modules/cadastro/application/use-cases/veiculo.use-cases';
+import {
+  CreateVeiculoDto,
+  UpdateVeiculoDto,
+  ListQueryDto,
+} from '../../src/modules/cadastro/presentation/dto/veiculo.dto';
+import {
+  VeiculoResponseDto,
+  VeiculoListResponseDto,
+} from '../../src/modules/cadastro/presentation/dto/veiculo.response.dto';
+import { Veiculo } from '../../src/modules/cadastro/domain/entities/veiculo.entity';
+import { AuthUser } from '../../src/auth/types/auth.types';
 
 interface MockUseCase {
   execute: jest.Mock;
@@ -44,6 +52,18 @@ describe('VeiculoController', () => {
     cor: 'Preto',
     clienteId: 'cliente-123',
   };
+
+  const mockVeiculoDomain: Veiculo = {
+    id: 'veiculo-123',
+    placa: {
+      formato: 'ABC1234',
+    },
+    marca: 'Toyota',
+    modelo: 'Corolla',
+    ano: 2020,
+    cor: 'Preto',
+    clienteId: 'cliente-123',
+  } as unknown as Veiculo;
 
   beforeEach(async () => {
     mockCreateUseCase = {
@@ -86,19 +106,19 @@ describe('VeiculoController', () => {
         cor: 'Preto',
         clienteId: 'cliente-123',
       };
-      mockCreateUseCase.execute.mockResolvedValue(mockVeiculoResponse);
+      mockCreateUseCase.execute.mockResolvedValue(mockVeiculoDomain);
 
       const result = await controller.create(createDto);
 
-      expect(result).toBe(mockVeiculoResponse);
+      expect(result).toEqual(mockVeiculoResponse);
       expect(mockCreateUseCase.execute).toHaveBeenCalledWith(createDto);
     });
   });
 
   describe('findAll', () => {
     it('should return list of veiculos', async () => {
-      const mockListResponse: VeiculoListResponseDto = {
-        data: [mockVeiculoResponse],
+      const mockListResponse = {
+        data: [mockVeiculoDomain],
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
       };
       mockListUseCase.execute.mockResolvedValue(mockListResponse);
@@ -107,12 +127,13 @@ describe('VeiculoController', () => {
       const result = await controller.findAll(query, mockAuthUser);
 
       expect(result.data).toHaveLength(1);
+      expect(result.data[0]).toEqual(mockVeiculoResponse);
       expect(result.pagination.total).toBe(1);
       expect(mockListUseCase.execute).toHaveBeenCalledWith(1, 10, undefined);
     });
 
     it('should pass search parameter', async () => {
-      const mockListResponse: VeiculoListResponseDto = {
+      const mockListResponse = {
         data: [],
         pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
       };
@@ -127,11 +148,11 @@ describe('VeiculoController', () => {
 
   describe('findOne', () => {
     it('should return a veiculo by id', async () => {
-      mockGetUseCase.execute.mockResolvedValue(mockVeiculoResponse);
+      mockGetUseCase.execute.mockResolvedValue(mockVeiculoDomain);
 
       const result = await controller.findOne('veiculo-123', mockAuthUser);
 
-      expect(result).toBe(mockVeiculoResponse);
+      expect(result).toEqual(mockVeiculoResponse);
       expect(mockGetUseCase.execute).toHaveBeenCalledWith('veiculo-123');
     });
   });
@@ -139,7 +160,7 @@ describe('VeiculoController', () => {
   describe('update', () => {
     it('should update a veiculo', async () => {
       const updateDto: UpdateVeiculoDto = { marca: 'Honda' };
-      const updatedVeiculo = { ...mockVeiculoResponse, marca: 'Honda' };
+      const updatedVeiculo = { ...mockVeiculoDomain, marca: 'Honda' };
       mockUpdateUseCase.execute.mockResolvedValue(updatedVeiculo);
 
       const result = await controller.update('veiculo-123', updateDto);
@@ -151,11 +172,11 @@ describe('VeiculoController', () => {
 
   describe('remove', () => {
     it('should delete a veiculo', async () => {
-      mockDeleteUseCase.execute.mockResolvedValue(mockVeiculoResponse);
+      mockDeleteUseCase.execute.mockResolvedValue(mockVeiculoDomain);
 
       const result = await controller.remove('veiculo-123');
 
-      expect(result).toBe(mockVeiculoResponse);
+      expect(result).toEqual(mockVeiculoResponse);
       expect(mockDeleteUseCase.execute).toHaveBeenCalledWith('veiculo-123');
     });
 
@@ -184,7 +205,7 @@ describe('VeiculoController', () => {
     it('should handle findOne error', async () => {
       mockGetUseCase.execute.mockRejectedValue(new Error('Not found'));
 
-      await expect(controller.findOne('invalid')).rejects.toThrow('Not found');
+      await expect(controller.findOne('invalid', mockAuthUser)).rejects.toThrow('Not found');
     });
 
     it('should handle update error', async () => {

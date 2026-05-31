@@ -21,6 +21,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { CreateVeiculoDto, UpdateVeiculoDto, ListQueryDto } from '../dto/veiculo.dto';
+import { VeiculoResponseDto, VeiculoListResponseDto } from '../dto/veiculo.response.dto';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
 import { Role } from '../../../../auth/enums/role.enum';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
@@ -62,8 +63,9 @@ export class VeiculoController {
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
-  create(@Body() dto: CreateVeiculoDto) {
-    return this.createUseCase.execute(dto);
+  async create(@Body() dto: CreateVeiculoDto): Promise<VeiculoResponseDto> {
+    const veiculo = await this.createUseCase.execute(dto);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 
   @Get()
@@ -76,12 +78,16 @@ export class VeiculoController {
   @ApiQuery({ name: 'search', type: String, required: false, example: 'Toyota' })
   @ApiResponse({ status: 200, description: 'Lista de veículos retornada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  findAll(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
-    return this.listUseCase.execute(
+  async findAll(
+    @Query() query: ListQueryDto,
+    @CurrentUser() _user: AuthUser
+  ): Promise<VeiculoListResponseDto> {
+    const result = await this.listUseCase.execute(
       Number(query.page) || 1,
       Number(query.limit) || 10,
       query.search
     );
+    return VeiculoListResponseDto.fromDomain(result.data, result.pagination);
   }
 
   @Get(':id')
@@ -90,8 +96,12 @@ export class VeiculoController {
   @ApiResponse({ status: 200, description: 'Veículo encontrado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
-    return this.getUseCase.execute(id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() _user: AuthUser
+  ): Promise<VeiculoResponseDto> {
+    const veiculo = await this.getUseCase.execute(id);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 
   @Patch(':id')
@@ -104,8 +114,12 @@ export class VeiculoController {
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
   @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateVeiculoDto) {
-    return this.updateUseCase.execute(id, dto);
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateVeiculoDto
+  ): Promise<VeiculoResponseDto> {
+    const veiculo = await this.updateUseCase.execute(id, dto);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 
   @Delete(':id')
@@ -117,7 +131,8 @@ export class VeiculoController {
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.deleteUseCase.execute(id);
+  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<VeiculoResponseDto> {
+    const veiculo = await this.deleteUseCase.execute(id);
+    return VeiculoResponseDto.fromDomain(veiculo);
   }
 }

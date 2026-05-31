@@ -151,7 +151,7 @@ describe('CreateClienteUseCase', () => {
 });
 ```
 
-- Test files: `*.spec.ts` (co-located with source)
+- Test files: `test/**/*.spec.ts` (create new tests in `test/`, avoid creating in `src/`)
 - E2E tests: `test/jest-e2e.json`
 - Jest config: `jest.config.js`
 - `tsconfig.json` path alias: `@/*` → `./src/*`
@@ -168,6 +168,7 @@ describe('CreateClienteUseCase', () => {
 6. **Validate with class-validator** — DTOs in `presentation/dto/`
 7. **Use NestJS exceptions** — `NotFoundException`, `BadRequestException`, etc.
 8. **No passwords in commits** — Use `.env`, gitignored
+9. **Prefer tests in `test/`** — New tests should be added under `test/`, not inside `src/`
 
 ---
 
