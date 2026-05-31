@@ -1,4 +1,3 @@
-import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
@@ -41,11 +40,7 @@ export class AssumirOrdemServicoUseCase {
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'RECEIVED') {
-      throw new DomainException(
-        `OS deve estar no status Recebida para ser assumida. Status atual: ${os.status}`
-      );
-    }
+    os.podeAssumir();
     await this.emissor.emitir(new OrdemServicoAssumida(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -60,11 +55,7 @@ export class AnalisarVeiculoUseCase {
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'UNDER_DIAGNOSIS') {
-      throw new DomainException(
-        `OS deve estar Em Diagnóstico para analisar o veículo. Status atual: ${os.status}`
-      );
-    }
+    os.podeAnalisarVeiculo();
     await this.emissor.emitir(new VeiculoAnalisado(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -88,11 +79,7 @@ export class ListarServicosInsumosNaOsUseCase {
     }
   ): Promise<Orcamento> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (!['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {
-      throw new DomainException(
-        `OS deve estar Em Diagnóstico ou Aguardando Aprovação. Status atual: ${os.status}`
-      );
-    }
+    os.podeLancarServicosInsumos();
 
     if (data.pecas && data.pecas.length > 0) {
       await this.osPecaRepository.replaceAll(
@@ -129,12 +116,7 @@ export class AtualizarOrdemServicoUseCase {
     }
   ): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-
-    if (!['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {
-      throw new DomainException(
-        `A ordem de serviço só pode ser atualizada até Aguardando Aprovação. Status atual: ${os.status}`
-      );
-    }
+    os.podeAtualizar();
 
     return this.ordemServicoRepository.update(id, {
       ...(data.status && { status: data.status }),
@@ -152,11 +134,7 @@ export class FinalizarExecucaoUseCase {
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'IN_PROGRESS') {
-      throw new DomainException(
-        `OS deve estar Em Execução para ser finalizada. Status atual: ${os.status}`
-      );
-    }
+    os.podeFinalizar();
     await this.emissor.emitir(new ServicoConcluidoPeloMecanico(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -171,11 +149,7 @@ export class AprovarServicoPrestadoUseCase {
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'FINISHED') {
-      throw new DomainException(
-        `OS deve estar Finalizada para aprovação do serviço pelo cliente. Status atual: ${os.status}`
-      );
-    }
+    os.podeAprovarServico();
     await this.emissor.emitir(new ServicoAprovadoPeloCliente(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -190,11 +164,7 @@ export class RegistrarEntregaVeiculoUseCase {
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'FINISHED') {
-      throw new DomainException(
-        `OS deve estar Finalizada para registrar a entrega. Status atual: ${os.status}`
-      );
-    }
+    os.podeRegistrarEntrega();
 
     await this.emissor.emitir(new PagamentoRegistrado(id));
     return this.ordemServicoRepository.findOne(id);
