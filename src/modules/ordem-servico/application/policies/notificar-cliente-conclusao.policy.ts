@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizado-finalizada.event';
 import { ClienteNotificadoConclusao } from '../../domain/events/cliente-notificado-conclusao.event';
 
@@ -8,7 +8,7 @@ import { ClienteNotificadoConclusao } from '../../domain/events/cliente-notifica
 export class NotificarClienteConclusaoPolicy {
   private readonly logger = new Logger(NotificarClienteConclusaoPolicy.name);
 
-  constructor(private readonly emissor: EmissorEventos) {}
+  constructor(private readonly emissor: IEmissorEventos) {}
 
   @OnEvent('StatusAtualizadoFinalizada')
   async handle(evento: StatusAtualizadoFinalizada): Promise<void> {

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { ServicoConcluidoPeloMecanico } from '../../domain/events/servico-concluido-pelo-mecanico.event';
 import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizado-finalizada.event';
@@ -11,7 +11,7 @@ export class AtualizarStatusFinalizadaPolicy {
 
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   @OnEvent('ServicoConcluidoPeloMecanico')
