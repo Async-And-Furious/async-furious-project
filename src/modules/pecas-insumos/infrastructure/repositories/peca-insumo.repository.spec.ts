@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import { PecaInsumoRepository } from './peca-insumo.repository';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
@@ -156,10 +156,10 @@ describe('PecaInsumoRepository', () => {
       expect(mockPrismaService.peca.findUnique).toHaveBeenCalledWith({ where: { id: '123' } });
     });
 
-    it('should throw NotFoundException when peca insumo not found', async () => {
+    it('should throw EntityNotFoundException when peca insumo not found', async () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
-      await expect(repository.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(repository.findOne('nonexistent')).rejects.toThrow(EntityNotFoundException);
     });
   });
 
@@ -181,11 +181,11 @@ describe('PecaInsumoRepository', () => {
       });
     });
 
-    it('should throw NotFoundException when peca insumo not found', async () => {
+    it('should throw EntityNotFoundException when peca insumo not found', async () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
       await expect(repository.update('nonexistent', { nome: 'X' })).rejects.toThrow(
-        NotFoundException
+        EntityNotFoundException
       );
     });
   });
@@ -207,10 +207,10 @@ describe('PecaInsumoRepository', () => {
       });
     });
 
-    it('should throw NotFoundException when peca insumo not found', async () => {
+    it('should throw EntityNotFoundException when peca insumo not found', async () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
-      await expect(repository.updateEstoque('nonexistent', 5)).rejects.toThrow(NotFoundException);
+      await expect(repository.updateEstoque('nonexistent', 5)).rejects.toThrow(EntityNotFoundException);
     });
   });
 
@@ -225,10 +225,10 @@ describe('PecaInsumoRepository', () => {
       expect(mockPrismaService.peca.delete).toHaveBeenCalledWith({ where: { id: '123' } });
     });
 
-    it('should throw NotFoundException when trying to delete nonexistent peca insumo', async () => {
+    it('should throw EntityNotFoundException when trying to delete nonexistent peca insumo', async () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
-      await expect(repository.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(repository.remove('nonexistent')).rejects.toThrow(EntityNotFoundException);
     });
   });
 });
