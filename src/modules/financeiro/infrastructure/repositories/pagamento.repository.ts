@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { Pagamento } from '../../domain/entities/pagamento.entity';
+import { IPagamentoRepository } from '../../domain/interfaces/pagamento.interface';
 import { PagamentoMapper, PagamentoORMEntity } from '../persistence/pagamento.orm.entity';
 
 @Injectable()
-export class PagamentoRepository {
+export class PagamentoRepository implements IPagamentoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async save(pagamento: Pagamento): Promise<void> {

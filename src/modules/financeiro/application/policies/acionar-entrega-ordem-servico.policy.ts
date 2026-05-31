@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import { PagamentoRegistradoEvent } from '../../domain/events/pagamento-registrado.event';
 import { PagamentoRegistrado } from '../../../ordem-servico/domain/events/pagamento-registrado.event';
@@ -10,7 +9,6 @@ export class AcionarEntregaOrdemServicoPolicy {
 
   constructor(private readonly emissor: EmissorEventos) {}
 
-  @OnEvent(PagamentoRegistradoEvent.name)
   async handle(evento: PagamentoRegistradoEvent): Promise<void> {
     this.logger.log(
       `[P-27] Pagamento interno da OS ${evento.ordemServicoId} detectado. Preparando integração.`
