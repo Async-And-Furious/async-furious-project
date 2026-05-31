@@ -17,8 +17,8 @@ export class DebitarEstoquePolicy {
   async handle(evento: PecasEmEstoqueConfirmadas): Promise<void> {
     for (const item of evento.pecas) {
       const peca = await this.pecaInsumoRepository.findOne(item.id_peca);
-      const novoEstoque = peca.quantidade_estoque - item.quantidade;
-      await this.pecaInsumoRepository.updateEstoque(item.id_peca, novoEstoque);
+      peca.debitarEstoque(item.quantidade);
+      await this.pecaInsumoRepository.updateEstoque(peca.id, peca.quantidade_estoque);
     }
 
     const itensDebitados = evento.pecas.map((item) => ({
