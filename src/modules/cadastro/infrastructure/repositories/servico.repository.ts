@@ -6,13 +6,15 @@ import {
 } from '../../../../shared/infrastructure/database/repository.utils';
 import { Servico } from '../../domain/entities/servico.entity';
 import { IServicoRepository } from '../../domain/interfaces/servico.interface';
+import { ServicoMapper, ServicoORMEntity } from '../persistence/servico.orm-entity';
 
 @Injectable()
 export class ServicoRepository implements IServicoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(data: { nome: string; descricao?: string; preco: number }): Promise<Servico> {
-    return (await this.prisma.servico.create({ data })) as unknown as Servico;
+    const ormEntity = await this.prisma.servico.create({ data });
+    return ServicoMapper.toDomain(ormEntity as ServicoORMEntity);
   }
 
   async findAll(
@@ -35,7 +37,12 @@ export class ServicoRepository implements IServicoRepository {
       this.prisma.servico.count({ where }),
     ]);
 
-    return formatPaginatedResponse(data as unknown as Servico[], page, limit, total);
+    return formatPaginatedResponse(
+      data.map((item) => ServicoMapper.toDomain(item as ServicoORMEntity)),
+      page,
+      limit,
+      total
+    );
   }
 
   async findOne(id: string): Promise<Servico> {
@@ -43,7 +50,7 @@ export class ServicoRepository implements IServicoRepository {
       where: { id },
     });
     if (!servico) throw new NotFoundException(`Servico with ID ${id} not found`);
-    return servico as unknown as Servico;
+    return ServicoMapper.toDomain(servico as ServicoORMEntity);
   }
 
   async update(
@@ -51,14 +58,17 @@ export class ServicoRepository implements IServicoRepository {
     data: { nome?: string; descricao?: string; preco?: number }
   ): Promise<Servico> {
     await this.findOne(id);
-    return (await this.prisma.servico.update({
+    const servico = await this.prisma.servico.update({
       where: { id },
       data,
-    })) as unknown as Servico;
+    });
+
+    return ServicoMapper.toDomain(servico as ServicoORMEntity);
   }
 
   async remove(id: string): Promise<Servico> {
     await this.findOne(id);
-    return (await this.prisma.servico.delete({ where: { id } })) as unknown as Servico;
+    const servico = await this.prisma.servico.delete({ where: { id } });
+    return ServicoMapper.toDomain(servico as ServicoORMEntity);
   }
 }
