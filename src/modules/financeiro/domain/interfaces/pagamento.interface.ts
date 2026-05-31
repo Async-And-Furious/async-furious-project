@@ -1,4 +1,4 @@
-import type { DomainEvent } from '../../../../../shared/domain/events/domain-event.base';
+import type { DomainEvent } from '../../../../shared/domain/events/domain-event.base';
 import { Pagamento } from '../entities/pagamento.entity';
 
 export interface IPagamentoRepository {

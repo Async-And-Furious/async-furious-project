@@ -1,12 +1,13 @@
+import { Prisma } from '@prisma/client';
 import { Pagamento } from '../../domain/entities/pagamento.entity';
 
 // Interface que espelha exatamente a tabela do Prisma
 export interface PagamentoORMEntity {
   id: string;
   ordemServicoId: string;
-  valor: number;
+  valor: Prisma.Decimal;
   status: string;
-  created_at: Date;
+  createdAt: Date;
 }
 
 export class PagamentoMapper {
@@ -19,11 +20,11 @@ export class PagamentoMapper {
     });
   }
 
-  static toOrm(pagamento: Pagamento): Omit<PagamentoORMEntity, 'created_at'> {
+  static toOrm(pagamento: Pagamento): Omit<PagamentoORMEntity, 'createdAt'> {
     return {
       id: pagamento.getId(),
       ordemServicoId: pagamento.getOrdemServicoId(),
-      valor: pagamento.getValor(),
+      valor: new Prisma.Decimal(pagamento.getValor()),
       status: pagamento.getStatus(),
     };
   }

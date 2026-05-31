@@ -14,7 +14,7 @@ export class ServicoRepository implements IServicoRepository {
 
   async create(data: { nome: string; descricao?: string; preco: number }): Promise<Servico> {
     const ormEntity = await this.prisma.servico.create({ data });
-    return ServicoMapper.toDomain(ormEntity as ServicoORMEntity);
+    return ServicoMapper.toDomain(ormEntity);
   }
 
   async findAll(
@@ -38,7 +38,7 @@ export class ServicoRepository implements IServicoRepository {
     ]);
 
     return formatPaginatedResponse(
-      data.map((item) => ServicoMapper.toDomain(item as ServicoORMEntity)),
+      data.map((item) => ServicoMapper.toDomain(item)),
       page,
       limit,
       total
@@ -50,7 +50,7 @@ export class ServicoRepository implements IServicoRepository {
       where: { id },
     });
     if (!servico) throw new NotFoundException(`Servico with ID ${id} not found`);
-    return ServicoMapper.toDomain(servico as ServicoORMEntity);
+    return ServicoMapper.toDomain(servico);
   }
 
   async update(
@@ -63,12 +63,12 @@ export class ServicoRepository implements IServicoRepository {
       data,
     });
 
-    return ServicoMapper.toDomain(servico as ServicoORMEntity);
+    return ServicoMapper.toDomain(servico);
   }
 
   async remove(id: string): Promise<Servico> {
     await this.findOne(id);
     const servico = await this.prisma.servico.delete({ where: { id } });
-    return ServicoMapper.toDomain(servico as ServicoORMEntity);
+    return ServicoMapper.toDomain(servico);
   }
 }

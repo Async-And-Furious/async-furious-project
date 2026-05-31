@@ -27,6 +27,6 @@ export class PagamentoRepository implements IPagamentoRepository {
 
     if (!record) return null;
 
-    return PagamentoMapper.toDomain(record as PagamentoORMEntity);
+    return PagamentoMapper.toDomain(record);
   }
 }

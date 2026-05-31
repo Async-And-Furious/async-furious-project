@@ -1,9 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Pagamento } from '../../domain/entities/pagamento.entity';
 import { PagamentoRegistradoEvent } from '../../domain/events/pagamento-registrado.event';
-import {
+import type {
   IPagamentoEventPublisher,
   IPagamentoRepository,
+} from '../../domain/interfaces/pagamento.interface';
+import {
   PAGAMENTO_EVENT_PUBLISHER,
   PAGAMENTO_REPOSITORY,
 } from '../../domain/interfaces/pagamento.interface';

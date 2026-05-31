@@ -1,10 +1,11 @@
+import { Prisma } from '@prisma/client';
 import { Servico } from '../../domain/entities/servico.entity';
 
 export interface ServicoORMEntity {
   id: string;
   nome: string;
   descricao: string | null;
-  preco: number;
+  preco: Prisma.Decimal;
   created_at: Date;
   updated_at: Date;
 }
@@ -26,7 +27,7 @@ export class ServicoMapper {
       id: servico.id,
       nome: servico.nome,
       descricao: servico.descricao,
-      preco: servico.preco,
+      preco: new Prisma.Decimal(servico.preco),
     };
   }
 }
