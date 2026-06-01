@@ -7,8 +7,10 @@ import { NotificarPecasIndisponiveisPolicy } from '../../src/modules/pecas-insum
 import { NotificarAdminReposicaoPolicy } from '../../src/modules/pecas-insumos/application/policies/notificar-admin-reposicao.policy';
 import { ValidarBacklogOrdensPendentesPolicy } from '../../src/modules/pecas-insumos/application/policies/validar-backlog-ordens-pendentes.policy';
 import { LiberarOrdensAguardandoPecasPolicy } from '../../src/modules/pecas-insumos/application/policies/liberar-ordens-aguardando-pecas.policy';
-import { SolicitarPecasFornecedorPolicy } from '../../src/modules/pecas-insumos/application/policies/solicitar-pecas-fornecedor.policy';
-import { ReceberPecasFornecedorPolicy } from '../../src/modules/pecas-insumos/application/policies/receber-pecas-fornecedor.policy';
+import {
+  SolicitarPecasAoFornecedorUseCase as SolicitarPecasFornecedorPolicy,
+  ReceberPecasDoFornecedorUseCase as ReceberPecasFornecedorPolicy,
+} from '../../src/modules/pecas-insumos/application/use-cases/fornecedor.use-cases';
 import { OrcamentoAprovadoComPecas } from '../../src/modules/ordem-servico/domain/events/orcamento-aprovado-com-pecas.event';
 import { PecasEmEstoqueConfirmadas } from '../../src/modules/pecas-insumos/domain/events/pecas-em-estoque-confirmadas.event';
 import { PecasNaoExistem } from '../../src/modules/pecas-insumos/domain/events/pecas-nao-existem.event';
