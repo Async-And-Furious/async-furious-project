@@ -19,10 +19,13 @@ describe('AppController (e2e)', () => {
   });
 
   it('/ (GET) - health check', () => {
-    return server.get('/').expect(200).expect((res) => {
-      expect(res.body).toHaveProperty('status', 'ok');
-      expect(res.body).toHaveProperty('timestamp');
-      expect(res.body).toHaveProperty('version');
-    });
+    return server
+      .get('/')
+      .expect(200)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('status', 'ok');
+        expect(res.body).toHaveProperty('timestamp');
+        expect(res.body).toHaveProperty('version');
+      });
   });
 });

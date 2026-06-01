@@ -35,7 +35,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       statusCode = HttpStatus.NOT_FOUND;
       message = exception.message;
       error = 'Not Found';
-      this.logger.warn(`EntityNotFoundException: ${exception.message} - ${request.method} ${request.url}`);
+      this.logger.warn(
+        `EntityNotFoundException: ${exception.message} - ${request.method} ${request.url}`
+      );
     } else if (exception instanceof DomainException) {
       statusCode = HttpStatus.BAD_REQUEST;
       message = exception.message;

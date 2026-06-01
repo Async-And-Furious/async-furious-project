@@ -28,9 +28,10 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
     entity.nome = record.nome;
     entity.codigo = record.codigo;
     entity.descricao = record.descricao;
-    entity.preco = typeof record.preco === 'object' && record.preco !== null && 'toNumber' in record.preco
-      ? (record.preco as { toNumber(): number }).toNumber()
-      : Number(record.preco);
+    entity.preco =
+      typeof record.preco === 'object' && record.preco !== null && 'toNumber' in record.preco
+        ? (record.preco as { toNumber(): number }).toNumber()
+        : Number(record.preco);
     entity.quantidade_estoque = record.quantidade_estoque;
     entity.quantidade_minima = record.quantidade_minima;
     entity.created_at = record.created_at;
@@ -70,7 +71,12 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
       this.prisma.peca.count({ where }),
     ]);
 
-    return formatPaginatedResponse(data.map((r) => this.mapToEntity(r)), page, limit, total);
+    return formatPaginatedResponse(
+      data.map((r) => this.mapToEntity(r)),
+      page,
+      limit,
+      total
+    );
   }
 
   async findOne(id: string): Promise<PecaInsumo> {

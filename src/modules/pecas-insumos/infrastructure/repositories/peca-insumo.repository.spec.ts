@@ -210,7 +210,9 @@ describe('PecaInsumoRepository', () => {
     it('should throw EntityNotFoundException when peca insumo not found', async () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
-      await expect(repository.updateEstoque('nonexistent', 5)).rejects.toThrow(EntityNotFoundException);
+      await expect(repository.updateEstoque('nonexistent', 5)).rejects.toThrow(
+        EntityNotFoundException
+      );
     });
   });
 
