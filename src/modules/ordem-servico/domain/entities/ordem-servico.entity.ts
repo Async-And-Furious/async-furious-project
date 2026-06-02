@@ -1,4 +1,6 @@
 import type { Orcamento } from './orcamento.entity';
+import { OsPeca } from './os-peca.entity';
+import { OsServico } from './os-servico.entity';
 
 export type OSStatus =
   | 'RECEIVED'
@@ -22,4 +24,6 @@ export class OrdemDeServico {
   created_at: Date;
   updated_at: Date;
   orcamento?: Orcamento;
+  osPecas?: OsPeca[];
+  osServicos?: OsServico[];
 }
