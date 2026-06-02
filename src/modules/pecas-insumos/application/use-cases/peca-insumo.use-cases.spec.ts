@@ -1,5 +1,6 @@
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
+import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 import {
   CreatePecaInsumoUseCase,
   ListPecasInsumoUseCase,
@@ -9,17 +10,21 @@ import {
   DeletePecaInsumoUseCase,
 } from './peca-insumo.use-cases';
 
-const mockPecaInsumo: PecaInsumo = {
-  id: '123',
-  nome: 'Filtro de Óleo',
-  codigo: 'FO-001',
-  descricao: 'Filtro de óleo para motor 1.0',
-  preco: 29.9,
-  quantidade_estoque: 10,
-  quantidade_minima: 2,
-  created_at: new Date(),
-  updated_at: new Date(),
-};
+const makePeca = (overrides: Partial<PecaInsumo> = {}): PecaInsumo =>
+  Object.assign(new PecaInsumo(), {
+    id: '123',
+    nome: 'Filtro de Óleo',
+    codigo: 'FO-001',
+    descricao: 'Filtro de óleo para motor 1.0',
+    preco: 29.9,
+    quantidade_estoque: 10,
+    quantidade_minima: 2,
+    created_at: new Date(),
+    updated_at: new Date(),
+    ...overrides,
+  });
+
+const mockPecaInsumo = makePeca();
 
 const makeMockRepository = (): jest.Mocked<IPecaInsumoRepository> =>
   ({
@@ -60,8 +65,7 @@ describe('CreatePecaInsumoUseCase', () => {
 
   it('should create a peca insumo without optional fields', async () => {
     const input = { nome: 'Vela de Ignição', codigo: 'VI-001', preco: 15.5 };
-    const peca = { ...mockPecaInsumo, ...input, descricao: null };
-    mockRepository.create.mockResolvedValue(peca);
+    mockRepository.create.mockResolvedValue(makePeca({ ...input, descricao: null }));
 
     const result = await useCase.execute(input);
 
@@ -76,7 +80,7 @@ describe('CreatePecaInsumoUseCase', () => {
       preco: 89.9,
       quantidade_estoque: 0,
     };
-    mockRepository.create.mockResolvedValue({ ...mockPecaInsumo, ...input });
+    mockRepository.create.mockResolvedValue(makePeca(input));
 
     const result = await useCase.execute(input);
 
@@ -170,7 +174,7 @@ describe('UpdatePecaInsumoUseCase', () => {
 
   it('should update peca insumo nome', async () => {
     const updateData = { nome: 'Filtro de Ar' };
-    mockRepository.update.mockResolvedValue({ ...mockPecaInsumo, nome: 'Filtro de Ar' });
+    mockRepository.update.mockResolvedValue(makePeca({ nome: 'Filtro de Ar' }));
 
     const result = await useCase.execute('123', updateData);
 
@@ -180,7 +184,7 @@ describe('UpdatePecaInsumoUseCase', () => {
 
   it('should update peca insumo preco', async () => {
     const updateData = { preco: 35.5 };
-    mockRepository.update.mockResolvedValue({ ...mockPecaInsumo, preco: 35.5 });
+    mockRepository.update.mockResolvedValue(makePeca({ preco: 35.5 }));
 
     const result = await useCase.execute('123', updateData);
 
@@ -190,7 +194,7 @@ describe('UpdatePecaInsumoUseCase', () => {
 
   it('should update peca insumo quantidade_minima', async () => {
     const updateData = { quantidade_minima: 5 };
-    mockRepository.update.mockResolvedValue({ ...mockPecaInsumo, quantidade_minima: 5 });
+    mockRepository.update.mockResolvedValue(makePeca({ quantidade_minima: 5 }));
 
     const result = await useCase.execute('123', updateData);
 
@@ -199,7 +203,7 @@ describe('UpdatePecaInsumoUseCase', () => {
 
   it('should update multiple fields', async () => {
     const updateData = { nome: 'Filtro de Ar', preco: 35.5, descricao: 'Nova descrição' };
-    mockRepository.update.mockResolvedValue({ ...mockPecaInsumo, ...updateData });
+    mockRepository.update.mockResolvedValue(makePeca(updateData));
 
     const result = await useCase.execute('123', updateData);
 
@@ -219,10 +223,7 @@ describe('UpdateEstoquePecaInsumoUseCase', () => {
   });
 
   it('should update stock quantity', async () => {
-    mockRepository.updateEstoque.mockResolvedValue({
-      ...mockPecaInsumo,
-      quantidade_estoque: 20,
-    });
+    mockRepository.updateEstoque.mockResolvedValue(makePeca({ quantidade_estoque: 20 }));
 
     const result = await useCase.execute('123', 20);
 
@@ -231,10 +232,7 @@ describe('UpdateEstoquePecaInsumoUseCase', () => {
   });
 
   it('should set stock to zero', async () => {
-    mockRepository.updateEstoque.mockResolvedValue({
-      ...mockPecaInsumo,
-      quantidade_estoque: 0,
-    });
+    mockRepository.updateEstoque.mockResolvedValue(makePeca({ quantidade_estoque: 0 }));
 
     const result = await useCase.execute('123', 0);
 
@@ -247,6 +245,11 @@ describe('UpdateEstoquePecaInsumoUseCase', () => {
     await useCase.execute('abc-123', 5);
 
     expect(mockRepository.updateEstoque).toHaveBeenCalledWith('abc-123', 5);
+  });
+
+  it('should throw DomainException when quantidade is negative', async () => {
+    await expect(useCase.execute('123', -1)).rejects.toThrow(DomainException);
+    expect(mockRepository.updateEstoque).not.toHaveBeenCalled();
   });
 });
 

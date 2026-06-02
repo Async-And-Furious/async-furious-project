@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import {
   formatPaginatedResponse,
@@ -11,6 +12,33 @@ import { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.inter
 export class PecaInsumoRepository implements IPecaInsumoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  private mapToEntity(record: {
+    id: string;
+    nome: string;
+    codigo: string;
+    descricao: string | null;
+    preco: unknown;
+    quantidade_estoque: number;
+    quantidade_minima: number;
+    created_at: Date;
+    updated_at: Date;
+  }): PecaInsumo {
+    const entity = new PecaInsumo();
+    entity.id = record.id;
+    entity.nome = record.nome;
+    entity.codigo = record.codigo;
+    entity.descricao = record.descricao;
+    entity.preco =
+      typeof record.preco === 'object' && record.preco !== null && 'toNumber' in record.preco
+        ? (record.preco as { toNumber(): number }).toNumber()
+        : Number(record.preco);
+    entity.quantidade_estoque = record.quantidade_estoque;
+    entity.quantidade_minima = record.quantidade_minima;
+    entity.created_at = record.created_at;
+    entity.updated_at = record.updated_at;
+    return entity;
+  }
+
   async create(data: {
     nome: string;
     codigo: string;
@@ -19,7 +47,8 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
     quantidade_estoque?: number;
     quantidade_minima?: number;
   }): Promise<PecaInsumo> {
-    return (await this.prisma.peca.create({ data })) as unknown as PecaInsumo;
+    const record = await this.prisma.peca.create({ data });
+    return this.mapToEntity(record);
   }
 
   async findAll(
@@ -42,17 +71,22 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
       this.prisma.peca.count({ where }),
     ]);
 
-    return formatPaginatedResponse(data as unknown as PecaInsumo[], page, limit, total);
+    return formatPaginatedResponse(
+      data.map((r) => this.mapToEntity(r)),
+      page,
+      limit,
+      total
+    );
   }
 
   async findOne(id: string): Promise<PecaInsumo> {
     const peca = await this.prisma.peca.findUnique({ where: { id } });
 
     if (!peca) {
-      throw new NotFoundException(`PecaInsumo with ID ${id} not found`);
+      throw new EntityNotFoundException('PecaInsumo', id);
     }
 
-    return peca as unknown as PecaInsumo;
+    return this.mapToEntity(peca);
   }
 
   async findByOrdemServicoId(ordemServicoId: string): Promise<
@@ -85,22 +119,22 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
     data: { nome?: string; descricao?: string; preco?: number; quantidade_minima?: number }
   ): Promise<PecaInsumo> {
     await this.findOne(id);
-
-    return this.prisma.peca.update({ where: { id }, data }) as unknown as PecaInsumo;
+    const record = await this.prisma.peca.update({ where: { id }, data });
+    return this.mapToEntity(record);
   }
 
   async updateEstoque(id: string, quantidade: number): Promise<PecaInsumo> {
     await this.findOne(id);
-
-    return this.prisma.peca.update({
+    const record = await this.prisma.peca.update({
       where: { id },
       data: { quantidade_estoque: quantidade },
-    }) as unknown as PecaInsumo;
+    });
+    return this.mapToEntity(record);
   }
 
   async remove(id: string): Promise<PecaInsumo> {
     await this.findOne(id);
-
-    return this.prisma.peca.delete({ where: { id } }) as unknown as PecaInsumo;
+    const record = await this.prisma.peca.delete({ where: { id } });
+    return this.mapToEntity(record);
   }
 }

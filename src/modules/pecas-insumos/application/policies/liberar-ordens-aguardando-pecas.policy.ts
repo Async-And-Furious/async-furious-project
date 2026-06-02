@@ -1,17 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { PecaInsumoRepository } from '@/modules/pecas-insumos/infrastructure/repositories/peca-insumo.repository';
-import { ReservaEstoqueRepository } from '@/modules/pecas-insumos/infrastructure/repositories/reserva-estoque.repository';
-import { EmissorEventos } from '@/shared/infrastructure/emissor-eventos/emissor-eventos.service';
-import { PecasReservadas } from '@/modules/pecas-insumos/domain/events/pecas-reservadas.event';
-import { PecaInsumo } from '@/modules/pecas-insumos/domain/entities/peca-insumo.entity';
+import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
+import type { IReservaEstoqueRepository } from '../../domain/interfaces/reserva-estoque.repository.interface';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
+import { PecasReservadas } from '../../domain/events/pecas-reservadas.event';
 
 @Injectable()
 export class LiberarOrdensAguardandoPecasPolicy {
   constructor(
-    private readonly pecaInsumoRepository: PecaInsumoRepository,
-    private readonly reservaEstoqueRepository: ReservaEstoqueRepository,
-    private readonly emissor: EmissorEventos
+    private readonly pecaInsumoRepository: IPecaInsumoRepository,
+    private readonly reservaEstoqueRepository: IReservaEstoqueRepository,
+    private readonly emissor: IEmissorEventos
   ) {}
 
   @OnEvent('BacklogValidadoPecasDisponiveis')
@@ -25,11 +25,10 @@ export class LiberarOrdensAguardandoPecasPolicy {
     const pecasReservadas: Array<{ id_peca: string; quantidade: number }> = [];
 
     for (const item of payload.pecas) {
-      const pecaRaw = await this.pecaInsumoRepository.findOne(item.pecaId);
-      if (!pecaRaw) {
-        throw new NotFoundException(`Peça ${item.pecaId} não encontrada durante liberação`);
+      const peca = await this.pecaInsumoRepository.findOne(item.pecaId);
+      if (!peca) {
+        throw new EntityNotFoundException('PecaInsumo', item.pecaId);
       }
-      const peca = pecaRaw as unknown as PecaInsumo;
       peca.debitarEstoque(item.quantidadeNecessaria);
       await this.pecaInsumoRepository.updateEstoque(peca.id, peca.quantidade_estoque);
       await this.reservaEstoqueRepository.save({

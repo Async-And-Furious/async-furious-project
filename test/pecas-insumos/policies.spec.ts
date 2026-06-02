@@ -1,12 +1,16 @@
-import { Logger, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
+import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
+import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 import { VerificarDisponibilidadeEstoquePolicy } from '../../src/modules/pecas-insumos/application/policies/verificar-disponibilidade-estoque.policy';
 import { DebitarEstoquePolicy } from '../../src/modules/pecas-insumos/application/policies/debitar-estoque.policy';
 import { NotificarPecasIndisponiveisPolicy } from '../../src/modules/pecas-insumos/application/policies/notificar-pecas-indisponiveis.policy';
 import { NotificarAdminReposicaoPolicy } from '../../src/modules/pecas-insumos/application/policies/notificar-admin-reposicao.policy';
 import { ValidarBacklogOrdensPendentesPolicy } from '../../src/modules/pecas-insumos/application/policies/validar-backlog-ordens-pendentes.policy';
 import { LiberarOrdensAguardandoPecasPolicy } from '../../src/modules/pecas-insumos/application/policies/liberar-ordens-aguardando-pecas.policy';
-import { SolicitarPecasFornecedorPolicy } from '../../src/modules/pecas-insumos/application/policies/solicitar-pecas-fornecedor.policy';
-import { ReceberPecasFornecedorPolicy } from '../../src/modules/pecas-insumos/application/policies/receber-pecas-fornecedor.policy';
+import {
+  SolicitarPecasAoFornecedorUseCase as SolicitarPecasFornecedorPolicy,
+  ReceberPecasDoFornecedorUseCase as ReceberPecasFornecedorPolicy,
+} from '../../src/modules/pecas-insumos/application/use-cases/fornecedor.use-cases';
 import { OrcamentoAprovadoComPecas } from '../../src/modules/ordem-servico/domain/events/orcamento-aprovado-com-pecas.event';
 import { PecasEmEstoqueConfirmadas } from '../../src/modules/pecas-insumos/domain/events/pecas-em-estoque-confirmadas.event';
 import { PecasNaoExistem } from '../../src/modules/pecas-insumos/domain/events/pecas-nao-existem.event';
@@ -315,7 +319,7 @@ describe('PecasInsumos Policies', () => {
           ordemId: 'os-1',
           pecas: [{ pecaId: 'peca-inexistente', quantidadeNecessaria: 1 }],
         })
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(EntityNotFoundException);
     });
   });
 
@@ -358,7 +362,7 @@ describe('PecasInsumos Policies', () => {
           fornecedorId: 'fornecedor-1',
           pecas: [],
         })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
     it('deve lancar BadRequestException quando pecas undefined', async () => {
@@ -369,7 +373,7 @@ describe('PecasInsumos Policies', () => {
           fornecedorId: 'fornecedor-1',
           pecas: undefined as any,
         })
-      ).rejects.toThrow(BadRequestException);
+      ).rejects.toThrow(DomainException);
     });
 
     it('deve lancar NotFoundException quando peca nao existe no catalogo', async () => {
@@ -381,7 +385,7 @@ describe('PecasInsumos Policies', () => {
           fornecedorId: 'fornecedor-1',
           pecas: [{ pecaId: 'peca-inexistente', quantidadeSolicitada: 5 }],
         })
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(EntityNotFoundException);
     });
 
     it('deve validar todas as pecas antes de criar pedido', async () => {
@@ -443,7 +447,7 @@ describe('PecasInsumos Policies', () => {
       pedidoFornecedorRepo.findById.mockResolvedValue(null);
 
       await expect(policy.execute({ pedidoId: 'pedido-inexistente' })).rejects.toThrow(
-        NotFoundException
+        EntityNotFoundException
       );
     });
 
@@ -457,7 +461,7 @@ describe('PecasInsumos Policies', () => {
         criado_em: new Date(),
       });
 
-      await expect(policy.execute({ pedidoId: 'pedido-1' })).rejects.toThrow(ConflictException);
+      await expect(policy.execute({ pedidoId: 'pedido-1' })).rejects.toThrow(DomainException);
     });
 
     it('deve continuar quando peca nao existe no catalogo (skip)', async () => {

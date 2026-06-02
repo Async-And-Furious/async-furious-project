@@ -1,5 +1,6 @@
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
+import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 
 export class CreatePecaInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
@@ -54,6 +55,9 @@ export class UpdateEstoquePecaInsumoUseCase {
   constructor(private readonly repository: IPecaInsumoRepository) {}
 
   async execute(id: string, quantidade: number): Promise<PecaInsumo> {
+    if (quantidade < 0) {
+      throw new DomainException('Quantidade em estoque não pode ser negativa');
+    }
     return this.repository.updateEstoque(id, quantidade);
   }
 }

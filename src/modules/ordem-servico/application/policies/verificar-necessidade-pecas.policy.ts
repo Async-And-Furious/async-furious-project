@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { OrcamentoAprovado } from '../../domain/events/orcamento-aprovado.event';
 import { OsSemPecasConfirmada } from '../../domain/events/os-sem-pecas-confirmada.event';
 import { OrcamentoAprovadoComPecas } from '../../domain/events/orcamento-aprovado-com-pecas.event';
 
 @Injectable()
 export class VerificarNecessidadePecasPolicy {
-  constructor(private readonly emissor: EmissorEventos) {}
+  constructor(private readonly emissor: IEmissorEventos) {}
 
   @OnEvent('OrcamentoAprovado')
   async handle(evento: OrcamentoAprovado): Promise<void> {

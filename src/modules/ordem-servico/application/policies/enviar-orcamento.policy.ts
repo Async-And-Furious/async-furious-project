@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event';
 import { OrcamentoEnviado } from '../../domain/events/orcamento-enviado.event';
 
@@ -8,7 +8,7 @@ import { OrcamentoEnviado } from '../../domain/events/orcamento-enviado.event';
 export class EnviarOrcamentoPolicy {
   private readonly logger = new Logger(EnviarOrcamentoPolicy.name);
 
-  constructor(private readonly emissor: EmissorEventos) {}
+  constructor(private readonly emissor: IEmissorEventos) {}
 
   @OnEvent('OrcamentoGerado')
   async handle(evento: OrcamentoGerado): Promise<void> {

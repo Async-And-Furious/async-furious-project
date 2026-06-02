@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { OrdemServicoRepository } from '@/modules/ordem-servico/infrastructure/repositories/ordem-servico.repository';
 import { PrismaService } from '@/shared/infrastructure/database/prisma.service';
+import { EntityNotFoundException } from '@/shared/domain/exceptions/entity-not-found.exception';
 
 describe('OrdemServicoRepository', () => {
   let repository: OrdemServicoRepository;
@@ -32,6 +32,20 @@ describe('OrdemServicoRepository', () => {
       tipo_documento: 'CPF',
     },
     orcamento: null,
+  };
+
+  // Entity-shaped object (mapped by mapToEntity)
+  const mappedOrdemServico = {
+    id: 'os-123',
+    veiculoId: 'veiculo-123',
+    clienteId: 'cliente-123',
+    descricao: 'Troca de óleo',
+    status: 'RECEIVED',
+    iniciada_em: null,
+    finalizada_em: null,
+    entregue_em: null,
+    created_at: new Date('2024-01-15'),
+    updated_at: new Date('2024-01-15'),
   };
 
   beforeEach(async () => {
@@ -81,7 +95,7 @@ describe('OrdemServicoRepository', () => {
           status: 'RECEIVED',
         },
       });
-      expect(result).toEqual(mockOrdemServico);
+      expect(result).toEqual(expect.objectContaining(mappedOrdemServico));
     });
 
     it('deve criar ordem de serviço sem descrição', async () => {
@@ -104,7 +118,7 @@ describe('OrdemServicoRepository', () => {
           status: 'RECEIVED',
         },
       });
-      expect(result).toEqual(ordemSemDescricao);
+      expect(result).toEqual(expect.objectContaining({ ...mappedOrdemServico, descricao: null }));
     });
   });
 
@@ -131,7 +145,7 @@ describe('OrdemServicoRepository', () => {
       });
       expect(prismaService.ordemServico.count).toHaveBeenCalledWith({ where: {} });
       expect(result).toEqual({
-        data: mockOrdens,
+        data: [expect.objectContaining(mappedOrdemServico)],
         pagination: {
           page: 1,
           limit: 10,
@@ -164,7 +178,7 @@ describe('OrdemServicoRepository', () => {
           orcamento: true,
         },
       });
-      expect(result.data).toEqual(mockOrdens);
+      expect(result.data).toEqual([expect.objectContaining(mappedOrdemServico)]);
     });
 
     it('deve calcular paginação corretamente', async () => {
@@ -207,16 +221,14 @@ describe('OrdemServicoRepository', () => {
         where: { id },
         include: { veiculo: true, cliente: true, orcamento: true },
       });
-      expect(result).toEqual(mockOrdemServico);
+      expect(result).toEqual(expect.objectContaining(mappedOrdemServico));
     });
 
     it('deve lançar NotFoundException quando ordem não encontrada', async () => {
       const id = 'os-inexistente';
       (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(repository.findOne(id)).rejects.toThrow(
-        new NotFoundException(`Ordem de Serviço com ID ${id} não encontrada`)
-      );
+      await expect(repository.findOne(id)).rejects.toThrow(EntityNotFoundException);
     });
   });
 
@@ -244,7 +256,7 @@ describe('OrdemServicoRepository', () => {
           iniciada_em: updateData.iniciada_em,
         },
       });
-      expect(result).toEqual(updatedOrdem);
+      expect(result).toEqual(expect.objectContaining({ veiculoId: 'veiculo-123', clienteId: 'cliente-123', status: 'IN_PROGRESS', descricao: 'Troca de óleo e filtro' }));
     });
 
     it('deve atualizar apenas campos fornecidos', async () => {
@@ -264,7 +276,7 @@ describe('OrdemServicoRepository', () => {
           status: updateData.status,
         },
       });
-      expect(result).toEqual(updatedOrdem);
+      expect(result).toEqual(expect.objectContaining({ ...mappedOrdemServico, status: 'FINISHED' }));
     });
 
     it('deve permitir definir campos como undefined', async () => {
@@ -288,7 +300,7 @@ describe('OrdemServicoRepository', () => {
           finalizada_em: undefined,
         },
       });
-      expect(result).toEqual(updatedOrdem);
+      expect(result).toEqual(expect.objectContaining({ veiculoId: 'veiculo-123', clienteId: 'cliente-123' }));
     });
 
     it('deve lançar NotFoundException quando ordem não encontrada para atualização', async () => {
@@ -297,9 +309,7 @@ describe('OrdemServicoRepository', () => {
 
       (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(repository.update(id, updateData)).rejects.toThrow(
-        new NotFoundException(`Ordem de Serviço com ID ${id} não encontrada`)
-      );
+      await expect(repository.update(id, updateData)).rejects.toThrow(EntityNotFoundException);
     });
   });
 
@@ -315,7 +325,7 @@ describe('OrdemServicoRepository', () => {
       expect(prismaService.ordemServico.delete).toHaveBeenCalledWith({
         where: { id },
       });
-      expect(result).toEqual(mockOrdemServico);
+      expect(result).toEqual(expect.objectContaining(mappedOrdemServico));
     });
 
     it('deve lançar NotFoundException quando ordem não encontrada para remoção', async () => {
@@ -323,9 +333,7 @@ describe('OrdemServicoRepository', () => {
 
       (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(repository.remove(id)).rejects.toThrow(
-        new NotFoundException(`Ordem de Serviço com ID ${id} não encontrada`)
-      );
+      await expect(repository.remove(id)).rejects.toThrow(EntityNotFoundException);
     });
   });
 

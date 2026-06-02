@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { DomainException } from '../../domain/exceptions/domain.exception';
+import { EntityNotFoundException } from '../../domain/exceptions/entity-not-found.exception';
 
 interface ErrorResponse {
   statusCode: number;
@@ -30,7 +31,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let message: string | string[] = 'Internal server error';
     let error = 'Internal Server Error';
 
-    if (exception instanceof DomainException) {
+    if (exception instanceof EntityNotFoundException) {
+      statusCode = HttpStatus.NOT_FOUND;
+      message = exception.message;
+      error = 'Not Found';
+      this.logger.warn(
+        `EntityNotFoundException: ${exception.message} - ${request.method} ${request.url}`
+      );
+    } else if (exception instanceof DomainException) {
       statusCode = HttpStatus.BAD_REQUEST;
       message = exception.message;
       error = 'Bad Request';

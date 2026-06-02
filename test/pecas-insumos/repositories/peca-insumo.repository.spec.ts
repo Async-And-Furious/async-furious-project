@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { EntityNotFoundException } from '../../../src/shared/domain/exceptions/entity-not-found.exception';
 import { PecaInsumoRepository } from '../../../src/modules/pecas-insumos/infrastructure/repositories/peca-insumo.repository';
 import { PrismaService } from '../../../src/shared/infrastructure/database/prisma.service';
 
@@ -73,10 +73,10 @@ describe('PecaInsumoRepository', () => {
       expect(result.nome).toBe('Óleo Lubrificante');
     });
 
-    it('should throw NotFoundException when not found', async () => {
+    it('should throw EntityNotFoundException when not found', async () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 
-      await expect(repository.findOne('nonexistent')).rejects.toThrow(NotFoundException);
+      await expect(repository.findOne('nonexistent')).rejects.toThrow(EntityNotFoundException);
     });
   });
 
