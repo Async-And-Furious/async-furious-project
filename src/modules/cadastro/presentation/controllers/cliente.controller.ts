@@ -21,6 +21,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { CreateClienteDto, UpdateClienteDto, ListQueryDto } from '../dto/cliente.dto';
+import { ClienteResponseDto, ClienteListResponseDto } from '../dto/cliente.response.dto';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
 import { Role } from '../../../../auth/enums/role.enum';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
@@ -63,7 +64,7 @@ export class ClienteController {
           email: 'joao@example.com',
           telefone: '11999999999',
           documento: '12345678901',
-          tipo_documento: 'CPF',
+          tipoDocumento: 'CPF',
         },
       },
       'Exemplo com CNPJ': {
@@ -72,7 +73,7 @@ export class ClienteController {
           email: 'contato@empresa.com',
           telefone: '1133333333',
           documento: '12345678000190',
-          tipo_documento: 'CNPJ',
+          tipoDocumento: 'CNPJ',
         },
       },
     },
@@ -81,8 +82,9 @@ export class ClienteController {
   @ApiResponse({ status: 400, description: 'Validação falhou - dados inválidos' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
-  create(@Body() dto: CreateClienteDto) {
-    return this.createUseCase.execute(dto);
+  async create(@Body() dto: CreateClienteDto): Promise<ClienteResponseDto> {
+    const cliente = await this.createUseCase.execute(dto);
+    return ClienteResponseDto.fromDomain(cliente);
   }
 
   @Get()
@@ -95,12 +97,16 @@ export class ClienteController {
   @ApiQuery({ name: 'search', type: String, required: false, example: 'João' })
   @ApiResponse({ status: 200, description: 'Lista de clientes retornada com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
-  findAll(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
-    return this.listUseCase.execute(
+  async findAll(
+    @Query() query: ListQueryDto,
+    @CurrentUser() _user: AuthUser
+  ): Promise<ClienteListResponseDto> {
+    const result = await this.listUseCase.execute(
       Number(query.page) || 1,
       Number(query.limit) || 10,
       query.search
     );
+    return ClienteListResponseDto.fromDomain(result.data, result.pagination);
   }
 
   @Get(':id')
@@ -109,8 +115,12 @@ export class ClienteController {
   @ApiResponse({ status: 200, description: 'Cliente encontrado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
-  findOne(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
-    return this.getUseCase.execute(id);
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() _user: AuthUser
+  ): Promise<ClienteResponseDto> {
+    const cliente = await this.getUseCase.execute(id);
+    return ClienteResponseDto.fromDomain(cliente);
   }
 
   @Patch(':id')
@@ -123,8 +133,12 @@ export class ClienteController {
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateClienteDto) {
-    return this.updateUseCase.execute(id, dto);
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateClienteDto
+  ): Promise<ClienteResponseDto> {
+    const cliente = await this.updateUseCase.execute(id, dto);
+    return ClienteResponseDto.fromDomain(cliente);
   }
 
   @Delete(':id')
@@ -136,7 +150,8 @@ export class ClienteController {
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Cliente não encontrado' })
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.deleteUseCase.execute(id);
+  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<ClienteResponseDto> {
+    const cliente = await this.deleteUseCase.execute(id);
+    return ClienteResponseDto.fromDomain(cliente);
   }
 }

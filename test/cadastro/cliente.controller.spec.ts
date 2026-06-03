@@ -1,15 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ClienteController } from './cliente.controller';
+import { ClienteController } from '../../src/modules/cadastro/presentation/controllers/cliente.controller';
 import {
   CreateClienteUseCase,
   ListClientesUseCase,
   GetClienteUseCase,
   UpdateClienteUseCase,
   DeleteClienteUseCase,
-} from '../../application/use-cases';
-import { CreateClienteDto, UpdateClienteDto, ListQueryDto } from '../dto/cliente.dto';
-import { Cliente } from '../../domain/entities/cliente.entity';
-import { AuthUser } from '../../../../auth/types/auth.types';
+} from '../../src/modules/cadastro/application/use-cases';
+import {
+  CreateClienteDto,
+  UpdateClienteDto,
+  ListQueryDto,
+} from '../../src/modules/cadastro/presentation/dto/cliente.dto';
+import { Cliente } from '../../src/modules/cadastro/domain/entities/cliente.entity';
+import { AuthUser } from '../../src/auth/types/auth.types';
 
 describe('ClienteController', () => {
   let controller: ClienteController;
@@ -29,13 +33,15 @@ describe('ClienteController', () => {
   const mockCliente: Cliente = {
     id: '123',
     nome: 'Test Client',
-    email: 'test@test.com',
-    telefone: '11999999999',
-    documento: '12345678901',
-    tipo_documento: 'CPF',
-    created_at: new Date(),
-    updated_at: new Date(),
-  };
+    contato: {
+      email: 'test@test.com',
+      telefone: '11999999999',
+    },
+    cpfCnpj: {
+      formato: '529.982.247-25',
+      tipo: 'CPF',
+    },
+  } as unknown as Cliente;
 
   beforeEach(async () => {
     mockCreateUseCase = { execute: jest.fn() } as unknown as jest.Mocked<CreateClienteUseCase>;
@@ -64,14 +70,21 @@ describe('ClienteController', () => {
         nome: 'Test Client',
         email: 'test@test.com',
         telefone: '11999999999',
-        documento: '12345678901',
-        tipo_documento: 'CPF',
+        documento: '52998224725',
+        tipoDocumento: 'CPF',
       };
       mockCreateUseCase.execute.mockResolvedValue(mockCliente);
 
       const result = await controller.create(createDto);
 
-      expect(result).toBe(mockCliente);
+      expect(result).toEqual({
+        id: '123',
+        nome: 'Test Client',
+        email: 'test@test.com',
+        telefone: '11999999999',
+        documento: '529.982.247-25',
+        tipoDocumento: 'CPF',
+      });
       expect(mockCreateUseCase.execute).toHaveBeenCalledWith(createDto);
     });
 
@@ -79,10 +92,16 @@ describe('ClienteController', () => {
       const createDto: CreateClienteDto = {
         nome: 'Test Client',
         email: 'test@test.com',
-        documento: '12345678901',
-        tipo_documento: 'CPF',
+        documento: '52998224725',
+        tipoDocumento: 'CPF',
       };
-      mockCreateUseCase.execute.mockResolvedValue({ ...mockCliente, telefone: null });
+      mockCreateUseCase.execute.mockResolvedValue({
+        ...mockCliente,
+        contato: {
+          ...mockCliente.contato,
+          telefone: null,
+        },
+      } as unknown as Cliente);
 
       const result = await controller.create(createDto);
 
@@ -101,7 +120,8 @@ describe('ClienteController', () => {
 
       const result = await controller.findAll({} as ListQueryDto, mockAuthUser);
 
-      expect(result).toBe(mockResult);
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].email).toBe('test@test.com');
       expect(mockListUseCase.execute).toHaveBeenCalledWith(1, 10, undefined);
     });
 
@@ -141,7 +161,8 @@ describe('ClienteController', () => {
 
       const result = await controller.findOne('123', mockAuthUser);
 
-      expect(result).toBe(mockCliente);
+      expect(result.id).toBe('123');
+      expect(result.email).toBe('test@test.com');
       expect(mockGetUseCase.execute).toHaveBeenCalledWith('123');
     });
   });
@@ -149,7 +170,10 @@ describe('ClienteController', () => {
   describe('update', () => {
     it('should update a cliente', async () => {
       const updateDto: UpdateClienteDto = { nome: 'Updated Name' };
-      mockUpdateUseCase.execute.mockResolvedValue({ ...mockCliente, nome: 'Updated Name' });
+      mockUpdateUseCase.execute.mockResolvedValue({
+        ...mockCliente,
+        nome: 'Updated Name',
+      } as unknown as Cliente);
 
       const result = await controller.update('123', updateDto);
 
@@ -163,7 +187,14 @@ describe('ClienteController', () => {
         email: 'new@test.com',
         telefone: '11988887777',
       };
-      mockUpdateUseCase.execute.mockResolvedValue({ ...mockCliente, ...updateDto });
+      mockUpdateUseCase.execute.mockResolvedValue({
+        ...mockCliente,
+        nome: updateDto.nome,
+        contato: {
+          email: updateDto.email,
+          telefone: updateDto.telefone,
+        },
+      } as unknown as Cliente);
 
       const result = await controller.update('123', updateDto);
 
@@ -179,7 +210,8 @@ describe('ClienteController', () => {
 
       const result = await controller.remove('123');
 
-      expect(result).toBe(mockCliente);
+      expect(result.id).toBe('123');
+      expect(result.nome).toBe('Test Client');
       expect(mockDeleteUseCase.execute).toHaveBeenCalledWith('123');
     });
   });

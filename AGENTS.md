@@ -23,7 +23,7 @@ pnpm run test:cov       # Coverage
 pnpm run test:e2e       # E2E (requires DB)
 
 # Single test
-pnpm run test -- src/modules/cadastro/application/use-cases/cliente.use-cases.spec.ts
+pnpm run test -- test/cadastro/use-cases/cliente.use-cases.spec.ts
 pnpm run test -- --testNamePattern="CreateClienteUseCase"
 
 # Database
@@ -67,6 +67,8 @@ presentation → application → domain
 - **Application**: Depends only on domain.
 - **Infrastructure**: Implements domain interfaces.
 - **Presentation**: Depends on application.
+- **Application must not import concrete infrastructure classes** — use domain contracts/tokens for repositories and publishers.
+- **Event listeners stay in infrastructure** — application policies should remain framework-agnostic.
 
 ### Entry Points
 - API prefix: `api/v1`
@@ -151,7 +153,8 @@ describe('CreateClienteUseCase', () => {
 });
 ```
 
-- Test files: `*.spec.ts` (co-located with source)
+- Test files: `test/**/*.spec.ts` (create new tests in `test/`, avoid creating in `src/`)
+- Controllers should also be tested under `test/` when new coverage is added.
 - E2E tests: `test/jest-e2e.json`
 - Jest config: `jest.config.js`
 - `tsconfig.json` path alias: `@/*` → `./src/*`
@@ -168,6 +171,7 @@ describe('CreateClienteUseCase', () => {
 6. **Validate with class-validator** — DTOs in `presentation/dto/`
 7. **Use NestJS exceptions** — `NotFoundException`, `BadRequestException`, etc.
 8. **No passwords in commits** — Use `.env`, gitignored
+9. **Prefer tests in `test/`** — New tests should be added under `test/`, not inside `src/`
 
 ---
 

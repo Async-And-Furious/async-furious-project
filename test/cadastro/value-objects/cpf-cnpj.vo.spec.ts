@@ -50,10 +50,10 @@ describe('CpfCnpjVo', () => {
     describe('validações de entrada', () => {
       it.each([
         ['valor vazio', '', 'CPF'],
-        ['valor null', null as unknown as string, 'CPF'],
-        ['valor undefined', undefined as unknown as string, 'CPF'],
-        ['tipo inválido', '11144477735', 'INVALID' as any],
-        ['tipo null', '11144477735', null as any],
+        ['valor null', null as never, 'CPF'],
+        ['valor undefined', undefined as never, 'CPF'],
+        ['tipo inválido', '11144477735', 'INVALID' as never],
+        ['tipo null', '11144477735', null as never],
       ])('deve lançar erro para %s', (_label, value, tipo) => {
         expect(() => CpfCnpjVo.criar(value, tipo)).toThrow(
           new DomainException('Tipo de documento invalido')

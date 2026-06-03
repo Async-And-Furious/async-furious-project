@@ -22,6 +22,18 @@ export class Pagamento {
     return novoPagamento;
   }
 
+  static reconstituir(props: {
+    id: string;
+    ordemServicoId: string;
+    valor: number;
+    status: string;
+  }): Pagamento {
+    const pagamento = new Pagamento(props.ordemServicoId, props.valor);
+    pagamento.id = props.id;
+    pagamento.status = props.status;
+    return pagamento;
+  }
+
   // P-26: Comportamento de Negócio (Apenas altera o estado interno)
   registrar() {
     this.status = 'PAGO';
