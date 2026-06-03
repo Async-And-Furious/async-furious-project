@@ -14,11 +14,11 @@ import { AcionarEntregaOrdemServicoPolicy } from '../../src/modules/financeiro/a
 import {
   IPagamentoEventPublisher,
   IPagamentoRepository,
-  PAGAMENTO_EVENT_PUBLISHER,
   PAGAMENTO_REPOSITORY,
 } from '../../src/modules/financeiro/domain/interfaces/pagamento.interface';
 import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/events/pagamento-registrado.event';
 import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
+import { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 
 describe('Módulo Financeiro: Policies de Fluxo', () => {
   let mockRepository: jest.Mocked<IPagamentoRepository>;
@@ -37,7 +37,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
         providers: [
           RegistrarPagamentoPolicy,
           { provide: PAGAMENTO_REPOSITORY, useValue: mockRepository },
-          { provide: PAGAMENTO_EVENT_PUBLISHER, useValue: mockEmissor },
+          { provide: EmissorEventos, useValue: mockEmissor },
         ],
       }).compile();
       policy = module.get<RegistrarPagamentoPolicy>(RegistrarPagamentoPolicy);
@@ -58,7 +58,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AcionarEntregaOrdemServicoPolicy,
-          { provide: PAGAMENTO_EVENT_PUBLISHER, useValue: mockEmissor },
+          { provide: EmissorEventos, useValue: mockEmissor },
         ],
       }).compile();
       policy = module.get<AcionarEntregaOrdemServicoPolicy>(AcionarEntregaOrdemServicoPolicy);

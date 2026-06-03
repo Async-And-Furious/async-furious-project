@@ -11,4 +11,3 @@ export interface IPagamentoEventPublisher {
 }
 
 export const PAGAMENTO_REPOSITORY = Symbol('PAGAMENTO_REPOSITORY');
-export const PAGAMENTO_EVENT_PUBLISHER = Symbol('PAGAMENTO_EVENT_PUBLISHER');

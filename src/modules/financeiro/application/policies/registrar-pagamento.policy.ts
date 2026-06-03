@@ -1,14 +1,9 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Pagamento } from '../../domain/entities/pagamento.entity';
 import { PagamentoRegistradoEvent } from '../../domain/events/pagamento-registrado.event';
-import type {
-  IPagamentoEventPublisher,
-  IPagamentoRepository,
-} from '../../domain/interfaces/pagamento.interface';
-import {
-  PAGAMENTO_EVENT_PUBLISHER,
-  PAGAMENTO_REPOSITORY,
-} from '../../domain/interfaces/pagamento.interface';
+import type { IPagamentoRepository } from '../../domain/interfaces/pagamento.interface';
+import { PAGAMENTO_REPOSITORY } from '../../domain/interfaces/pagamento.interface';
+import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 
 // O "Command" agora é apenas uma interface ou DTO tipado para a função
 export interface RecepcionistaRegistraPagamentoCommand {
@@ -23,8 +18,7 @@ export class RegistrarPagamentoPolicy {
   constructor(
     @Inject(PAGAMENTO_REPOSITORY)
     private readonly repository: IPagamentoRepository,
-    @Inject(PAGAMENTO_EVENT_PUBLISHER)
-    private readonly emissor: IPagamentoEventPublisher
+    private readonly emissor: EmissorEventos
   ) {}
 
   async execute(command: RecepcionistaRegistraPagamentoCommand): Promise<void> {
