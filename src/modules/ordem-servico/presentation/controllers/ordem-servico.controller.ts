@@ -32,8 +32,7 @@ import { Roles } from '../../../../auth/decorators/roles.decorator';
 import { Public } from '../../../../auth/decorators/public.decorator';
 import { Role } from '../../../../auth/enums/role.enum';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
-import type { AuthUser } from '../../../../auth/types/auth.types';
-import {
+import type { AuthUser } from '../../../../auth/types/auth.types';import {
   CriarOrdemServicoUseCase,
   AssumirOrdemServicoUseCase,
   AnalisarVeiculoUseCase,
@@ -109,18 +108,35 @@ export class OrdemServicoController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas as ordens de serviço (paginado)' })
+  @ApiOperation({
+    summary: 'Listar ordens de serviço ativas por prioridade',
+    description:
+      'Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
+  })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
-  @ApiQuery({ name: 'search', type: String, required: false, example: 'troca' })
-  @ApiResponse({ status: 200, description: 'Lista retornada com sucesso' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de OS ativas ordenadas por prioridade',
+    schema: {
+      example: {
+        data: [
+          {
+            id: 'uuid',
+            veiculoId: 'uuid',
+            clienteId: 'uuid',
+            status: 'IN_PROGRESS',
+            descricao: 'Troca de óleo',
+            created_at: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+        pagination: { page: 1, limit: 10, total: 5, totalPages: 1 },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  listar(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
-    return this.listarUseCase.execute(
-      Number(query.page) || 1,
-      Number(query.limit) || 10,
-      query.search
-    );
+  listar(@Query() query: ListQueryDto) {
+    return this.listarUseCase.execute(Number(query.page) || 1, Number(query.limit) || 10);
   }
 
   @Get('tempo-medio')
