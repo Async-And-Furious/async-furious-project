@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PagamentoController } from '../../src/modules/financeiro/presentation/controllers/pagamento.controller';
-import { RegistrarPagamentoPolicy } from '../../src/modules/financeiro/application/policies/registrar-pagamento.policy';
+import { RegistrarPagamentoUseCase } from '../../src/modules/financeiro/application/use-cases/registrar-pagamento.use-case';
 
 describe('PagamentoController', () => {
   let controller: PagamentoController;
@@ -11,7 +11,7 @@ describe('PagamentoController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PagamentoController],
-      providers: [{ provide: RegistrarPagamentoPolicy, useValue: mockPolicy }],
+      providers: [{ provide: RegistrarPagamentoUseCase, useValue: mockPolicy }],
     }).compile();
 
     controller = module.get<PagamentoController>(PagamentoController);
