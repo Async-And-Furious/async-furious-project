@@ -9,7 +9,7 @@ jest.mock('../../src/shared/infrastructure/database/prisma.service', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { RegistrarPagamentoPolicy } from '../../src/modules/financeiro/application/policies/registrar-pagamento.policy';
+import { RegistrarPagamentoUseCase } from '../../src/modules/financeiro/application/use-cases/registrar-pagamento.use-case';
 import { AcionarEntregaOrdemServicoPolicy } from '../../src/modules/financeiro/application/policies/acionar-entrega-ordem-servico.policy';
 import {
   IPagamentoEventPublisher,
@@ -29,22 +29,25 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
     mockEmissor = { emitir: jest.fn() } as jest.Mocked<IPagamentoEventPublisher>;
   });
 
-  describe('RegistrarPagamentoPolicy (P-26)', () => {
-    let policy: RegistrarPagamentoPolicy;
+  describe('RegistrarPagamentoUseCase (P-26)', () => {
+    let useCase: RegistrarPagamentoUseCase;
 
     beforeEach(async () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
-          RegistrarPagamentoPolicy,
+          {
+            provide: RegistrarPagamentoUseCase,
+            useFactory: () => new RegistrarPagamentoUseCase(mockRepository, mockEmissor),
+          },
           { provide: PAGAMENTO_REPOSITORY, useValue: mockRepository },
           { provide: EmissorEventos, useValue: mockEmissor },
         ],
       }).compile();
-      policy = module.get<RegistrarPagamentoPolicy>(RegistrarPagamentoPolicy);
+      useCase = module.get<RegistrarPagamentoUseCase>(RegistrarPagamentoUseCase);
     });
 
     it('deve persistir pagamento e emitir evento de sucesso', async () => {
-      await policy.execute({ ordemServicoId: 'os-1', valor: 100 });
+      await useCase.execute({ ordemServicoId: 'os-1', valor: 100 });
 
       expect(mockRepository.save).toHaveBeenCalled();
       expect(mockEmissor.emitir).toHaveBeenCalledWith(expect.any(PagamentoRegistradoEvent));
