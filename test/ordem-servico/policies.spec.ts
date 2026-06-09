@@ -32,22 +32,25 @@ import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/event
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
-import type { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
+import { OrdemDeServico, type OSStatus } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 
-const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => ({
-  id: 'os-1',
-  veiculoId: 'veh-1',
-  clienteId: 'cli-1',
-  status: 'RECEIVED',
-  descricao: null,
-  iniciada_em: null,
-  finalizada_em: null,
-  entregue_em: null,
-  created_at: new Date(),
-  updated_at: new Date(),
-  ...overrides,
-});
+const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => {
+  const os = new OrdemDeServico();
+  Object.assign(os, {
+    id: 'os-1',
+    veiculoId: 'veh-1',
+    clienteId: 'cli-1',
+    status: 'RECEIVED' as OSStatus,
+    descricao: null,
+    iniciada_em: null,
+    finalizada_em: null,
+    entregue_em: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+  }, overrides);
+  return os;
+};
 
 const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
   id: 'orc-1',
@@ -65,7 +68,7 @@ const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
 async function shouldNotUpdateWhenStatusIs(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
   policy: unknown,
-  wrongStatus: string,
+  wrongStatus: OSStatus,
   event: unknown,
   methodName = 'handle'
 ): Promise<void> {
@@ -78,7 +81,7 @@ async function shouldNotUpdateWhenStatusIs(
 async function shouldUpdateToInProgress(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
   emissor: jest.Mocked<EmissorEventos>,
-  status: string,
+  status: OSStatus,
   handler: () => Promise<void>
 ): Promise<void> {
   osRepo.findOne.mockResolvedValue(mockOs({ status }));
@@ -100,6 +103,7 @@ describe('OS Policies', () => {
       update: jest.fn(),
       findAll: jest.fn(),
       remove: jest.fn(),
+      calcularTempoMedioExecucao: jest.fn(),
     } as jest.Mocked<IOrdemServicoRepository>;
     orcRepo = {
       findByOrdemServicoId: jest.fn(),
