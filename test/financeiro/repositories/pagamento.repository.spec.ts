@@ -21,8 +21,7 @@ describe('PagamentoRepository', () => {
     ordemServicoId: 'os-123',
     valor: 100.0,
     status: 'AGUARDANDO_PAGAMENTO',
-    created_at: new Date(),
-    updated_at: new Date(),
+    createdAt: new Date(),
   };
 
   beforeEach(async () => {

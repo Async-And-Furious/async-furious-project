@@ -25,4 +25,5 @@ export interface IOrdemServicoRepository {
   findOne(id: string): Promise<OrdemDeServico>;
   update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico>;
   remove(id: string): Promise<OrdemDeServico>;
+  calcularTempoMedioExecucao(): Promise<{ totalMinutos: number; total: number }>;
 }

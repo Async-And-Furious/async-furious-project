@@ -16,6 +16,7 @@ prisma/migrations/
 .env.development
 .env.production
 !.env.example
+.github/agents
 
 # IDE
 .idea/
@@ -69,3 +70,4 @@ Thumbs.db
 .sisyphus/
 .opencode/
 REVISAO_FINAL.md
+docs/superpowers

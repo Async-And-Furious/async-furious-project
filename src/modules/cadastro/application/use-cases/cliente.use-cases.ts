@@ -1,7 +1,4 @@
-import {
-  ClienteResponseDto,
-  ClienteListResponseDto,
-} from '../../presentation/dto/cliente.response.dto';
+import { Cliente } from '../../domain/entities/cliente.entity';
 import type { IClienteRepository } from '../../domain/interfaces/cliente.interface';
 import type {
   CreateClienteInput,
@@ -11,44 +8,46 @@ import type {
 export class CreateClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
-  async execute(data: CreateClienteInput): Promise<ClienteResponseDto> {
-    const cliente = await this.repository.create(data);
-    return ClienteResponseDto.fromDomain(cliente);
+  async execute(data: CreateClienteInput): Promise<Cliente> {
+    return this.repository.create(data);
   }
 }
 
 export class ListClientesUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
-  async execute(page?: number, limit?: number, search?: string): Promise<ClienteListResponseDto> {
-    const result = await this.repository.findAll(page, limit, search);
-    return ClienteListResponseDto.fromDomain(result.data, result.pagination);
+  async execute(
+    page?: number,
+    limit?: number,
+    search?: string
+  ): Promise<{
+    data: Cliente[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    return this.repository.findAll(page, limit, search);
   }
 }
 
 export class GetClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
-  async execute(id: string): Promise<ClienteResponseDto> {
-    const cliente = await this.repository.findById(id);
-    return ClienteResponseDto.fromDomain(cliente);
+  async execute(id: string): Promise<Cliente> {
+    return this.repository.findById(id);
   }
 }
 
 export class UpdateClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
-  async execute(id: string, data: UpdateClienteInput): Promise<ClienteResponseDto> {
-    const cliente = await this.repository.update(id, data);
-    return ClienteResponseDto.fromDomain(cliente);
+  async execute(id: string, data: UpdateClienteInput): Promise<Cliente> {
+    return this.repository.update(id, data);
   }
 }
 
 export class DeleteClienteUseCase {
   constructor(private readonly repository: IClienteRepository) {}
 
-  async execute(id: string): Promise<ClienteResponseDto> {
-    const cliente = await this.repository.remove(id);
-    return ClienteResponseDto.fromDomain(cliente);
+  async execute(id: string): Promise<Cliente> {
+    return this.repository.remove(id);
   }
 }

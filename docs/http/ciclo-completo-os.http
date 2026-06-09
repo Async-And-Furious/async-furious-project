@@ -1,0 +1,184 @@
+# Ciclo Completo de uma Ordem de Serviço
+# Pré-requisito: servidor rodando em http://localhost:3333
+#
+# 1. Execute os logins (PASSO 0a e 0b), copie os tokens e cole nas variáveis abaixo.
+# 2. Execute PASSO 1, copie os IDs e cole nas variáveis abaixo.
+# 3. Execute os PASSOs 2-9 na ordem.
+#
+# Extensão recomendada: REST Client (VS Code) — humao.rest-client
+
+@base = http://localhost:3333/api/v1
+
+# ── Cole aqui os valores retornados antes de executar cada passo ──
+@adminToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxYWZiNjZkYi0yZGI5LTQxMWEtYmM5Yy1iYmM4NDc2YzkwNGEiLCJlbWFpbCI6ImFkbWluQG9maWNpbmEuY29tIiwicm9sZSI6IkFETUlOIiwiaWF0IjoxNzc4MTc5NzYxLCJleHAiOjE3NzgxODMzNjF9.CdBwHOBBFcqi7rm4rmM-sIw4nYY4Dchd2VWUnR1gds8
+@recepToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjMWI4ZWZmNC0wNzkyLTQ5YjUtODM4Ny0xYWZkNjE5NWY2MDYiLCJlbWFpbCI6InJlY2VwY2lvbmlzdGFAb2ZpY2luYS5jb20iLCJyb2xlIjoiUkVDRVBDSU9OSVNUQSIsImlhdCI6MTc3ODE3OTc4MiwiZXhwIjoxNzc4MTgzMzgyfQ.gte0_EG1g-lzv-tD4f_8i_Od6z0Ua19zhIf5p2LicdA
+@mecToken   = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ZGI2N2M1OS04NzNhLTRmMjItODZhOC04ZGYzNjVjZDU3NjUiLCJlbWFpbCI6Im1lY2FuaWNvQG9maWNpbmEuY29tIiwicm9sZSI6Ik1FQ0FOSUNPIiwiaWF0IjoxNzc4MTc5Nzk5LCJleHAiOjE3NzgxODMzOTl9.wjWG7pNaGIhGMYMhHQ2aleo4AcC9HxX-EjQ64YtY6JQ
+@clienteId  = 3bd55479-bffd-4e23-b66a-648726db2e01
+@veiculoId  = f67e2d0d-f0c2-450e-bfec-a7a5ed36cb6e
+@osId       = 15defb43-5171-400a-844b-a181d706d499
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 0a — Login ADMIN (credenciais do .env)
+# ─────────────────────────────────────────────────────────────
+
+### Login ADMIN
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@oficina.com",
+  "password": "changeme123"
+}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 0b — Login RECEPCIONISTA e MECÂNICO
+# (o seed já cria esses usuários automaticamente)
+# ─────────────────────────────────────────────────────────────
+
+### Login RECEPCIONISTA
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "recepcionista@oficina.com",
+  "password": "recep123"
+}
+
+### Login MECANICO
+POST {{base}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "mecanico@oficina.com",
+  "password": "mecanico123"
+}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 1 — Criar pré-requisitos (cliente + veículo)
+# Se já tiver IDs existentes, pule para o Passo 2.
+# ─────────────────────────────────────────────────────────────
+
+### Criar cliente
+POST {{base}}/clientes
+Content-Type: application/json
+Authorization: Bearer {{recepToken}}
+
+{
+  "nome": "Cliente Teste",
+  "email": "cliente@teste.com",
+  "telefone": "(11) 99999-0001",
+  "documento": "52998224725",
+  "tipoDocumento": "CPF"
+}
+
+### Criar veículo  ← use o clienteId retornado acima
+POST {{base}}/veiculos
+Content-Type: application/json
+Authorization: Bearer {{recepToken}}
+
+{
+  "placa": "TST0A01",
+  "marca": "Toyota",
+  "modelo": "Corolla",
+  "ano": 2022,
+  "cor": "Prata",
+  "clienteId": "{{clienteId}}"
+}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 2 — Criar OS  (RECEPCIONISTA)
+# Status resultante: RECEIVED
+# ─────────────────────────────────────────────────────────────
+
+### Criar OS
+POST {{base}}/ordens-servico
+Content-Type: application/json
+Authorization: Bearer {{recepToken}}
+
+{
+  "veiculoId": "{{veiculoId}}",
+  "clienteId": "{{clienteId}}",
+  "descricao": "Alinhamento e balanceamento"
+}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 3 — Mecânico assume a OS  (MECANICO)
+# Status resultante: UNDER_DIAGNOSIS
+# ─────────────────────────────────────────────────────────────
+
+### Assumir OS
+PATCH {{base}}/ordens-servico/{{osId}}/assumir
+Authorization: Bearer {{mecToken}}
+
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 4 — Mecânico registra análise do veículo  (MECANICO)
+# Status: permanece UNDER_DIAGNOSIS
+# ─────────────────────────────────────────────────────────────
+
+### Analisar veículo
+PATCH {{base}}/ordens-servico/{{osId}}/analisar
+Authorization: Bearer {{mecToken}}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 5 — Mecânico gera orçamento  (MECANICO)
+# Status resultante: AWAITING_APPROVAL
+# IMPORTANTE: valor_total_servicos deve ser > 0.
+# ─────────────────────────────────────────────────────────────
+
+### Gerar orçamento (sem peças)
+PATCH {{base}}/ordens-servico/{{osId}}/servicos-insumos
+Content-Type: application/json
+Authorization: Bearer {{mecToken}}
+
+{
+  "valor_total_servicos": 350.00,
+  "valor_total_pecas": 0,
+  "pecas": []
+}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 6 — Cliente aprova o orçamento  (PÚBLICO — sem token)
+# Status resultante: IN_PROGRESS
+# iniciada_em é preenchido automaticamente aqui.
+# ─────────────────────────────────────────────────────────────
+
+### Aprovar orçamento
+PATCH {{base}}/ordens-servico/{{osId}}/orcamento/aprovar
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 7 — Mecânico finaliza execução  (MECANICO)
+# Status resultante: FINISHED
+# finalizada_em é preenchido automaticamente aqui.
+# ─────────────────────────────────────────────────────────────
+
+### Finalizar execução
+PATCH {{base}}/ordens-servico/{{osId}}/finalizar-execucao
+Authorization: Bearer {{mecToken}}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 8 — Recepcionista registra entrega  (RECEPCIONISTA)
+# Status resultante: DELIVERED
+# entregue_em é preenchido automaticamente aqui.
+# ─────────────────────────────────────────────────────────────
+
+### Registrar entrega
+PATCH {{base}}/ordens-servico/{{osId}}/registrar-entrega
+Authorization: Bearer {{recepToken}}
+
+# ─────────────────────────────────────────────────────────────
+# PASSO 9 — Consultar tempo médio  (ADMIN)
+# Deve retornar totalOrdensConsideradas >= 1 agora.
+# ─────────────────────────────────────────────────────────────
+
+### Tempo médio de execução
+GET {{base}}/ordens-servico/tempo-medio
+Authorization: Bearer {{adminToken}}
+
+# ─────────────────────────────────────────────────────────────
+# EXTRA — Verificar status da OS a qualquer momento
+# ─────────────────────────────────────────────────────────────
+
+### Detalhar OS
+GET {{base}}/ordens-servico/{{osId}}
+Authorization: Bearer {{adminToken}}

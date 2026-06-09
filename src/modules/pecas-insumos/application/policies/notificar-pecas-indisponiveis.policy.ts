@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { PecasNaoExistem } from '../../domain/events/pecas-nao-existem.event';
 import { PecasIndisponiveis } from '../../domain/events/pecas-indisponiveis.event';
 
 @Injectable()
 export class NotificarPecasIndisponiveisPolicy {
-  constructor(private readonly emissor: EmissorEventos) {}
+  constructor(private readonly emissor: IEmissorEventos) {}
 
   @OnEvent('PecasNaoExistem')
   async handle(evento: PecasNaoExistem): Promise<void> {

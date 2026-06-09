@@ -1,50 +1,55 @@
+
 # Mechanic Shop Management System
 
-> RESTful API for managing service orders, customers, vehicles, and parts inventory.
+> RESTful API for managing service orders, customers, vehicles, parts inventory, and payments.
 
 ## 🏗️ Project Objective
 
-This is a backend system for **integrated mechanic shop management**, built with DDD (Domain-Driven Design) architecture based on the Product Requirements Document (PRD).
+Backend for **integrated mechanic shop management**, developed as a Tech Challenge for the Software Architecture postgrad (FIAP). Architecture: Clean Architecture + DDD.
 
 ### Problem It Solves
 
-- **Centralization**: Replaces spreadsheets and manual notes with a unified system
-- **Tracking**: Customers track service order status via public API
-- **Inventory Control**: Parts management with minimum stock alerts
-- **Validation**: CPF/CNPJ and Brazilian vehicle plates follow local standards
+- **Centralization**: Replaces spreadsheets and manual processes with a unified system
+- **Tracking**: Customers track service order status in real time
+- **Inventory Control**: Parts management with minimum stock alerts and supplier requests
+- **Validation**: CPF/CNPJ and vehicle plates follow Brazilian standards
 
 ### Main Features
 
-| Module             | Description                                                |
-| ------------------ | ---------------------------------------------------------- |
-| **Service Orders** | Creation, lifecycle (RECEIVED → DELIVERED), quote approval |
-| **Customers**      | Registration with CPF/CNPJ validation                      |
-| **Vehicles**       | Registration with Brazilian plate validation               |
-| **Parts**          | Full CRUD with inventory control                           |
-| **Authentication** | JWT for admin endpoints                                    |
-| **Tracking**       | Public API for status queries                              |
+| Module                | Description                                                                      |
+| --------------------- | ------------------------------------------------------------------------------ |
+| **Service Orders**    | Full lifecycle (RECEIVED → DELIVERED), quote and customer approval              |
+| **Customers**         | CRUD with CPF/CNPJ validation                                                   |
+| **Vehicles**          | CRUD with Brazilian plate validation                                            |
+| **Services**          | Catalog of services offered                                                     |
+| **Parts & Supplies**  | CRUD with inventory control and supplier requests                               |
+| **Payments**          | Payment registration with automatic delivery trigger                            |
+| **Authentication**    | JWT with roles: ADMIN, RECEPTIONIST, MECHANIC                                   |
 
 ---
 
 ## 🛠️ Technologies
 
-| Layer          | Technology      |
-| -------------- | --------------- |
-| Framework      | NestJS 11.x     |
-| Language       | TypeScript 5.x  |
-| Database       | PostgreSQL 15   |
-| ORM            | Prisma          |
-| Authentication | JWT + bcrypt    |
-| Documentation  | Swagger/OpenAPI |
-| Container      | Docker Compose  |
+| Layer          | Technology           |
+| -------------- | -------------------- |
+| Framework      | NestJS 10.x          |
+| Language       | TypeScript 5.x       |
+| Database       | PostgreSQL 15        |
+| ORM            | Prisma               |
+| Authentication | JWT + bcrypt         |
+| Documentation  | Swagger / OpenAPI    |
+| Container      | Docker Compose       |
+| Tests          | Jest                 |
+| Security DAST  | OWASP ZAP            |
+| Package Manager| pnpm                 |
 
 ---
 
 ## 📋 Prerequisites
 
 - Node.js 20+
+- pnpm (`npm install -g pnpm`)
 - Docker and Docker Compose
-- PostgreSQL 15 (or via Docker)
 
 ---
 
@@ -59,89 +64,145 @@ cd async-furious-project
 
 ### 2. Configure environment variables
 
-Create a `.env` file at the project root:
-
-```env
-PORT=3000
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workshop
-JWT_SECRET=your-secret-key-here
-```
-
-### 3. Start with Docker Compose
+Copy the example file and edit as needed:
 
 ```bash
+cp .env.example .env
+```
+
+Edit `.env`:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workshop"
+JWT_SECRET="your-secret-key-here"
+PORT=3000
+BCRYPT_SALT_ROUNDS=10
+ALLOWED_ORIGINS=http://localhost:3000
+SEED_ADMIN_EMAIL="your-admin-email"
+SEED_ADMIN_PASSWORD="your-admin-password"
+```
+
+### 3. Start with Docker (recommended)
+
+```bash
+# Start only PostgreSQL
+docker compose -f docker-compose.dependencies.yml up -d
+
+# Run migrations + seed + app in watch mode
+pnpm run dev
+```
+
+### 4. Or start full stack
+
+```bash
+# Start PostgreSQL + app
 docker compose up -d
 ```
 
-This starts:
-
-- PostgreSQL on port 5432
-- Application on port 3000
-
-### 4. Without Docker (alternative)
-
-```bash
-# Install dependencies
-npm install
-
-# Run migrations
-npx prisma migrate dev
-
-# Start development
-npm run start:dev
-```
+The app will be available at `http://localhost:3000`.
 
 ---
 
 ## 📚 API Documentation
 
-After starting the project, access Swagger documentation at:
+After starting the project, access Swagger docs at:
 
 ```
 http://localhost:3000/api/docs
 ```
 
+The Insomnia collection with all routes is at:
+
+```
+docs/http/insomnia.yaml
+```
+
 ### Main Routes
 
-#### Root
+#### Authentication (`/api/v1/auth`)
 
-| Method | Endpoint | Description       |
-| ------ | -------- | ----------------- |
-| GET    | `/`      | Root health check |
+| Method | Endpoint         | Access           | Description               |
+| ------ | ---------------- | ---------------- | ------------------------- |
+| POST   | `/auth/register` | ADMIN            | Register new user         |
+| POST   | `/auth/login`    | Public           | Login, returns JWT        |
 
-#### Authentication
+#### Customers (`/api/v1/clientes`)
 
-| Method | Endpoint         | Description       |
-| ------ | ---------------- | ----------------- |
-| POST   | `/auth/register` | Register new user |
-| POST   | `/auth/login`    | Get JWT token     |
+| Method | Endpoint         | Access        | Description          |
+| ------ | ---------------- | ------------- | -------------------- |
+| POST   | `/clientes`      | RECEPTIONIST  | Create customer      |
+| GET    | `/clientes`      | Authenticated | List customers      |
+| GET    | `/clientes/:id`  | Authenticated | Get customer        |
+| PATCH  | `/clientes/:id`  | RECEPTIONIST  | Update customer     |
+| DELETE | `/clientes/:id`  | ADMIN         | Delete customer     |
 
-#### Customers (Protected - JWT)
+#### Vehicles (`/api/v1/veiculos`)
 
-| Method | Endpoint         | Description | Access        |
-| ------ | ---------------- | ----------- | ------------- |
-| POST   | `/customers`     | Create      | Admin only    |
-| GET    | `/customers`     | List all    | Authenticated |
-| GET    | `/customers/:id` | Get details | Authenticated |
-| PATCH  | `/customers/:id` | Update      | Admin only    |
-| DELETE | `/customers/:id` | Delete      | Admin only    |
+| Method | Endpoint         | Access        | Description          |
+| ------ | ---------------- | ------------- | -------------------- |
+| POST   | `/veiculos`      | RECEPTIONIST  | Create vehicle       |
+| GET    | `/veiculos`      | Authenticated | List vehicles       |
+| GET    | `/veiculos/:id`  | Authenticated | Get vehicle         |
+| PATCH  | `/veiculos/:id`  | RECEPTIONIST  | Update vehicle      |
+| DELETE | `/veiculos/:id`  | ADMIN         | Delete vehicle      |
 
-#### Coming Soon
+#### Services (`/api/v1/servicos`)
 
-| Module         | Endpoint          | Status      |
-| -------------- | ----------------- | ----------- |
-| Service Orders | `/service-orders` | Coming soon |
-| Vehicles       | `/vehicles`       | Coming soon |
-| Parts          | `/parts`          | Coming soon |
-| Tracking       | `/track/:soId`    | Coming soon |
+| Method | Endpoint         | Access      | Description          |
+| ------ | ---------------- | ---------- | -------------------- |
+| POST   | `/servicos`      | ADMIN      | Create service       |
+| GET    | `/servicos`      | Authenticated | List services    |
+| GET    | `/servicos/:id`  | Authenticated | Get service      |
+| PATCH  | `/servicos/:id`  | ADMIN      | Update service      |
+| DELETE | `/servicos/:id`  | ADMIN      | Delete service      |
+
+#### Service Orders (`/api/v1/ordens-servico`)
+
+| Method | Endpoint                              | Access        | Description                                      |
+| ------ | ------------------------------------- | ------------- | ---------------------------------------------- |
+| POST   | `/ordens-servico`                     | RECEPTIONIST  | Create service order                            |
+| GET    | `/ordens-servico`                     | Authenticated | List service orders                             |
+| GET    | `/ordens-servico/:id`                 | Authenticated | Get service order                               |
+| GET    | `/ordens-servico/:id/status`          | Authenticated | Get service order status                          |
+| PATCH  | `/ordens-servico/:id`                 | ADMIN         | Update service order                            |
+| DELETE | `/ordens-servico/:id`                 | ADMIN         | Delete service order                            |
+| PATCH  | `/ordens-servico/:id/assumir`         | MECHANIC      | Mechanic takes order → UNDER_DIAGNOSIS          |
+| PATCH  | `/ordens-servico/:id/analisar`        | MECHANIC      | Register diagnostic analysis                    |
+| PATCH  | `/ordens-servico/:id/servicos-insumos`| MECHANIC      | Generate quote → AWAITING_APPROVAL              |
+| PATCH  | `/ordens-servico/:id/orcamento/aprovar` | Public      | Customer approves quote → IN_PROGRESS           |
+| PATCH  | `/ordens-servico/:id/orcamento/recusar` | Public      | Customer rejects → CLOSED_WITHOUT_EXECUTION     |
+| PATCH  | `/ordens-servico/:id/aprovar-servico` | Public        | Customer approves performed service             |
+| PATCH  | `/ordens-servico/:id/finalizar-execucao` | MECHANIC   | Mechanic finishes → FINISHED                    |
+| PATCH  | `/ordens-servico/:id/registrar-entrega` | RECEPTIONIST | Register delivery → DELIVERED                   |
+| GET    | `/ordens-servico/tempo-medio`         | ADMIN         | Average execution time for service orders        |
+
+#### Parts & Supplies (`/api/v1/pecas`)
+
+| Method | Endpoint         | Access      | Description          |
+| ------ | ---------------- | ---------- | -------------------- |
+| POST   | `/pecas`         | ADMIN      | Create part          |
+| GET    | `/pecas`         | Authenticated | List parts       |
+| GET    | `/pecas/:id`     | Authenticated | Get part         |
+| PATCH  | `/pecas/:id`     | ADMIN      | Update part         |
+| PATCH  | `/pecas/:id/estoque` | ADMIN  | Update stock quantity |
+| DELETE | `/pecas/:id`     | ADMIN      | Delete part         |
+| POST   | `/pecas/fornecedor/solicitar` | ADMIN | Request part replenishment from supplier |
+| PATCH  | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirm supplier order receipt and update stock |
+
+#### Payments (`/api/v1/pagamentos`)
+
+| Method | Endpoint         | Access      | Description          |
+| ------ | ---------------- | ---------- | -------------------- |
+| POST   | `/pagamentos/registrar` | Authenticated | Register payment and trigger service-order delivery flow |
 
 ---
 
 ## 🔐 Authentication
 
-- Endpoints under `/customers` require JWT token (except listing)
+- Endpoints under `/clientes`, `/veiculos`, `/servicos`, `/ordens-servico`, `/pecas`, `/pagamentos/registrar` require JWT token (except public endpoints)
 - Endpoints under `/auth/*` are public
 - Token: Bearer with 1-hour expiry
+- Roles: ADMIN, RECEPTIONIST, MECHANIC
 
 ---
 
@@ -149,32 +210,32 @@ http://localhost:3000/api/docs
 
 ```bash
 # All tests
-npm run test
+pnpm run test
 
 # With coverage
-npm run test:cov
+pnpm run test:cov
 
 # Watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Specific test by name
-npm run test -- --testNamePattern="Customer"
+pnpm run test -- --testNamePattern="Cliente"
 
 # Specific test file
-npm run test -- src/modules/infrastructure/auth/auth.service.spec.ts
+pnpm run test -- src/modules/cadastro/application/use-cases/cliente.use-cases.spec.ts
 ```
 
 ### Build and Lint Commands
 
 ```bash
 # Production build
-npm run build
+pnpm run build
 
 # Format code
-npm run format
+pnpm run format
 
 # Lint with auto-fix
-npm run lint
+pnpm run lint
 ```
 
 ### Minimum Coverage (per PRD)
@@ -190,32 +251,6 @@ npm run lint
 ---
 
 ## 📁 Project Structure (DDD)
-
-```
-src/
-├── modules/
-│   ├── domain/
-│   │   └── customers/          # Customer aggregate
-│   │       ├── customer.controller.ts
-│   │       ├── customer.service.ts
-│   │       ├── customer.module.ts
-│   │       └── dto/
-│   └── infrastructure/
-│       ├── auth/                # Authentication & authorization
-│       │   ├── auth.controller.ts
-│       │   ├── auth.service.ts
-│       │   ├── guards/
-│       │   └── strategies/
-│       └── database/            # Prisma connection
-├── app.controller.ts
-├── app.service.ts
-├── app.module.ts
-└── main.ts
-```
-
----
-
-## 📝 Code Conventions
 
 See [AGENTS.md](./AGENTS.md) for:
 

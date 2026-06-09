@@ -1,32 +1,30 @@
+import { Prisma } from '@prisma/client';
 import { Pagamento } from '../../domain/entities/pagamento.entity';
 
 // Interface que espelha exatamente a tabela do Prisma
 export interface PagamentoORMEntity {
   id: string;
   ordemServicoId: string;
-  valor: number;
+  valor: Prisma.Decimal;
   status: string;
-  created_at: Date;
+  createdAt: Date;
 }
 
 export class PagamentoMapper {
   static toDomain(orm: PagamentoORMEntity): Pagamento {
-    // Reconstroi o Aggregate Root a partir dos dados do Prisma
-    const pagamento = Object.create(Pagamento.prototype);
-    // Atribui os campos privados via cast para manter o estado persistido
-    pagamento.ordemServicoId = orm.ordemServicoId;
-    pagamento.valor = Number(orm.valor);
-    pagamento.id = orm.id;
-    pagamento.status = orm.status;
-    return pagamento;
+    return Pagamento.reconstituir({
+      id: orm.id,
+      ordemServicoId: orm.ordemServicoId,
+      valor: Number(orm.valor),
+      status: orm.status,
+    });
   }
 
-  static toOrm(pagamento: Pagamento): Omit<PagamentoORMEntity, 'created_at'> {
-    // Transforma a Entidade de Domínio em um objeto que o Prisma aceita
+  static toOrm(pagamento: Pagamento): Omit<PagamentoORMEntity, 'createdAt'> {
     return {
       id: pagamento.getId(),
-      ordemServicoId: (pagamento as any).ordemServicoId, // Usando cast para acessar campos privados
-      valor: (pagamento as any).valor,
+      ordemServicoId: pagamento.getOrdemServicoId(),
+      valor: new Prisma.Decimal(pagamento.getValor()),
       status: pagamento.getStatus(),
     };
   }

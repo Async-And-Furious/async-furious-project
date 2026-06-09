@@ -11,17 +11,22 @@ jest.mock('../../src/shared/infrastructure/database/prisma.service', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { RegistrarPagamentoPolicy } from '../../src/modules/financeiro/application/policies/registrar-pagamento.policy';
 import { AcionarEntregaOrdemServicoPolicy } from '../../src/modules/financeiro/application/policies/acionar-entrega-ordem-servico.policy';
-import { PagamentoRepository } from '../../src/modules/financeiro/infrastructure/repositories/pagamento.repository';
-import { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import {
+  IPagamentoEventPublisher,
+  IPagamentoRepository,
+  PAGAMENTO_REPOSITORY,
+} from '../../src/modules/financeiro/domain/interfaces/pagamento.interface';
 import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/events/pagamento-registrado.event';
+import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
+import { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 
 describe('Módulo Financeiro: Policies de Fluxo', () => {
-  let mockRepository: jest.Mocked<PagamentoRepository>;
-  let mockEmissor: jest.Mocked<EmissorEventos>;
+  let mockRepository: jest.Mocked<IPagamentoRepository>;
+  let mockEmissor: jest.Mocked<IPagamentoEventPublisher>;
 
   beforeEach(() => {
-    mockRepository = { save: jest.fn(), findById: jest.fn() } as any;
-    mockEmissor = { emitir: jest.fn() } as any;
+    mockRepository = { save: jest.fn(), findById: jest.fn() } as jest.Mocked<IPagamentoRepository>;
+    mockEmissor = { emitir: jest.fn() } as jest.Mocked<IPagamentoEventPublisher>;
   });
 
   describe('RegistrarPagamentoPolicy (P-26)', () => {
@@ -31,7 +36,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           RegistrarPagamentoPolicy,
-          { provide: PagamentoRepository, useValue: mockRepository },
+          { provide: PAGAMENTO_REPOSITORY, useValue: mockRepository },
           { provide: EmissorEventos, useValue: mockEmissor },
         ],
       }).compile();
@@ -64,8 +69,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
 
       await policy.handle(eventoInterno);
 
-      // Usamos 'as any' para validar propriedades que o TypeScript ainda não conhece (Cross-Module)
-      const eventoPublicado = mockEmissor.emitir.mock.calls[0][0] as any;
+      const eventoPublicado = mockEmissor.emitir.mock.calls[0][0] as PagamentoRegistrado;
 
       expect(eventoPublicado.ordemServicoId).toBe('os-id');
       expect(eventoPublicado.pagamentoId).toBe('pag-id');

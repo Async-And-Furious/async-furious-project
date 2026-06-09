@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { OrcamentoAprovadoComPecas } from '../../../ordem-servico/domain/events/orcamento-aprovado-com-pecas.event';
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { PecasEmEstoqueConfirmadas } from '../../domain/events/pecas-em-estoque-confirmadas.event';
 import { PecasNaoExistem } from '../../domain/events/pecas-nao-existem.event';
 
@@ -10,7 +10,7 @@ import { PecasNaoExistem } from '../../domain/events/pecas-nao-existem.event';
 export class VerificarDisponibilidadeEstoquePolicy {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   @OnEvent('OrcamentoAprovadoComPecas')

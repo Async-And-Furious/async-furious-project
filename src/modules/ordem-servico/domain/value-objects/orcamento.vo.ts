@@ -1,4 +1,4 @@
-import { Decimal } from '@prisma/client/runtime/library';
+import Decimal from 'decimal.js';
 
 export interface OrcamentoData {
   valor_total_servicos: Decimal | number;

@@ -2,7 +2,7 @@
 
 ## 1. Introdução
 
-Este documento apresenta a aplicação dos princípios de Domain-Driven Design (DDD) ao projeto Async & Furious, conforme especificado na documentação fornecida para a turma 15SOAT do curso de pós graduação em Software Arcthecture da FIAP. O objetivo é criar um sistema integrado de atendimento e execução de serviços para uma oficina mecânica, com foco em gestão de ordens de serviço, clientes e peças.
+Este documento apresenta a aplicação dos princípios de Domain-Driven Design (DDD) ao projeto Async & Furious, conforme especificado na documentação fornecida para a turma 15SOAT do curso de pós-graduação em Software Architecture da FIAP. O objetivo é criar um sistema integrado de atendimento e execução de serviços para uma oficina mecânica, com foco em gestão de ordens de serviço, clientes e peças.
 
 ## 2. Linguagem Ubíqua (Ubiquitous Language)
 
@@ -14,7 +14,7 @@ Este documento apresenta a aplicação dos princípios de Domain-Driven Design (
 | **Serviço** | `Servico` | Atividade específica realizada no veículo (ex: troca de óleo, alinhamento). |
 | **Peça/Insumo** | `PecaInsumo` | Componente ou material utilizado na execução de um serviço. |
 | **Orçamento** | `Orcamento` | Proposta de custo dos serviços e peças para o cliente, gerada automaticamente. |
-| **Status da OS** | `status` | Estágio atual da Ordem de Serviço: `RECEIVED` (Recebida), `UNDER_DIAGNOSIS` (Em Diagnóstico), `AWAITING_APPROVAL` (Aguardando Aprovação), `IN_PROGRESS` (Em Execução), `FINISHED` (Finalizada), `DELIVERED` (Entregue). |
+| **Status da OS** | `status` | Estágio atual da Ordem de Serviço: `RECEIVED` (Recebida), `UNDER_DIAGNOSIS` (Em Diagnóstico), `AWAITING_APPROVAL` (Aguardando Aprovação), `IN_PROGRESS` (Em Execução), `AWAITING_PARTS` (Aguardando Peças), `FINISHED` (Finalizada), `DELIVERED` (Entregue), `CLOSED_WITHOUT_EXECUTION` (Encerrada Sem Execução). |
 | **Estoque** | `quantidade_estoque` | Controle da quantidade de peças e insumos disponíveis. |
 | **Autenticação JWT** | `AuthModule` | Mecanismo de segurança para acesso às APIs administrativas. |
 | **Nome** | `nome` | Nome completo ou razão social do cliente. |
@@ -47,9 +47,9 @@ Responsável pelo cadastro e manutenção das informações de clientes e seus r
 
 Gerencia o catálogo de serviços oferecidos, o estoque de peças e insumos, e a precificação.
 
-### 3.4. Contexto: Financeiro (Integrado à OS)
+### 3.4. Contexto: Financeiro
 
-Embora não seja um Bounded Context independente para o MVP, os aspectos financeiros relacionados diretamente às Ordens de Serviço (como orçamentos e valores totais) são tratados dentro do Contexto de Ordem de Serviço. Para futuras expansões, um contexto financeiro mais abrangente poderia ser considerado.
+No estado atual do projeto, o contexto financeiro está implementado como módulo próprio (`financeiro`), responsável pelo registro de pagamentos e pela integração com o ciclo de entrega da Ordem de Serviço. Esse contexto se integra ao domínio de Ordem de Serviço para concluir o fluxo operacional.
 
 ### 3.5. Contexto: Segurança e Autenticação
 
@@ -97,7 +97,7 @@ Trata da autenticação de usuários administrativos e da validação de dados s
 #### Value Objects:
 
 *   **StatusOS**
-    *   Valores possíveis: Recebida, Em Diagnóstico, Aguardando Aprovação, Em Execução, Finalizada, Entregue.
+    *   Valores possíveis: Recebida, Em Diagnóstico, Aguardando Aprovação, Em Execução, Aguardando Peças, Finalizada, Entregue e Encerrada Sem Execução.
 
 *   **Orcamento**
     *   Valor Total dos Serviços
@@ -297,7 +297,7 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 
 ---
 
-### 5.4. BC: Gestão Financeira (`financeiro`) — _não implementado_
+### 5.4. BC: Gestão Financeira (`financeiro`)
 
 #### Eventos de Domínio (3):
 
@@ -318,24 +318,34 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 
 O Context Map ilustra as relações entre os diferentes Bounded Contexts identificados no sistema.
 
-![Context Map](/doc/img/context_map.png)
+![Context Map](./context-map/suggestions/context-map.suggestion.vic.png)
 
 ### 6.2. Diagrama de Modelo de Domínio (Tactical Design)
 
 O diagrama abaixo detalha as entidades, agregados e suas relações dentro do núcleo do sistema.
 
-![Domain Model](/doc/img/domain_model.png)
+![Domain Model](./others/suggestions/domain-model.suggestion.vic.png)
 
 ### 6.3. Domain Storytelling: Fluxo de Criação e Acompanhamento da OS
 
 Este diagrama narra a interação entre os atores e o sistema no processo de criação e acompanhamento de uma Ordem de Serviço.
 
-![Domain Storytelling OS](/doc/img/os_flow.png)
+![Domain Storytelling OS](./domain-storytelling/suggestions/domain-storytelling.suggestion.vic.png)
 
 ### 6.4. Event Storming: Fluxo de Gestão de Peças e Insumos
 
 Este diagrama visualiza os eventos e comandos envolvidos na gestão de peças e insumos.
 
-![Event Storming Peças e Insumos](/doc/img/event_storming.png)
+![Event Storming Peças e Insumos](./event-storming/suggestions/event-storming.suggestion.vic.png)
+
+### 6.5. Domain Storytelling (Cenários Complementares)
+
+As imagens abaixo representam cenários complementares levantados na etapa de modelagem colaborativa:
+
+*   Consulta de OS:![](./static/domainstorytelling.consultaOS_2026-03-27.png)
+*   Notificação de orçamento: ![](./static/domainstorytelling.notificacao_2026-03-27.png)
+*   Cadastro de peças: ![](./static/domainstorytelling.Peças_2026-03-27.png)
+*   Remoção de peças: ![](./static/domainstorytelling.PeçasRemover_2026-03-27.png)
+*   Cadastro de serviços: ![](./static/domainstorytelling.Servico_2026-03-27 (1).png)
 
 

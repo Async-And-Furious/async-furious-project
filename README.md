@@ -72,12 +72,13 @@ Edite o `.env`:
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workshop"
 JWT_SECRET="sua-chave-secreta-aqui"
-PORT=5000
+PORT=3000
 BCRYPT_SALT_ROUNDS=10
-ALLOWED_ORIGINS=http://localhost:5000
+ALLOWED_ORIGINS=http://localhost:3000
 SEED_ADMIN_EMAIL="seu-email-admin"
 SEED_ADMIN_PASSWORD="sua-senha-admin"
 ```
+
 
 ### 3. Iniciar com Docker (recomendado)
 
@@ -86,8 +87,9 @@ SEED_ADMIN_PASSWORD="sua-senha-admin"
 docker compose -f docker-compose.dependencies.yml up -d
 
 # Roda migrations + seed + aplicação em modo watch
-pnpm dev:local
+pnpm run dev
 ```
+
 
 ### 4. Ou iniciar com stack completa
 
@@ -96,17 +98,25 @@ pnpm dev:local
 docker compose up -d
 ```
 
-A aplicação ficará disponível em `http://localhost:5000`.
+A aplicação ficará disponível em `http://localhost:3000`.
 
 ---
+
 
 ## Documentação da API
 
 Após iniciar o projeto, acesse o Swagger em:
 
 ```
-http://localhost:5000/api/docs
+http://localhost:3000/api/docs
 ```
+
+A coleção Insomnia com todas as rotas configuradas está em:
+
+```
+docs/http/insomnia.yaml
+```
+
 
 ### Rotas
 
@@ -154,16 +164,18 @@ http://localhost:5000/api/docs
 | POST   | `/ordens-servico`                     | RECEPCIONISTA | Criar OS                                       |
 | GET    | `/ordens-servico`                     | Autenticado   | Listar OSs                                     |
 | GET    | `/ordens-servico/:id`                 | Autenticado   | Detalhar OS                                    |
-| GET    | `/ordens-servico/:id/status`          | Autenticado   | Consultar status (endpoint público para cliente) |
+| GET    | `/ordens-servico/:id/status`          | Autenticado   | Consultar status da OS                            |
 | PATCH  | `/ordens-servico/:id`                 | ADMIN         | Atualizar OS                                   |
 | DELETE | `/ordens-servico/:id`                 | ADMIN         | Deletar OS                                     |
-| PATCH  | `/ordens-servico/:id/assumir`         | ADMIN         | Mecânico assume OS → UNDER_DIAGNOSIS           |
-| PATCH  | `/ordens-servico/:id/analisar`        | ADMIN         | Registrar análise diagnóstica                  |
-| PATCH  | `/ordens-servico/:id/servicos-insumos`| ADMIN         | Gerar orçamento → AWAITING_APPROVAL            |
+| PATCH  | `/ordens-servico/:id/assumir`         | MECÂNICO      | Mecânico assume OS → UNDER_DIAGNOSIS           |
+| PATCH  | `/ordens-servico/:id/analisar`        | MECÂNICO      | Registrar análise diagnóstica                  |
+| PATCH  | `/ordens-servico/:id/servicos-insumos`| MECÂNICO      | Gerar orçamento → AWAITING_APPROVAL            |
 | PATCH  | `/ordens-servico/:id/orcamento/aprovar` | Público     | Cliente aprova orçamento → IN_PROGRESS         |
 | PATCH  | `/ordens-servico/:id/orcamento/recusar` | Público     | Cliente recusa → CLOSED_WITHOUT_EXECUTION      |
-| PATCH  | `/ordens-servico/:id/finalizar-execucao` | ADMIN      | Mecânico finaliza → FINISHED                   |
+| PATCH  | `/ordens-servico/:id/aprovar-servico` | Público       | Cliente aprova serviço prestado                |
+| PATCH  | `/ordens-servico/:id/finalizar-execucao` | MECÂNICO   | Mecânico finaliza → FINISHED                   |
 | PATCH  | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega → DELIVERED               |
+| GET    | `/ordens-servico/tempo-medio`         | ADMIN         | Tempo médio de execução das OSs                |
 
 #### Peças e Insumos (`/api/v1/pecas`)
 
@@ -208,8 +220,9 @@ Todos os endpoints (exceto `@Public()`) exigem header `Authorization: Bearer <to
 
 | Role            | Permissões principais                                               |
 | --------------- | ------------------------------------------------------------------- |
-| `ADMIN`         | Acesso total: CRUD serviços e peças, ações do mecânico na OS        |
+| `ADMIN`         | Acesso total: CRUD serviços e peças, gestão administrativa          |
 | `RECEPCIONISTA` | Criar/atualizar clientes e veículos, criar OS, registrar entrega    |
+| `MECÂNICO`      | Assumir OS, diagnosticar, gerar orçamento, finalizar execução       |
 
 Token JWT expira em **1 hora**.
 

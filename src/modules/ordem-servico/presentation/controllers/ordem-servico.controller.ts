@@ -51,6 +51,7 @@ import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
 } from '../../application/use-cases/orcamento.use-cases';
+import { ConsultarTempoMedioExecucaoUseCase } from '../../application/use-cases/tempo-medio-execucao.use-case';
 
 @ApiTags('Ordens Servico')
 @ApiBearerAuth()
@@ -85,7 +86,9 @@ export class OrdemServicoController {
     @Inject(DetalharOrdemServicoUseCase)
     private readonly detalharUseCase: DetalharOrdemServicoUseCase,
     @Inject(DeletarOrdemServicoUseCase)
-    private readonly deletarUseCase: DeletarOrdemServicoUseCase
+    private readonly deletarUseCase: DeletarOrdemServicoUseCase,
+    @Inject(ConsultarTempoMedioExecucaoUseCase)
+    private readonly tempoMedioExecucaoUseCase: ConsultarTempoMedioExecucaoUseCase
   ) {}
 
   @Post()
@@ -118,6 +121,27 @@ export class OrdemServicoController {
       Number(query.limit) || 10,
       query.search
     );
+  }
+
+  @Get('tempo-medio')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({
+    summary: 'Tempo médio de execução das ordens de serviço (gestão administrativa)',
+    description:
+      'Retorna o tempo médio em minutos entre iniciada_em e finalizada_em de todas as OS entregues. Requer role ADMIN.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tempo médio retornado com sucesso',
+    schema: {
+      example: { tempoMedioMinutos: 87, totalOrdensConsideradas: 12 },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
+  tempoMedioExecucao(): Promise<{ tempoMedioMinutos: number; totalOrdensConsideradas: number }> {
+    return this.tempoMedioExecucaoUseCase.execute();
   }
 
   @Get(':id')

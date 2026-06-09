@@ -9,6 +9,7 @@ import { ClienteRepository } from '../cadastro/infrastructure/repositories/clien
 import { VeiculoRepository } from '../cadastro/infrastructure/repositories/veiculo.repository';
 import { ServicoRepository } from '../cadastro/infrastructure/repositories/servico.repository';
 import { PecaInsumoRepository } from '../pecas-insumos/infrastructure/repositories/peca-insumo.repository';
+import { EMISSOR_EVENTOS, IEmissorEventos } from '../../shared/domain/interfaces/emissor-eventos.interface';
 import { OrdemServicoBacklogAdapter } from './infrastructure/adapters/ordem-servico-backlog.adapter';
 import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
 import {
@@ -29,6 +30,7 @@ import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
 } from './application/use-cases/orcamento.use-cases';
+import { ConsultarTempoMedioExecucaoUseCase } from './application/use-cases/tempo-medio-execucao.use-case';
 // Policies
 import { AtualizarStatusRecebidaPolicy } from './application/policies/atualizar-status-recebida.policy';
 import { AtualizarStatusEmDiagnosticoPolicy } from './application/policies/atualizar-status-em-diagnostico.policy';
@@ -61,6 +63,7 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     OrcamentoRepository,
     OsPecaRepository,
     EmissorEventos,
+    { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
 
     // Policies (registered as NestJS providers — @OnEvent listeners)
     {
@@ -70,9 +73,9 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     },
     {
       provide: AtualizarStatusEmDiagnosticoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AtualizarStatusEmDiagnosticoPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: NotificarClienteDiagnosticoPolicy,
@@ -84,14 +87,14 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos
+        barramento: IEmissorEventos
       ) => new GerarOrcamentoPolicy(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: EnviarOrcamentoPolicy,
-      useFactory: (barramento: EmissorEventos) => new EnviarOrcamentoPolicy(barramento),
-      inject: [EmissorEventos],
+      useFactory: (barramento: IEmissorEventos) => new EnviarOrcamentoPolicy(barramento),
+      inject: [EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusAguardandoAprovacaoPolicy,
@@ -101,20 +104,20 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     },
     {
       provide: AtualizarStatusAguardandoPecasPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AtualizarStatusAguardandoPecasPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: VerificarNecessidadePecasPolicy,
-      useFactory: (barramento: EmissorEventos) => new VerificarNecessidadePecasPolicy(barramento),
-      inject: [EmissorEventos],
+      useFactory: (barramento: IEmissorEventos) => new VerificarNecessidadePecasPolicy(barramento),
+      inject: [EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusEmExecucaoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AtualizarStatusEmExecucaoPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: IniciarMonitoramentoTempoPolicy,
@@ -123,9 +126,9 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     },
     {
       provide: AtualizarStatusFinalizadaPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AtualizarStatusFinalizadaPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: FinalizarMonitoramentoTempoPolicy,
@@ -134,20 +137,20 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     },
     {
       provide: NotificarClienteConclusaoPolicy,
-      useFactory: (barramento: EmissorEventos) => new NotificarClienteConclusaoPolicy(barramento),
-      inject: [EmissorEventos],
+      useFactory: (barramento: IEmissorEventos) => new NotificarClienteConclusaoPolicy(barramento),
+      inject: [EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusEntreguePolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AtualizarStatusEntreguePolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusEncerradaSemExecucaoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AtualizarStatusEncerradaSemExecucaoPolicy(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
 
     // Use Cases
@@ -189,15 +192,15 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     },
     {
       provide: AssumirOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AssumirOrdemServicoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AnalisarVeiculoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AnalisarVeiculoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: ListarServicosInsumosNaOsUseCase,
@@ -205,9 +208,9 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
         osPecaRepo: OsPecaRepository,
-        barramento: EmissorEventos
+        barramento: IEmissorEventos
       ) => new ListarServicosInsumosNaOsUseCase(osRepo, orcRepo, osPecaRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, OsPecaRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, OsPecaRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarOrdemServicoUseCase,
@@ -219,36 +222,36 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos
+        barramento: IEmissorEventos
       ) => new AprovarOrcamentoUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: RecusarOrcamentoUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos
+        barramento: IEmissorEventos
       ) => new RecusarOrcamentoUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: FinalizarExecucaoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new FinalizarExecucaoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AprovarServicoPrestadoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AprovarServicoPrestadoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: RegistrarEntregaVeiculoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: EmissorEventos) =>
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new RegistrarEntregaVeiculoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EmissorEventos],
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: ConsultarStatusOrdemServicoUseCase,
@@ -271,6 +274,12 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
       useFactory: (osRepo: OrdemServicoRepository) => new DeletarOrdemServicoUseCase(osRepo),
       inject: [OrdemServicoRepository],
     },
+    {
+      provide: ConsultarTempoMedioExecucaoUseCase,
+      useFactory: (osRepo: OrdemServicoRepository) =>
+        new ConsultarTempoMedioExecucaoUseCase(osRepo),
+      inject: [OrdemServicoRepository],
+    },
 
     // ACL Adapter for pecas-insumos
     {
@@ -280,4 +289,5 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
   ],
   exports: [OrdemServicoRepository, OrcamentoRepository, ORDEM_SERVICO_BACKLOG_PORT, OsServicoRepository],
 })
-export class OrdemServicoModule {}
+export class OrdemServicoModule { }
+

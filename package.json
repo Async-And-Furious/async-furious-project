@@ -6,8 +6,10 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "prebuild": "prisma generate",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "prestart": "prisma generate",
     "start": "nest start",
     "dev": "docker compose -f docker-compose.dependencies.yml down -v && docker compose -f docker-compose.dependencies.yml up -d && pnpm ts-node ./scripts/docker/wait-for-postgres.ts && prisma migrate dev && pnpm ts-node ./scripts/seed.ts && nest start --watch",
     "debug": "nest start --debug --watch",
@@ -35,6 +37,7 @@
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
     "cpf-cnpj-validator": "2.1.0",
+    "decimal.js": "^10.6.0",
     "helmet": "^8.1.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

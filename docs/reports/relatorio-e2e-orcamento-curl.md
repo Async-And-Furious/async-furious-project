@@ -5,6 +5,8 @@ Base URL: http://localhost:3000/api/v1
 
 ## Etapas
 
+> Nota: este relatório registra uma execução histórica de E2E. No estado atual da API, a etapa de geração de orçamento é acionada pelo endpoint `PATCH /ordens-servico/:id/servicos-insumos`.
+
 ### 1) Registrar usuario
 Comando:
 ```bash
@@ -110,7 +112,7 @@ Resposta:
 ### 6) Gerar orcamento
 Comando:
 ```bash
-curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X PATCH "http://localhost:3000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe/orcamento/gerar" -d '{"valor_total_servicos":300.5,"valor_total_pecas":199.5}'
+curl -sS -w "\nHTTP_STATUS:%{http_code}" -H "Content-Type: application/json" -H "Authorization: Bearer <TOKEN>" -X PATCH "http://localhost:3000/api/v1/ordens-servico/0093411a-c3d5-4b79-a341-7b70dbe35cfe/servicos-insumos" -d '{"valor_total_servicos":300.5,"valor_total_pecas":199.5}'
 ```
 Status: 200
 Resposta:
@@ -119,7 +121,7 @@ Resposta:
   "id": "0093411a-c3d5-4b79-a341-7b70dbe35cfe",
   "id_veiculo": "16aba024-44bb-4e81-a348-1770e6bb953a",
   "id_cliente": "de9e3275-23dd-4859-8c09-b213ab2a77fe",
-  "status": "RECEIVED",
+  "status": "AWAITING_APPROVAL",
   "descricao": "Revisao geral E2E",
   "valor_total_servicos": "300.5",
   "valor_total_pecas": "199.5",
