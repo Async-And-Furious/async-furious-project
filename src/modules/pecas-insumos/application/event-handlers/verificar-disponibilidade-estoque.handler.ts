@@ -7,7 +7,7 @@ import { PecasEmEstoqueConfirmadas } from '../../domain/events/pecas-em-estoque-
 import { PecasNaoExistem } from '../../domain/events/pecas-nao-existem.event';
 
 @Injectable()
-export class VerificarDisponibilidadeEstoquePolicy {
+export class VerificarDisponibilidadeEstoqueHandler {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly emissor: IEmissorEventos

@@ -5,7 +5,7 @@ import { PecasNaoExistem } from '../../domain/events/pecas-nao-existem.event';
 import { PecasIndisponiveis } from '../../domain/events/pecas-indisponiveis.event';
 
 @Injectable()
-export class NotificarPecasIndisponiveisPolicy {
+export class NotificarPecasIndisponiveisHandler {
   constructor(private readonly emissor: IEmissorEventos) {}
 
   @OnEvent('PecasNaoExistem')

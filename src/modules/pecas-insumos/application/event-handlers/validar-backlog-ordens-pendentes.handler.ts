@@ -8,7 +8,7 @@ import { EstoqueAtualizadoAposRecebimento } from '@/modules/pecas-insumos/domain
 import { BacklogValidadoPecasDisponiveis } from '@/modules/pecas-insumos/domain/events/backlog-validado-pecas-disponiveis.event';
 
 @Injectable()
-export class ValidarBacklogOrdensPendentesPolicy {
+export class ValidarBacklogOrdensPendentesHandler {
   constructor(
     @Inject(ORDEM_SERVICO_BACKLOG_PORT)
     private readonly backlogPort: IOrdemServicoBacklogPort,

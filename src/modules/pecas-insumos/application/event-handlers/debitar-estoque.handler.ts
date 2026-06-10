@@ -7,7 +7,7 @@ import { EstoqueDebitado } from '../../domain/events/estoque-debitado.event';
 import { PecasReservadas } from '../../domain/events/pecas-reservadas.event';
 
 @Injectable()
-export class DebitarEstoquePolicy {
+export class DebitarEstoqueHandler {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly emissor: IEmissorEventos
