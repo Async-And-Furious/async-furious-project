@@ -4,8 +4,8 @@ import { PagamentoRegistrado } from '../../../ordem-servico/domain/events/pagame
 import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 
 @Injectable()
-export class AcionarEntregaOrdemServicoPolicy {
-  private readonly logger = new Logger(AcionarEntregaOrdemServicoPolicy.name);
+export class AcionarEntregaOrdemServicoHandler {
+  private readonly logger = new Logger(AcionarEntregaOrdemServicoHandler.name);
 
   constructor(private readonly emissor: EmissorEventos) {}
 

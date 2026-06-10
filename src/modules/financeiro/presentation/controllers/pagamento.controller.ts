@@ -1,4 +1,3 @@
-// src/modules/financeiro/presentation/controllers/pagamento.controller.ts
 import { Controller, Post, Body } from '@nestjs/common';
 import { RegistrarPagamentoUseCase } from '../../application/use-cases/registrar-pagamento.use-case';
 import { RegistrarPagamentoDto } from '../dto/registrar-pagamento.dto';

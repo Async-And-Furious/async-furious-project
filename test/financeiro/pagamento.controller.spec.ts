@@ -4,14 +4,14 @@ import { RegistrarPagamentoUseCase } from '../../src/modules/financeiro/applicat
 
 describe('PagamentoController', () => {
   let controller: PagamentoController;
-  let mockPolicy: { execute: jest.Mock };
+  let mockUseCase: { execute: jest.Mock };
 
   beforeEach(async () => {
-    mockPolicy = { execute: jest.fn().mockResolvedValue(undefined) };
+    mockUseCase = { execute: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PagamentoController],
-      providers: [{ provide: RegistrarPagamentoUseCase, useValue: mockPolicy }],
+      providers: [{ provide: RegistrarPagamentoUseCase, useValue: mockUseCase }],
     }).compile();
 
     controller = module.get<PagamentoController>(PagamentoController);
@@ -22,7 +22,7 @@ describe('PagamentoController', () => {
   });
 
   describe('registrar', () => {
-    it('should call policy.execute with correct data', async () => {
+    it('should call useCase.execute with correct data', async () => {
       const dto = {
         ordemServicoId: 'os-123',
         valor: 150.0,
@@ -30,7 +30,7 @@ describe('PagamentoController', () => {
 
       const result = await controller.registrar(dto);
 
-      expect(mockPolicy.execute).toHaveBeenCalledWith({
+      expect(mockUseCase.execute).toHaveBeenCalledWith({
         ordemServicoId: 'os-123',
         valor: 150.0,
       });
@@ -45,7 +45,7 @@ describe('PagamentoController', () => {
 
       await controller.registrar(dto);
 
-      expect(mockPolicy.execute).toHaveBeenCalledWith({
+      expect(mockUseCase.execute).toHaveBeenCalledWith({
         ordemServicoId: 'os-456',
         valor: 299.99,
       });

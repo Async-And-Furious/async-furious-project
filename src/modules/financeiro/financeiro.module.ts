@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { PagamentoController } from './presentation/controllers/pagamento.controller';
 import { PagamentoRepository } from './infrastructure/repositories/pagamento.repository';
 import { RegistrarPagamentoUseCase } from './application/use-cases/registrar-pagamento.use-case';
-import { AcionarEntregaOrdemServicoPolicy } from './application/policies/acionar-entrega-ordem-servico.policy';
+import { AcionarEntregaOrdemServicoHandler } from './application/event-handlers/acionar-entrega-ordem-servico.handler';
 import { AcionarEntregaOrdemServicoListener } from './infrastructure/listeners/acionar-entrega-ordem-servico.listener';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
@@ -22,7 +22,7 @@ import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
         new RegistrarPagamentoUseCase(repository, emissor),
       inject: [PAGAMENTO_REPOSITORY, EmissorEventos],
     },
-    AcionarEntregaOrdemServicoPolicy,
+    AcionarEntregaOrdemServicoHandler,
     AcionarEntregaOrdemServicoListener,
   ],
 })
