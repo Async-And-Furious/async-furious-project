@@ -5,8 +5,8 @@ import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizad
 import { ClienteNotificadoConclusao } from '../../domain/events/cliente-notificado-conclusao.event';
 
 @Injectable()
-export class NotificarClienteConclusaoPolicy {
-  private readonly logger = new Logger(NotificarClienteConclusaoPolicy.name);
+export class NotificarClienteConclusaoHandler {
+  private readonly logger = new Logger(NotificarClienteConclusaoHandler.name);
 
   constructor(private readonly emissor: IEmissorEventos) {}
 

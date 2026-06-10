@@ -4,8 +4,8 @@ import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-serv
 import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizado-finalizada.event';
 
 @Injectable()
-export class FinalizarMonitoramentoTempoPolicy {
-  private readonly logger = new Logger(FinalizarMonitoramentoTempoPolicy.name);
+export class FinalizarMonitoramentoTempoHandler {
+  private readonly logger = new Logger(FinalizarMonitoramentoTempoHandler.name);
 
   constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 

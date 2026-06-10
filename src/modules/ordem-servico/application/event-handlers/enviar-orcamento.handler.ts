@@ -5,8 +5,8 @@ import { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event';
 import { OrcamentoEnviado } from '../../domain/events/orcamento-enviado.event';
 
 @Injectable()
-export class EnviarOrcamentoPolicy {
-  private readonly logger = new Logger(EnviarOrcamentoPolicy.name);
+export class EnviarOrcamentoHandler {
+  private readonly logger = new Logger(EnviarOrcamentoHandler.name);
 
   constructor(private readonly emissor: IEmissorEventos) {}
 

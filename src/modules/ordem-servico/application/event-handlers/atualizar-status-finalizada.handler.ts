@@ -6,8 +6,8 @@ import { ServicoConcluidoPeloMecanico } from '../../domain/events/servico-conclu
 import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizado-finalizada.event';
 
 @Injectable()
-export class AtualizarStatusFinalizadaPolicy {
-  private readonly logger = new Logger(AtualizarStatusFinalizadaPolicy.name);
+export class AtualizarStatusFinalizadaHandler {
+  private readonly logger = new Logger(AtualizarStatusFinalizadaHandler.name);
 
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,

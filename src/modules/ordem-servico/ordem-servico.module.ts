@@ -4,7 +4,10 @@ import { OrdemServicoRepository } from './infrastructure/repositories/ordem-serv
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
 import { OsPecaRepository } from './infrastructure/repositories/os-peca.repository';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
-import { EMISSOR_EVENTOS, IEmissorEventos } from '../../shared/domain/interfaces/emissor-eventos.interface';
+import {
+  EMISSOR_EVENTOS,
+  IEmissorEventos,
+} from '../../shared/domain/interfaces/emissor-eventos.interface';
 import { OrdemServicoBacklogAdapter } from './infrastructure/adapters/ordem-servico-backlog.adapter';
 import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
 import {
@@ -26,22 +29,22 @@ import {
   RecusarOrcamentoUseCase,
 } from './application/use-cases/orcamento.use-cases';
 import { ConsultarTempoMedioExecucaoUseCase } from './application/use-cases/tempo-medio-execucao.use-case';
-// Policies
-import { AtualizarStatusRecebidaPolicy } from './application/policies/atualizar-status-recebida.policy';
-import { AtualizarStatusEmDiagnosticoPolicy } from './application/policies/atualizar-status-em-diagnostico.policy';
-import { NotificarClienteDiagnosticoPolicy } from './application/policies/notificar-cliente-diagnostico.policy';
-import { GerarOrcamentoPolicy } from './application/policies/gerar-orcamento.policy';
-import { EnviarOrcamentoPolicy } from './application/policies/enviar-orcamento.policy';
-import { AtualizarStatusAguardandoAprovacaoPolicy } from './application/policies/atualizar-status-aguardando-aprovacao.policy';
-import { VerificarNecessidadePecasPolicy } from './application/policies/verificar-necessidade-pecas.policy';
-import { AtualizarStatusEmExecucaoPolicy } from './application/policies/atualizar-status-em-execucao.policy';
-import { IniciarMonitoramentoTempoPolicy } from './application/policies/iniciar-monitoramento-tempo.policy';
-import { AtualizarStatusFinalizadaPolicy } from './application/policies/atualizar-status-finalizada.policy';
-import { FinalizarMonitoramentoTempoPolicy } from './application/policies/finalizar-monitoramento-tempo.policy';
-import { NotificarClienteConclusaoPolicy } from './application/policies/notificar-cliente-conclusao.policy';
-import { AtualizarStatusEntreguePolicy } from './application/policies/atualizar-status-entregue.policy';
-import { AtualizarStatusEncerradaSemExecucaoPolicy } from './application/policies/atualizar-status-encerrada-sem-execucao.policy';
-import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atualizar-status-aguardando-pecas.policy';
+// Event handlers
+import { AtualizarStatusRecebidaHandler } from './application/event-handlers/atualizar-status-recebida.handler';
+import { AtualizarStatusEmDiagnosticoHandler } from './application/event-handlers/atualizar-status-em-diagnostico.handler';
+import { NotificarClienteDiagnosticoHandler } from './application/event-handlers/notificar-cliente-diagnostico.handler';
+import { GerarOrcamentoHandler } from './application/event-handlers/gerar-orcamento.handler';
+import { EnviarOrcamentoHandler } from './application/event-handlers/enviar-orcamento.handler';
+import { AtualizarStatusAguardandoAprovacaoHandler } from './application/event-handlers/atualizar-status-aguardando-aprovacao.handler';
+import { VerificarNecessidadePecasHandler } from './application/event-handlers/verificar-necessidade-pecas.handler';
+import { AtualizarStatusEmExecucaoHandler } from './application/event-handlers/atualizar-status-em-execucao.handler';
+import { IniciarMonitoramentoTempoHandler } from './application/event-handlers/iniciar-monitoramento-tempo.handler';
+import { AtualizarStatusFinalizadaHandler } from './application/event-handlers/atualizar-status-finalizada.handler';
+import { FinalizarMonitoramentoTempoHandler } from './application/event-handlers/finalizar-monitoramento-tempo.handler';
+import { NotificarClienteConclusaoHandler } from './application/event-handlers/notificar-cliente-conclusao.handler';
+import { AtualizarStatusEntregueHandler } from './application/event-handlers/atualizar-status-entregue.handler';
+import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
+import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
 
 @Module({
   controllers: [OrdemServicoController],
@@ -52,91 +55,92 @@ import { AtualizarStatusAguardandoPecasPolicy } from './application/policies/atu
     EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
 
-    // Policies (registered as NestJS providers — @OnEvent listeners)
+    // Event handlers (registered as NestJS providers — @OnEvent listeners)
     {
-      provide: AtualizarStatusRecebidaPolicy,
-      useFactory: (osRepo: OrdemServicoRepository) => new AtualizarStatusRecebidaPolicy(osRepo),
+      provide: AtualizarStatusRecebidaHandler,
+      useFactory: (osRepo: OrdemServicoRepository) => new AtualizarStatusRecebidaHandler(osRepo),
       inject: [OrdemServicoRepository],
     },
     {
-      provide: AtualizarStatusEmDiagnosticoPolicy,
+      provide: AtualizarStatusEmDiagnosticoHandler,
       useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEmDiagnosticoPolicy(osRepo, barramento),
+        new AtualizarStatusEmDiagnosticoHandler(osRepo, barramento),
       inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: NotificarClienteDiagnosticoPolicy,
-      useFactory: () => new NotificarClienteDiagnosticoPolicy(),
+      provide: NotificarClienteDiagnosticoHandler,
+      useFactory: () => new NotificarClienteDiagnosticoHandler(),
       inject: [],
     },
     {
-      provide: GerarOrcamentoPolicy,
+      provide: GerarOrcamentoHandler,
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
         barramento: IEmissorEventos
-      ) => new GerarOrcamentoPolicy(osRepo, orcRepo, barramento),
+      ) => new GerarOrcamentoHandler(osRepo, orcRepo, barramento),
       inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: EnviarOrcamentoPolicy,
-      useFactory: (barramento: IEmissorEventos) => new EnviarOrcamentoPolicy(barramento),
+      provide: EnviarOrcamentoHandler,
+      useFactory: (barramento: IEmissorEventos) => new EnviarOrcamentoHandler(barramento),
       inject: [EMISSOR_EVENTOS],
     },
     {
-      provide: AtualizarStatusAguardandoAprovacaoPolicy,
+      provide: AtualizarStatusAguardandoAprovacaoHandler,
       useFactory: (osRepo: OrdemServicoRepository) =>
-        new AtualizarStatusAguardandoAprovacaoPolicy(osRepo),
+        new AtualizarStatusAguardandoAprovacaoHandler(osRepo),
       inject: [OrdemServicoRepository],
     },
     {
-      provide: AtualizarStatusAguardandoPecasPolicy,
+      provide: AtualizarStatusAguardandoPecasHandler,
       useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusAguardandoPecasPolicy(osRepo, barramento),
+        new AtualizarStatusAguardandoPecasHandler(osRepo, barramento),
       inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: VerificarNecessidadePecasPolicy,
-      useFactory: (barramento: IEmissorEventos) => new VerificarNecessidadePecasPolicy(barramento),
+      provide: VerificarNecessidadePecasHandler,
+      useFactory: (barramento: IEmissorEventos) => new VerificarNecessidadePecasHandler(barramento),
       inject: [EMISSOR_EVENTOS],
     },
     {
-      provide: AtualizarStatusEmExecucaoPolicy,
+      provide: AtualizarStatusEmExecucaoHandler,
       useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEmExecucaoPolicy(osRepo, barramento),
+        new AtualizarStatusEmExecucaoHandler(osRepo, barramento),
       inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: IniciarMonitoramentoTempoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository) => new IniciarMonitoramentoTempoPolicy(osRepo),
+      provide: IniciarMonitoramentoTempoHandler,
+      useFactory: (osRepo: OrdemServicoRepository) => new IniciarMonitoramentoTempoHandler(osRepo),
       inject: [OrdemServicoRepository],
     },
     {
-      provide: AtualizarStatusFinalizadaPolicy,
+      provide: AtualizarStatusFinalizadaHandler,
       useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusFinalizadaPolicy(osRepo, barramento),
+        new AtualizarStatusFinalizadaHandler(osRepo, barramento),
       inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: FinalizarMonitoramentoTempoPolicy,
-      useFactory: (osRepo: OrdemServicoRepository) => new FinalizarMonitoramentoTempoPolicy(osRepo),
+      provide: FinalizarMonitoramentoTempoHandler,
+      useFactory: (osRepo: OrdemServicoRepository) =>
+        new FinalizarMonitoramentoTempoHandler(osRepo),
       inject: [OrdemServicoRepository],
     },
     {
-      provide: NotificarClienteConclusaoPolicy,
-      useFactory: (barramento: IEmissorEventos) => new NotificarClienteConclusaoPolicy(barramento),
+      provide: NotificarClienteConclusaoHandler,
+      useFactory: (barramento: IEmissorEventos) => new NotificarClienteConclusaoHandler(barramento),
       inject: [EMISSOR_EVENTOS],
     },
     {
-      provide: AtualizarStatusEntreguePolicy,
+      provide: AtualizarStatusEntregueHandler,
       useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEntreguePolicy(osRepo, barramento),
+        new AtualizarStatusEntregueHandler(osRepo, barramento),
       inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: AtualizarStatusEncerradaSemExecucaoPolicy,
+      provide: AtualizarStatusEncerradaSemExecucaoHandler,
       useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEncerradaSemExecucaoPolicy(osRepo, barramento),
+        new AtualizarStatusEncerradaSemExecucaoHandler(osRepo, barramento),
       inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
 

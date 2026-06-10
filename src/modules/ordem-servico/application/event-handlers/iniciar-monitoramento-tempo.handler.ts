@@ -4,7 +4,7 @@ import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-serv
 import { StatusAtualizadoEmExecucao } from '../../domain/events/status-atualizado-em-execucao.event';
 
 @Injectable()
-export class IniciarMonitoramentoTempoPolicy {
+export class IniciarMonitoramentoTempoHandler {
   constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   @OnEvent('StatusAtualizadoEmExecucao')

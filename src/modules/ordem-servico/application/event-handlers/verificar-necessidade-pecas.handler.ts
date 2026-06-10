@@ -6,7 +6,7 @@ import { OsSemPecasConfirmada } from '../../domain/events/os-sem-pecas-confirmad
 import { OrcamentoAprovadoComPecas } from '../../domain/events/orcamento-aprovado-com-pecas.event';
 
 @Injectable()
-export class VerificarNecessidadePecasPolicy {
+export class VerificarNecessidadePecasHandler {
   constructor(private readonly emissor: IEmissorEventos) {}
 
   @OnEvent('OrcamentoAprovado')
