@@ -79,4 +79,12 @@ export class OrdemDeServico {
       );
     }
   }
+
+  podeAprovarOuRecusarOrcamento(): void {
+    if (this.status !== 'AWAITING_APPROVAL') {
+      throw new DomainException(
+        `OS deve estar em Aguardando Aprovação para aprovar ou recusar o orçamento. Status atual: ${this.status}`
+      );
+    }
+  }
 }
