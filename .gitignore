@@ -16,7 +16,6 @@ prisma/migrations/
 .env.development
 .env.production
 !.env.example
-.github/agents
 
 # IDE
 .idea/
