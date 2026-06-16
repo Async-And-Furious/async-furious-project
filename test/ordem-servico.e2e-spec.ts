@@ -6,6 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
+import { randomInt } from 'crypto';
 
 describe('OrdemServico Happy Flow (e2e)', () => {
   let app: INestApplication;
@@ -108,7 +109,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     clienteId = clienteResponse.body.id;
 
-    const uniquePlaca = `OSF${Math.floor(1000 + Math.random() * 9000)}`;
+    const uniquePlaca = `OSF${randomInt(1000, 10000)}`;
 
     const veiculoResponse = await server
       .post('/veiculos')
