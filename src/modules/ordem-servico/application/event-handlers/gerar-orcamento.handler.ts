@@ -10,7 +10,7 @@ import { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 
 @Injectable()
-export class GerarOrcamentoPolicy {
+export class GerarOrcamentoHandler {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,

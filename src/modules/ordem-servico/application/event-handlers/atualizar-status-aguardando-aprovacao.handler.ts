@@ -4,7 +4,7 @@ import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-serv
 import { OrcamentoEnviado } from '../../domain/events/orcamento-enviado.event';
 
 @Injectable()
-export class AtualizarStatusAguardandoAprovacaoPolicy {
+export class AtualizarStatusAguardandoAprovacaoHandler {
   constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   @OnEvent('OrcamentoEnviado')

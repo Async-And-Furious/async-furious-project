@@ -7,7 +7,7 @@ import { EntityNotFoundException } from '../../../../shared/domain/exceptions/en
 import { PecasReservadas } from '../../domain/events/pecas-reservadas.event';
 
 @Injectable()
-export class LiberarOrdensAguardandoPecasPolicy {
+export class LiberarOrdensAguardandoPecasHandler {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly reservaEstoqueRepository: IReservaEstoqueRepository,

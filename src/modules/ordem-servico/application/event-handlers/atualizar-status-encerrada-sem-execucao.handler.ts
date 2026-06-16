@@ -6,7 +6,7 @@ import { OrcamentoRecusado } from '../../domain/events/orcamento-recusado.event'
 import { StatusAtualizadoEncerradaSemExecucao } from '../../domain/events/status-atualizado-encerrada-sem-execucao.event';
 
 @Injectable()
-export class AtualizarStatusEncerradaSemExecucaoPolicy {
+export class AtualizarStatusEncerradaSemExecucaoHandler {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly emissor: IEmissorEventos

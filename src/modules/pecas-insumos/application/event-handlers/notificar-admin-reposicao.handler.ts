@@ -3,8 +3,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { PecasIndisponiveis } from '../../domain/events/pecas-indisponiveis.event';
 
 @Injectable()
-export class NotificarAdminReposicaoPolicy {
-  private readonly logger = new Logger(NotificarAdminReposicaoPolicy.name);
+export class NotificarAdminReposicaoHandler {
+  private readonly logger = new Logger(NotificarAdminReposicaoHandler.name);
 
   @OnEvent('PecasIndisponiveis')
   handle(evento: PecasIndisponiveis): void {

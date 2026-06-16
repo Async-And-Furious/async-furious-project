@@ -7,8 +7,8 @@ import { StatusAtualizadoEmExecucao } from '../../domain/events/status-atualizad
 import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
 
 @Injectable()
-export class AtualizarStatusEmExecucaoPolicy {
-  private readonly logger = new Logger(AtualizarStatusEmExecucaoPolicy.name);
+export class AtualizarStatusEmExecucaoHandler {
+  private readonly logger = new Logger(AtualizarStatusEmExecucaoHandler.name);
 
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
@@ -21,8 +21,8 @@ export class AtualizarStatusEmExecucaoPolicy {
   }
 
   // PecasReservadas vem de dois lugares:
-  // 1. DebitarEstoquePolicy (peças disponíveis imediatamente) → OS em AWAITING_APPROVAL
-  // 2. LiberarOrdensAguardandoPecasPolicy (peças recebidas do fornecedor) → OS em AWAITING_PARTS
+  // 1. DebitarEstoqueHandler (peças disponíveis imediatamente) → OS em AWAITING_APPROVAL
+  // 2. LiberarOrdensAguardandoPecasHandler (peças recebidas do fornecedor) → OS em AWAITING_PARTS
   @OnEvent('PecasReservadas')
   async handlePecasReservadas(evento: { ordemServicoId: string }): Promise<void> {
     await this.iniciarExecucao(evento.ordemServicoId, ['AWAITING_APPROVAL', 'AWAITING_PARTS']);

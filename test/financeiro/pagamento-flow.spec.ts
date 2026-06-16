@@ -1,16 +1,14 @@
-// Este mock "engana" o Jest para que ele não tente carregar o cliente real do Prisma
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn().mockImplementation(() => ({})),
 }));
 
-// Mock do PrismaService para evitar que ele tente conectar à base de dados
 jest.mock('../../src/shared/infrastructure/database/prisma.service', () => ({
   PrismaService: jest.fn().mockImplementation(() => ({})),
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { RegistrarPagamentoPolicy } from '../../src/modules/financeiro/application/policies/registrar-pagamento.policy';
-import { AcionarEntregaOrdemServicoPolicy } from '../../src/modules/financeiro/application/policies/acionar-entrega-ordem-servico.policy';
+import { RegistrarPagamentoUseCase } from '../../src/modules/financeiro/application/use-cases/registrar-pagamento.use-case';
+import { AcionarEntregaOrdemServicoHandler } from '../../src/modules/financeiro/application/event-handlers/acionar-entrega-ordem-servico.handler';
 import {
   IPagamentoEventPublisher,
   IPagamentoRepository,
@@ -20,7 +18,7 @@ import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/ev
 import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 import { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 
-describe('Módulo Financeiro: Policies de Fluxo', () => {
+describe('Módulo Financeiro: Event handlers de Fluxo', () => {
   let mockRepository: jest.Mocked<IPagamentoRepository>;
   let mockEmissor: jest.Mocked<IPagamentoEventPublisher>;
 
@@ -29,45 +27,48 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
     mockEmissor = { emitir: jest.fn() } as jest.Mocked<IPagamentoEventPublisher>;
   });
 
-  describe('RegistrarPagamentoPolicy (P-26)', () => {
-    let policy: RegistrarPagamentoPolicy;
+  describe('RegistrarPagamentoUseCase (P-26)', () => {
+    let useCase: RegistrarPagamentoUseCase;
 
     beforeEach(async () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
-          RegistrarPagamentoPolicy,
+          {
+            provide: RegistrarPagamentoUseCase,
+            useFactory: () => new RegistrarPagamentoUseCase(mockRepository, mockEmissor),
+          },
           { provide: PAGAMENTO_REPOSITORY, useValue: mockRepository },
           { provide: EmissorEventos, useValue: mockEmissor },
         ],
       }).compile();
-      policy = module.get<RegistrarPagamentoPolicy>(RegistrarPagamentoPolicy);
+      useCase = module.get<RegistrarPagamentoUseCase>(RegistrarPagamentoUseCase);
     });
 
     it('deve persistir pagamento e emitir evento de sucesso', async () => {
-      await policy.execute({ ordemServicoId: 'os-1', valor: 100 });
+      await useCase.execute({ ordemServicoId: 'os-1', valor: 100 });
 
       expect(mockRepository.save).toHaveBeenCalled();
       expect(mockEmissor.emitir).toHaveBeenCalledWith(expect.any(PagamentoRegistradoEvent));
     });
   });
 
-  describe('AcionarEntregaOrdemServicoPolicy (P-27)', () => {
-    let policy: AcionarEntregaOrdemServicoPolicy;
+  describe('AcionarEntregaOrdemServicoHandler (P-27)', () => {
+    let handler: AcionarEntregaOrdemServicoHandler;
 
     beforeEach(async () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
-          AcionarEntregaOrdemServicoPolicy,
+          AcionarEntregaOrdemServicoHandler,
           { provide: EmissorEventos, useValue: mockEmissor },
         ],
       }).compile();
-      policy = module.get<AcionarEntregaOrdemServicoPolicy>(AcionarEntregaOrdemServicoPolicy);
+      handler = module.get<AcionarEntregaOrdemServicoHandler>(AcionarEntregaOrdemServicoHandler);
     });
 
     it('deve traduzir o evento interno para o contrato de integração da OS', async () => {
       const eventoInterno = new PagamentoRegistradoEvent('pag-id', 'os-id');
 
-      await policy.handle(eventoInterno);
+      await handler.handle(eventoInterno);
 
       const eventoPublicado = mockEmissor.emitir.mock.calls[0][0] as PagamentoRegistrado;
 
@@ -80,7 +81,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
       const eventoInterno = new PagamentoRegistradoEvent('os-123', 'pag-456');
       mockEmissor.emitir.mockResolvedValue(undefined);
 
-      await policy.handle(eventoInterno);
+      await handler.handle(eventoInterno);
 
       expect(mockEmissor.emitir).toHaveBeenCalled();
     });
@@ -89,7 +90,7 @@ describe('Módulo Financeiro: Policies de Fluxo', () => {
       const eventoInterno = new PagamentoRegistradoEvent('os-789', 'pag-101');
       mockEmissor.emitir.mockResolvedValue(undefined);
 
-      await policy.handle(eventoInterno);
+      await handler.handle(eventoInterno);
 
       expect(mockEmissor.emitir).toHaveBeenCalledTimes(1);
     });

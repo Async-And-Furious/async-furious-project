@@ -256,7 +256,14 @@ describe('OrdemServicoRepository', () => {
           iniciada_em: updateData.iniciada_em,
         },
       });
-      expect(result).toEqual(expect.objectContaining({ veiculoId: 'veiculo-123', clienteId: 'cliente-123', status: 'IN_PROGRESS', descricao: 'Troca de óleo e filtro' }));
+      expect(result).toEqual(
+        expect.objectContaining({
+          veiculoId: 'veiculo-123',
+          clienteId: 'cliente-123',
+          status: 'IN_PROGRESS',
+          descricao: 'Troca de óleo e filtro',
+        })
+      );
     });
 
     it('deve atualizar apenas campos fornecidos', async () => {
@@ -276,7 +283,9 @@ describe('OrdemServicoRepository', () => {
           status: updateData.status,
         },
       });
-      expect(result).toEqual(expect.objectContaining({ ...mappedOrdemServico, status: 'FINISHED' }));
+      expect(result).toEqual(
+        expect.objectContaining({ ...mappedOrdemServico, status: 'FINISHED' })
+      );
     });
 
     it('deve permitir definir campos como undefined', async () => {
@@ -300,7 +309,9 @@ describe('OrdemServicoRepository', () => {
           finalizada_em: undefined,
         },
       });
-      expect(result).toEqual(expect.objectContaining({ veiculoId: 'veiculo-123', clienteId: 'cliente-123' }));
+      expect(result).toEqual(
+        expect.objectContaining({ veiculoId: 'veiculo-123', clienteId: 'cliente-123' })
+      );
     });
 
     it('deve lançar NotFoundException quando ordem não encontrada para atualização', async () => {

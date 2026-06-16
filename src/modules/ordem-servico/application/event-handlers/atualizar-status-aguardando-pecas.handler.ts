@@ -6,8 +6,8 @@ import { PecasIndisponiveis } from '../../../pecas-insumos/domain/events/pecas-i
 import { StatusAtualizadoAguardandoPecas } from '../../domain/events/status-atualizado-aguardando-pecas.event';
 
 @Injectable()
-export class AtualizarStatusAguardandoPecasPolicy {
-  private readonly logger = new Logger(AtualizarStatusAguardandoPecasPolicy.name);
+export class AtualizarStatusAguardandoPecasHandler {
+  private readonly logger = new Logger(AtualizarStatusAguardandoPecasHandler.name);
 
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,

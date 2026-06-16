@@ -1,30 +1,30 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AcionarEntregaOrdemServicoListener } from '../../src/modules/financeiro/infrastructure/listeners/acionar-entrega-ordem-servico.listener';
-import { AcionarEntregaOrdemServicoPolicy } from '../../src/modules/financeiro/application/policies/acionar-entrega-ordem-servico.policy';
+import { AcionarEntregaOrdemServicoHandler } from '../../src/modules/financeiro/application/event-handlers/acionar-entrega-ordem-servico.handler';
 import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/events/pagamento-registrado.event';
 
 describe('AcionarEntregaOrdemServicoListener', () => {
   let listener: AcionarEntregaOrdemServicoListener;
-  let mockPolicy: { handle: jest.Mock };
+  let mockHandler: { handle: jest.Mock };
 
   beforeEach(async () => {
-    mockPolicy = { handle: jest.fn().mockResolvedValue(undefined) };
+    mockHandler = { handle: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AcionarEntregaOrdemServicoListener,
-        { provide: AcionarEntregaOrdemServicoPolicy, useValue: mockPolicy },
+        { provide: AcionarEntregaOrdemServicoHandler, useValue: mockHandler },
       ],
     }).compile();
 
     listener = module.get<AcionarEntregaOrdemServicoListener>(AcionarEntregaOrdemServicoListener);
   });
 
-  it('should delegate the event to the application policy', async () => {
+  it('should delegate the event to the application handler', async () => {
     const evento = new PagamentoRegistradoEvent('pag-1', 'os-1');
 
     await listener.handle(evento);
 
-    expect(mockPolicy.handle).toHaveBeenCalledWith(evento);
+    expect(mockHandler.handle).toHaveBeenCalledWith(evento);
   });
 });

@@ -1,19 +1,19 @@
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
-import { AtualizarStatusRecebidaPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-recebida.policy';
-import { AtualizarStatusEmDiagnosticoPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-em-diagnostico.policy';
-import { NotificarClienteDiagnosticoPolicy } from '../../src/modules/ordem-servico/application/policies/notificar-cliente-diagnostico.policy';
-import { GerarOrcamentoPolicy } from '../../src/modules/ordem-servico/application/policies/gerar-orcamento.policy';
-import { EnviarOrcamentoPolicy } from '../../src/modules/ordem-servico/application/policies/enviar-orcamento.policy';
-import { AtualizarStatusAguardandoAprovacaoPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-aguardando-aprovacao.policy';
-import { VerificarNecessidadePecasPolicy } from '../../src/modules/ordem-servico/application/policies/verificar-necessidade-pecas.policy';
-import { AtualizarStatusEmExecucaoPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-em-execucao.policy';
-import { IniciarMonitoramentoTempoPolicy } from '../../src/modules/ordem-servico/application/policies/iniciar-monitoramento-tempo.policy';
-import { AtualizarStatusFinalizadaPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-finalizada.policy';
-import { FinalizarMonitoramentoTempoPolicy } from '../../src/modules/ordem-servico/application/policies/finalizar-monitoramento-tempo.policy';
-import { NotificarClienteConclusaoPolicy } from '../../src/modules/ordem-servico/application/policies/notificar-cliente-conclusao.policy';
-import { AtualizarStatusEntreguePolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-entregue.policy';
-import { AtualizarStatusEncerradaSemExecucaoPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-encerrada-sem-execucao.policy';
-import { AtualizarStatusAguardandoPecasPolicy } from '../../src/modules/ordem-servico/application/policies/atualizar-status-aguardando-pecas.policy';
+import { AtualizarStatusRecebidaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-recebida.handler';
+import { AtualizarStatusEmDiagnosticoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-em-diagnostico.handler';
+import { NotificarClienteDiagnosticoHandler } from '../../src/modules/ordem-servico/application/event-handlers/notificar-cliente-diagnostico.handler';
+import { GerarOrcamentoHandler } from '../../src/modules/ordem-servico/application/event-handlers/gerar-orcamento.handler';
+import { EnviarOrcamentoHandler } from '../../src/modules/ordem-servico/application/event-handlers/enviar-orcamento.handler';
+import { AtualizarStatusAguardandoAprovacaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-aguardando-aprovacao.handler';
+import { VerificarNecessidadePecasHandler } from '../../src/modules/ordem-servico/application/event-handlers/verificar-necessidade-pecas.handler';
+import { AtualizarStatusEmExecucaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-em-execucao.handler';
+import { IniciarMonitoramentoTempoHandler } from '../../src/modules/ordem-servico/application/event-handlers/iniciar-monitoramento-tempo.handler';
+import { AtualizarStatusFinalizadaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-finalizada.handler';
+import { FinalizarMonitoramentoTempoHandler } from '../../src/modules/ordem-servico/application/event-handlers/finalizar-monitoramento-tempo.handler';
+import { NotificarClienteConclusaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/notificar-cliente-conclusao.handler';
+import { AtualizarStatusEntregueHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-entregue.handler';
+import { AtualizarStatusEncerradaSemExecucaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
+import { AtualizarStatusAguardandoPecasHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-aguardando-pecas.handler';
 import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-criada.event';
 import { OrdemServicoAssumida } from '../../src/modules/ordem-servico/domain/events/ordem-servico-assumida.event';
 import { StatusAtualizadoEmDiagnostico } from '../../src/modules/ordem-servico/domain/events/status-atualizado-em-diagnostico.event';
@@ -64,20 +64,25 @@ const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
   ...overrides,
 });
 
-/** Test helper: verifies policy should NOT update when OS has wrong status */
+/** Test helper: verifies handler should NOT update when OS has wrong status */
 async function shouldNotUpdateWhenStatusIs(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
+<<<<<<< HEAD:test/ordem-servico/policies.spec.ts
   policy: unknown,
   wrongStatus: OSStatus,
+=======
+  handlerInstance: unknown,
+  wrongStatus: string,
+>>>>>>> origin/develop:test/ordem-servico/event-handlers.spec.ts
   event: unknown,
   methodName = 'handle'
 ): Promise<void> {
   osRepo.findOne.mockResolvedValue(mockOs({ status: wrongStatus }));
-  await (policy as Record<string, (e: unknown) => Promise<void>>)[methodName](event);
+  await (handlerInstance as Record<string, (e: unknown) => Promise<void>>)[methodName](event);
   expect(osRepo.update).not.toHaveBeenCalled();
 }
 
-/** Test helper: verifies policy updates OS to IN_PROGRESS and emits StatusAtualizadoEmExecucao */
+/** Test helper: verifies handler updates OS to IN_PROGRESS and emits StatusAtualizadoEmExecucao */
 async function shouldUpdateToInProgress(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
   emissor: jest.Mocked<EmissorEventos>,
@@ -91,7 +96,7 @@ async function shouldUpdateToInProgress(
   expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
 }
 
-describe('OS Policies', () => {
+describe('OS Event handlers', () => {
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
   let orcRepo: jest.Mocked<IOrcamentoRepository>;
   let emissor: jest.Mocked<EmissorEventos>;
@@ -117,21 +122,21 @@ describe('OS Policies', () => {
 
   // ─── P-01 ────────────────────────────────────────────────────────────────
 
-  describe('P-01 AtualizarStatusRecebidaPolicy', () => {
+  describe('P-01 AtualizarStatusRecebidaHandler', () => {
     it('não deve atualizar quando OS já está RECEIVED', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const policy = new AtualizarStatusRecebidaPolicy(osRepo);
+      const handler = new AtualizarStatusRecebidaHandler(osRepo);
 
-      await policy.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
+      await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
       expect(osRepo.update).not.toHaveBeenCalled();
     });
 
     it('deve forçar status RECEIVED quando OS foi criada em status incorreto', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const policy = new AtualizarStatusRecebidaPolicy(osRepo);
+      const handler = new AtualizarStatusRecebidaHandler(osRepo);
 
-      await policy.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
+      await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'RECEIVED' });
     });
@@ -139,23 +144,23 @@ describe('OS Policies', () => {
 
   // ─── P-02 ────────────────────────────────────────────────────────────────
 
-  describe('P-02 AtualizarStatusEmDiagnosticoPolicy', () => {
+  describe('P-02 AtualizarStatusEmDiagnosticoHandler', () => {
     it('deve atualizar para UNDER_DIAGNOSIS e emitir StatusAtualizadoEmDiagnostico', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
       osRepo.update.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEmDiagnosticoHandler(osRepo, emissor);
 
-      await policy.handle(new OrdemServicoAssumida('os-1'));
+      await handler.handle(new OrdemServicoAssumida('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'UNDER_DIAGNOSIS' });
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmDiagnostico));
     });
 
     it('não deve atualizar quando OS não está em RECEIVED', async () => {
-      const policy = new AtualizarStatusEmDiagnosticoPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEmDiagnosticoHandler(osRepo, emissor);
       await shouldNotUpdateWhenStatusIs(
         osRepo,
-        policy,
+        handler,
         'UNDER_DIAGNOSIS',
         new OrdemServicoAssumida('os-1')
       );
@@ -164,25 +169,25 @@ describe('OS Policies', () => {
 
   // ─── P-03 ────────────────────────────────────────────────────────────────
 
-  describe('P-03 NotificarClienteDiagnosticoPolicy', () => {
+  describe('P-03 NotificarClienteDiagnosticoHandler', () => {
     it('deve executar stub sem lançar erro', () => {
-      const policy = new NotificarClienteDiagnosticoPolicy();
-      expect(() => policy.handle(new StatusAtualizadoEmDiagnostico('os-1'))).not.toThrow();
+      const handler = new NotificarClienteDiagnosticoHandler();
+      expect(() => handler.handle(new StatusAtualizadoEmDiagnostico('os-1'))).not.toThrow();
     });
   });
 
   // ─── P-04 ────────────────────────────────────────────────────────────────
 
-  describe('P-04 GerarOrcamentoPolicy', () => {
+  describe('P-04 GerarOrcamentoHandler', () => {
     const evento = new ServicosEInsumosListados('os-1', 100, 50);
 
     it('deve criar orçamento quando não existe nenhum e emitir OrcamentoGerado', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
       orcRepo.findByOrdemServicoId.mockResolvedValue(null);
       orcRepo.create.mockResolvedValue(mockOrc());
-      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
+      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
 
-      await policy.handle(evento);
+      await handler.handle(evento);
 
       expect(orcRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({ id_ordem_servico: 'os-1' })
@@ -194,9 +199,9 @@ describe('OS Policies', () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
       orcRepo.findByOrdemServicoId.mockResolvedValue(mockOrc({ status: 'PENDING' }));
       orcRepo.update.mockResolvedValue(mockOrc());
-      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
+      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
 
-      await policy.handle(evento);
+      await handler.handle(evento);
 
       expect(orcRepo.update).toHaveBeenCalledWith(
         'orc-1',
@@ -208,26 +213,26 @@ describe('OS Policies', () => {
     it('deve lançar DomainException quando orçamento já está APPROVED', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
       orcRepo.findByOrdemServicoId.mockResolvedValue(mockOrc({ status: 'APPROVED' }));
-      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
+      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
 
-      await expect(policy.handle(evento)).rejects.toThrow(DomainException);
+      await expect(handler.handle(evento)).rejects.toThrow(DomainException);
     });
 
     it('deve lançar DomainException quando OS está em status inválido', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const policy = new GerarOrcamentoPolicy(osRepo, orcRepo, emissor);
+      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
 
-      await expect(policy.handle(evento)).rejects.toThrow(DomainException);
+      await expect(handler.handle(evento)).rejects.toThrow(DomainException);
     });
   });
 
   // ─── P-05 ────────────────────────────────────────────────────────────────
 
-  describe('P-05 EnviarOrcamentoPolicy', () => {
+  describe('P-05 EnviarOrcamentoHandler', () => {
     it('deve emitir OrcamentoEnviado', async () => {
-      const policy = new EnviarOrcamentoPolicy(emissor);
+      const handler = new EnviarOrcamentoHandler(emissor);
 
-      await policy.handle(new OrcamentoGerado('os-1', 'orc-1'));
+      await handler.handle(new OrcamentoGerado('os-1', 'orc-1'));
 
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrcamentoEnviado));
     });
@@ -235,21 +240,21 @@ describe('OS Policies', () => {
 
   // ─── P-06 ────────────────────────────────────────────────────────────────
 
-  describe('P-06 AtualizarStatusAguardandoAprovacaoPolicy', () => {
+  describe('P-06 AtualizarStatusAguardandoAprovacaoHandler', () => {
     it('deve atualizar para AWAITING_APPROVAL quando OS está UNDER_DIAGNOSIS', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
+      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
 
-      await policy.handle(new OrcamentoEnviado('os-1', 'orc-1'));
+      await handler.handle(new OrcamentoEnviado('os-1', 'orc-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_APPROVAL' });
     });
 
     it('não deve atualizar quando OS já não está UNDER_DIAGNOSIS', async () => {
-      const policy = new AtualizarStatusAguardandoAprovacaoPolicy(osRepo);
+      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
       await shouldNotUpdateWhenStatusIs(
         osRepo,
-        policy,
+        handler,
         'AWAITING_APPROVAL',
         new OrcamentoEnviado('os-1', 'orc-1')
       );
@@ -258,20 +263,20 @@ describe('OS Policies', () => {
 
   // ─── P-07 ────────────────────────────────────────────────────────────────
 
-  describe('P-07 VerificarNecessidadePecasPolicy', () => {
+  describe('P-07 VerificarNecessidadePecasHandler', () => {
     it('deve emitir OrcamentoAprovadoComPecas quando valorTotalPecas > 0', async () => {
-      const policy = new VerificarNecessidadePecasPolicy(emissor);
+      const handler = new VerificarNecessidadePecasHandler(emissor);
 
-      await policy.handle(new OrcamentoAprovado('os-1', 'orc-1', 50));
+      await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 50));
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('OrcamentoAprovadoComPecas');
     });
 
     it('deve emitir OsSemPecasConfirmada quando valorTotalPecas é 0', async () => {
-      const policy = new VerificarNecessidadePecasPolicy(emissor);
+      const handler = new VerificarNecessidadePecasHandler(emissor);
 
-      await policy.handle(new OrcamentoAprovado('os-1', 'orc-1', 0));
+      await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 0));
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido).toBeInstanceOf(OsSemPecasConfirmada);
@@ -280,33 +285,33 @@ describe('OS Policies', () => {
 
   // ─── P-08 ────────────────────────────────────────────────────────────────
 
-  describe('P-08 AtualizarStatusEmExecucaoPolicy', () => {
+  describe('P-08 AtualizarStatusEmExecucaoHandler', () => {
     it('deve atualizar para IN_PROGRESS e emitir StatusAtualizadoEmExecucao via OsSemPecasConfirmada', async () => {
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
       await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
-        policy.handleSemPecas(new OsSemPecasConfirmada('os-1'))
+        handler.handleSemPecas(new OsSemPecasConfirmada('os-1'))
       );
     });
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_APPROVAL', async () => {
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
       await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
-        policy.handlePecasReservadas({ ordemServicoId: 'os-1' })
+        handler.handlePecasReservadas({ ordemServicoId: 'os-1' })
       );
     });
 
     it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_PARTS', async () => {
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
       await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_PARTS', () =>
-        policy.handlePecasReservadas({ ordemServicoId: 'os-1' })
+        handler.handlePecasReservadas({ ordemServicoId: 'os-1' })
       );
     });
 
     it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-      const policy = new AtualizarStatusEmExecucaoPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
       await shouldNotUpdateWhenStatusIs(
         osRepo,
-        policy,
+        handler,
         'IN_PROGRESS',
         new OsSemPecasConfirmada('os-1'),
         'handleSemPecas'
@@ -316,12 +321,12 @@ describe('OS Policies', () => {
 
   // ─── P-09 ────────────────────────────────────────────────────────────────
 
-  describe('P-09 IniciarMonitoramentoTempoPolicy', () => {
+  describe('P-09 IniciarMonitoramentoTempoHandler', () => {
     it('deve atualizar iniciada_em com data atual', async () => {
       osRepo.update.mockResolvedValue(mockOs());
-      const policy = new IniciarMonitoramentoTempoPolicy(osRepo);
+      const handler = new IniciarMonitoramentoTempoHandler(osRepo);
 
-      await policy.handle(new StatusAtualizadoEmExecucao('os-1'));
+      await handler.handle(new StatusAtualizadoEmExecucao('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { iniciada_em: expect.any(Date) });
     });
@@ -329,23 +334,23 @@ describe('OS Policies', () => {
 
   // ─── P-10 ────────────────────────────────────────────────────────────────
 
-  describe('P-10 AtualizarStatusFinalizadaPolicy', () => {
+  describe('P-10 AtualizarStatusFinalizadaHandler', () => {
     it('deve atualizar para FINISHED e emitir StatusAtualizadoFinalizada', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
       osRepo.update.mockResolvedValue(mockOs({ status: 'FINISHED' }));
-      const policy = new AtualizarStatusFinalizadaPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusFinalizadaHandler(osRepo, emissor);
 
-      await policy.handle(new ServicoConcluidoPeloMecanico('os-1'));
+      await handler.handle(new ServicoConcluidoPeloMecanico('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'FINISHED' });
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoFinalizada));
     });
 
     it('não deve atualizar quando OS não está em IN_PROGRESS', async () => {
-      const policy = new AtualizarStatusFinalizadaPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusFinalizadaHandler(osRepo, emissor);
       await shouldNotUpdateWhenStatusIs(
         osRepo,
-        policy,
+        handler,
         'RECEIVED',
         new ServicoConcluidoPeloMecanico('os-1')
       );
@@ -354,14 +359,14 @@ describe('OS Policies', () => {
 
   // ─── P-11 ────────────────────────────────────────────────────────────────
 
-  describe('P-11 FinalizarMonitoramentoTempoPolicy', () => {
+  describe('P-11 FinalizarMonitoramentoTempoHandler', () => {
     it('deve atualizar finalizada_em e logar duração quando iniciada_em está definida', async () => {
       const iniciada_em = new Date(Date.now() - 30 * 60 * 1000);
       osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em }));
       osRepo.update.mockResolvedValue(mockOs());
-      const policy = new FinalizarMonitoramentoTempoPolicy(osRepo);
+      const handler = new FinalizarMonitoramentoTempoHandler(osRepo);
 
-      await policy.handle(new StatusAtualizadoFinalizada('os-1'));
+      await handler.handle(new StatusAtualizadoFinalizada('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { finalizada_em: expect.any(Date) });
     });
@@ -369,9 +374,9 @@ describe('OS Policies', () => {
     it('deve atualizar finalizada_em sem logar quando iniciada_em é null', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ iniciada_em: null }));
       osRepo.update.mockResolvedValue(mockOs());
-      const policy = new FinalizarMonitoramentoTempoPolicy(osRepo);
+      const handler = new FinalizarMonitoramentoTempoHandler(osRepo);
 
-      await policy.handle(new StatusAtualizadoFinalizada('os-1'));
+      await handler.handle(new StatusAtualizadoFinalizada('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { finalizada_em: expect.any(Date) });
     });
@@ -379,11 +384,11 @@ describe('OS Policies', () => {
 
   // ─── P-12 ────────────────────────────────────────────────────────────────
 
-  describe('P-12 NotificarClienteConclusaoPolicy', () => {
+  describe('P-12 NotificarClienteConclusaoHandler', () => {
     it('deve emitir ClienteNotificadoConclusao', async () => {
-      const policy = new NotificarClienteConclusaoPolicy(emissor);
+      const handler = new NotificarClienteConclusaoHandler(emissor);
 
-      await policy.handle(new StatusAtualizadoFinalizada('os-1'));
+      await handler.handle(new StatusAtualizadoFinalizada('os-1'));
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('ClienteNotificadoConclusao');
@@ -392,13 +397,13 @@ describe('OS Policies', () => {
 
   // ─── P-13 ────────────────────────────────────────────────────────────────
 
-  describe('P-13 AtualizarStatusEntreguePolicy', () => {
+  describe('P-13 AtualizarStatusEntregueHandler', () => {
     it('deve atualizar para DELIVERED com entregue_em e emitir StatusAtualizadoEntregue', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'FINISHED' }));
       osRepo.update.mockResolvedValue(mockOs({ status: 'DELIVERED' }));
-      const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEntregueHandler(osRepo, emissor);
 
-      await policy.handle(new PagamentoRegistrado('os-1'));
+      await handler.handle(new PagamentoRegistrado('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', {
         status: 'DELIVERED',
@@ -409,10 +414,10 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em FINISHED', async () => {
-      const policy = new AtualizarStatusEntreguePolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEntregueHandler(osRepo, emissor);
       await shouldNotUpdateWhenStatusIs(
         osRepo,
-        policy,
+        handler,
         'IN_PROGRESS',
         new PagamentoRegistrado('os-1')
       );
@@ -421,12 +426,12 @@ describe('OS Policies', () => {
 
   // ─── P-14 ────────────────────────────────────────────────────────────────
 
-  describe('P-14 AtualizarStatusEncerradaSemExecucaoPolicy', () => {
+  describe('P-14 AtualizarStatusEncerradaSemExecucaoHandler', () => {
     it('deve atualizar para CLOSED_WITHOUT_EXECUTION e emitir StatusAtualizadoEncerradaSemExecucao', async () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'CLOSED_WITHOUT_EXECUTION' }));
-      const policy = new AtualizarStatusEncerradaSemExecucaoPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusEncerradaSemExecucaoHandler(osRepo, emissor);
 
-      await policy.handle(new OrcamentoRecusado('os-1', 'orc-1'));
+      await handler.handle(new OrcamentoRecusado('os-1', 'orc-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'CLOSED_WITHOUT_EXECUTION' });
       const emitido = emissor.emitir.mock.calls[0][0];
@@ -436,13 +441,13 @@ describe('OS Policies', () => {
 
   // ─── P-15 ────────────────────────────────────────────────────────────────
 
-  describe('P-15 AtualizarStatusAguardandoPecasPolicy', () => {
+  describe('P-15 AtualizarStatusAguardandoPecasHandler', () => {
     it('deve atualizar para AWAITING_PARTS quando PecasIndisponiveis ocorrer', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
       osRepo.update.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
-      const policy = new AtualizarStatusAguardandoPecasPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusAguardandoPecasHandler(osRepo, emissor);
 
-      await policy.handle(new PecasIndisponiveis('os-1', ['peca-1']));
+      await handler.handle(new PecasIndisponiveis('os-1', ['peca-1']));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_PARTS' });
       const emitido = emissor.emitir.mock.calls[0][0];
@@ -450,10 +455,10 @@ describe('OS Policies', () => {
     });
 
     it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-      const policy = new AtualizarStatusAguardandoPecasPolicy(osRepo, emissor);
+      const handler = new AtualizarStatusAguardandoPecasHandler(osRepo, emissor);
       await shouldNotUpdateWhenStatusIs(
         osRepo,
-        policy,
+        handler,
         'IN_PROGRESS',
         new PecasIndisponiveis('os-1', ['peca-1'])
       );

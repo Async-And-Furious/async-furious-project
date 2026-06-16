@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { PagamentoController } from './presentation/controllers/pagamento.controller';
 import { PagamentoRepository } from './infrastructure/repositories/pagamento.repository';
-import { RegistrarPagamentoPolicy } from './application/policies/registrar-pagamento.policy';
-import { AcionarEntregaOrdemServicoPolicy } from './application/policies/acionar-entrega-ordem-servico.policy';
+import { RegistrarPagamentoUseCase } from './application/use-cases/registrar-pagamento.use-case';
+import { AcionarEntregaOrdemServicoHandler } from './application/event-handlers/acionar-entrega-ordem-servico.handler';
 import { AcionarEntregaOrdemServicoListener } from './infrastructure/listeners/acionar-entrega-ordem-servico.listener';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
@@ -16,8 +16,13 @@ import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
       provide: PAGAMENTO_REPOSITORY,
       useExisting: PagamentoRepository,
     },
-    RegistrarPagamentoPolicy,
-    AcionarEntregaOrdemServicoPolicy,
+    {
+      provide: RegistrarPagamentoUseCase,
+      useFactory: (repository: PagamentoRepository, emissor: EmissorEventos) =>
+        new RegistrarPagamentoUseCase(repository, emissor),
+      inject: [PAGAMENTO_REPOSITORY, EmissorEventos],
+    },
+    AcionarEntregaOrdemServicoHandler,
     AcionarEntregaOrdemServicoListener,
   ],
 })

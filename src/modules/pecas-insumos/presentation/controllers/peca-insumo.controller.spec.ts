@@ -207,7 +207,7 @@ describe('PecaInsumoController', () => {
   });
 
   describe('solicitarReposicao', () => {
-    it('should call policy to request parts from supplier', async () => {
+    it('should call use case to request parts from supplier', async () => {
       const dto = {
         fornecedorId: 'fornecedor-1',
         pecas: [
@@ -244,7 +244,7 @@ describe('PecaInsumoController', () => {
   });
 
   describe('receberPecas', () => {
-    it('should call policy to confirm receipt from supplier', async () => {
+    it('should call use case to confirm receipt from supplier', async () => {
       mockReceberUseCase.execute.mockResolvedValue(undefined);
 
       await controller.receberPecas('pedido-123');

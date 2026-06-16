@@ -1,15 +1,15 @@
 import { Logger } from '@nestjs/common';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
-import { VerificarDisponibilidadeEstoquePolicy } from '../../src/modules/pecas-insumos/application/policies/verificar-disponibilidade-estoque.policy';
-import { DebitarEstoquePolicy } from '../../src/modules/pecas-insumos/application/policies/debitar-estoque.policy';
-import { NotificarPecasIndisponiveisPolicy } from '../../src/modules/pecas-insumos/application/policies/notificar-pecas-indisponiveis.policy';
-import { NotificarAdminReposicaoPolicy } from '../../src/modules/pecas-insumos/application/policies/notificar-admin-reposicao.policy';
-import { ValidarBacklogOrdensPendentesPolicy } from '../../src/modules/pecas-insumos/application/policies/validar-backlog-ordens-pendentes.policy';
-import { LiberarOrdensAguardandoPecasPolicy } from '../../src/modules/pecas-insumos/application/policies/liberar-ordens-aguardando-pecas.policy';
+import { VerificarDisponibilidadeEstoqueHandler } from '../../src/modules/pecas-insumos/application/event-handlers/verificar-disponibilidade-estoque.handler';
+import { DebitarEstoqueHandler } from '../../src/modules/pecas-insumos/application/event-handlers/debitar-estoque.handler';
+import { NotificarPecasIndisponiveisHandler } from '../../src/modules/pecas-insumos/application/event-handlers/notificar-pecas-indisponiveis.handler';
+import { NotificarAdminReposicaoHandler } from '../../src/modules/pecas-insumos/application/event-handlers/notificar-admin-reposicao.handler';
+import { ValidarBacklogOrdensPendentesHandler } from '../../src/modules/pecas-insumos/application/event-handlers/validar-backlog-ordens-pendentes.handler';
+import { LiberarOrdensAguardandoPecasHandler } from '../../src/modules/pecas-insumos/application/event-handlers/liberar-ordens-aguardando-pecas.handler';
 import {
-  SolicitarPecasAoFornecedorUseCase as SolicitarPecasFornecedorPolicy,
-  ReceberPecasDoFornecedorUseCase as ReceberPecasFornecedorPolicy,
+  SolicitarPecasAoFornecedorUseCase,
+  ReceberPecasDoFornecedorUseCase,
 } from '../../src/modules/pecas-insumos/application/use-cases/fornecedor.use-cases';
 import { OrcamentoAprovadoComPecas } from '../../src/modules/ordem-servico/domain/events/orcamento-aprovado-com-pecas.event';
 import { PecasEmEstoqueConfirmadas } from '../../src/modules/pecas-insumos/domain/events/pecas-em-estoque-confirmadas.event';
@@ -53,7 +53,7 @@ const mockPeca = (overrides: Partial<PecaInsumo> = {}): PecaInsumo => ({
   ...overrides,
 });
 
-describe('PecasInsumos Policies', () => {
+describe('PecasInsumos Event handlers', () => {
   let repo: jest.Mocked<IPecaInsumoRepository>;
   let emissor: jest.Mocked<EmissorEventos>;
   let backlogPort: jest.Mocked<IOrdemServicoBacklogPort>;
@@ -84,9 +84,9 @@ describe('PecasInsumos Policies', () => {
     } as unknown as jest.Mocked<ReservaEstoqueRepository>;
   });
 
-  describe('VerificarDisponibilidadeEstoquePolicy (P-18)', () => {
+  describe('VerificarDisponibilidadeEstoqueHandler (P-18)', () => {
     it('deve emitir PecasEmEstoqueConfirmadas quando todas as pecas estao disponiveis', async () => {
-      const policy = new VerificarDisponibilidadeEstoquePolicy(repo, emissor);
+      const handler = new VerificarDisponibilidadeEstoqueHandler(repo, emissor);
       repo.findByOrdemServicoId.mockResolvedValue([
         {
           id_peca: 'peca-1',
@@ -98,7 +98,7 @@ describe('PecasInsumos Policies', () => {
         },
       ]);
 
-      await policy.handle(new OrcamentoAprovadoComPecas('os-1', 'orc-1'));
+      await handler.handle(new OrcamentoAprovadoComPecas('os-1', 'orc-1'));
 
       expect(repo.findByOrdemServicoId).toHaveBeenCalledWith('os-1');
       expect(emissor.emitir).toHaveBeenCalledTimes(1);
@@ -111,7 +111,7 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('deve emitir PecasNaoExistem quando alguma peca nao tem estoque suficiente', async () => {
-      const policy = new VerificarDisponibilidadeEstoquePolicy(repo, emissor);
+      const handler = new VerificarDisponibilidadeEstoqueHandler(repo, emissor);
       repo.findByOrdemServicoId.mockResolvedValue([
         {
           id_peca: 'peca-1',
@@ -123,7 +123,7 @@ describe('PecasInsumos Policies', () => {
         },
       ]);
 
-      await policy.handle(new OrcamentoAprovadoComPecas('os-1', 'orc-1'));
+      await handler.handle(new OrcamentoAprovadoComPecas('os-1', 'orc-1'));
 
       expect(emissor.emitir).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -135,9 +135,9 @@ describe('PecasInsumos Policies', () => {
     });
   });
 
-  describe('DebitarEstoquePolicy (P-19)', () => {
+  describe('DebitarEstoqueHandler (P-19)', () => {
     it('deve debitar estoque e emitir EstoqueDebitado e PecasReservadas', async () => {
-      const policy = new DebitarEstoquePolicy(repo, emissor);
+      const handler = new DebitarEstoqueHandler(repo, emissor);
       repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 10 }));
       repo.updateEstoque.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 7 }));
 
@@ -145,7 +145,7 @@ describe('PecasInsumos Policies', () => {
         { id_peca: 'peca-1', quantidade: 3, preco_unitario: 50 },
       ]);
 
-      await policy.handle(evento);
+      await handler.handle(evento);
 
       expect(repo.findOne).toHaveBeenCalledWith('peca-1');
       expect(repo.updateEstoque).toHaveBeenCalledWith('peca-1', 7);
@@ -161,11 +161,11 @@ describe('PecasInsumos Policies', () => {
     });
   });
 
-  describe('NotificarPecasIndisponiveisPolicy (P-20)', () => {
+  describe('NotificarPecasIndisponiveisHandler (P-20)', () => {
     it('deve emitir PecasIndisponiveis a partir de PecasNaoExistem', async () => {
-      const policy = new NotificarPecasIndisponiveisPolicy(emissor);
+      const handler = new NotificarPecasIndisponiveisHandler(emissor);
 
-      await policy.handle(new PecasNaoExistem('os-1', ['peca-1', 'peca-2']));
+      await handler.handle(new PecasNaoExistem('os-1', ['peca-1', 'peca-2']));
 
       expect(emissor.emitir).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -177,21 +177,21 @@ describe('PecasInsumos Policies', () => {
     });
   });
 
-  describe('NotificarAdminReposicaoPolicy (P-21)', () => {
+  describe('NotificarAdminReposicaoHandler (P-21)', () => {
     it('deve registrar aviso para reposicao quando PecasIndisponiveis ocorrer', () => {
       const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-      const policy = new NotificarAdminReposicaoPolicy();
+      const handler = new NotificarAdminReposicaoHandler();
 
-      policy.handle(new PecasIndisponiveis('os-1', ['peca-1']));
+      handler.handle(new PecasIndisponiveis('os-1', ['peca-1']));
 
       expect(warnSpy).toHaveBeenCalled();
       warnSpy.mockRestore();
     });
   });
 
-  describe('ValidarBacklogOrdensPendentesPolicy (P-22)', () => {
+  describe('ValidarBacklogOrdensPendentesHandler (P-22)', () => {
     it('deve emitir BacklogValidadoPecasDisponiveis quando estoque suporta a OS aguardando pecas', async () => {
-      const policy = new ValidarBacklogOrdensPendentesPolicy(
+      const handler = new ValidarBacklogOrdensPendentesHandler(
         backlogPort,
         repo as unknown as PecaInsumoRepository,
         emissor
@@ -204,7 +204,7 @@ describe('PecasInsumos Policies', () => {
       ]);
       repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 5 }));
 
-      await policy.handle(
+      await handler.handle(
         new EstoqueAtualizadoAposRecebimento([{ pecaId: 'peca-1', novaQuantidade: 3 }])
       );
 
@@ -215,7 +215,7 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('nao deve emitir evento quando ainda faltar estoque para atender backlog', async () => {
-      const policy = new ValidarBacklogOrdensPendentesPolicy(
+      const handler = new ValidarBacklogOrdensPendentesHandler(
         backlogPort,
         repo as unknown as PecaInsumoRepository,
         emissor
@@ -228,7 +228,7 @@ describe('PecasInsumos Policies', () => {
       ]);
       repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 2 }));
 
-      await policy.handle(
+      await handler.handle(
         new EstoqueAtualizadoAposRecebimento([{ pecaId: 'peca-1', novaQuantidade: 2 }])
       );
 
@@ -237,7 +237,7 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('não deve emitir evento quando peca não for encontrada no estoque', async () => {
-      const policy = new ValidarBacklogOrdensPendentesPolicy(
+      const handler = new ValidarBacklogOrdensPendentesHandler(
         backlogPort,
         repo as unknown as PecaInsumoRepository,
         emissor
@@ -250,7 +250,7 @@ describe('PecasInsumos Policies', () => {
       ]);
       repo.findOne.mockResolvedValue(null);
 
-      await policy.handle(
+      await handler.handle(
         new EstoqueAtualizadoAposRecebimento([{ pecaId: 'peca-inexistente', novaQuantidade: 0 }])
       );
 
@@ -258,9 +258,9 @@ describe('PecasInsumos Policies', () => {
     });
   });
 
-  describe('LiberarOrdensAguardandoPecasPolicy (P-25)', () => {
+  describe('LiberarOrdensAguardandoPecasHandler (P-25)', () => {
     it('deve debitar, reservar e emitir PecasReservadas quando backlog estiver validado', async () => {
-      const policy = new LiberarOrdensAguardandoPecasPolicy(
+      const handler = new LiberarOrdensAguardandoPecasHandler(
         repo as unknown as PecaInsumoRepository,
         reservaRepo,
         emissor
@@ -269,7 +269,7 @@ describe('PecasInsumos Policies', () => {
       reservaRepo.existsByOrdemId.mockResolvedValue(false);
       repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 10 }));
 
-      await policy.handle({
+      await handler.handle({
         ordemId: 'os-1',
         pecas: [{ pecaId: 'peca-1', quantidadeNecessaria: 3 }],
       });
@@ -287,7 +287,7 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('nao deve executar novamente quando a ordem ja estiver reservada', async () => {
-      const policy = new LiberarOrdensAguardandoPecasPolicy(
+      const handler = new LiberarOrdensAguardandoPecasHandler(
         repo as unknown as PecaInsumoRepository,
         reservaRepo,
         emissor
@@ -295,7 +295,7 @@ describe('PecasInsumos Policies', () => {
 
       reservaRepo.existsByOrdemId.mockResolvedValue(true);
 
-      await policy.handle({
+      await handler.handle({
         ordemId: 'os-1',
         pecas: [{ pecaId: 'peca-1', quantidadeNecessaria: 1 }],
       });
@@ -306,7 +306,7 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('deve throw NotFoundException quando peca nao for encontrada', async () => {
-      const policy = new LiberarOrdensAguardandoPecasPolicy(
+      const handler = new LiberarOrdensAguardandoPecasHandler(
         repo as unknown as PecaInsumoRepository,
         reservaRepo,
         emissor
@@ -316,7 +316,7 @@ describe('PecasInsumos Policies', () => {
       repo.findOne.mockResolvedValue(null);
 
       await expect(
-        policy.handle({
+        handler.handle({
           ordemId: 'os-1',
           pecas: [{ pecaId: 'peca-inexistente', quantidadeNecessaria: 1 }],
         })
@@ -324,7 +324,7 @@ describe('PecasInsumos Policies', () => {
     });
   });
 
-  describe('SolicitarPecasFornecedorPolicy', () => {
+  describe('SolicitarPecasAoFornecedorUseCase', () => {
     let pedidoFornecedorRepo: jest.Mocked<PedidoFornecedorRepository>;
 
     beforeEach(() => {
@@ -336,7 +336,7 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('deve criar pedido e emitir evento quando pecas sao validas', async () => {
-      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
       repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1' }));
       pedidoFornecedorRepo.create.mockResolvedValue({
         id: 'pedido-1',
@@ -346,7 +346,7 @@ describe('PecasInsumos Policies', () => {
         criado_em: new Date(),
       });
 
-      await policy.execute({
+      await useCase.execute({
         fornecedorId: 'fornecedor-1',
         pecas: [{ pecaId: 'peca-1', quantidadeSolicitada: 5 }],
       });
@@ -356,10 +356,10 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('deve lancar BadRequestException quando lista de pecas vazia', async () => {
-      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
 
       await expect(
-        policy.execute({
+        useCase.execute({
           fornecedorId: 'fornecedor-1',
           pecas: [],
         })
@@ -367,22 +367,22 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('deve lancar BadRequestException quando pecas undefined', async () => {
-      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
 
       await expect(
-        policy.execute({
+        useCase.execute({
           fornecedorId: 'fornecedor-1',
-          pecas: undefined as any,
+          pecas: undefined as unknown as Array<{ pecaId: string; quantidadeSolicitada: number }>,
         })
       ).rejects.toThrow(DomainException);
     });
 
     it('deve lancar NotFoundException quando peca nao existe no catalogo', async () => {
-      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
       repo.findOne.mockResolvedValue(null);
 
       await expect(
-        policy.execute({
+        useCase.execute({
           fornecedorId: 'fornecedor-1',
           pecas: [{ pecaId: 'peca-inexistente', quantidadeSolicitada: 5 }],
         })
@@ -390,7 +390,7 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('deve validar todas as pecas antes de criar pedido', async () => {
-      const policy = new SolicitarPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
       repo.findOne.mockResolvedValueOnce(mockPeca({ id: 'peca-1' }));
       repo.findOne.mockResolvedValueOnce(mockPeca({ id: 'peca-2' }));
       pedidoFornecedorRepo.create.mockResolvedValue({
@@ -401,7 +401,7 @@ describe('PecasInsumos Policies', () => {
         criado_em: new Date(),
       });
 
-      await policy.execute({
+      await useCase.execute({
         fornecedorId: 'fornecedor-1',
         pecas: [
           { pecaId: 'peca-1', quantidadeSolicitada: 2 },
@@ -413,7 +413,7 @@ describe('PecasInsumos Policies', () => {
     });
   });
 
-  describe('ReceberPecasFornecedorPolicy', () => {
+  describe('ReceberPecasDoFornecedorUseCase', () => {
     let pedidoFornecedorRepo: jest.Mocked<PedidoFornecedorRepository>;
 
     const pedidoFornecedorPendente: PedidoFornecedor = {
@@ -460,36 +460,36 @@ describe('PecasInsumos Policies', () => {
     });
 
     it('deve atualizar estoque e emitir evento quando pedido valido', async () => {
-      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue(pedidoFornecedorPendente);
       repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 10 }));
       repo.updateEstoque.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 15 }));
       pedidoFornecedorRepo.save.mockResolvedValue(pedidoFornecedorSalvo);
 
-      await policy.execute({ pedidoId: 'pedido-1' });
+      await useCase.execute({ pedidoId: 'pedido-1' });
 
       expect(repo.updateEstoque).toHaveBeenCalled();
       expect(emissor.emitir).toHaveBeenCalled();
     });
 
     it('deve lancar NotFoundException quando pedido nao existe', async () => {
-      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue(null);
 
-      await expect(policy.execute({ pedidoId: 'pedido-inexistente' })).rejects.toThrow(
+      await expect(useCase.execute({ pedidoId: 'pedido-inexistente' })).rejects.toThrow(
         EntityNotFoundException
       );
     });
 
     it('deve lancar ConflictException quando pedido ja foi recebido', async () => {
-      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue(pedidoFornecedorRecebido);
 
-      await expect(policy.execute({ pedidoId: 'pedido-1' })).rejects.toThrow(DomainException);
+      await expect(useCase.execute({ pedidoId: 'pedido-1' })).rejects.toThrow(DomainException);
     });
 
     it('deve continuar quando peca nao existe no catalogo (skip)', async () => {
-      const policy = new ReceberPecasFornecedorPolicy(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue({
         ...pedidoFornecedorPendente,
         status: 'PENDENTE',
@@ -505,7 +505,7 @@ describe('PecasInsumos Policies', () => {
       });
       repo.findOne.mockResolvedValue(null);
 
-      await policy.execute({ pedidoId: 'pedido-1' });
+      await useCase.execute({ pedidoId: 'pedido-1' });
 
       expect(emissor.emitir).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -515,11 +515,11 @@ describe('PecasInsumos Policies', () => {
     });
   });
 
-  describe('P-24 NotificarAdminReposicaoPolicy', () => {
+  describe('P-24 NotificarAdminReposicaoHandler', () => {
     it('should handle PecasIndisponiveis event without throwing', () => {
-      const policy = new NotificarAdminReposicaoPolicy();
+      const handler = new NotificarAdminReposicaoHandler();
 
-      expect(() => policy.handle(new PecasIndisponiveis('os-1', ['peca-1']))).not.toThrow();
+      expect(() => handler.handle(new PecasIndisponiveis('os-1', ['peca-1']))).not.toThrow();
     });
   });
 });
