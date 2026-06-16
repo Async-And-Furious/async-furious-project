@@ -67,13 +67,8 @@ const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
 /** Test helper: verifies handler should NOT update when OS has wrong status */
 async function shouldNotUpdateWhenStatusIs(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
-<<<<<<< HEAD:test/ordem-servico/policies.spec.ts
-  policy: unknown,
-  wrongStatus: OSStatus,
-=======
   handlerInstance: unknown,
-  wrongStatus: string,
->>>>>>> origin/develop:test/ordem-servico/event-handlers.spec.ts
+  wrongStatus: OSStatus,
   event: unknown,
   methodName = 'handle'
 ): Promise<void> {
