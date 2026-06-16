@@ -178,14 +178,16 @@ describe('PecasInsumos Event handlers', () => {
   });
 
   describe('NotificarAdminReposicaoHandler (P-21)', () => {
-    it('deve registrar aviso para reposicao quando PecasIndisponiveis ocorrer', () => {
-      const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-      const handler = new NotificarAdminReposicaoHandler();
+    it('deve alertar gateway quando PecasIndisponiveis ocorrer', async () => {
+      const mockGateway = { alertar: jest.fn().mockResolvedValue(undefined) };
+      const handler = new NotificarAdminReposicaoHandler(mockGateway as any);
 
-      handler.handle(new PecasIndisponiveis('os-1', ['peca-1']));
+      await handler.handle(new PecasIndisponiveis('os-1', ['peca-1']));
 
-      expect(warnSpy).toHaveBeenCalled();
-      warnSpy.mockRestore();
+      expect(mockGateway.alertar).toHaveBeenCalledWith({
+        ordemServicoId: 'os-1',
+        idsPecasIndisponiveis: ['peca-1'],
+      });
     });
   });
 
@@ -326,6 +328,7 @@ describe('PecasInsumos Event handlers', () => {
 
   describe('SolicitarPecasAoFornecedorUseCase', () => {
     let pedidoFornecedorRepo: jest.Mocked<PedidoFornecedorRepository>;
+    let mockFornecedorGateway: { enviarPedido: jest.Mock };
 
     beforeEach(() => {
       pedidoFornecedorRepo = {
@@ -333,10 +336,11 @@ describe('PecasInsumos Event handlers', () => {
         findById: jest.fn(),
         save: jest.fn(),
       } as unknown as jest.Mocked<PedidoFornecedorRepository>;
+      mockFornecedorGateway = { enviarPedido: jest.fn().mockResolvedValue(undefined) };
     });
 
     it('deve criar pedido e emitir evento quando pecas sao validas', async () => {
-      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor, mockFornecedorGateway as any);
       repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1' }));
       pedidoFornecedorRepo.create.mockResolvedValue({
         id: 'pedido-1',
@@ -356,7 +360,7 @@ describe('PecasInsumos Event handlers', () => {
     });
 
     it('deve lancar BadRequestException quando lista de pecas vazia', async () => {
-      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor, mockFornecedorGateway as any);
 
       await expect(
         useCase.execute({
@@ -367,7 +371,7 @@ describe('PecasInsumos Event handlers', () => {
     });
 
     it('deve lancar BadRequestException quando pecas undefined', async () => {
-      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor, mockFornecedorGateway as any);
 
       await expect(
         useCase.execute({
@@ -378,7 +382,7 @@ describe('PecasInsumos Event handlers', () => {
     });
 
     it('deve lancar NotFoundException quando peca nao existe no catalogo', async () => {
-      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor, mockFornecedorGateway as any);
       repo.findOne.mockResolvedValue(null);
 
       await expect(
@@ -390,7 +394,7 @@ describe('PecasInsumos Event handlers', () => {
     });
 
     it('deve validar todas as pecas antes de criar pedido', async () => {
-      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new SolicitarPecasAoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor, mockFornecedorGateway as any);
       repo.findOne.mockResolvedValueOnce(mockPeca({ id: 'peca-1' }));
       repo.findOne.mockResolvedValueOnce(mockPeca({ id: 'peca-2' }));
       pedidoFornecedorRepo.create.mockResolvedValue({
@@ -516,10 +520,11 @@ describe('PecasInsumos Event handlers', () => {
   });
 
   describe('P-24 NotificarAdminReposicaoHandler', () => {
-    it('should handle PecasIndisponiveis event without throwing', () => {
-      const handler = new NotificarAdminReposicaoHandler();
+    it('should handle PecasIndisponiveis event without throwing', async () => {
+      const mockGateway = { alertar: jest.fn().mockResolvedValue(undefined) };
+      const handler = new NotificarAdminReposicaoHandler(mockGateway as any);
 
-      expect(() => handler.handle(new PecasIndisponiveis('os-1', ['peca-1']))).not.toThrow();
+      await expect(handler.handle(new PecasIndisponiveis('os-1', ['peca-1']))).resolves.not.toThrow();
     });
   });
 });
