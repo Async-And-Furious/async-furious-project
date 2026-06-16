@@ -45,6 +45,9 @@ import { NotificarClienteConclusaoHandler } from './application/event-handlers/n
 import { AtualizarStatusEntregueHandler } from './application/event-handlers/atualizar-status-entregue.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
+import { NotificacaoClienteStub } from './infrastructure/gateways/notificacao-cliente.stub';
+import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cliente.gateway';
+import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
 
 @Module({
   controllers: [OrdemServicoController],
@@ -52,8 +55,8 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
     OrdemServicoRepository,
     OrcamentoRepository,
     OsPecaRepository,
-    EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
+    { provide: NOTIFICACAO_CLIENTE_GATEWAY, useClass: NotificacaoClienteStub },
 
     // Event handlers (registered as NestJS providers — @OnEvent listeners)
     {
@@ -69,8 +72,9 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
     },
     {
       provide: NotificarClienteDiagnosticoHandler,
-      useFactory: () => new NotificarClienteDiagnosticoHandler(),
-      inject: [],
+      useFactory: (gateway: INotificacaoClienteGateway) =>
+        new NotificarClienteDiagnosticoHandler(gateway),
+      inject: [NOTIFICACAO_CLIENTE_GATEWAY],
     },
     {
       provide: GerarOrcamentoHandler,
@@ -128,8 +132,9 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
     },
     {
       provide: NotificarClienteConclusaoHandler,
-      useFactory: (barramento: IEmissorEventos) => new NotificarClienteConclusaoHandler(barramento),
-      inject: [EMISSOR_EVENTOS],
+      useFactory: (gateway: INotificacaoClienteGateway, barramento: IEmissorEventos) =>
+        new NotificarClienteConclusaoHandler(gateway, barramento),
+      inject: [NOTIFICACAO_CLIENTE_GATEWAY, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusEntregueHandler,
