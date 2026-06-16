@@ -32,6 +32,7 @@ import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/event
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { INotificacaoClienteGateway } from '../../src/modules/ordem-servico/application/ports/notificacao-cliente.gateway';
 import type { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 
@@ -92,6 +93,7 @@ describe('OS Event handlers', () => {
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
   let orcRepo: jest.Mocked<IOrcamentoRepository>;
   let emissor: jest.Mocked<EmissorEventos>;
+  let notificacaoGateway: jest.Mocked<INotificacaoClienteGateway>;
 
   beforeEach(() => {
     osRepo = {
@@ -109,6 +111,9 @@ describe('OS Event handlers', () => {
     emissor = {
       emitir: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<EmissorEventos>;
+    notificacaoGateway = {
+      notificar: jest.fn().mockResolvedValue(undefined),
+    } as jest.Mocked<INotificacaoClienteGateway>;
   });
 
   // ─── P-01 ────────────────────────────────────────────────────────────────
@@ -161,9 +166,14 @@ describe('OS Event handlers', () => {
   // ─── P-03 ────────────────────────────────────────────────────────────────
 
   describe('P-03 NotificarClienteDiagnosticoHandler', () => {
-    it('deve executar stub sem lançar erro', () => {
-      const handler = new NotificarClienteDiagnosticoHandler();
-      expect(() => handler.handle(new StatusAtualizadoEmDiagnostico('os-1'))).not.toThrow();
+    it('deve chamar notificacaoGateway.notificar quando diagnostico atualizado', async () => {
+      const handler = new NotificarClienteDiagnosticoHandler(notificacaoGateway);
+      await handler.handle(new StatusAtualizadoEmDiagnostico('os-1'));
+
+      expect(notificacaoGateway.notificar).toHaveBeenCalledWith({
+        ordemServicoId: 'os-1',
+        mensagem: 'Seu veículo está em diagnóstico.',
+      });
     });
   });
 
@@ -376,10 +386,15 @@ describe('OS Event handlers', () => {
   // ─── P-12 ────────────────────────────────────────────────────────────────
 
   describe('P-12 NotificarClienteConclusaoHandler', () => {
-    it('deve emitir ClienteNotificadoConclusao', async () => {
-      const handler = new NotificarClienteConclusaoHandler(emissor);
+    it('deve notificar cliente e emitir ClienteNotificadoConclusao', async () => {
+      const handler = new NotificarClienteConclusaoHandler(notificacaoGateway, emissor);
 
       await handler.handle(new StatusAtualizadoFinalizada('os-1'));
+
+      expect(notificacaoGateway.notificar).toHaveBeenCalledWith({
+        ordemServicoId: 'os-1',
+        mensagem: 'Seu veículo foi finalizado e está pronto para retirada.',
+      });
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('ClienteNotificadoConclusao');

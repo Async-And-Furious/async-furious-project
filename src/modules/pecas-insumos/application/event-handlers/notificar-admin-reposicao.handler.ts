@@ -8,7 +8,7 @@ import type { INotificacaoAdminGateway } from '../ports/notificacao-admin.gatewa
 export class NotificarAdminReposicaoHandler {
   constructor(
     @Inject(NOTIFICACAO_ADMIN_GATEWAY)
-    private readonly notificacaoAdmin: INotificacaoAdminGateway,
+    private readonly notificacaoAdmin: INotificacaoAdminGateway
   ) {}
 
   @OnEvent('PecasIndisponiveis')

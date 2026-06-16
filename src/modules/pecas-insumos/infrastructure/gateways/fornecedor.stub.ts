@@ -8,9 +8,10 @@ import type {
 export class FornecedorStub implements IFornecedorGateway {
   private readonly logger = new Logger(FornecedorStub.name);
 
-  async enviarPedido(payload: EnviarPedidoFornecedorPayload): Promise<void> {
+  enviarPedido(payload: EnviarPedidoFornecedorPayload): Promise<void> {
     this.logger.log(
       `[STUB] Pedido ${payload.pedidoId} enviado ao fornecedor ${payload.fornecedorId} — ${payload.itens.length} item(ns).`
     );
+    return Promise.resolve();
   }
 }

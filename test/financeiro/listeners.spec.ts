@@ -1,30 +1,33 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AcionarEntregaOrdemServicoListener } from '../../src/modules/financeiro/infrastructure/listeners/acionar-entrega-ordem-servico.listener';
 import { AcionarEntregaOrdemServicoHandler } from '../../src/modules/financeiro/application/event-handlers/acionar-entrega-ordem-servico.handler';
 import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/events/pagamento-registrado.event';
+import { EMISSOR_EVENTOS } from '../../src/shared/domain/interfaces/emissor-eventos.interface';
 
-describe('AcionarEntregaOrdemServicoListener', () => {
-  let listener: AcionarEntregaOrdemServicoListener;
-  let mockHandler: { handle: jest.Mock };
+describe('AcionarEntregaOrdemServicoHandler', () => {
+  let handler: AcionarEntregaOrdemServicoHandler;
+  let mockEmissor: { emitir: jest.Mock };
 
   beforeEach(async () => {
-    mockHandler = { handle: jest.fn().mockResolvedValue(undefined) };
+    mockEmissor = { emitir: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
-        AcionarEntregaOrdemServicoListener,
-        { provide: AcionarEntregaOrdemServicoHandler, useValue: mockHandler },
+        AcionarEntregaOrdemServicoHandler,
+        { provide: EMISSOR_EVENTOS, useValue: mockEmissor },
       ],
     }).compile();
 
-    listener = module.get<AcionarEntregaOrdemServicoListener>(AcionarEntregaOrdemServicoListener);
+    handler = module.get<AcionarEntregaOrdemServicoHandler>(AcionarEntregaOrdemServicoHandler);
   });
 
-  it('should delegate the event to the application handler', async () => {
+  it('should emit PagamentoRegistrado integration event', async () => {
     const evento = new PagamentoRegistradoEvent('pag-1', 'os-1');
 
-    await listener.handle(evento);
+    await handler.handle(evento);
 
-    expect(mockHandler.handle).toHaveBeenCalledWith(evento);
+    expect(mockEmissor.emitir).toHaveBeenCalledTimes(1);
+    expect(mockEmissor.emitir).toHaveBeenCalledWith(
+      expect.objectContaining({ ordemServicoId: 'os-1', pagamentoId: 'pag-1' })
+    );
   });
 });

@@ -8,7 +8,7 @@ import type { INotificacaoClienteGateway } from '../ports/notificacao-cliente.ga
 export class NotificarClienteDiagnosticoHandler {
   constructor(
     @Inject(NOTIFICACAO_CLIENTE_GATEWAY)
-    private readonly notificacaoGateway: INotificacaoClienteGateway,
+    private readonly notificacaoGateway: INotificacaoClienteGateway
   ) {}
 
   @OnEvent('StatusAtualizadoEmDiagnostico')

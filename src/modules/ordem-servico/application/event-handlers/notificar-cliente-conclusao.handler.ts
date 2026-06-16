@@ -13,7 +13,7 @@ export class NotificarClienteConclusaoHandler {
     @Inject(NOTIFICACAO_CLIENTE_GATEWAY)
     private readonly notificacaoGateway: INotificacaoClienteGateway,
     @Inject(EMISSOR_EVENTOS)
-    private readonly emissor: IEmissorEventos,
+    private readonly emissor: IEmissorEventos
   ) {}
 
   @OnEvent('StatusAtualizadoFinalizada')

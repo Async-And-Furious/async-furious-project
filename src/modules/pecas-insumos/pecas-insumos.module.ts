@@ -26,10 +26,7 @@ import {
   INotificacaoAdminGateway,
 } from './application/ports/notificacao-admin.gateway';
 import { FornecedorStub } from './infrastructure/gateways/fornecedor.stub';
-import {
-  FORNECEDOR_GATEWAY,
-  IFornecedorGateway,
-} from './application/ports/fornecedor.gateway';
+import { FORNECEDOR_GATEWAY, IFornecedorGateway } from './application/ports/fornecedor.gateway';
 import {
   SolicitarPecasAoFornecedorUseCase,
   ReceberPecasDoFornecedorUseCase,
@@ -109,7 +106,12 @@ import {
         emissor: IEmissorEventos,
         fornecedorGateway: IFornecedorGateway
       ) => new SolicitarPecasAoFornecedorUseCase(pecaRepo, pedidoRepo, emissor, fornecedorGateway),
-      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EMISSOR_EVENTOS, FORNECEDOR_GATEWAY],
+      inject: [
+        PecaInsumoRepository,
+        PedidoFornecedorRepository,
+        EMISSOR_EVENTOS,
+        FORNECEDOR_GATEWAY,
+      ],
     },
     // P-23: Receber peças do fornecedor
     {
