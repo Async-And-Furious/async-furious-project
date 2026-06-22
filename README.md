@@ -40,6 +40,8 @@ Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech 
 | Container      | Docker Compose       |
 | Testes         | Jest                 |
 | Segurança DAST | OWASP ZAP            |
+| IaC            | Terraform 1.6+       |
+| Orquestração   | Kubernetes (kind)    |
 
 Utilizamos Node.js com NestJS pela arquitetura modular e suporte nativo a injeção de dependência, PostgreSQL pela robustez e consistência transacional, e Prisma como ORM por sua tipagem forte integrada ao TypeScript, garantindo segurança e produtividade no desenvolvimento.
 ---
@@ -49,6 +51,8 @@ Utilizamos Node.js com NestJS pela arquitetura modular e suporte nativo a injeç
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
+- Terraform 1.6+ (para provisionamento via IaC)
+- kind (`go install sigs.k8s.io/kind@latest` ou via package manager)
 
 ---
 
@@ -305,6 +309,71 @@ pnpm lint
 # Formatar código
 pnpm format
 ```
+
+---
+
+## Infraestrutura como Código (Terraform + Kubernetes)
+
+A infraestrutura é provisionada via Terraform com um cluster Kubernetes local (`kind`).
+
+### Pré-requisitos
+
+- Docker rodando
+- `terraform` 1.6+
+- `kind`
+
+### Estrutura
+
+```
+/infra
+  versions.tf                        # Provider pins
+  /modules/kind-cluster              # Cria cluster kind (1 control-plane + 1 worker)
+  /modules/kubernetes-apps           # Aplica todos os manifests via kubectl provider
+  /environments/local                # Ambiente local (terraform.tfvars commitado)
+  /environments/aws/README.md        # Stub para migração EKS
+
+/k8s
+  namespace.yaml
+  /config    configmap.yaml, secret.yaml
+  /app       deployment.yaml, service.yaml, hpa.yaml
+  /database  statefulset.yaml, service.yaml, pvc.yaml
+```
+
+### Subir o ambiente local
+
+```bash
+# 1. Build da imagem
+docker build -t async-furious-api:latest .
+
+# 2. Variáveis sensíveis (nunca commitadas)
+export TF_VAR_db_password="postgres"
+export TF_VAR_jwt_secret="dev-secret"
+
+# 3. Provisionar
+cd infra/environments/local
+terraform init
+terraform apply
+
+# 4. Testar
+curl http://localhost:30000/health
+
+# 5. Destruir
+terraform destroy
+```
+
+### Carregar imagem no cluster (após apply)
+
+```bash
+kind load docker-image async-furious-api:latest --name async-furious
+```
+
+### CI/CD
+
+Pull requests que alterem `infra/**` ou `k8s/**` executam automaticamente `terraform validate` + `terraform plan` via `.github/workflows/terraform.yml`. Nenhum `apply` ocorre em CI.
+
+### Migração para EKS
+
+Consulte `infra/environments/aws/README.md`.
 
 ---
 
