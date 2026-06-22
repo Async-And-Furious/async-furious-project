@@ -1,0 +1,90 @@
+name: Container Security - Trivy
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  docker-image-scan:
+    name: Docker Image Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_REF: local/async-furious-project:${{ github.sha }}
+      TRIVY_CACHE_DIR: .trivy-cache
+
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build --tag "$IMAGE_REF" .
+
+      - name: Trivy table report
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_REF }}
+          scanners: vuln
+          vuln-type: os,library
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: table
+          output: trivy-image-report.txt
+          exit-code: '0'
+
+      - name: Trivy SARIF report
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_REF }}
+          scanners: vuln
+          vuln-type: os,library
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        continue-on-error: true
+        with:
+          sarif_file: trivy-results.sarif
+
+      - name: Upload Trivy reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-reports-${{ github.run_id }}
+          path: |
+            trivy-image-report.txt
+            trivy-results.sarif
+          retention-days: 30
+
+      - name: Enforce HIGH and CRITICAL vulnerability gate
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.IMAGE_REF }}
+          scanners: vuln
+          vuln-type: os,library
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+          format: table
+          exit-code: '1'
