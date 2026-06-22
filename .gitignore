@@ -71,3 +71,11 @@ Thumbs.db
 .opencode/
 REVISAO_FINAL.md
 docs/superpowers
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+tfplan
