@@ -90,7 +90,12 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
       this.prisma.ordemServico.count({ where }),
     ]);
 
-    return formatPaginatedResponse(data.map((r) => this.mapToEntity(r)), page, limit, total);
+    return formatPaginatedResponse(
+      data.map((r) => this.mapToEntity(r)),
+      page,
+      limit,
+      total
+    );
   }
 
   async findAllAtivas(
