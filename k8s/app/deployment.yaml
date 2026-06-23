@@ -17,7 +17,7 @@ spec:
         - name: migrate
           image: async-furious-api:latest
           imagePullPolicy: Never
-          command: ["node", "node_modules/.bin/prisma", "migrate", "deploy"]
+          command: ["node_modules/.bin/prisma", "migrate", "deploy"]
           envFrom:
             - configMapRef:
                 name: async-furious-config
