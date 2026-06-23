@@ -304,6 +304,30 @@ describe('OS + Orçamento Use Cases', () => {
       );
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
+
+    it('deve lançar DomainException quando OS não está em AWAITING_APPROVAL', async () => {
+      const statusesInvalidos: OrdemDeServico['status'][] = [
+        'RECEIVED',
+        'UNDER_DIAGNOSIS',
+        'IN_PROGRESS',
+        'FINISHED',
+        'DELIVERED',
+        'CLOSED_WITHOUT_EXECUTION',
+      ];
+
+      for (const status of statusesInvalidos) {
+        mockOsRepository.findOne.mockResolvedValue(makeOs({ status }));
+
+        const uc = new AprovarOrcamentoUseCase(
+          mockOsRepository,
+          mockOrcamentoRepository,
+          mockBarramento
+        );
+        await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+        expect(mockOrcamentoRepository.findByOrdemServicoId).not.toHaveBeenCalled();
+        jest.clearAllMocks();
+      }
+    });
   });
 
   describe('RecusarOrcamentoUseCase', () => {
@@ -350,6 +374,30 @@ describe('OS + Orçamento Use Cases', () => {
         mockBarramento
       );
       await expect(uc.execute('os-1')).rejects.toThrow(EntityNotFoundException);
+    });
+
+    it('deve lançar DomainException quando OS não está em AWAITING_APPROVAL', async () => {
+      const statusesInvalidos: OrdemDeServico['status'][] = [
+        'RECEIVED',
+        'UNDER_DIAGNOSIS',
+        'IN_PROGRESS',
+        'FINISHED',
+        'DELIVERED',
+        'CLOSED_WITHOUT_EXECUTION',
+      ];
+
+      for (const status of statusesInvalidos) {
+        mockOsRepository.findOne.mockResolvedValue(makeOs({ status }));
+
+        const uc = new RecusarOrcamentoUseCase(
+          mockOsRepository,
+          mockOrcamentoRepository,
+          mockBarramento
+        );
+        await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+        expect(mockOrcamentoRepository.findByOrdemServicoId).not.toHaveBeenCalled();
+        jest.clearAllMocks();
+      }
     });
   });
 
