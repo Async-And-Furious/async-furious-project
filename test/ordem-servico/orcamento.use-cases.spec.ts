@@ -75,6 +75,7 @@ describe('OS + Orçamento Use Cases', () => {
       create: jest.fn(),
       update: jest.fn(),
       findAll: jest.fn(),
+      findAllAtivas: jest.fn(),
       remove: jest.fn(),
       calcularTempoMedioExecucao: jest.fn(),
     } as jest.Mocked<IOrdemServicoRepository>;
@@ -510,33 +511,32 @@ describe('OS + Orçamento Use Cases', () => {
   });
 
   describe('ListarOrdensServicoUseCase', () => {
-    it('deve delegar para o repositório e retornar lista paginada', async () => {
+    it('deve delegar para findAllAtivas e retornar lista paginada', async () => {
       const paginado = {
         data: [mockOs],
         pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
       };
-      mockOsRepository.findAll.mockResolvedValue(paginado);
-
-      const uc = new ListarOrdensServicoUseCase(mockOsRepository);
-      const result = await uc.execute(1, 10, 'troca');
-
-      expect(mockOsRepository.findAll).toHaveBeenCalledWith(1, 10, 'troca');
-      expect(result).toBe(paginado);
-    });
-
-    it('deve retornar OS recusada sem filtrar status CLOSED_WITHOUT_EXECUTION', async () => {
-      const osRecusada = makeOs({ status: 'CLOSED_WITHOUT_EXECUTION' });
-      const paginado = {
-        data: [osRecusada],
-        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
-      };
-      mockOsRepository.findAll.mockResolvedValue(paginado);
+      mockOsRepository.findAllAtivas.mockResolvedValue(paginado);
 
       const uc = new ListarOrdensServicoUseCase(mockOsRepository);
       const result = await uc.execute(1, 10);
 
-      expect(mockOsRepository.findAll).toHaveBeenCalledWith(1, 10, undefined);
-      expect(result.data[0].status).toBe('CLOSED_WITHOUT_EXECUTION');
+      expect(mockOsRepository.findAllAtivas).toHaveBeenCalledWith(1, 10);
+      expect(result).toBe(paginado);
+    });
+
+    it('deve excluir CLOSED_WITHOUT_EXECUTION da listagem ativa', async () => {
+      const paginado = {
+        data: [],
+        pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
+      };
+      mockOsRepository.findAllAtivas.mockResolvedValue(paginado);
+
+      const uc = new ListarOrdensServicoUseCase(mockOsRepository);
+      const result = await uc.execute(1, 10);
+
+      expect(mockOsRepository.findAllAtivas).toHaveBeenCalledWith(1, 10);
+      expect(result.data).toHaveLength(0);
     });
   });
 

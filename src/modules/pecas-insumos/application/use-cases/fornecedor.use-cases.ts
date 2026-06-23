@@ -1,6 +1,7 @@
 import type { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 import type { IPedidoFornecedorRepository } from '../../domain/interfaces/pedido-fornecedor.repository.interface';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
+import type { IFornecedorGateway } from '../ports/fornecedor.gateway';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import { PedidoFornecedorEnviado } from '../../domain/events/pedido-fornecedor-enviado.event';
@@ -10,7 +11,8 @@ export class SolicitarPecasAoFornecedorUseCase {
   constructor(
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly pedidoFornecedorRepository: IPedidoFornecedorRepository,
-    private readonly emissor: IEmissorEventos
+    private readonly emissor: IEmissorEventos,
+    private readonly fornecedorGateway: IFornecedorGateway
   ) {}
 
   async execute(cmd: {
@@ -36,6 +38,15 @@ export class SolicitarPecasAoFornecedorUseCase {
       })),
       status: 'PENDENTE',
       criado_em: new Date(),
+    });
+
+    await this.fornecedorGateway.enviarPedido({
+      pedidoId: pedido.id,
+      fornecedorId: cmd.fornecedorId,
+      itens: cmd.pecas.map((p) => ({
+        pecaId: p.pecaId,
+        quantidadeSolicitada: p.quantidadeSolicitada,
+      })),
     });
 
     await this.emissor.emitir(
