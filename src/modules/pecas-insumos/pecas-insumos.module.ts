@@ -20,6 +20,13 @@ import { VerificarDisponibilidadeEstoqueHandler } from './application/event-hand
 import { DebitarEstoqueHandler } from './application/event-handlers/debitar-estoque.handler';
 import { NotificarPecasIndisponiveisHandler } from './application/event-handlers/notificar-pecas-indisponiveis.handler';
 import { NotificarAdminReposicaoHandler } from './application/event-handlers/notificar-admin-reposicao.handler';
+import { NotificacaoAdminStub } from './infrastructure/gateways/notificacao-admin.stub';
+import {
+  NOTIFICACAO_ADMIN_GATEWAY,
+  INotificacaoAdminGateway,
+} from './application/ports/notificacao-admin.gateway';
+import { FornecedorStub } from './infrastructure/gateways/fornecedor.stub';
+import { FORNECEDOR_GATEWAY, IFornecedorGateway } from './application/ports/fornecedor.gateway';
 import {
   SolicitarPecasAoFornecedorUseCase,
   ReceberPecasDoFornecedorUseCase,
@@ -41,6 +48,8 @@ import {
     ReservaEstoqueRepository,
     EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
+    { provide: NOTIFICACAO_ADMIN_GATEWAY, useClass: NotificacaoAdminStub },
+    { provide: FORNECEDOR_GATEWAY, useClass: FornecedorStub },
 
     // P-18 → P-21 event handlers
     {
@@ -62,8 +71,9 @@ import {
     },
     {
       provide: NotificarAdminReposicaoHandler,
-      useFactory: () => new NotificarAdminReposicaoHandler(),
-      inject: [],
+      useFactory: (gateway: INotificacaoAdminGateway) =>
+        new NotificarAdminReposicaoHandler(gateway),
+      inject: [NOTIFICACAO_ADMIN_GATEWAY],
     },
 
     // P-22 → P-25 event handlers
@@ -93,9 +103,15 @@ import {
       useFactory: (
         pecaRepo: PecaInsumoRepository,
         pedidoRepo: PedidoFornecedorRepository,
-        emissor: IEmissorEventos
-      ) => new SolicitarPecasAoFornecedorUseCase(pecaRepo, pedidoRepo, emissor),
-      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EMISSOR_EVENTOS],
+        emissor: IEmissorEventos,
+        fornecedorGateway: IFornecedorGateway
+      ) => new SolicitarPecasAoFornecedorUseCase(pecaRepo, pedidoRepo, emissor, fornecedorGateway),
+      inject: [
+        PecaInsumoRepository,
+        PedidoFornecedorRepository,
+        EMISSOR_EVENTOS,
+        FORNECEDOR_GATEWAY,
+      ],
     },
     // P-23: Receber peças do fornecedor
     {

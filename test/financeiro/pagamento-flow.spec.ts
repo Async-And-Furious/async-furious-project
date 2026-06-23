@@ -16,7 +16,7 @@ import {
 } from '../../src/modules/financeiro/domain/interfaces/pagamento.interface';
 import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/events/pagamento-registrado.event';
 import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
-import { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { EMISSOR_EVENTOS } from '../../src/shared/domain/interfaces/emissor-eventos.interface';
 
 describe('Módulo Financeiro: Event handlers de Fluxo', () => {
   let mockRepository: jest.Mocked<IPagamentoRepository>;
@@ -38,7 +38,7 @@ describe('Módulo Financeiro: Event handlers de Fluxo', () => {
             useFactory: () => new RegistrarPagamentoUseCase(mockRepository, mockEmissor),
           },
           { provide: PAGAMENTO_REPOSITORY, useValue: mockRepository },
-          { provide: EmissorEventos, useValue: mockEmissor },
+          { provide: EMISSOR_EVENTOS, useValue: mockEmissor },
         ],
       }).compile();
       useCase = module.get<RegistrarPagamentoUseCase>(RegistrarPagamentoUseCase);
@@ -59,7 +59,7 @@ describe('Módulo Financeiro: Event handlers de Fluxo', () => {
       const module: TestingModule = await Test.createTestingModule({
         providers: [
           AcionarEntregaOrdemServicoHandler,
-          { provide: EmissorEventos, useValue: mockEmissor },
+          { provide: EMISSOR_EVENTOS, useValue: mockEmissor },
         ],
       }).compile();
       handler = module.get<AcionarEntregaOrdemServicoHandler>(AcionarEntregaOrdemServicoHandler);

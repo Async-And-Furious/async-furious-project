@@ -187,13 +187,12 @@ export class ListarOrdensServicoUseCase {
 
   async execute(
     page?: number,
-    limit?: number,
-    search?: string
+    limit?: number
   ): Promise<{
     data: OrdemDeServico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    return this.ordemServicoRepository.findAll(page, limit, search);
+    return this.ordemServicoRepository.findAllAtivas(page, limit);
   }
 }
 

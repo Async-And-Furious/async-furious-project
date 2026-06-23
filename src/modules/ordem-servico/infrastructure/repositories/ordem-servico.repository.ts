@@ -11,6 +11,10 @@ import {
   OrdemServicoUpdateData,
 } from '../../domain/interfaces/ordem-servico.interface';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
+import {
+  STATUS_EXCLUIDOS_DA_LISTAGEM,
+  getPrioridadeStatus,
+} from '../../domain/policies/status-priority.policy';
 
 @Injectable()
 export class OrdemServicoRepository implements IOrdemServicoRepository {
@@ -92,6 +96,32 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
       limit,
       total
     );
+  }
+
+  async findAllAtivas(
+    page = 1,
+    limit = 10
+  ): Promise<{
+    data: OrdemDeServico[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const where = { status: { notIn: STATUS_EXCLUIDOS_DA_LISTAGEM } };
+
+    const [records, total] = await Promise.all([
+      this.prisma.ordemServico.findMany({
+        where,
+        orderBy: { created_at: 'asc' },
+        include: { orcamento: true },
+      }),
+      this.prisma.ordemServico.count({ where }),
+    ]);
+
+    const sorted = records
+      .map((r) => this.mapToEntity(r))
+      .sort((a, b) => getPrioridadeStatus(a.status) - getPrioridadeStatus(b.status));
+
+    const paginated = sorted.slice((page - 1) * limit, page * limit);
+    return formatPaginatedResponse(paginated, page, limit, total);
   }
 
   async findOne(id: string): Promise<OrdemDeServico> {

@@ -191,21 +191,21 @@ describe('OrdemServicoController', () => {
       limit: 10,
     };
 
-    it('deve listar ordens de serviço com paginação', async () => {
+    it('deve listar ordens de serviço ativas com paginação', async () => {
       listarUseCase.execute.mockResolvedValue(resultadoEsperado);
 
-      const resultado = await controller.listar(query, mockUser);
+      const resultado = await controller.listar(query);
 
-      expect(listarUseCase.execute).toHaveBeenCalledWith(1, 10, 'troca');
+      expect(listarUseCase.execute).toHaveBeenCalledWith(1, 10);
       expect(resultado).toEqual(resultadoEsperado);
     });
 
     it('deve usar valores padrão de paginação', async () => {
       listarUseCase.execute.mockResolvedValue(resultadoEsperado);
 
-      const resultado = await controller.listar({}, mockUser);
+      const resultado = await controller.listar({});
 
-      expect(listarUseCase.execute).toHaveBeenCalledWith(1, 10, undefined);
+      expect(listarUseCase.execute).toHaveBeenCalledWith(1, 10);
       expect(resultado).toEqual(resultadoEsperado);
     });
   });
