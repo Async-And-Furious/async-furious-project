@@ -152,10 +152,12 @@ describe('OrdemServicoController', () => {
 
   describe('criar', () => {
     const createDto: CreateOrdemServicoDto = {
-      veiculoId: 'veiculo-1',
-      clienteId: 'cliente-1',
+      cliente: { nome: 'João', documento: '12345678909', tipoDocumento: 'CPF', email: 'joao@example.com' },
+      veiculo: { placa: 'ABC1234', marca: 'Fiat', modelo: 'Uno', ano: 2020 },
       descricao: 'Troca de óleo',
-    };
+      servicos: [],
+      pecas: [],
+    } as any;
 
     const resultadoEsperado = {
       id: 'os-1',
@@ -166,12 +168,12 @@ describe('OrdemServicoController', () => {
     };
 
     it('deve criar ordem de serviço com sucesso', async () => {
-      criarUseCase.execute.mockResolvedValue(resultadoEsperado);
+      criarUseCase.execute.mockResolvedValue(resultadoEsperado as any);
 
       const resultado = await controller.criar(createDto);
 
       expect(criarUseCase.execute).toHaveBeenCalledWith(createDto);
-      expect(resultado).toEqual(resultadoEsperado);
+      expect(resultado).toEqual({ id: resultadoEsperado.id });
     });
 
     it('deve tratar erros de criação', async () => {
@@ -184,11 +186,14 @@ describe('OrdemServicoController', () => {
 
   describe('listar', () => {
     const query: ListQueryDto = { page: 1, limit: 10, search: 'troca' };
-    const resultadoEsperado = {
+    const resultadoEsperado: any = {
       data: [{ id: 'os-1', descricao: 'Troca de óleo' }],
-      total: 1,
-      page: 1,
-      limit: 10,
+      pagination: {
+        total: 1,
+        page: 1,
+        limit: 10,
+        totalPages: 1,
+      },
     };
 
     it('deve listar ordens de serviço ativas com paginação', async () => {
@@ -212,7 +217,7 @@ describe('OrdemServicoController', () => {
 
   describe('detalhar', () => {
     const osId = 'os-1';
-    const resultadoEsperado = {
+    const resultadoEsperado: any = {
       id: 'os-1',
       descricao: 'Troca de óleo',
       status: 'RECEIVED',
@@ -230,7 +235,7 @@ describe('OrdemServicoController', () => {
 
   describe('consultarStatus', () => {
     const osId = 'os-1';
-    const resultadoEsperado = {
+    const resultadoEsperado: any = {
       id: 'os-1',
       status: 'RECEIVED',
       descricao: 'Troca de óleo',
@@ -254,7 +259,7 @@ describe('OrdemServicoController', () => {
     };
 
     it('deve atualizar ordem de serviço', async () => {
-      const resultadoEsperado = { id: osId, ...updateDto };
+      const resultadoEsperado: any = { id: osId, ...updateDto };
       atualizarOrdemServicoUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.atualizar(osId, updateDto);
@@ -268,7 +273,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve deletar ordem de serviço', async () => {
-      deletarUseCase.execute.mockResolvedValue({ sucesso: true });
+      deletarUseCase.execute.mockResolvedValue({ sucesso: true } as any);
 
       const resultado = await controller.deletar(osId);
 
@@ -281,7 +286,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve assumir ordem de serviço', async () => {
-      const resultadoEsperado = { id: osId, status: 'UNDER_DIAGNOSIS' };
+      const resultadoEsperado: any = { id: osId, status: 'UNDER_DIAGNOSIS' };
       assumirUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.assumir(osId);
@@ -295,7 +300,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve analisar veículo', async () => {
-      const resultadoEsperado = { id: osId, analiseRealizada: true };
+      const resultadoEsperado: any = { id: osId, analiseRealizada: true };
       analisarVeiculoUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.analisarVeiculo(osId);
@@ -320,7 +325,7 @@ describe('OrdemServicoController', () => {
     };
 
     it('deve listar serviços e gerar orçamento', async () => {
-      const resultadoEsperado = {
+      const resultadoEsperado: any = {
         id: osId,
         status: 'AWAITING_APPROVAL',
         orcamento: gerarOrcamentoDto,
@@ -338,7 +343,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve aprovar orçamento', async () => {
-      const resultadoEsperado = { id: osId, status: 'IN_PROGRESS' };
+      const resultadoEsperado: any = { id: osId, status: 'IN_PROGRESS' };
       aprovarOrcamentoUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.aprovarOrcamento(osId);
@@ -352,7 +357,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve recusar orçamento', async () => {
-      const resultadoEsperado = { id: osId, status: 'CLOSED_WITHOUT_EXECUTION' };
+      const resultadoEsperado: any = { id: osId, status: 'CLOSED_WITHOUT_EXECUTION' };
       recusarOrcamentoUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.recusarOrcamento(osId);
@@ -366,7 +371,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve finalizar execução', async () => {
-      const resultadoEsperado = { id: osId, status: 'FINISHED' };
+      const resultadoEsperado: any = { id: osId, status: 'FINISHED' };
       finalizarExecucaoUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.finalizarExecucao(osId);
@@ -380,7 +385,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve aprovar serviço prestado', async () => {
-      const resultadoEsperado = { id: osId, servicoAprovado: true };
+      const resultadoEsperado: any = { id: osId, servicoAprovado: true };
       aprovarServicoPrestadoUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.aprovarServicoPrestado(osId);
@@ -394,7 +399,7 @@ describe('OrdemServicoController', () => {
     const osId = 'os-1';
 
     it('deve registrar entrega', async () => {
-      const resultadoEsperado = { id: osId, status: 'DELIVERED' };
+      const resultadoEsperado: any = { id: osId, status: 'DELIVERED' };
       registrarEntregaVeiculoUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.registrarEntrega(osId);
@@ -437,9 +442,12 @@ describe('OrdemServicoController', () => {
       criarUseCase.execute.mockRejectedValue(erro);
 
       const createDto: CreateOrdemServicoDto = {
-        veiculoId: 'veiculo-1',
-        clienteId: 'cliente-1',
-      };
+        cliente: { nome: 'João', documento: '12345678909', tipoDocumento: 'CPF', email: 'joao@example.com' },
+        veiculo: { placa: 'ABC1234', marca: 'Fiat', modelo: 'Uno', ano: 2020 },
+        descricao: 'Troca de óleo',
+        servicos: [],
+        pecas: [],
+      } as any;
 
       await expect(controller.criar(createDto)).rejects.toThrow('Erro no banco de dados');
     });

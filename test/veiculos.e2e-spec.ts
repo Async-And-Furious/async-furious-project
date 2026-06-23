@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
-import request, { SuperTest } from 'supertest';
-import { App } from 'supertest/types';
+import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -15,7 +14,7 @@ function generateValidPlaca(prefix: string = 'ABC'): string {
 
 describe('VeiculosController (e2e)', () => {
   let app: INestApplication;
-  let server: SuperTest<App>;
+  let server: ReturnType<typeof request>;
   let prismaService: PrismaService;
   let jwtService: JwtService;
   let authToken: string;

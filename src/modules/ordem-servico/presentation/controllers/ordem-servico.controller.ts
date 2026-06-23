@@ -96,16 +96,16 @@ export class OrdemServicoController {
   @Roles(Role.RECEPCIONISTA)
   @ApiOperation({
     summary: 'Criar nova ordem de serviço',
-    description: 'Cria uma nova ordem de serviço. Requer role de RECEPCIONISTA.',
+    description: 'Cria uma nova ordem de serviço recebendo cliente, veículo, serviços e peças. Calcula o orçamento e cria OS com status RECEIVED.',
   })
   @ApiBody({ type: CreateOrdemServicoDto })
-  @ApiResponse({ status: 201, description: 'Ordem de serviço criada com sucesso' })
+  @ApiResponse({ status: 201, description: 'Ordem de serviço criada com sucesso, retorna o ID.' })
   @ApiResponse({ status: 400, description: 'Validação falhou - dados inválidos' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
-  @ApiResponse({ status: 404, description: 'Veículo ou cliente não encontrado' })
-  criar(@Body() dto: CreateOrdemServicoDto) {
-    return this.criarUseCase.execute(dto);
+  async criar(@Body() dto: CreateOrdemServicoDto) {
+    const os = await this.criarUseCase.execute(dto);
+    return { id: os.id };
   }
 
   @Get()

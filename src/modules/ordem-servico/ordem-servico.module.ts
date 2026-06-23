@@ -3,7 +3,12 @@ import { OrdemServicoController } from './presentation/controllers/ordem-servico
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
 import { OsPecaRepository } from './infrastructure/repositories/os-peca.repository';
+import { OsServicoRepository } from './infrastructure/repositories/os-servico.repository';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { ClienteRepository } from '../cadastro/infrastructure/repositories/cliente.repository';
+import { VeiculoRepository } from '../cadastro/infrastructure/repositories/veiculo.repository';
+import { ServicoRepository } from '../cadastro/infrastructure/repositories/servico.repository';
+import { PecaInsumoRepository } from '../pecas-insumos/infrastructure/repositories/peca-insumo.repository';
 import {
   EMISSOR_EVENTOS,
   IEmissorEventos,
@@ -55,6 +60,15 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
     OrdemServicoRepository,
     OrcamentoRepository,
     OsPecaRepository,
+    OsServicoRepository,
+    ClienteRepository,
+    VeiculoRepository,
+    ServicoRepository,
+    PecaInsumoRepository,
+    EmissorEventos,
+    OrcamentoRepository,
+    OsPecaRepository,
+    EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
     { provide: NOTIFICACAO_CLIENTE_GATEWAY, useClass: NotificacaoClienteStub },
 
@@ -152,9 +166,39 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
     // Use Cases
     {
       provide: CriarOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new CriarOrdemServicoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        clienteRepo: ClienteRepository,
+        veiculoRepo: VeiculoRepository,
+        servicoRepo: ServicoRepository,
+        pecaRepo: PecaInsumoRepository,
+        osServicoRepo: OsServicoRepository,
+        osPecaRepo: OsPecaRepository,
+        orcRepo: OrcamentoRepository,
+        barramento: EmissorEventos
+      ) =>
+        new CriarOrdemServicoUseCase(
+          osRepo,
+          clienteRepo,
+          veiculoRepo,
+          servicoRepo,
+          pecaRepo,
+          osServicoRepo,
+          osPecaRepo,
+          orcRepo,
+          barramento
+        ),
+      inject: [
+        OrdemServicoRepository,
+        ClienteRepository,
+        VeiculoRepository,
+        ServicoRepository,
+        PecaInsumoRepository,
+        OsServicoRepository,
+        OsPecaRepository,
+        OrcamentoRepository,
+        EmissorEventos,
+      ],
     },
     {
       provide: AssumirOrdemServicoUseCase,
@@ -253,6 +297,11 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
       useClass: OrdemServicoBacklogAdapter,
     },
   ],
-  exports: [OrdemServicoRepository, OrcamentoRepository, ORDEM_SERVICO_BACKLOG_PORT],
+  exports: [
+    OrdemServicoRepository,
+    OrcamentoRepository,
+    ORDEM_SERVICO_BACKLOG_PORT,
+    OsServicoRepository,
+  ],
 })
-export class OrdemServicoModule {}
+export class OrdemServicoModule { }

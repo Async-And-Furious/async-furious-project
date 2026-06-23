@@ -1,4 +1,6 @@
 import type { Orcamento } from './orcamento.entity';
+import { OsPeca } from './os-peca.entity';
+import { OsServico } from './os-servico.entity';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 
 export type OSStatus =
@@ -23,6 +25,8 @@ export class OrdemDeServico {
   created_at: Date;
   updated_at: Date;
   orcamento?: Orcamento;
+  osPecas?: OsPeca[];
+  osServicos?: OsServico[];
 
   podeAssumir(): void {
     if (this.status !== 'RECEIVED') {
