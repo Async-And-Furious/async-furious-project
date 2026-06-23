@@ -13,6 +13,16 @@ spec:
       labels:
         app: async-furious-api
     spec:
+      initContainers:
+        - name: migrate
+          image: async-furious-api:latest
+          imagePullPolicy: Never
+          command: ["node", "node_modules/.bin/prisma", "migrate", "deploy"]
+          envFrom:
+            - configMapRef:
+                name: async-furious-config
+            - secretRef:
+                name: async-furious-secret
       containers:
         - name: api
           image: async-furious-api:latest
@@ -33,13 +43,13 @@ spec:
                 name: async-furious-secret
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/v1
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /health
+              path: /api/v1
               port: 3000
             initialDelaySeconds: 30
             periodSeconds: 10

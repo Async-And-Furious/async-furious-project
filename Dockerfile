@@ -1,7 +1,10 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
@@ -21,9 +24,12 @@ RUN pnpm prisma generate
 RUN pnpm build
 
 # Production stage
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
 WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy only built artifacts and runtime dependencies
 COPY --from=builder /app/node_modules ./node_modules/
@@ -31,8 +37,8 @@ COPY --from=builder /app/prisma ./prisma/
 COPY --from=builder /app/dist ./dist/
 
 # Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+RUN groupadd --gid 1001 nodejs && \
+    useradd --uid 1001 --gid nodejs --shell /usr/sbin/nologin --create-home nodejs
 
 # Change ownership
 RUN chown -R nodejs:nodejs /app

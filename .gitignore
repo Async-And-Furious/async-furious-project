@@ -79,3 +79,6 @@ docs/superpowers
 *.tfstate.backup
 *.tfplan
 tfplan
+
+# KinD kubeconfig dumps (contain private keys)
+infra/environments/local/async-furious-config
