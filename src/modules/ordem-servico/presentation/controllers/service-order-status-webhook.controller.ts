@@ -6,9 +6,7 @@ import { UpdateServiceOrderStatusWebhookDto } from '../dto/update-service-order-
 @ApiTags('Webhooks')
 @Controller('webhooks/service-orders')
 export class ServiceOrderStatusWebhookController {
-  constructor(
-    private readonly updateServiceOrderStatusUseCase: UpdateServiceOrderStatusUseCase
-  ) {}
+  constructor(private readonly updateServiceOrderStatusUseCase: UpdateServiceOrderStatusUseCase) {}
 
   @Post('status')
   @HttpCode(HttpStatus.OK)

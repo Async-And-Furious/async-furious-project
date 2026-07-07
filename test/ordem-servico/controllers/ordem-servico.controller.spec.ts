@@ -152,7 +152,12 @@ describe('OrdemServicoController', () => {
 
   describe('criar', () => {
     const createDto: CreateOrdemServicoDto = {
-      cliente: { nome: 'João', documento: '12345678909', tipoDocumento: 'CPF', email: 'joao@example.com' },
+      cliente: {
+        nome: 'João',
+        documento: '12345678909',
+        tipoDocumento: 'CPF',
+        email: 'joao@example.com',
+      },
       veiculo: { placa: 'ABC1234', marca: 'Fiat', modelo: 'Uno', ano: 2020 },
       descricao: 'Troca de óleo',
       servicos: [],
@@ -442,7 +447,12 @@ describe('OrdemServicoController', () => {
       criarUseCase.execute.mockRejectedValue(erro);
 
       const createDto: CreateOrdemServicoDto = {
-        cliente: { nome: 'João', documento: '12345678909', tipoDocumento: 'CPF', email: 'joao@example.com' },
+        cliente: {
+          nome: 'João',
+          documento: '12345678909',
+          tipoDocumento: 'CPF',
+          email: 'joao@example.com',
+        },
         veiculo: { placa: 'ABC1234', marca: 'Fiat', modelo: 'Uno', ano: 2020 },
         descricao: 'Troca de óleo',
         servicos: [],

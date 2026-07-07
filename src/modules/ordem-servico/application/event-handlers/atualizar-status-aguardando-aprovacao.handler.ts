@@ -5,7 +5,7 @@ import { OrcamentoEnviado } from '../../domain/events/orcamento-enviado.event';
 
 @Injectable()
 export class AtualizarStatusAguardandoAprovacaoHandler {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) { }
+  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   @OnEvent('OrcamentoEnviado')
   async handle(evento: OrcamentoEnviado): Promise<void> {

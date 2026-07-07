@@ -28,7 +28,10 @@ import type { IPecaInsumoRepository } from '../../src/modules/pecas-insumos/doma
 import type { IOsServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/os-servico.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
-import { OrdemDeServico, type OSStatus } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
+import {
+  OrdemDeServico,
+  type OSStatus,
+} from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 
 const makeOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico =>
   Object.assign(new OrdemDeServico(), {
@@ -149,7 +152,12 @@ describe('OS + Orçamento Use Cases', () => {
       );
 
       const payload = {
-        cliente: { nome: 'Joao', email: 'joao@a.com', documento: '123', tipoDocumento: 'CPF' as 'CPF' },
+        cliente: {
+          nome: 'Joao',
+          email: 'joao@a.com',
+          documento: '123',
+          tipoDocumento: 'CPF' as const,
+        },
         veiculo: { placa: 'ABC1234', marca: 'Ford', modelo: 'Ka', ano: 2020 },
         servicos: [],
         pecas: [],
@@ -255,10 +263,12 @@ describe('OS + Orçamento Use Cases', () => {
   describe('AtualizarOrdemServicoUseCase', () => {
     it('deve atualizar a OS quando estiver até AWAITING_APPROVAL', async () => {
       mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOsRepository.update.mockResolvedValue(makeOs({
-        status: 'AWAITING_APPROVAL',
-        descricao: 'Nova descrição',
-      }));
+      mockOsRepository.update.mockResolvedValue(
+        makeOs({
+          status: 'AWAITING_APPROVAL',
+          descricao: 'Nova descrição',
+        })
+      );
 
       const uc = new AtualizarOrdemServicoUseCase(mockOsRepository);
       const result = await uc.execute('os-1', {

@@ -15,11 +15,7 @@ export class UpdateServiceOrderStatusUseCase {
     private readonly statusTransitionService: StatusTransitionService
   ) {}
 
-  async execute(
-    osId: string,
-    newStatus: OSStatus,
-    motivo?: string
-  ): Promise<OrdemDeServico> {
+  async execute(osId: string, newStatus: OSStatus, motivo?: string): Promise<OrdemDeServico> {
     // 1. Busca a OS
     const os = await this.ordemServicoRepository.findOne(osId);
     if (!os) {

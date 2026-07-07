@@ -34,24 +34,31 @@ import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/event
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
-import { OrdemDeServico, type OSStatus } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
+import {
+  OrdemDeServico,
+  type OSStatus,
+} from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { INotificacaoClienteGateway } from '../../src/modules/ordem-servico/application/ports/notificacao-cliente.gateway';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 
 const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => {
   const os = new OrdemDeServico();
-  Object.assign(os, {
-    id: 'os-1',
-    veiculoId: 'veh-1',
-    clienteId: 'cli-1',
-    status: 'RECEIVED' as OSStatus,
-    descricao: null,
-    iniciada_em: null,
-    finalizada_em: null,
-    entregue_em: null,
-    created_at: new Date(),
-    updated_at: new Date(),
-  }, overrides);
+  Object.assign(
+    os,
+    {
+      id: 'os-1',
+      veiculoId: 'veh-1',
+      clienteId: 'cli-1',
+      status: 'RECEIVED' as OSStatus,
+      descricao: null,
+      iniciada_em: null,
+      finalizada_em: null,
+      entregue_em: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    },
+    overrides
+  );
   return os;
 };
 
@@ -422,7 +429,7 @@ describe('OS Event handlers', () => {
         entregue_em: expect.any(Date),
       });
       const emitido = emissor.emitir.mock.calls[0][0];
-      expect(emitido.constructor.name).toBe('OrdemServicoEntregue');
+      expect(emitido).toBeInstanceOf(OrdemServicoEntregue);
     });
 
     it('não deve atualizar quando OS não está em FINISHED', async () => {

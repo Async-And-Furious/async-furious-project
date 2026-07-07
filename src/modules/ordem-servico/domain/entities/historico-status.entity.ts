@@ -26,7 +26,9 @@ export class HistoricoStatus {
     this.dataHora = props.dataHora;
   }
 
-  static create(props: Omit<HistoricoStatusProps, 'dataHora'> & { dataHora?: Date }): HistoricoStatus {
+  static create(
+    props: Omit<HistoricoStatusProps, 'dataHora'> & { dataHora?: Date }
+  ): HistoricoStatus {
     return new HistoricoStatus({
       ...props,
       dataHora: props.dataHora ?? new Date(),

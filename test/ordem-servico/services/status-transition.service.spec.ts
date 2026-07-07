@@ -16,10 +16,14 @@ describe('StatusTransitionService', () => {
   });
 
   it('deve lançar erro se o status for igual', () => {
-    expect(() => service.validateAndGetEvent('os-1', 'RECEIVED', 'RECEIVED')).toThrow(DomainException);
+    expect(() => service.validateAndGetEvent('os-1', 'RECEIVED', 'RECEIVED')).toThrow(
+      DomainException
+    );
   });
 
   it('deve lançar erro para transição inválida (ex: RECEIVED para FINISHED)', () => {
-    expect(() => service.validateAndGetEvent('os-1', 'RECEIVED', 'FINISHED')).toThrow(DomainException);
+    expect(() => service.validateAndGetEvent('os-1', 'RECEIVED', 'FINISHED')).toThrow(
+      DomainException
+    );
   });
 });

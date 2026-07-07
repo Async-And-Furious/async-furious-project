@@ -17,13 +17,16 @@ describe('StatusPriorityPolicy', () => {
       expect(getPrioridadeStatus('AWAITING_APPROVAL')).toBeLessThan(
         getPrioridadeStatus('UNDER_DIAGNOSIS')
       );
-      expect(getPrioridadeStatus('UNDER_DIAGNOSIS')).toBeLessThan(
-        getPrioridadeStatus('RECEIVED')
-      );
+      expect(getPrioridadeStatus('UNDER_DIAGNOSIS')).toBeLessThan(getPrioridadeStatus('RECEIVED'));
     });
 
     it('deve retornar FINISHED e DELIVERED com prioridade mais baixa que os operacionais', () => {
-      const operacionais = ['IN_PROGRESS', 'AWAITING_APPROVAL', 'UNDER_DIAGNOSIS', 'RECEIVED'] as const;
+      const operacionais = [
+        'IN_PROGRESS',
+        'AWAITING_APPROVAL',
+        'UNDER_DIAGNOSIS',
+        'RECEIVED',
+      ] as const;
       for (const status of operacionais) {
         expect(getPrioridadeStatus(status)).toBeLessThan(getPrioridadeStatus('FINISHED'));
         expect(getPrioridadeStatus(status)).toBeLessThan(getPrioridadeStatus('DELIVERED'));

@@ -12,7 +12,11 @@ export class StatusTransitionService {
   /**
    * Valida a transição e retorna o evento correspondente.
    */
-  public validateAndGetEvent(osId: string, currentStatus: OSStatus, newStatus: OSStatus): DomainEvent {
+  public validateAndGetEvent(
+    osId: string,
+    currentStatus: OSStatus,
+    newStatus: OSStatus
+  ): DomainEvent {
     if (currentStatus === newStatus) {
       throw new DomainException(`A Ordem de Serviço já está no status ${newStatus}.`);
     }
@@ -30,7 +34,9 @@ export class StatusTransitionService {
 
     const allowed = validTransitions[currentStatus] || [];
     if (!allowed.includes(newStatus)) {
-      throw new DomainException(`Transição inválida: Não é possível mudar de ${currentStatus} para ${newStatus}.`);
+      throw new DomainException(
+        `Transição inválida: Não é possível mudar de ${currentStatus} para ${newStatus}.`
+      );
     }
 
     switch (newStatus) {

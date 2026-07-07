@@ -2,11 +2,7 @@ import { ListarOrdensServicoUseCase } from './ordem-servico.use-cases';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 
-const makeOS = (
-  id: string,
-  status: OrdemDeServico['status'],
-  created_at: Date
-): OrdemDeServico => {
+const makeOS = (id: string, status: OrdemDeServico['status'], created_at: Date): OrdemDeServico => {
   const os = new OrdemDeServico();
   os.id = id;
   os.veiculoId = 'veiculo-id';
@@ -27,9 +23,7 @@ describe('ListarOrdensServicoUseCase', () => {
 
   beforeEach(() => {
     repository = { findAllAtivas: jest.fn() };
-    useCase = new ListarOrdensServicoUseCase(
-      repository as unknown as IOrdemServicoRepository
-    );
+    useCase = new ListarOrdensServicoUseCase(repository as unknown as IOrdemServicoRepository);
   });
 
   it('deve delegar para findAllAtivas com valores padrão', async () => {

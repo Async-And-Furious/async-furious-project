@@ -304,7 +304,12 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
         barramento: IEmissorEventos,
         transitionSvc: StatusTransitionService
       ) => new UpdateServiceOrderStatusUseCase(osRepo, historyRepo, barramento, transitionSvc),
-      inject: [OrdemServicoRepository, StatusHistoryRepository, EMISSOR_EVENTOS, StatusTransitionService],
+      inject: [
+        OrdemServicoRepository,
+        StatusHistoryRepository,
+        EMISSOR_EVENTOS,
+        StatusTransitionService,
+      ],
     },
 
     // ACL Adapter for pecas-insumos
@@ -320,4 +325,4 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
     OsServicoRepository,
   ],
 })
-export class OrdemServicoModule { }
+export class OrdemServicoModule {}

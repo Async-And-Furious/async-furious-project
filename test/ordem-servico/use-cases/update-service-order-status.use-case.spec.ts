@@ -34,7 +34,9 @@ describe('UpdateServiceOrderStatusUseCase', () => {
 
   it('deve lançar EntityNotFoundException se OS não existir', async () => {
     osRepo.findOne.mockResolvedValue(null as any);
-    await expect(useCase.execute('invalid-id', 'UNDER_DIAGNOSIS')).rejects.toThrow(EntityNotFoundException);
+    await expect(useCase.execute('invalid-id', 'UNDER_DIAGNOSIS')).rejects.toThrow(
+      EntityNotFoundException
+    );
   });
 
   it('deve atualizar o status, salvar histórico e emitir evento', async () => {
@@ -46,9 +48,16 @@ describe('UpdateServiceOrderStatusUseCase', () => {
     osRepo.findOne.mockResolvedValue(mockOs);
     osRepo.update.mockResolvedValue({ ...mockOs, status: 'UNDER_DIAGNOSIS' } as OrdemDeServico);
 
-    const result = await useCase.execute('os-1', 'UNDER_DIAGNOSIS', 'Iniciando diagnóstico via webhook');
+    const result = await useCase.execute(
+      'os-1',
+      'UNDER_DIAGNOSIS',
+      'Iniciando diagnóstico via webhook'
+    );
 
-    expect(osRepo.update).toHaveBeenCalledWith('os-1', expect.objectContaining({ status: 'UNDER_DIAGNOSIS' }));
+    expect(osRepo.update).toHaveBeenCalledWith(
+      'os-1',
+      expect.objectContaining({ status: 'UNDER_DIAGNOSIS' })
+    );
     expect(historyRepo.create).toHaveBeenCalled();
     expect(emissor.emitir).toHaveBeenCalled();
     expect(result.status).toBe('UNDER_DIAGNOSIS');
