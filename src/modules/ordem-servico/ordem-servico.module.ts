@@ -3,7 +3,12 @@ import { OrdemServicoController } from './presentation/controllers/ordem-servico
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
 import { OsPecaRepository } from './infrastructure/repositories/os-peca.repository';
+import { OsServicoRepository } from './infrastructure/repositories/os-servico.repository';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { ClienteRepository } from '../cadastro/infrastructure/repositories/cliente.repository';
+import { VeiculoRepository } from '../cadastro/infrastructure/repositories/veiculo.repository';
+import { ServicoRepository } from '../cadastro/infrastructure/repositories/servico.repository';
+import { PecaInsumoRepository } from '../pecas-insumos/infrastructure/repositories/peca-insumo.repository';
 import {
   EMISSOR_EVENTOS,
   IEmissorEventos,
@@ -49,6 +54,9 @@ import { NotificarClienteConclusaoHandler } from './application/event-handlers/n
 import { AtualizarStatusEntregueHandler } from './application/event-handlers/atualizar-status-entregue.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
+import { NotificacaoClienteStub } from './infrastructure/gateways/notificacao-cliente.stub';
+import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cliente.gateway';
+import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
 
 @Module({
   controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
@@ -58,8 +66,17 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
     OsPecaRepository,
     StatusHistoryRepository,
     StatusTransitionService,
+    OsServicoRepository,
+    ClienteRepository,
+    VeiculoRepository,
+    ServicoRepository,
+    PecaInsumoRepository,
+    EmissorEventos,
+    OrcamentoRepository,
+    OsPecaRepository,
     EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
+    { provide: NOTIFICACAO_CLIENTE_GATEWAY, useClass: NotificacaoClienteStub },
 
     // Event handlers (registered as NestJS providers — @OnEvent listeners)
     {
@@ -75,8 +92,9 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
     },
     {
       provide: NotificarClienteDiagnosticoHandler,
-      useFactory: () => new NotificarClienteDiagnosticoHandler(),
-      inject: [],
+      useFactory: (gateway: INotificacaoClienteGateway) =>
+        new NotificarClienteDiagnosticoHandler(gateway),
+      inject: [NOTIFICACAO_CLIENTE_GATEWAY],
     },
     {
       provide: GerarOrcamentoHandler,
@@ -134,8 +152,9 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
     },
     {
       provide: NotificarClienteConclusaoHandler,
-      useFactory: (barramento: IEmissorEventos) => new NotificarClienteConclusaoHandler(barramento),
-      inject: [EMISSOR_EVENTOS],
+      useFactory: (gateway: INotificacaoClienteGateway, barramento: IEmissorEventos) =>
+        new NotificarClienteConclusaoHandler(gateway, barramento),
+      inject: [NOTIFICACAO_CLIENTE_GATEWAY, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusEntregueHandler,
@@ -153,9 +172,39 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
     // Use Cases
     {
       provide: CriarOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new CriarOrdemServicoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        clienteRepo: ClienteRepository,
+        veiculoRepo: VeiculoRepository,
+        servicoRepo: ServicoRepository,
+        pecaRepo: PecaInsumoRepository,
+        osServicoRepo: OsServicoRepository,
+        osPecaRepo: OsPecaRepository,
+        orcRepo: OrcamentoRepository,
+        barramento: EmissorEventos
+      ) =>
+        new CriarOrdemServicoUseCase(
+          osRepo,
+          clienteRepo,
+          veiculoRepo,
+          servicoRepo,
+          pecaRepo,
+          osServicoRepo,
+          osPecaRepo,
+          orcRepo,
+          barramento
+        ),
+      inject: [
+        OrdemServicoRepository,
+        ClienteRepository,
+        VeiculoRepository,
+        ServicoRepository,
+        PecaInsumoRepository,
+        OsServicoRepository,
+        OsPecaRepository,
+        OrcamentoRepository,
+        EmissorEventos,
+      ],
     },
     {
       provide: AssumirOrdemServicoUseCase,
@@ -264,6 +313,11 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
       useClass: OrdemServicoBacklogAdapter,
     },
   ],
-  exports: [OrdemServicoRepository, OrcamentoRepository, ORDEM_SERVICO_BACKLOG_PORT],
+  exports: [
+    OrdemServicoRepository,
+    OrcamentoRepository,
+    ORDEM_SERVICO_BACKLOG_PORT,
+    OsServicoRepository,
+  ],
 })
-export class OrdemServicoModule {}
+export class OrdemServicoModule { }

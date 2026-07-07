@@ -26,6 +26,7 @@ export interface IClienteRepository {
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }>;
   findById(id: string): Promise<Cliente>;
+  findByDocumento(documento: string): Promise<Cliente | null>;
   update(id: string, data: UpdateClienteInput): Promise<Cliente>;
   remove(id: string): Promise<Cliente>;
 }

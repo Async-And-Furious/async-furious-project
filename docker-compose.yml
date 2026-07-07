@@ -13,7 +13,7 @@ services:
     ports:
       - '3000:3000'
     environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/workshop
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5433/workshop
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       NODE_ENV: production
       PORT: 3000

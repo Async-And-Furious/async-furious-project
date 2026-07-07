@@ -122,6 +122,8 @@ model Servico {
   preco      Decimal  @db.Decimal(10, 2)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  osServicos OsServico[]
 }
 
 model OsPeca {
@@ -138,6 +140,22 @@ model OsPeca {
   peca          Peca         @relation(fields: [id_peca], references: [id], onDelete: Restrict)
 
   @@unique([id_ordem_servico, id_peca])
+}
+
+model OsServico {
+  id               String   @id @default(uuid())
+  id_ordem_servico String
+  id_servico       String
+  quantidade       Int      @default(1)
+  preco_unitario   Decimal  @db.Decimal(10, 2)
+  valor_total      Decimal  @db.Decimal(10, 2)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  ordem_servico OrdemServico @relation(fields: [id_ordem_servico], references: [id], onDelete: Cascade)
+  servico       Servico      @relation(fields: [id_servico], references: [id], onDelete: Restrict)
+
+  @@unique([id_ordem_servico, id_servico])
 }
 
 model PedidoFornecedor {

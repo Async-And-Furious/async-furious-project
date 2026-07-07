@@ -1,67 +1,74 @@
-# Sistema de Gestão para Oficina Mecânica
+# Sistema de Gestao para Oficina Mecanica
 
-> API RESTful para gerenciamento de ordens de serviço, clientes, veículos e estoque de peças.
+> API RESTful para gerenciamento de ordens de servico, clientes, veiculos e estoque de pecas.
+
+English version: [README-en.md](./README-en.md)
 
 ## Objetivo do Projeto
 
-Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech Challenge da pós-graduação em Arquitetura de Software (15SOAT — FIAP). Arquitetura: Clean Architecture + DDD.
+Backend para **gestao integrada de oficina mecanica**, desenvolvido como Tech Challenge da pos-graduacao em Arquitetura de Software (15SOAT - FIAP). A arquitetura combina Clean Architecture e DDD.
 
 ### Problema que Resolve
 
-- **Centralização**: Substitui planilhas e processos manuais por um sistema unificado
-- **Rastreamento**: Clientes acompanham o status da ordem de serviço em tempo real
-- **Controle de Estoque**: Gerenciamento de peças com alertas de estoque mínimo e pedidos a fornecedores
-- **Validação**: CPF/CNPJ e placas veiculares seguem padrões brasileiros
+- **Centralizacao**: substitui planilhas e processos manuais por um sistema unico.
+- **Rastreamento**: permite acompanhar o status da ordem de servico em tempo real.
+- **Controle de estoque**: gerencia pecas, estoque minimo e pedidos a fornecedores.
+- **Validacao**: aplica regras para CPF/CNPJ e placas veiculares brasileiras.
 
 ### Funcionalidades Principais
 
-| Módulo                | Descrição                                                                      |
-| --------------------- | ------------------------------------------------------------------------------ |
-| **Ordens de Serviço** | Ciclo de vida completo (RECEIVED → DELIVERED), orçamento e aprovação pelo cliente |
-| **Clientes**          | CRUD com validação de CPF/CNPJ                                                 |
-| **Veículos**          | CRUD com validação de placa brasileira                                         |
-| **Serviços**          | Catálogo de serviços oferecidos pela oficina                                   |
-| **Peças e Insumos**   | CRUD com controle de estoque e pedidos a fornecedores                          |
-| **Pagamentos**        | Registro de pagamentos com disparo de entrega automática                       |
-| **Autenticação**      | JWT com papéis ADMIN, RECEPCIONISTA e MECÂNICO                                 |
+| Modulo | Descricao |
+| ------ | --------- |
+| **Ordens de Servico** | Ciclo completo da OS, do recebimento ate a entrega. |
+| **Clientes** | CRUD com validacao de CPF/CNPJ. |
+| **Veiculos** | CRUD com validacao de placa brasileira. |
+| **Servicos** | Catalogo de servicos oferecidos pela oficina. |
+| **Pecas e Insumos** | CRUD com controle de estoque e pedidos a fornecedores. |
+| **Pagamentos** | Registro de pagamentos com disparo automatico da entrega. |
+| **Autenticacao** | JWT com papeis `ADMIN`, `RECEPCIONISTA` e `MECANICO`. |
 
 ---
 
 ## Tecnologias
 
-| Camada         | Tecnologia           |
-| -------------- | -------------------- |
-| Framework      | NestJS 10.x          |
-| Linguagem      | TypeScript 5.x       |
-| Banco de Dados | PostgreSQL 15        |
-| ORM            | Prisma               |
-| Autenticação   | JWT + bcrypt         |
-| Documentação   | Swagger / OpenAPI    |
-| Container      | Docker Compose       |
-| Testes         | Jest                 |
-| Segurança DAST | OWASP ZAP            |
+| Camada | Tecnologia |
+| ------ | ---------- |
+| Framework | NestJS 10.x |
+| Linguagem | TypeScript 5.x |
+| Banco de dados | PostgreSQL 15 |
+| ORM | Prisma |
+| Autenticacao | JWT + bcrypt |
+| Documentacao | Swagger / OpenAPI |
+| Container | Docker Compose |
+| Testes | Jest |
+| Seguranca DAST | OWASP ZAP |
+| IaC | Terraform 1.6+ |
+| Orquestracao | Kubernetes com kind |
 
-Utilizamos Node.js com NestJS pela arquitetura modular e suporte nativo a injeção de dependência, PostgreSQL pela robustez e consistência transacional, e Prisma como ORM por sua tipagem forte integrada ao TypeScript, garantindo segurança e produtividade no desenvolvimento.
+Usamos Node.js com NestJS pela arquitetura modular e pela injecao de dependencia nativa, PostgreSQL pela consistencia transacional, e Prisma pela tipagem forte integrada ao TypeScript.
+
 ---
 
-## Pré-requisitos
+## Pre-requisitos
 
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
+- Terraform 1.6+
+- kind (`go install sigs.k8s.io/kind@latest` ou instalacao via gerenciador de pacotes)
 
 ---
 
 ## Como Executar Localmente
 
-### 1. Clonar o repositório
+### 1. Clonar o repositorio
 
 ```bash
 git clone <repo-url>
 cd async-furious-project
 ```
 
-### 2. Configurar variáveis de ambiente
+### 2. Configurar variaveis de ambiente
 
 ```bash
 cp .env.example .env
@@ -79,162 +86,158 @@ SEED_ADMIN_EMAIL="seu-email-admin"
 SEED_ADMIN_PASSWORD="sua-senha-admin"
 ```
 
-
-### 3. Iniciar com Docker (recomendado)
+### 3. Iniciar com Docker para desenvolvimento
 
 ```bash
 # Sobe somente o PostgreSQL
 docker compose -f docker-compose.dependencies.yml up -d
 
-# Roda migrations + seed + aplicação em modo watch
+# Roda migrations, seed e aplicacao em modo watch
 pnpm run dev
 ```
 
-
-### 4. Ou iniciar com stack completa
+### 4. Ou iniciar a stack completa
 
 ```bash
-# Sobe PostgreSQL + aplicação
+# Sobe PostgreSQL + aplicacao
 docker compose up -d
 ```
 
-A aplicação ficará disponível em `http://localhost:3000`.
+A aplicacao fica disponivel em `http://localhost:3000`.
 
 ---
 
+## Documentacao da API
 
-## Documentação da API
+Depois de iniciar o projeto, acesse o Swagger em:
 
-Após iniciar o projeto, acesse o Swagger em:
-
-```
+```text
 http://localhost:3000/api/docs
 ```
 
-A coleção Insomnia com todas as rotas configuradas está em:
+A colecao Insomnia com as rotas configuradas fica em:
 
-```
+```text
 docs/http/insomnia.yaml
 ```
 
-
 ### Rotas
 
-#### Autenticação (`/api/v1/auth`)
+#### Autenticacao (`/api/v1/auth`)
 
-| Método | Endpoint         | Acesso           | Descrição               |
-| ------ | ---------------- | ---------------- | ----------------------- |
-| POST   | `/auth/register` | ADMIN            | Registrar novo usuário  |
-| POST   | `/auth/login`    | Público          | Fazer login, retorna JWT |
+| Metodo | Endpoint | Acesso | Descricao |
+| ------ | -------- | ------ | --------- |
+| POST | `/auth/register` | ADMIN | Registrar novo usuario. |
+| POST | `/auth/login` | Publico | Fazer login e retornar JWT. |
 
 #### Clientes (`/api/v1/clientes`)
 
-| Método | Endpoint         | Acesso        | Descrição          |
-| ------ | ---------------- | ------------- | ------------------ |
-| POST   | `/clientes`      | RECEPCIONISTA | Criar cliente      |
-| GET    | `/clientes`      | Autenticado   | Listar clientes    |
-| GET    | `/clientes/:id`  | Autenticado   | Detalhar cliente   |
-| PATCH  | `/clientes/:id`  | RECEPCIONISTA | Atualizar cliente  |
-| DELETE | `/clientes/:id`  | ADMIN         | Deletar cliente    |
+| Metodo | Endpoint | Acesso | Descricao |
+| ------ | -------- | ------ | --------- |
+| POST | `/clientes` | RECEPCIONISTA | Criar cliente. |
+| GET | `/clientes` | Autenticado | Listar clientes. |
+| GET | `/clientes/:id` | Autenticado | Detalhar cliente. |
+| PATCH | `/clientes/:id` | RECEPCIONISTA | Atualizar cliente. |
+| DELETE | `/clientes/:id` | ADMIN | Deletar cliente. |
 
-#### Veículos (`/api/v1/veiculos`)
+#### Veiculos (`/api/v1/veiculos`)
 
-| Método | Endpoint         | Acesso        | Descrição          |
-| ------ | ---------------- | ------------- | ------------------ |
-| POST   | `/veiculos`      | RECEPCIONISTA | Criar veículo      |
-| GET    | `/veiculos`      | Autenticado   | Listar veículos    |
-| GET    | `/veiculos/:id`  | Autenticado   | Detalhar veículo   |
-| PATCH  | `/veiculos/:id`  | RECEPCIONISTA | Atualizar veículo  |
-| DELETE | `/veiculos/:id`  | ADMIN         | Deletar veículo    |
+| Metodo | Endpoint | Acesso | Descricao |
+| ------ | -------- | ------ | --------- |
+| POST | `/veiculos` | RECEPCIONISTA | Criar veiculo. |
+| GET | `/veiculos` | Autenticado | Listar veiculos. |
+| GET | `/veiculos/:id` | Autenticado | Detalhar veiculo. |
+| PATCH | `/veiculos/:id` | RECEPCIONISTA | Atualizar veiculo. |
+| DELETE | `/veiculos/:id` | ADMIN | Deletar veiculo. |
 
-#### Serviços (`/api/v1/servicos`)
+#### Servicos (`/api/v1/servicos`)
 
-| Método | Endpoint         | Acesso      | Descrição          |
-| ------ | ---------------- | ----------- | ------------------ |
-| POST   | `/servicos`      | ADMIN       | Criar serviço      |
-| GET    | `/servicos`      | Autenticado | Listar serviços    |
-| GET    | `/servicos/:id`  | Autenticado | Detalhar serviço   |
-| PATCH  | `/servicos/:id`  | ADMIN       | Atualizar serviço  |
-| DELETE | `/servicos/:id`  | ADMIN       | Deletar serviço    |
+| Metodo | Endpoint | Acesso | Descricao |
+| ------ | -------- | ------ | --------- |
+| POST | `/servicos` | ADMIN | Criar servico. |
+| GET | `/servicos` | Autenticado | Listar servicos. |
+| GET | `/servicos/:id` | Autenticado | Detalhar servico. |
+| PATCH | `/servicos/:id` | ADMIN | Atualizar servico. |
+| DELETE | `/servicos/:id` | ADMIN | Deletar servico. |
 
-#### Ordens de Serviço (`/api/v1/ordens-servico`)
+#### Ordens de Servico (`/api/v1/ordens-servico`)
 
-| Método | Endpoint                              | Acesso        | Descrição                                      |
-| ------ | ------------------------------------- | ------------- | ---------------------------------------------- |
-| POST   | `/ordens-servico`                     | RECEPCIONISTA | Criar OS                                       |
-| GET    | `/ordens-servico`                     | Autenticado   | Listar OSs                                     |
-| GET    | `/ordens-servico/:id`                 | Autenticado   | Detalhar OS                                    |
-| GET    | `/ordens-servico/:id/status`          | Autenticado   | Consultar status da OS                            |
-| PATCH  | `/ordens-servico/:id`                 | ADMIN         | Atualizar OS                                   |
-| DELETE | `/ordens-servico/:id`                 | ADMIN         | Deletar OS                                     |
-| PATCH  | `/ordens-servico/:id/assumir`         | MECÂNICO      | Mecânico assume OS → UNDER_DIAGNOSIS           |
-| PATCH  | `/ordens-servico/:id/analisar`        | MECÂNICO      | Registrar análise diagnóstica                  |
-| PATCH  | `/ordens-servico/:id/servicos-insumos`| MECÂNICO      | Gerar orçamento → AWAITING_APPROVAL            |
-| PATCH  | `/ordens-servico/:id/orcamento/aprovar` | Público     | Cliente aprova orçamento → IN_PROGRESS         |
-| PATCH  | `/ordens-servico/:id/orcamento/recusar` | Público     | Cliente recusa → CLOSED_WITHOUT_EXECUTION      |
-| PATCH  | `/ordens-servico/:id/aprovar-servico` | Público       | Cliente aprova serviço prestado                |
-| PATCH  | `/ordens-servico/:id/finalizar-execucao` | MECÂNICO   | Mecânico finaliza → FINISHED                   |
-| PATCH  | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega → DELIVERED               |
-| GET    | `/ordens-servico/tempo-medio`         | ADMIN         | Tempo médio de execução das OSs                |
+| Metodo | Endpoint | Acesso | Descricao |
+| ------ | -------- | ------ | --------- |
+| POST | `/ordens-servico` | RECEPCIONISTA | Criar OS. |
+| GET | `/ordens-servico` | Autenticado | Listar OSs. |
+| GET | `/ordens-servico/:id` | Autenticado | Detalhar OS. |
+| GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
+| PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
+| DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
+| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecanico assume a OS. |
+| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar analise diagnostica. |
+| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orcamento. |
+| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Publico | Cliente aprova orcamento. |
+| PATCH | `/ordens-servico/:id/orcamento/recusar` | Publico | Cliente recusa orcamento. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Publico | Cliente aprova servico prestado. |
+| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecanico finaliza execucao. |
+| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
+| GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo medio de execucao. |
 
-#### Peças e Insumos (`/api/v1/pecas`)
+#### Pecas e Insumos (`/api/v1/pecas`)
 
-| Método | Endpoint                                   | Acesso      | Descrição                          |
-| ------ | ------------------------------------------ | ----------- | ---------------------------------- |
-| POST   | `/pecas`                                   | ADMIN       | Criar peça/insumo                  |
-| GET    | `/pecas`                                   | Autenticado | Listar peças/insumos               |
-| GET    | `/pecas/:id`                               | Autenticado | Detalhar peça/insumo               |
-| PATCH  | `/pecas/:id`                               | ADMIN       | Atualizar peça/insumo              |
-| PATCH  | `/pecas/:id/estoque`                       | ADMIN       | Atualizar estoque                  |
-| DELETE | `/pecas/:id`                               | ADMIN       | Deletar peça/insumo                |
-| POST   | `/pecas/fornecedor/solicitar`              | ADMIN       | Solicitar peças a fornecedor       |
-| PATCH  | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN    | Confirmar recebimento de peças     |
+| Metodo | Endpoint | Acesso | Descricao |
+| ------ | -------- | ------ | --------- |
+| POST | `/pecas` | ADMIN | Criar peca ou insumo. |
+| GET | `/pecas` | Autenticado | Listar pecas e insumos. |
+| GET | `/pecas/:id` | Autenticado | Detalhar peca ou insumo. |
+| PATCH | `/pecas/:id` | ADMIN | Atualizar peca ou insumo. |
+| PATCH | `/pecas/:id/estoque` | ADMIN | Atualizar estoque. |
+| DELETE | `/pecas/:id` | ADMIN | Deletar peca ou insumo. |
+| POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar pecas a fornecedor. |
+| PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de pecas. |
 
 #### Pagamentos (`/api/v1/pagamentos`)
 
-| Método | Endpoint               | Acesso      | Descrição                                    |
-| ------ | ---------------------- | ----------- | -------------------------------------------- |
-| POST   | `/pagamentos/registrar`| Autenticado | Registrar pagamento → dispara entrega da OS  |
+| Metodo | Endpoint | Acesso | Descricao |
+| ------ | -------- | ------ | --------- |
+| POST | `/pagamentos/registrar` | Autenticado | Registrar pagamento e disparar entrega da OS. |
 
 ---
 
-## Ciclo de Vida da Ordem de Serviço
+## Ciclo de Vida da Ordem de Servico
 
-```
+```text
 RECEIVED
-  └─► UNDER_DIAGNOSIS
-        └─► AWAITING_APPROVAL
-              ├─► CLOSED_WITHOUT_EXECUTION  (orçamento recusado)
-              └─► IN_PROGRESS
-                    ├─► AWAITING_PARTS  (peças indisponíveis)
-                    │     └─► IN_PROGRESS  (peças reservadas)
-                    └─► FINISHED
-                          └─► DELIVERED
+  -> UNDER_DIAGNOSIS
+      -> AWAITING_APPROVAL
+          -> CLOSED_WITHOUT_EXECUTION  (orcamento recusado)
+          -> IN_PROGRESS
+              -> AWAITING_PARTS  (pecas indisponiveis)
+                  -> IN_PROGRESS  (pecas reservadas)
+              -> FINISHED
+                  -> DELIVERED
 ```
 
 ---
 
-## Autenticação e Papéis
+## Autenticacao e Papeis
 
-Todos os endpoints (exceto `@Public()`) exigem header `Authorization: Bearer <token>`.
+Todos os endpoints, exceto os marcados com `@Public()`, exigem o header `Authorization: Bearer <token>`.
 
-| Role            | Permissões principais                                               |
-| --------------- | ------------------------------------------------------------------- |
-| `ADMIN`         | Acesso total: CRUD serviços e peças, gestão administrativa          |
-| `RECEPCIONISTA` | Criar/atualizar clientes e veículos, criar OS, registrar entrega    |
-| `MECÂNICO`      | Assumir OS, diagnosticar, gerar orçamento, finalizar execução       |
+| Papel | Permissoes principais |
+| ----- | --------------------- |
+| `ADMIN` | Acesso total: CRUD de servicos, pecas e gestao administrativa. |
+| `RECEPCIONISTA` | Cria e atualiza clientes/veiculos, cria OS e registra entrega. |
+| `MECANICO` | Assume OS, diagnostica, gera orcamento e finaliza execucao. |
 
-Token JWT expira em **1 hora**.
+O token JWT expira em **1 hora**.
 
 ---
 
 ## Testes
 
 ```bash
-# Todos os testes unitários
+# Todos os testes unitarios
 pnpm test
 
-# Com relatório de cobertura
+# Relatorio de cobertura
 pnpm test:cov
 
 # Modo watch
@@ -243,77 +246,206 @@ pnpm test:watch
 # Testes E2E
 pnpm test:e2e
 
-# Arquivo específico
-pnpm test -- src/modules/cadastro/application/use-cases/cliente.use-cases.spec.ts
+# Arquivo especifico
+pnpm test -- test/cadastro/use-cases/cliente.use-cases.spec.ts
 
-# Por nome de teste
+# Por nome do teste
 pnpm test -- --testNamePattern="CreateClienteUseCase"
 ```
 
 ### Thresholds de Cobertura
 
-| Métrica    | Mínimo |
-| ---------- | ------ |
-| Statements | 85%    |
-| Lines      | 85%    |
-| Functions  | 80%    |
-| Branches   | 80%    |
+| Metrica | Minimo |
+| ------- | ------ |
+| Statements | 85% |
+| Lines | 85% |
+| Functions | 80% |
+| Branches | 80% |
 
 ---
 
 ## Estrutura do Projeto
 
-```
+```text
 src/
-├── auth/                    # JWT, guards, estratégias, decorators
+├── auth/                    # JWT, guards, estrategias, decorators
 ├── modules/
-│   ├── cadastro/            # Clientes, Veículos, Serviços
-│   │   ├── domain/          # Entidades, VOs, interfaces de repositório
+│   ├── cadastro/            # Clientes, Veiculos, Servicos
+│   │   ├── domain/          # Entidades, VOs, interfaces de repositorio
 │   │   ├── application/     # Use cases
-│   │   ├── infrastructure/  # Prisma repositories
+│   │   ├── infrastructure/  # Repositorios Prisma
 │   │   └── presentation/    # Controllers, DTOs
-│   ├── ordem-servico/       # Ordens de Serviço + Orçamentos
-│   ├── pecas-insumos/       # Peças, estoque, pedidos a fornecedores
+│   ├── ordem-servico/       # Ordens de Servico + Orcamentos
+│   ├── pecas-insumos/       # Pecas, estoque, pedidos a fornecedores
 │   └── financeiro/          # Pagamentos
 └── shared/
-    ├── domain/              # DomainEvent base, exceções, interfaces
+    ├── domain/              # DomainEvent base, excecoes, interfaces
     └── infrastructure/      # PrismaService, EmissorEventos, filtros
 ```
 
-Cada módulo segue a regra de dependência: `presentation → application → domain ← infrastructure`.
+Cada modulo segue a regra de dependencia: `presentation -> application -> domain <- infrastructure`.
 
 ---
 
-## Comandos Úteis
+## Comandos Uteis
 
 ```bash
-# Desenvolvimento (sobe container + migrate + seed + watch)
-pnpm dev
+# Desenvolvimento com PostgreSQL, migrations, seed e app
+pnpm run dev
 
-# Desenvolvimento sem container
-pnpm dev:local
+# Build de producao
+pnpm run build
 
-# Reset completo do banco
-pnpm dev:reset-db
-
-# Build de produção
-pnpm build
+# Executar build de producao
+pnpm run prod
 
 # Lint com auto-fix
-pnpm lint
+pnpm run lint
 
-# Formatar código
-pnpm format
+# Formatar codigo
+pnpm run format
 ```
 
 ---
 
-## Convenções de Código
+## Infraestrutura como Codigo (Terraform + Kubernetes)
 
-Consulte [AGENTS.md](./AGENTS.md) para convenções de nomenclatura, padrões TypeScript/NestJS e políticas de imports.
+A infraestrutura local e provisionada com Terraform em um cluster Kubernetes local criado pelo kind.
+
+### Pre-requisitos
+
+- Docker rodando
+- `terraform` 1.6+
+- `kind`
+- `kubectl`
+
+### Estrutura
+
+```text
+/infra
+  versions.tf                        # Versoes dos providers
+  /modules/kind-cluster              # Cria cluster kind com control-plane e worker
+  /modules/kubernetes-apps           # Aplica manifests via kubectl provider
+  /environments/local                # Ambiente local
+  /environments/aws/README.md        # Stub para migracao EKS
+
+/k8s
+  namespace.yaml
+  /config    configmap.yaml, secret.yaml
+  /app       deployment.yaml, service.yaml, hpa.yaml
+  /database  statefulset.yaml, service.yaml, pvc.yaml
+```
+
+### Subir o ambiente local (script automatizado)
+
+Use o script `scripts/local-up.sh` — ele executa todos os passos na ordem correta:
+
+```bash
+# Provisiona tudo: build da imagem, cluster kind, Terraform apply,
+# carrega imagem nos nos, aguarda Postgres, roda migrations Prisma e smoke test
+./scripts/local-up.sh up
+
+# Rebuild da imagem + reload no cluster (sem recriar infra)
+./scripts/local-up.sh reload
+
+# Destroi o ambiente
+./scripts/local-up.sh down
+```
+
+As variaveis `TF_VAR_db_password` e `TF_VAR_jwt_secret` podem ser exportadas
+antes ou definidas em `.env.local` — o script solicita interativamente se nao encontrar.
+
+### Subir o ambiente local (manual)
+
+Execute os comandos a partir da raiz do repositorio, exceto quando indicado.
+
+```bash
+# 1. Build da imagem local da API
+docker build -t async-furious-api:latest .
+
+# 2. Variaveis sensiveis usadas pelo Terraform
+export TF_VAR_db_password="postgres"
+export TF_VAR_jwt_secret="dev-secret"
+
+# 3. Criar cluster e aplicar os manifests
+cd infra/environments/local
+terraform init
+terraform apply
+
+# 4. Carregar imagem nos nos do kind (necessario por imagePullPolicy: Never)
+kind load docker-image async-furious-api:latest --name async-furious
+
+# 5. Recriar pods da API
+kubectl rollout restart deployment/async-furious-api -n async-furious
+```
+
+### Acompanhar o deploy
+
+```bash
+kubectl get pods -n async-furious -w
+kubectl rollout status deployment/async-furious-api -n async-furious --timeout=240s
+kubectl get events -n async-furious --sort-by=.lastTimestamp -w
+```
+
+Se a API quebrar durante o bootstrap:
+
+```bash
+kubectl logs -n async-furious -l app=async-furious-api --previous --tail=100
+kubectl describe pod -n async-furious -l app=async-furious-api
+```
+
+A API deve responder no endpoint de status publicado em `/api/v1`:
+
+```bash
+curl http://localhost:30000/api/v1
+```
+
+Para destruir o ambiente local:
+
+```bash
+cd infra/environments/local
+terraform destroy
+# ou: ./scripts/local-up.sh down
+```
+
+### Rebuild e redeploy da API
+
+```bash
+# Via script (recomendado)
+./scripts/local-up.sh reload
+
+# Manual
+docker build -t async-furious-api:latest .
+kind load docker-image async-furious-api:latest --name async-furious
+kubectl rollout restart deployment/async-furious-api -n async-furious
+kubectl rollout status deployment/async-furious-api -n async-furious --timeout=240s
+curl http://localhost:30000/api/v1
+```
+
+### Observacoes importantes
+
+- Os probes do Kubernetes devem apontar para `/api/v1`, nao para `/health`.
+- Se aparecer `ErrImageNeverPull`, carregue a imagem com `kind load docker-image` ou use `./scripts/local-up.sh reload`.
+- O init container `migrate` roda `prisma migrate deploy` antes de cada pod da API iniciar.
+- O HPA requer o metrics-server, que e instalado automaticamente pelo modulo `kubernetes-apps`.
+- Se aparecer erro de autenticacao do Prisma contra `postgres-service`, confira se `TF_VAR_db_password` e o password do Postgres existente sao iguais. Em ambiente local descartavel, destruir e recriar o cluster/volume tambem resolve.
+
+### CI/CD
+
+Pull requests que alterem `infra/**` ou `k8s/**` executam automaticamente `terraform validate` e `terraform plan` via `.github/workflows/terraform.yml`. Nenhum `apply` ocorre em CI.
+
+### Migracao para EKS
+
+Consulte `infra/environments/aws/README.md`.
 
 ---
 
-## Licença
+## Convencoes de Codigo
 
-Privado — Todos os direitos reservados.
+Consulte [AGENTS.md](./AGENTS.md) para convencoes de nomenclatura, padroes TypeScript/NestJS e politicas de imports.
+
+---
+
+## Licenca
+
+Privado - Todos os direitos reservados.

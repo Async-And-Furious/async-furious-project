@@ -6,19 +6,12 @@ import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
-
-type PrismaDeleteManyArgs = { where?: Record<string, unknown> };
-
-type PrismaTestClient = {
-  ordemServico: { deleteMany(args: PrismaDeleteManyArgs): Promise<unknown> };
-  veiculo: { deleteMany(args: PrismaDeleteManyArgs): Promise<unknown> };
-  cliente: { deleteMany(args: PrismaDeleteManyArgs): Promise<unknown> };
-};
+import { randomInt } from 'crypto';
 
 describe('OrdemServico Happy Flow (e2e)', () => {
   let app: INestApplication;
   let server: ReturnType<typeof request>;
-  let prismaService: PrismaTestClient;
+  let prismaService: PrismaService;
   let jwtService: JwtService;
 
   let recepcionistaToken: string;
@@ -50,7 +43,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
     await app.init();
 
     server = request(app.getHttpServer() as unknown as Application);
-    prismaService = moduleFixture.get<PrismaService>(PrismaService) as unknown as PrismaTestClient;
+    prismaService = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
 
     await prismaService.ordemServico.deleteMany({});
@@ -76,6 +69,13 @@ describe('OrdemServico Happy Flow (e2e)', () => {
   });
 
   afterAll(async () => {
+    if (!prismaService) {
+      if (app) {
+        await app.close();
+      }
+      return;
+    }
+
     if (ordemServicoId) {
       await prismaService.ordemServico.deleteMany({ where: { id: ordemServicoId } });
     }
@@ -109,11 +109,13 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     clienteId = clienteResponse.body.id;
 
+    const uniquePlaca = `OSF${randomInt(1000, 10000)}`;
+
     const veiculoResponse = await server
       .post('/veiculos')
       .set('Authorization', `Bearer ${recepcionistaToken}`)
       .send({
-        placa: 'OSF1234',
+        placa: uniquePlaca,
         marca: 'Honda',
         modelo: 'Fit',
         ano: 2021,
@@ -128,8 +130,22 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       .post('/ordens-servico')
       .set('Authorization', `Bearer ${recepcionistaToken}`)
       .send({
-        veiculoId,
-        clienteId,
+        cliente: {
+          nome: 'Cliente Fluxo OS',
+          email: clienteEmail,
+          telefone: '11999999999',
+          documento: clienteDocumento,
+          tipoDocumento: 'CPF',
+        },
+        veiculo: {
+          placa: uniquePlaca,
+          marca: 'Honda',
+          modelo: 'Fit',
+          ano: 2021,
+          cor: 'Prata',
+        },
+        servicos: [],
+        pecas: [],
         descricao: 'Revisao geral e troca de oleo',
       })
       .expect(201);

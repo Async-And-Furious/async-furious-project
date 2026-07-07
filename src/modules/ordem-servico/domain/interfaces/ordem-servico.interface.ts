@@ -22,6 +22,13 @@ export interface IOrdemServicoRepository {
     data: OrdemDeServico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }>;
+  findAllAtivas(
+    page?: number,
+    limit?: number
+  ): Promise<{
+    data: OrdemDeServico[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  }>;
   findOne(id: string): Promise<OrdemDeServico>;
   update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico>;
   remove(id: string): Promise<OrdemDeServico>;

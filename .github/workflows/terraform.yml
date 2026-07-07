@@ -1,0 +1,43 @@
+name: Terraform Validate & Plan
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "k8s/**"
+
+jobs:
+  terraform:
+    name: Terraform Validate & Plan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~> 1.6"
+
+      - name: Terraform Init
+        working-directory: infra/environments/local
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: infra/environments/local
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: infra/environments/local
+        run: terraform plan -out=tfplan
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: infra/environments/local/tfplan
+          retention-days: 7

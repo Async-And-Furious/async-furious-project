@@ -37,6 +37,30 @@ pnpm ts-node scripts/seed.ts
 
 **NOTE:** `pnpm run dev` runs migrations + seed + app — disruptive for TDD. Use `nest start --watch` manually during active development.
 
+### Local Kubernetes (kind + Terraform)
+
+```bash
+# Full up: build image → terraform apply → load image → wait → migrations → smoke test
+./scripts/local-up.sh up
+
+# Rebuild image and reload into existing cluster (no infra teardown)
+./scripts/local-up.sh reload
+
+# Tear down cluster
+./scripts/local-up.sh down
+
+# Secrets (or define in .env.local — script prompts if missing)
+export TF_VAR_db_password="postgres"
+export TF_VAR_jwt_secret="dev-secret"
+
+# Manual Terraform (from infra/environments/local/)
+terraform init && terraform apply
+terraform destroy
+
+# Load image into kind nodes manually (required when imagePullPolicy: Never)
+kind load docker-image async-furious-api:latest --name async-furious
+```
+
 ---
 
 ## 🏗️ Architecture
@@ -210,6 +234,17 @@ transform: true            // Auto-transform payloads
 
 ---
 
+## Documentation
+
+- `README.md` is the canonical Portuguese README.
+- `README-en.md` is the English mirror; update it whenever README content changes.
+- Keep local infra instructions in both READMEs aligned with `k8s/` manifests.
+- Local Kubernetes health/status checks use `GET /api/v1`; do not document `/health` unless the app actually exposes it.
+- For kind deployments using `imagePullPolicy: Never`, document `docker build`, `kind load docker-image`, rollout status, and the `curl http://localhost:30000/api/v1` smoke test together.
+- `scripts/local-up.sh` is the canonical local provisioning entrypoint — keep README infra sections aligned with it.
+
+---
+
 ## 📁 Key Files
 
 | File | Purpose |
@@ -221,6 +256,9 @@ transform: true            // Auto-transform payloads
 | `src/modules/*/application/use-cases/*.ts` | Use cases |
 | `src/modules/*/infrastructure/repositories/*.ts` | Repository implementations |
 | `scripts/docker/wait-for-postgres.ts` | Dev script to wait for Postgres |
+| `scripts/local-up.sh` | One-command local K8s provisioning (up/reload/down) |
+| `infra/environments/local/` | Terraform root for local kind cluster |
+| `k8s/` | Raw Kubernetes manifests (namespace, app, database, config) |
 
 ---
 

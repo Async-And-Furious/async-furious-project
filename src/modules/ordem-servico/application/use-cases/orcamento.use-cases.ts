@@ -16,7 +16,8 @@ export class AprovarOrcamentoUseCase {
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {
-    await this.ordemServicoRepository.findOne(id_ordem_servico);
+    const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
+    os.podeAprovarOuRecusarOrcamento();
 
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id_ordem_servico);
     if (!orcamento) {
@@ -48,7 +49,8 @@ export class RecusarOrcamentoUseCase {
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {
-    await this.ordemServicoRepository.findOne(id_ordem_servico);
+    const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
+    os.podeAprovarOuRecusarOrcamento();
 
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id_ordem_servico);
     if (!orcamento) {
