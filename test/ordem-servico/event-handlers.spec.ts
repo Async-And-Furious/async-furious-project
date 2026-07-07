@@ -21,10 +21,12 @@ import { ServicosEInsumosListados } from '../../src/modules/ordem-servico/domain
 import { OrcamentoGerado } from '../../src/modules/ordem-servico/domain/events/orcamento-gerado.event';
 import { OrcamentoEnviado } from '../../src/modules/ordem-servico/domain/events/orcamento-enviado.event';
 import { OrcamentoAprovado } from '../../src/modules/ordem-servico/domain/events/orcamento-aprovado.event';
+import { OrdemServicoEmDiagnostico } from '../../src/modules/ordem-servico/domain/events/ordem-servico-em-diagnostico.event';
+import { OrdemServicoEmExecucao } from '../../src/modules/ordem-servico/domain/events/ordem-servico-em-execucao.event';
+import { OrdemServicoFinalizada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-finalizada.event';
+import { OrdemServicoEntregue } from '../../src/modules/ordem-servico/domain/events/ordem-servico-entregue.event';
 import { OsSemPecasConfirmada } from '../../src/modules/ordem-servico/domain/events/os-sem-pecas-confirmada.event';
-import { StatusAtualizadoEmExecucao } from '../../src/modules/ordem-servico/domain/events/status-atualizado-em-execucao.event';
 import { ServicoConcluidoPeloMecanico } from '../../src/modules/ordem-servico/domain/events/servico-concluido-pelo-mecanico.event';
-import { StatusAtualizadoFinalizada } from '../../src/modules/ordem-servico/domain/events/status-atualizado-finalizada.event';
 // `ServicoAprovadoPeloCliente` removed: not used in tests
 import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
@@ -32,7 +34,7 @@ import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/event
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
-import type { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
+import type { OrdemDeServico, OSStatus } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 
 const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => ({
@@ -47,7 +49,7 @@ const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => ({
   created_at: new Date(),
   updated_at: new Date(),
   ...overrides,
-});
+} as OrdemDeServico);
 
 const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
   id: 'orc-1',
@@ -65,7 +67,7 @@ const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
 async function shouldNotUpdateWhenStatusIs(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
   handlerInstance: unknown,
-  wrongStatus: string,
+  wrongStatus: OSStatus,
   event: unknown,
   methodName = 'handle'
 ): Promise<void> {
@@ -78,14 +80,14 @@ async function shouldNotUpdateWhenStatusIs(
 async function shouldUpdateToInProgress(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
   emissor: jest.Mocked<EmissorEventos>,
-  status: string,
+  status: OSStatus,
   handler: () => Promise<void>
 ): Promise<void> {
   osRepo.findOne.mockResolvedValue(mockOs({ status }));
   osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
   await handler();
   expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
-  expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmExecucao));
+  expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmExecucao));
 }
 
 describe('OS Event handlers', () => {
@@ -100,7 +102,7 @@ describe('OS Event handlers', () => {
       update: jest.fn(),
       findAll: jest.fn(),
       remove: jest.fn(),
-    } as jest.Mocked<IOrdemServicoRepository>;
+    } as unknown as jest.Mocked<IOrdemServicoRepository>;
     orcRepo = {
       findByOrdemServicoId: jest.fn(),
       create: jest.fn(),
@@ -144,7 +146,7 @@ describe('OS Event handlers', () => {
       await handler.handle(new OrdemServicoAssumida('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'UNDER_DIAGNOSIS' });
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoEmDiagnostico));
+      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmDiagnostico));
     });
 
     it('não deve atualizar quando OS não está em RECEIVED', async () => {
@@ -317,7 +319,7 @@ describe('OS Event handlers', () => {
       osRepo.update.mockResolvedValue(mockOs());
       const handler = new IniciarMonitoramentoTempoHandler(osRepo);
 
-      await handler.handle(new StatusAtualizadoEmExecucao('os-1'));
+      await handler.handle(new OrdemServicoEmExecucao('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { iniciada_em: expect.any(Date) });
     });
@@ -334,7 +336,7 @@ describe('OS Event handlers', () => {
       await handler.handle(new ServicoConcluidoPeloMecanico('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'FINISHED' });
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(StatusAtualizadoFinalizada));
+      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoFinalizada));
     });
 
     it('não deve atualizar quando OS não está em IN_PROGRESS', async () => {
@@ -357,7 +359,7 @@ describe('OS Event handlers', () => {
       osRepo.update.mockResolvedValue(mockOs());
       const handler = new FinalizarMonitoramentoTempoHandler(osRepo);
 
-      await handler.handle(new StatusAtualizadoFinalizada('os-1'));
+      await handler.handle(new OrdemServicoFinalizada('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { finalizada_em: expect.any(Date) });
     });
@@ -367,7 +369,7 @@ describe('OS Event handlers', () => {
       osRepo.update.mockResolvedValue(mockOs());
       const handler = new FinalizarMonitoramentoTempoHandler(osRepo);
 
-      await handler.handle(new StatusAtualizadoFinalizada('os-1'));
+      await handler.handle(new OrdemServicoFinalizada('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { finalizada_em: expect.any(Date) });
     });
@@ -379,7 +381,7 @@ describe('OS Event handlers', () => {
     it('deve emitir ClienteNotificadoConclusao', async () => {
       const handler = new NotificarClienteConclusaoHandler(emissor);
 
-      await handler.handle(new StatusAtualizadoFinalizada('os-1'));
+      await handler.handle(new OrdemServicoFinalizada('os-1'));
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('ClienteNotificadoConclusao');
@@ -401,7 +403,7 @@ describe('OS Event handlers', () => {
         entregue_em: expect.any(Date),
       });
       const emitido = emissor.emitir.mock.calls[0][0];
-      expect(emitido.constructor.name).toBe('StatusAtualizadoEntregue');
+      expect(emitido.constructor.name).toBe('OrdemServicoEntregue');
     });
 
     it('não deve atualizar quando OS não está em FINISHED', async () => {
