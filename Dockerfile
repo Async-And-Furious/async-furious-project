@@ -23,6 +23,10 @@ RUN pnpm prisma generate
 # Build the application
 RUN pnpm build
 
+# Remove devDependencies (build tooling like Nest/Angular CLI) so they never
+# ship in the production image
+RUN pnpm prune --prod
+
 # Production stage
 FROM node:20-slim AS production
 
