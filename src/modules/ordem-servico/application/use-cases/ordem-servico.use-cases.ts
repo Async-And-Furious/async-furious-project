@@ -30,7 +30,7 @@ export class CriarOrdemServicoUseCase {
     private readonly osPecaRepository: IOsPecaRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
     private readonly emissor: IEmissorEventos
-  ) { }
+  ) {}
 
   async execute(data: {
     cliente: {
@@ -68,7 +68,12 @@ export class CriarOrdemServicoUseCase {
 
     // 3. Obter Preços e Calcular Totais
     let valorTotalServicos = 0;
-    const servicosComPreco: Array<{ id_servico: string; quantidade: number; preco_unitario: number; valor_total: number }> = [];
+    const servicosComPreco: Array<{
+      id_servico: string;
+      quantidade: number;
+      preco_unitario: number;
+      valor_total: number;
+    }> = [];
     for (const item of data.servicos) {
       const servico = await this.servicoRepository.findOne(item.id_servico);
       const preco = Number(servico.preco);
@@ -83,7 +88,12 @@ export class CriarOrdemServicoUseCase {
     }
 
     let valorTotalPecas = 0;
-    const pecasComPreco: Array<{ id_peca: string; quantidade: number; preco_unitario: number; valor_total: number }> = [];
+    const pecasComPreco: Array<{
+      id_peca: string;
+      quantidade: number;
+      preco_unitario: number;
+      valor_total: number;
+    }> = [];
     for (const item of data.pecas) {
       const peca = await this.pecaInsumoRepository.findOne(item.id_peca);
       const preco = Number(peca.preco);
@@ -113,7 +123,7 @@ export class CriarOrdemServicoUseCase {
     }
 
     // 6. Gerar Orçamento Automático
-    // Assumindo que a interface IOrcamentoRepository possui um método create ou que podemos injetar CriarOrcamentoUseCase. 
+    // Assumindo que a interface IOrcamentoRepository possui um método create ou que podemos injetar CriarOrcamentoUseCase.
     // Como a OS acabou de ser criada, o orcamento ainda não existe, então usamos o repository.create.
     await this.orcamentoRepository.create({
       id_ordem_servico: os.id,
@@ -132,7 +142,7 @@ export class AssumirOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly emissor: IEmissorEventos
-  ) { }
+  ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
@@ -147,7 +157,7 @@ export class AnalisarVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly emissor: IEmissorEventos
-  ) { }
+  ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
@@ -164,7 +174,7 @@ export class ListarServicosInsumosNaOsUseCase {
     private readonly orcamentoRepository: IOrcamentoRepository,
     private readonly osPecaRepository: IOsPecaRepository,
     private readonly emissor: IEmissorEventos
-  ) { }
+  ) {}
 
   async execute(
     id: string,
@@ -202,7 +212,7 @@ export class ListarServicosInsumosNaOsUseCase {
 
 // UC-01A / PATCH administrativo antes da execução
 export class AtualizarOrdemServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) { }
+  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   async execute(
     id: string,
@@ -226,7 +236,7 @@ export class FinalizarExecucaoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly emissor: IEmissorEventos
-  ) { }
+  ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
@@ -241,7 +251,7 @@ export class AprovarServicoPrestadoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly emissor: IEmissorEventos
-  ) { }
+  ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
@@ -256,7 +266,7 @@ export class RegistrarEntregaVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly emissor: IEmissorEventos
-  ) { }
+  ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
@@ -269,7 +279,7 @@ export class RegistrarEntregaVeiculoUseCase {
 
 // UC-10
 export class ConsultarStatusOrdemServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) { }
+  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   async execute(id: string): Promise<{ ordemServicoId: string; status: string }> {
     const os = await this.ordemServicoRepository.findOne(id);
@@ -279,7 +289,7 @@ export class ConsultarStatusOrdemServicoUseCase {
 
 // UC-11
 export class ListarOrdensServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) { }
+  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   async execute(
     page?: number,
@@ -294,7 +304,7 @@ export class ListarOrdensServicoUseCase {
 
 // UC-12
 export class DetalharOrdemServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) { }
+  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     return this.ordemServicoRepository.findOne(id);
@@ -303,7 +313,7 @@ export class DetalharOrdemServicoUseCase {
 
 // Admin: delete
 export class DeletarOrdemServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) { }
+  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     return this.ordemServicoRepository.remove(id);

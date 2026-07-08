@@ -80,11 +80,12 @@ model OrdemServico {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
-  veiculo   Veiculo    @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
-  cliente   Cliente    @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
-  orcamento  Orcamento?
-  osPecas    OsPeca[]
-  osServicos OsServico[]
+  veiculo         Veiculo             @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
+  cliente         Cliente             @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  orcamento       Orcamento?
+  osPecas         OsPeca[]
+  osServicos      OsServico[]
+  historicoStatus HistoricoStatusOS[]
 }
 
 model Orcamento {
@@ -197,4 +198,17 @@ model Pagamento {
   createdAt      DateTime @default(now())
 
   @@map("pagamentos")
+}
+
+model HistoricoStatusOS {
+  id               String    @id @default(uuid())
+  ordem_servico_id String
+  status_anterior  SOStatus?
+  status_novo      SOStatus
+  motivo           String?
+  data_hora        DateTime  @default(now())
+
+  ordem_servico OrdemServico @relation(fields: [ordem_servico_id], references: [id], onDelete: Cascade)
+
+  @@map("historico_status_os")
 }

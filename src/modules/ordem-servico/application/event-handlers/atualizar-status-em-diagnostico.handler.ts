@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { OrdemServicoAssumida } from '../../domain/events/ordem-servico-assumida.event';
-import { StatusAtualizadoEmDiagnostico } from '../../domain/events/status-atualizado-em-diagnostico.event';
+import { OrdemServicoEmDiagnostico } from '../../domain/events/ordem-servico-em-diagnostico.event';
 
 @Injectable()
 export class AtualizarStatusEmDiagnosticoHandler {
@@ -26,6 +26,6 @@ export class AtualizarStatusEmDiagnosticoHandler {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'UNDER_DIAGNOSIS',
     });
-    await this.emissor.emitir(new StatusAtualizadoEmDiagnostico(evento.ordemServicoId));
+    await this.emissor.emitir(new OrdemServicoEmDiagnostico(evento.ordemServicoId));
   }
 }

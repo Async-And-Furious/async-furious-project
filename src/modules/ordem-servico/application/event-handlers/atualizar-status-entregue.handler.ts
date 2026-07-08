@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.event';
-import { StatusAtualizadoEntregue } from '../../domain/events/status-atualizado-entregue.event';
+import { OrdemServicoEntregue } from '../../domain/events/ordem-servico-entregue.event';
 
 @Injectable()
 export class AtualizarStatusEntregueHandler {
@@ -27,6 +27,6 @@ export class AtualizarStatusEntregueHandler {
       status: 'DELIVERED',
       entregue_em: new Date(),
     });
-    await this.emissor.emitir(new StatusAtualizadoEntregue(evento.ordemServicoId));
+    await this.emissor.emitir(new OrdemServicoEntregue(evento.ordemServicoId));
   }
 }

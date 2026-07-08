@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { OsSemPecasConfirmada } from '../../domain/events/os-sem-pecas-confirmada.event';
-import { StatusAtualizadoEmExecucao } from '../../domain/events/status-atualizado-em-execucao.event';
+import { OrdemServicoEmExecucao } from '../../domain/events/ordem-servico-em-execucao.event';
 import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
 
 @Injectable()
@@ -40,6 +40,6 @@ export class AtualizarStatusEmExecucaoHandler {
       return;
     }
     await this.ordemServicoRepository.update(ordemServicoId, { status: 'IN_PROGRESS' });
-    await this.emissor.emitir(new StatusAtualizadoEmExecucao(ordemServicoId));
+    await this.emissor.emitir(new OrdemServicoEmExecucao(ordemServicoId));
   }
 }

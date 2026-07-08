@@ -5,7 +5,7 @@ import { OsServico } from '../../domain/entities/os-servico.entity';
 
 @Injectable()
 export class OsServicoRepository implements IOsServicoRepository {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async replaceAll(
     ordemServicoId: string,

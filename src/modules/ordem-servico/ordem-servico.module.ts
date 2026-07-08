@@ -29,6 +29,10 @@ import {
   DetalharOrdemServicoUseCase,
   DeletarOrdemServicoUseCase,
 } from './application/use-cases/ordem-servico.use-cases';
+import { UpdateServiceOrderStatusUseCase } from './application/use-cases/update-service-order-status.use-case';
+import { StatusTransitionService } from './domain/services/status-transition.service';
+import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
+import { ServiceOrderStatusWebhookController } from './presentation/controllers/service-order-status-webhook.controller';
 import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
@@ -55,11 +59,13 @@ import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cli
 import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
 
 @Module({
-  controllers: [OrdemServicoController],
+  controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
   providers: [
     OrdemServicoRepository,
     OrcamentoRepository,
     OsPecaRepository,
+    StatusHistoryRepository,
+    StatusTransitionService,
     OsServicoRepository,
     ClienteRepository,
     VeiculoRepository,
@@ -290,6 +296,21 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
         new ConsultarTempoMedioExecucaoUseCase(osRepo),
       inject: [OrdemServicoRepository],
     },
+    {
+      provide: UpdateServiceOrderStatusUseCase,
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        historyRepo: StatusHistoryRepository,
+        barramento: IEmissorEventos,
+        transitionSvc: StatusTransitionService
+      ) => new UpdateServiceOrderStatusUseCase(osRepo, historyRepo, barramento, transitionSvc),
+      inject: [
+        OrdemServicoRepository,
+        StatusHistoryRepository,
+        EMISSOR_EVENTOS,
+        StatusTransitionService,
+      ],
+    },
 
     // ACL Adapter for pecas-insumos
     {
@@ -304,4 +325,4 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
     OsServicoRepository,
   ],
 })
-export class OrdemServicoModule { }
+export class OrdemServicoModule {}

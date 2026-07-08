@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { StatusAtualizadoEmDiagnostico } from '../../domain/events/status-atualizado-em-diagnostico.event';
+import { OrdemServicoEmDiagnostico } from '../../domain/events/ordem-servico-em-diagnostico.event';
 import { NOTIFICACAO_CLIENTE_GATEWAY } from '../ports/notificacao-cliente.gateway';
 import type { INotificacaoClienteGateway } from '../ports/notificacao-cliente.gateway';
 
@@ -11,8 +11,8 @@ export class NotificarClienteDiagnosticoHandler {
     private readonly notificacaoGateway: INotificacaoClienteGateway
   ) {}
 
-  @OnEvent('StatusAtualizadoEmDiagnostico')
-  async handle(evento: StatusAtualizadoEmDiagnostico): Promise<void> {
+  @OnEvent('OrdemServicoEmDiagnostico')
+  async handle(evento: OrdemServicoEmDiagnostico): Promise<void> {
     await this.notificacaoGateway.notificar({
       ordemServicoId: evento.ordemServicoId,
       mensagem: 'Seu veículo está em diagnóstico.',

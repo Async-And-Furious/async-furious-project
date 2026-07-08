@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
-import { StatusAtualizadoFinalizada } from '../../domain/events/status-atualizado-finalizada.event';
+import { OrdemServicoFinalizada } from '../../domain/events/ordem-servico-finalizada.event';
 
 @Injectable()
 export class FinalizarMonitoramentoTempoHandler {
@@ -9,8 +9,8 @@ export class FinalizarMonitoramentoTempoHandler {
 
   constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
-  @OnEvent('StatusAtualizadoFinalizada')
-  async handle(evento: StatusAtualizadoFinalizada): Promise<void> {
+  @OnEvent('OrdemServicoFinalizada')
+  async handle(evento: OrdemServicoFinalizada): Promise<void> {
     const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
     const finalizada_em = new Date();
     await this.ordemServicoRepository.update(evento.ordemServicoId, { finalizada_em });

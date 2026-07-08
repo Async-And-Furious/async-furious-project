@@ -1,6 +1,8 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+
+dotenv.config();
 
 const prisma = new PrismaClient();
 

@@ -33,7 +33,8 @@ import { Roles } from '../../../../auth/decorators/roles.decorator';
 import { Public } from '../../../../auth/decorators/public.decorator';
 import { Role } from '../../../../auth/enums/role.enum';
 import { CurrentUser } from '../../../../auth/decorators/current-user.decorator';
-import type { AuthUser } from '../../../../auth/types/auth.types';import {
+import type { AuthUser } from '../../../../auth/types/auth.types';
+import {
   CriarOrdemServicoUseCase,
   AssumirOrdemServicoUseCase,
   AnalisarVeiculoUseCase,
@@ -96,7 +97,8 @@ export class OrdemServicoController {
   @Roles(Role.RECEPCIONISTA)
   @ApiOperation({
     summary: 'Criar nova ordem de serviço',
-    description: 'Cria uma nova ordem de serviço recebendo cliente, veículo, serviços e peças. Calcula o orçamento e cria OS com status RECEIVED.',
+    description:
+      'Cria uma nova ordem de serviço recebendo cliente, veículo, serviços e peças. Calcula o orçamento e cria OS com status RECEIVED.',
   })
   @ApiBody({ type: CreateOrdemServicoDto })
   @ApiResponse({ status: 201, description: 'Ordem de serviço criada com sucesso, retorna o ID.' })
@@ -322,14 +324,18 @@ export class OrdemServicoController {
   @Post(':id/aprovar-servico')
   @Public()
   @ApiOperation({
-    summary: 'Webhook: aprovação ou recusa de orçamento pelo cliente (AWAITING_APPROVAL → IN_PROGRESS | CLOSED_WITHOUT_EXECUTION)',
+    summary:
+      'Webhook: aprovação ou recusa de orçamento pelo cliente (AWAITING_APPROVAL → IN_PROGRESS | CLOSED_WITHOUT_EXECUTION)',
     description:
       'Endpoint público para receber notificações externas de aprovação ou recusa do orçamento. Aprovação move a OS para Em Execução; recusa encerra sem execução.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: NotificacaoAprovacaoOrcamentoDto })
   @ApiResponse({ status: 201, description: 'Decisão registrada. OS atualizada conforme decisão' })
-  @ApiResponse({ status: 400, description: 'OS não está em Aguardando Aprovação ou orçamento inválido' })
+  @ApiResponse({
+    status: 400,
+    description: 'OS não está em Aguardando Aprovação ou orçamento inválido',
+  })
   @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
   notificarAprovacaoOrcamento(
     @Param('id', ParseUUIDPipe) id: string,
