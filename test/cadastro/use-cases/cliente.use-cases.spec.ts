@@ -214,7 +214,7 @@ describe('Cliente Use Cases', () => {
       const resultado = await useCase.execute(clienteId, updateData);
 
       expect(mockRepository.update).toHaveBeenCalledWith(clienteId, updateData);
-      expect(resultado.telefone).toBe(updateData.telefone);
+      expect(resultado.contato.telefone).toBe(updateData.telefone);
     });
 
     it('deve propagar erro do repositório', async () => {

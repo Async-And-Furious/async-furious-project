@@ -3,23 +3,13 @@ import { PlacaVeiculoVo } from '../../../src/modules/cadastro/domain/value-objec
 
 describe('PlacaVeiculoVo', () => {
   describe('criar', () => {
-    it('should create with valid plate', () => {
-      const placa = PlacaVeiculoVo.criar('ABC1234');
-      expect(placa.valor).toBe('ABC1234');
-    });
-
-    it('should create with lowercase and normalize', () => {
-      const placa = PlacaVeiculoVo.criar('abc1234');
-      expect(placa.valor).toBe('ABC1234');
-    });
-
-    it('should create with hyphen and normalize', () => {
-      const placa = PlacaVeiculoVo.criar('ABC-1234');
-      expect(placa.valor).toBe('ABC1234');
-    });
-
-    it('should create with spaces and normalize', () => {
-      const placa = PlacaVeiculoVo.criar('ABC 1234');
+    it.each([
+      ['valid plate', 'ABC1234'],
+      ['lowercase', 'abc1234'],
+      ['hyphen', 'ABC-1234'],
+      ['spaces', 'ABC 1234'],
+    ])('should create and normalize with %s', (_description, input) => {
+      const placa = PlacaVeiculoVo.criar(input);
       expect(placa.valor).toBe('ABC1234');
     });
 
@@ -28,7 +18,7 @@ describe('PlacaVeiculoVo', () => {
     });
 
     it('should throw for null', () => {
-      expect(() => PlacaVeiculoVo.criar(null as any)).toThrow(DomainException);
+      expect(() => PlacaVeiculoVo.criar(null as never)).toThrow(DomainException);
     });
 
     it('should throw for too short', () => {

@@ -5,6 +5,10 @@ import { PedidoFornecedorRepository } from './infrastructure/repositories/pedido
 import { ReservaEstoqueRepository } from './infrastructure/repositories/reserva-estoque.repository';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import {
+  EMISSOR_EVENTOS,
+  IEmissorEventos,
+} from '../../shared/domain/interfaces/emissor-eventos.interface';
+import {
   CreatePecaInsumoUseCase,
   ListPecasInsumoUseCase,
   GetPecaInsumoUseCase,
@@ -12,14 +16,23 @@ import {
   UpdateEstoquePecaInsumoUseCase,
   DeletePecaInsumoUseCase,
 } from './application/use-cases/peca-insumo.use-cases';
-import { VerificarDisponibilidadeEstoquePolicy } from './application/policies/verificar-disponibilidade-estoque.policy';
-import { DebitarEstoquePolicy } from './application/policies/debitar-estoque.policy';
-import { NotificarPecasIndisponiveisPolicy } from './application/policies/notificar-pecas-indisponiveis.policy';
-import { NotificarAdminReposicaoPolicy } from './application/policies/notificar-admin-reposicao.policy';
-import { SolicitarPecasFornecedorPolicy } from './application/policies/solicitar-pecas-fornecedor.policy';
-import { ReceberPecasFornecedorPolicy } from './application/policies/receber-pecas-fornecedor.policy';
-import { ValidarBacklogOrdensPendentesPolicy } from './application/policies/validar-backlog-ordens-pendentes.policy';
-import { LiberarOrdensAguardandoPecasPolicy } from './application/policies/liberar-ordens-aguardando-pecas.policy';
+import { VerificarDisponibilidadeEstoqueHandler } from './application/event-handlers/verificar-disponibilidade-estoque.handler';
+import { DebitarEstoqueHandler } from './application/event-handlers/debitar-estoque.handler';
+import { NotificarPecasIndisponiveisHandler } from './application/event-handlers/notificar-pecas-indisponiveis.handler';
+import { NotificarAdminReposicaoHandler } from './application/event-handlers/notificar-admin-reposicao.handler';
+import { NotificacaoAdminStub } from './infrastructure/gateways/notificacao-admin.stub';
+import {
+  NOTIFICACAO_ADMIN_GATEWAY,
+  INotificacaoAdminGateway,
+} from './application/ports/notificacao-admin.gateway';
+import { FornecedorStub } from './infrastructure/gateways/fornecedor.stub';
+import { FORNECEDOR_GATEWAY, IFornecedorGateway } from './application/ports/fornecedor.gateway';
+import {
+  SolicitarPecasAoFornecedorUseCase,
+  ReceberPecasDoFornecedorUseCase,
+} from './application/use-cases/fornecedor.use-cases';
+import { ValidarBacklogOrdensPendentesHandler } from './application/event-handlers/validar-backlog-ordens-pendentes.handler';
+import { LiberarOrdensAguardandoPecasHandler } from './application/event-handlers/liberar-ordens-aguardando-pecas.handler';
 import { OrdemServicoModule } from '../ordem-servico/ordem-servico.module';
 import {
   ORDEM_SERVICO_BACKLOG_PORT,
@@ -34,70 +47,82 @@ import {
     PedidoFornecedorRepository,
     ReservaEstoqueRepository,
     EmissorEventos,
+    { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
+    { provide: NOTIFICACAO_ADMIN_GATEWAY, useClass: NotificacaoAdminStub },
+    { provide: FORNECEDOR_GATEWAY, useClass: FornecedorStub },
 
-    // P-18 → P-21 policies
+    // P-18 → P-21 event handlers
     {
-      provide: VerificarDisponibilidadeEstoquePolicy,
-      useFactory: (repo: PecaInsumoRepository, emissor: EmissorEventos) =>
-        new VerificarDisponibilidadeEstoquePolicy(repo, emissor),
-      inject: [PecaInsumoRepository, EmissorEventos],
+      provide: VerificarDisponibilidadeEstoqueHandler,
+      useFactory: (repo: PecaInsumoRepository, emissor: IEmissorEventos) =>
+        new VerificarDisponibilidadeEstoqueHandler(repo, emissor),
+      inject: [PecaInsumoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: DebitarEstoquePolicy,
-      useFactory: (repo: PecaInsumoRepository, emissor: EmissorEventos) =>
-        new DebitarEstoquePolicy(repo, emissor),
-      inject: [PecaInsumoRepository, EmissorEventos],
+      provide: DebitarEstoqueHandler,
+      useFactory: (repo: PecaInsumoRepository, emissor: IEmissorEventos) =>
+        new DebitarEstoqueHandler(repo, emissor),
+      inject: [PecaInsumoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: NotificarPecasIndisponiveisPolicy,
-      useFactory: (emissor: EmissorEventos) => new NotificarPecasIndisponiveisPolicy(emissor),
-      inject: [EmissorEventos],
+      provide: NotificarPecasIndisponiveisHandler,
+      useFactory: (emissor: IEmissorEventos) => new NotificarPecasIndisponiveisHandler(emissor),
+      inject: [EMISSOR_EVENTOS],
     },
     {
-      provide: NotificarAdminReposicaoPolicy,
-      useFactory: () => new NotificarAdminReposicaoPolicy(),
-      inject: [],
+      provide: NotificarAdminReposicaoHandler,
+      useFactory: (gateway: INotificacaoAdminGateway) =>
+        new NotificarAdminReposicaoHandler(gateway),
+      inject: [NOTIFICACAO_ADMIN_GATEWAY],
     },
 
-    // P-22 → P-25 policies
+    // P-22 → P-25 event handlers
     {
-      provide: SolicitarPecasFornecedorPolicy,
-      useFactory: (
-        pecaRepo: PecaInsumoRepository,
-        pedidoRepo: PedidoFornecedorRepository,
-        emissor: EmissorEventos
-      ) => new SolicitarPecasFornecedorPolicy(pecaRepo, pedidoRepo, emissor),
-      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EmissorEventos],
-    },
-    {
-      provide: ReceberPecasFornecedorPolicy,
-      useFactory: (
-        pecaRepo: PecaInsumoRepository,
-        pedidoRepo: PedidoFornecedorRepository,
-        emissor: EmissorEventos
-      ) => new ReceberPecasFornecedorPolicy(pecaRepo, pedidoRepo, emissor),
-      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EmissorEventos],
-    },
-    {
-      provide: ValidarBacklogOrdensPendentesPolicy,
+      provide: ValidarBacklogOrdensPendentesHandler,
       useFactory: (
         backlogPort: IOrdemServicoBacklogPort,
         pecaRepo: PecaInsumoRepository,
-        emissor: EmissorEventos
-      ) => new ValidarBacklogOrdensPendentesPolicy(backlogPort, pecaRepo, emissor),
-      inject: [ORDEM_SERVICO_BACKLOG_PORT, PecaInsumoRepository, EmissorEventos],
+        emissor: IEmissorEventos
+      ) => new ValidarBacklogOrdensPendentesHandler(backlogPort, pecaRepo, emissor),
+      inject: [ORDEM_SERVICO_BACKLOG_PORT, PecaInsumoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: LiberarOrdensAguardandoPecasPolicy,
+      provide: LiberarOrdensAguardandoPecasHandler,
       useFactory: (
         pecaRepo: PecaInsumoRepository,
         reservaRepo: ReservaEstoqueRepository,
-        emissor: EmissorEventos
-      ) => new LiberarOrdensAguardandoPecasPolicy(pecaRepo, reservaRepo, emissor),
-      inject: [PecaInsumoRepository, ReservaEstoqueRepository, EmissorEventos],
+        emissor: IEmissorEventos
+      ) => new LiberarOrdensAguardandoPecasHandler(pecaRepo, reservaRepo, emissor),
+      inject: [PecaInsumoRepository, ReservaEstoqueRepository, EMISSOR_EVENTOS],
     },
 
     // Use cases
+    // P-22: Solicitar peças ao fornecedor
+    {
+      provide: SolicitarPecasAoFornecedorUseCase,
+      useFactory: (
+        pecaRepo: PecaInsumoRepository,
+        pedidoRepo: PedidoFornecedorRepository,
+        emissor: IEmissorEventos,
+        fornecedorGateway: IFornecedorGateway
+      ) => new SolicitarPecasAoFornecedorUseCase(pecaRepo, pedidoRepo, emissor, fornecedorGateway),
+      inject: [
+        PecaInsumoRepository,
+        PedidoFornecedorRepository,
+        EMISSOR_EVENTOS,
+        FORNECEDOR_GATEWAY,
+      ],
+    },
+    // P-23: Receber peças do fornecedor
+    {
+      provide: ReceberPecasDoFornecedorUseCase,
+      useFactory: (
+        pecaRepo: PecaInsumoRepository,
+        pedidoRepo: PedidoFornecedorRepository,
+        emissor: IEmissorEventos
+      ) => new ReceberPecasDoFornecedorUseCase(pecaRepo, pedidoRepo, emissor),
+      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EMISSOR_EVENTOS],
+    },
     {
       provide: CreatePecaInsumoUseCase,
       useFactory: (repo: PecaInsumoRepository) => new CreatePecaInsumoUseCase(repo),

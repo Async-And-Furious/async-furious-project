@@ -1,0 +1,101 @@
+name: Terraform & Kubernetes
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "k8s/**"
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "infra/**"
+      - "k8s/**"
+      - "Dockerfile"
+      - "scripts/local-up.sh"
+  workflow_dispatch:
+
+jobs:
+  # PRs: apenas valida e planeja, sem provisionar nada (rapido, seguro para rodar em toda PR)
+  plan:
+    name: Terraform Validate & Plan
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: "~> 1.6"
+
+      - name: Terraform Init
+        working-directory: infra/environments/local
+        run: terraform init
+
+      - name: Terraform Validate
+        working-directory: infra/environments/local
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: infra/environments/local
+        run: terraform plan -out=tfplan
+        env:
+          TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+          TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
+
+      - name: Upload Plan
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tfplan
+          path: infra/environments/local/tfplan
+          retention-days: 7
+
+  # main/develop e execucao manual: aplica de verdade num cluster kind efemero no proprio runner
+  # (kind usa apenas containers Docker, ja disponivel no runner ubuntu-latest — nao depende de nuvem)
+  apply-and-deploy:
+    name: Terraform Apply + Deploy no kind
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
+      TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: "~> 1.6"
+
+      - name: Install kind
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.32.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+
+      - name: Provisionar cluster e implantar aplicacao (terraform apply)
+        run: ./scripts/local-up.sh up
+
+      - name: Estado do cluster
+        if: always()
+        run: kubectl get all -n async-furious || true
+
+      - name: Destruir cluster (terraform destroy)
+        if: always()
+        run: ./scripts/local-up.sh down
+
+      - name: Terraform + Kubernetes concluido
+        if: success()
+        run: |
+          echo "### ✅ Terraform + Kubernetes concluído" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cluster kind provisionado via Terraform, aplicação implantada, smoke test em /api/v1 respondeu com sucesso, e ambiente destruído ao final do pipeline." >> "$GITHUB_STEP_SUMMARY"

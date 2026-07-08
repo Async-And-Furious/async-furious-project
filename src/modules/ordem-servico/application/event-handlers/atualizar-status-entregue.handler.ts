@@ -1,0 +1,32 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
+import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
+import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.event';
+import { OrdemServicoEntregue } from '../../domain/events/ordem-servico-entregue.event';
+
+@Injectable()
+export class AtualizarStatusEntregueHandler {
+  private readonly logger = new Logger(AtualizarStatusEntregueHandler.name);
+
+  constructor(
+    private readonly ordemServicoRepository: IOrdemServicoRepository,
+    private readonly emissor: IEmissorEventos
+  ) {}
+
+  @OnEvent('PagamentoRegistrado')
+  async handle(evento: PagamentoRegistrado): Promise<void> {
+    const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
+    if (os.status !== 'FINISHED') {
+      this.logger.warn(
+        `[P-13] OS ${evento.ordemServicoId} em status inválido para entrega: ${os.status}`
+      );
+      return;
+    }
+    await this.ordemServicoRepository.update(evento.ordemServicoId, {
+      status: 'DELIVERED',
+      entregue_em: new Date(),
+    });
+    await this.emissor.emitir(new OrdemServicoEntregue(evento.ordemServicoId));
+  }
+}

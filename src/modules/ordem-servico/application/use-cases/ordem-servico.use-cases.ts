@@ -1,6 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
-import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -13,20 +12,122 @@ import { ServicosEInsumosListados } from '../../domain/events/servicos-e-insumos
 import { ServicoConcluidoPeloMecanico } from '../../domain/events/servico-concluido-pelo-mecanico.event';
 import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado-pelo-cliente.event';
 import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.event';
+import type { IClienteRepository } from '../../../cadastro/domain/interfaces/cliente.interface';
+import type { IVeiculoRepository } from '../../../cadastro/domain/interfaces/veiculo.interface';
+import type { IServicoRepository } from '../../../cadastro/domain/interfaces/servico.interface';
+import type { IPecaInsumoRepository } from '../../../pecas-insumos/domain/interfaces/peca-insumo.interface';
+import type { IOsServicoRepository } from '../../domain/interfaces/os-servico.interface';
 
 // UC-01
 export class CriarOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly clienteRepository: IClienteRepository,
+    private readonly veiculoRepository: IVeiculoRepository,
+    private readonly servicoRepository: IServicoRepository,
+    private readonly pecaInsumoRepository: IPecaInsumoRepository,
+    private readonly osServicoRepository: IOsServicoRepository,
+    private readonly osPecaRepository: IOsPecaRepository,
+    private readonly orcamentoRepository: IOrcamentoRepository,
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(data: {
-    veiculoId: string;
-    clienteId: string;
+    cliente: {
+      nome: string;
+      email: string;
+      telefone?: string;
+      documento: string;
+      tipoDocumento: 'CPF' | 'CNPJ';
+    };
+    veiculo: {
+      placa: string;
+      marca: string;
+      modelo: string;
+      ano: number;
+      cor?: string;
+    };
+    servicos: Array<{ id_servico: string; quantidade: number }>;
+    pecas: Array<{ id_peca: string; quantidade: number }>;
     descricao?: string;
   }): Promise<OrdemDeServico> {
-    const os = await this.ordemServicoRepository.create(data);
+    // 1. Criar ou Obter Cliente
+    let cliente = await this.clienteRepository.findByDocumento(data.cliente.documento);
+    cliente ??= await this.clienteRepository.create(data.cliente);
+
+    // 2. Criar ou Obter Veículo
+    let veiculo = await this.veiculoRepository.findByPlaca(data.veiculo.placa);
+    veiculo ??= await this.veiculoRepository.create({
+      ...data.veiculo,
+      clienteId: cliente.id,
+    });
+
+    // 3. Obter Preços e Calcular Totais
+    let valorTotalServicos = 0;
+    const servicosComPreco: Array<{
+      id_servico: string;
+      quantidade: number;
+      preco_unitario: number;
+      valor_total: number;
+    }> = [];
+    for (const item of data.servicos) {
+      const servico = await this.servicoRepository.findOne(item.id_servico);
+      const preco = Number(servico.preco);
+      const total = preco * item.quantidade;
+      valorTotalServicos += total;
+      servicosComPreco.push({
+        id_servico: item.id_servico,
+        quantidade: item.quantidade,
+        preco_unitario: preco,
+        valor_total: total,
+      });
+    }
+
+    let valorTotalPecas = 0;
+    const pecasComPreco: Array<{
+      id_peca: string;
+      quantidade: number;
+      preco_unitario: number;
+      valor_total: number;
+    }> = [];
+    for (const item of data.pecas) {
+      const peca = await this.pecaInsumoRepository.findOne(item.id_peca);
+      const preco = Number(peca.preco);
+      const total = preco * item.quantidade;
+      valorTotalPecas += total;
+      pecasComPreco.push({
+        id_peca: item.id_peca,
+        quantidade: item.quantidade,
+        preco_unitario: preco,
+        valor_total: total,
+      });
+    }
+
+    // 4. Criar Ordem de Serviço
+    const os = await this.ordemServicoRepository.create({
+      veiculoId: veiculo.id,
+      clienteId: cliente.id,
+      descricao: data.descricao,
+    });
+
+    // 5. Vincular Serviços e Peças
+    if (servicosComPreco.length > 0) {
+      await this.osServicoRepository.replaceAll(os.id, servicosComPreco);
+    }
+    if (pecasComPreco.length > 0) {
+      await this.osPecaRepository.replaceAll(os.id, pecasComPreco);
+    }
+
+    // 6. Gerar Orçamento Automático
+    // Assumindo que a interface IOrcamentoRepository possui um método create ou que podemos injetar CriarOrcamentoUseCase.
+    // Como a OS acabou de ser criada, o orcamento ainda não existe, então usamos o repository.create.
+    await this.orcamentoRepository.create({
+      id_ordem_servico: os.id,
+      valor_total_servicos: valorTotalServicos,
+      valor_total_pecas: valorTotalPecas,
+      valor_total_geral: valorTotalServicos + valorTotalPecas,
+    });
+
     await this.emissor.emitir(new OrdemServicoCriada(os.id, os.clienteId, os.veiculoId));
     return this.ordemServicoRepository.findOne(os.id);
   }
@@ -36,16 +137,12 @@ export class CriarOrdemServicoUseCase {
 export class AssumirOrdemServicoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'RECEIVED') {
-      throw new DomainException(
-        `OS deve estar no status Recebida para ser assumida. Status atual: ${os.status}`
-      );
-    }
+    os.podeAssumir();
     await this.emissor.emitir(new OrdemServicoAssumida(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -55,16 +152,12 @@ export class AssumirOrdemServicoUseCase {
 export class AnalisarVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'UNDER_DIAGNOSIS') {
-      throw new DomainException(
-        `OS deve estar Em Diagnóstico para analisar o veículo. Status atual: ${os.status}`
-      );
-    }
+    os.podeAnalisarVeiculo();
     await this.emissor.emitir(new VeiculoAnalisado(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -76,7 +169,7 @@ export class ListarServicosInsumosNaOsUseCase {
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
     private readonly osPecaRepository: IOsPecaRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(
@@ -88,11 +181,7 @@ export class ListarServicosInsumosNaOsUseCase {
     }
   ): Promise<Orcamento> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (!['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {
-      throw new DomainException(
-        `OS deve estar Em Diagnóstico ou Aguardando Aprovação. Status atual: ${os.status}`
-      );
-    }
+    os.podeLancarServicosInsumos();
 
     if (data.pecas && data.pecas.length > 0) {
       await this.osPecaRepository.replaceAll(
@@ -111,7 +200,7 @@ export class ListarServicosInsumosNaOsUseCase {
     );
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id);
     if (!orcamento) {
-      throw new NotFoundException('Orçamento não foi gerado após listar serviços e insumos.');
+      throw new EntityNotFoundException('Orcamento', id);
     }
     return orcamento;
   }
@@ -129,12 +218,7 @@ export class AtualizarOrdemServicoUseCase {
     }
   ): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-
-    if (!['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {
-      throw new DomainException(
-        `A ordem de serviço só pode ser atualizada até Aguardando Aprovação. Status atual: ${os.status}`
-      );
-    }
+    os.podeAtualizar();
 
     return this.ordemServicoRepository.update(id, {
       ...(data.status && { status: data.status }),
@@ -147,16 +231,12 @@ export class AtualizarOrdemServicoUseCase {
 export class FinalizarExecucaoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'IN_PROGRESS') {
-      throw new DomainException(
-        `OS deve estar Em Execução para ser finalizada. Status atual: ${os.status}`
-      );
-    }
+    os.podeFinalizar();
     await this.emissor.emitir(new ServicoConcluidoPeloMecanico(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -166,16 +246,12 @@ export class FinalizarExecucaoUseCase {
 export class AprovarServicoPrestadoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'FINISHED') {
-      throw new DomainException(
-        `OS deve estar Finalizada para aprovação do serviço pelo cliente. Status atual: ${os.status}`
-      );
-    }
+    os.podeAprovarServico();
     await this.emissor.emitir(new ServicoAprovadoPeloCliente(id));
     return this.ordemServicoRepository.findOne(id);
   }
@@ -185,16 +261,12 @@ export class AprovarServicoPrestadoUseCase {
 export class RegistrarEntregaVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
-    if (os.status !== 'FINISHED') {
-      throw new DomainException(
-        `OS deve estar Finalizada para registrar a entrega. Status atual: ${os.status}`
-      );
-    }
+    os.podeRegistrarEntrega();
 
     await this.emissor.emitir(new PagamentoRegistrado(id));
     return this.ordemServicoRepository.findOne(id);
@@ -217,13 +289,12 @@ export class ListarOrdensServicoUseCase {
 
   async execute(
     page?: number,
-    limit?: number,
-    search?: string
+    limit?: number
   ): Promise<{
     data: OrdemDeServico[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    return this.ordemServicoRepository.findAll(page, limit, search);
+    return this.ordemServicoRepository.findAllAtivas(page, limit);
   }
 }
 

@@ -40,8 +40,10 @@ import {
   UpdateEstoquePecaInsumoUseCase,
   DeletePecaInsumoUseCase,
 } from '../../application/use-cases/peca-insumo.use-cases';
-import { SolicitarPecasFornecedorPolicy } from '../../application/policies/solicitar-pecas-fornecedor.policy';
-import { ReceberPecasFornecedorPolicy } from '../../application/policies/receber-pecas-fornecedor.policy';
+import {
+  SolicitarPecasAoFornecedorUseCase,
+  ReceberPecasDoFornecedorUseCase,
+} from '../../application/use-cases/fornecedor.use-cases';
 
 @ApiTags('Pecas Insumos')
 @ApiBearerAuth()
@@ -55,10 +57,10 @@ export class PecaInsumoController {
     @Inject(UpdateEstoquePecaInsumoUseCase)
     private readonly updateEstoqueUseCase: UpdateEstoquePecaInsumoUseCase,
     @Inject(DeletePecaInsumoUseCase) private readonly deleteUseCase: DeletePecaInsumoUseCase,
-    @Inject(SolicitarPecasFornecedorPolicy)
-    private readonly solicitarPecasPolicy: SolicitarPecasFornecedorPolicy,
-    @Inject(ReceberPecasFornecedorPolicy)
-    private readonly receberPecasPolicy: ReceberPecasFornecedorPolicy
+    @Inject(SolicitarPecasAoFornecedorUseCase)
+    private readonly solicitarPecasUseCase: SolicitarPecasAoFornecedorUseCase,
+    @Inject(ReceberPecasDoFornecedorUseCase)
+    private readonly receberPecasUseCase: ReceberPecasDoFornecedorUseCase
   ) {}
 
   @Post()
@@ -160,7 +162,7 @@ export class PecaInsumoController {
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role admin' })
   @ApiResponse({ status: 404, description: 'Peça não encontrada no catálogo' })
   async solicitarReposicao(@Body() dto: SolicitarReposicaoDto) {
-    await this.solicitarPecasPolicy.execute({
+    await this.solicitarPecasUseCase.execute({
       fornecedorId: dto.fornecedorId,
       pecas: dto.pecas.map((p) => ({
         pecaId: p.pecaId,
@@ -180,6 +182,6 @@ export class PecaInsumoController {
   @ApiResponse({ status: 404, description: 'Pedido não encontrado' })
   @ApiResponse({ status: 409, description: 'Pedido já foi recebido' })
   async receberPecas(@Param('pedidoId', ParseUUIDPipe) pedidoId: string) {
-    await this.receberPecasPolicy.execute({ pedidoId });
+    await this.receberPecasUseCase.execute({ pedidoId });
   }
 }

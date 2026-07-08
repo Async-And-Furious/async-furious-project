@@ -166,7 +166,7 @@ describe('Veiculo Entity', () => {
         clienteId: 'cli-1',
       });
 
-      expect(v1.equals(v2 as any)).toBe(false);
+      expect(v1.equals(v2)).toBe(false);
     });
   });
 });

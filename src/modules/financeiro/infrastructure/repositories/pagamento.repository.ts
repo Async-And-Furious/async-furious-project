@@ -1,17 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { Pagamento } from '../../domain/entities/pagamento.entity';
-import { PagamentoMapper, PagamentoORMEntity } from '../persistence/pagamento.orm.entity';
+import { IPagamentoRepository } from '../../domain/interfaces/pagamento.interface';
+import { PagamentoMapper } from '../persistence/pagamento.orm.entity';
 
 @Injectable()
-export class PagamentoRepository {
+export class PagamentoRepository implements IPagamentoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async save(pagamento: Pagamento): Promise<void> {
-    // Usa o Mapper para converter Domínio -> Prisma
     const data = PagamentoMapper.toOrm(pagamento);
 
-    await (this.prisma as any).pagamento.upsert({
+    await this.prisma.pagamento.upsert({
       where: { id: data.id },
       update: {
         status: data.status,
@@ -21,13 +21,12 @@ export class PagamentoRepository {
   }
 
   async findById(id: string): Promise<Pagamento | null> {
-    const record = await (this.prisma as any).pagamento.findUnique({
+    const record = await this.prisma.pagamento.findUnique({
       where: { id },
     });
 
     if (!record) return null;
 
-    // Usa o Mapper para converter Prisma -> Domínio
-    return PagamentoMapper.toDomain(record as PagamentoORMEntity);
+    return PagamentoMapper.toDomain(record);
   }
 }

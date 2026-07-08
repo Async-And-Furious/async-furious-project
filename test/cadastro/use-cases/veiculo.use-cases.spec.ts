@@ -46,7 +46,7 @@ describe('Veiculo Use Cases', () => {
 
       expect(mockRepository.create).toHaveBeenCalledWith(input);
       expect(resultado.id).toBe(veiculoCriado.id);
-      expect(resultado.placa).toBe('ABC1234');
+      expect(resultado.placa.valor).toBe('ABC1234');
       expect(resultado.marca).toBe(input.marca);
       expect(resultado.modelo).toBe(input.modelo);
       expect(resultado.ano).toBe(input.ano);
@@ -73,7 +73,7 @@ describe('Veiculo Use Cases', () => {
       const resultado = await useCase.execute(input);
 
       expect(mockRepository.create).toHaveBeenCalledWith(input);
-      expect(resultado.placa).toBe('XYZ9876');
+      expect(resultado.placa.valor).toBe('XYZ9876');
       expect(resultado.cor).toBeNull();
     });
 
@@ -187,7 +187,7 @@ describe('Veiculo Use Cases', () => {
 
       expect(mockRepository.findById).toHaveBeenCalledWith(veiculoId);
       expect(resultado.id).toBe(veiculoId);
-      expect(resultado.placa).toBe('ABC1234');
+      expect(resultado.placa.valor).toBe('ABC1234');
       expect(resultado.marca).toBe('Toyota');
     });
 
@@ -263,7 +263,7 @@ describe('Veiculo Use Cases', () => {
 
       expect(mockRepository.remove).toHaveBeenCalledWith(veiculoId);
       expect(resultado.id).toBe(veiculoId);
-      expect(resultado.placa).toBe('ABC1234');
+      expect(resultado.placa.valor).toBe('ABC1234');
       expect(resultado.marca).toBe('Toyota');
     });
 

@@ -9,21 +9,113 @@ import {
   ValidateNested,
   IsInt,
   IsPositive,
+  IsEmail,
+  IsEnum,
+  Max,
   IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreateOrdemServicoDto {
-  @ApiProperty({ example: 'uuid-do-veiculo', description: 'ID do veículo' })
-  @IsUUID()
+export class OsClienteDto {
+  @ApiProperty({ example: 'João Silva' })
+  @IsString()
   @IsNotEmpty()
-  veiculoId: string;
+  nome: string;
 
-  @ApiProperty({ example: 'uuid-do-cliente', description: 'ID do cliente' })
-  @IsUUID()
+  @ApiProperty({ example: 'joao@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiPropertyOptional({ example: '11999999999' })
+  @IsString()
+  @IsOptional()
+  telefone?: string;
+
+  @ApiProperty({ example: '12345678901' })
+  @IsString()
   @IsNotEmpty()
-  clienteId: string;
+  documento: string;
+
+  @ApiProperty({ enum: ['CPF', 'CNPJ'] })
+  @IsEnum(['CPF', 'CNPJ'])
+  tipoDocumento: 'CPF' | 'CNPJ';
+}
+
+export class OsVeiculoDto {
+  @ApiProperty({ example: 'ABC-1234' })
+  @IsString()
+  @IsNotEmpty()
+  placa: string;
+
+  @ApiProperty({ example: 'Toyota' })
+  @IsString()
+  @IsNotEmpty()
+  marca: string;
+
+  @ApiProperty({ example: 'Corolla' })
+  @IsString()
+  @IsNotEmpty()
+  modelo: string;
+
+  @ApiProperty({ example: 2024 })
+  @IsInt()
+  @Min(1900)
+  @Max(new Date().getFullYear() + 1)
+  ano: number;
+
+  @ApiPropertyOptional({ example: 'Prata' })
+  @IsString()
+  @IsOptional()
+  cor?: string;
+}
+
+export class OsServicoItemDto {
+  @ApiProperty({ example: 'uuid-do-servico' })
+  @IsUUID()
+  id_servico: string;
+
+  @ApiProperty({ example: 1 })
+  @IsInt()
+  @IsPositive()
+  quantidade: number;
+}
+
+export class OsPecaItemDto {
+  @ApiProperty({ example: 'uuid-da-peca' })
+  @IsUUID()
+  id_peca: string;
+
+  @ApiProperty({ example: 2 })
+  @IsInt()
+  @IsPositive()
+  quantidade: number;
+}
+
+export class CreateOrdemServicoDto {
+  @ApiProperty({ type: OsClienteDto, description: 'Dados do cliente' })
+  @ValidateNested()
+  @Type(() => OsClienteDto)
+  @IsNotEmpty()
+  cliente: OsClienteDto;
+
+  @ApiProperty({ type: OsVeiculoDto, description: 'Dados do veículo' })
+  @ValidateNested()
+  @Type(() => OsVeiculoDto)
+  @IsNotEmpty()
+  veiculo: OsVeiculoDto;
+
+  @ApiProperty({ type: [OsServicoItemDto], description: 'Serviços solicitados' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OsServicoItemDto)
+  servicos: OsServicoItemDto[];
+
+  @ApiProperty({ type: [OsPecaItemDto], description: 'Peças e insumos utilizados' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OsPecaItemDto)
+  pecas: OsPecaItemDto[];
 
   @ApiPropertyOptional({
     example: 'Troca de óleo e revisão completa',
@@ -100,4 +192,15 @@ export class GerarOrcamentoDto {
   @ValidateNested({ each: true })
   @Type(() => ItemPecaDto)
   pecas?: ItemPecaDto[];
+}
+
+export class NotificacaoAprovacaoOrcamentoDto {
+  @ApiProperty({
+    enum: ['APROVADO', 'RECUSADO'],
+    example: 'APROVADO',
+    description: 'Decisão do cliente sobre o orçamento',
+  })
+  @IsIn(['APROVADO', 'RECUSADO'])
+  @IsNotEmpty()
+  decisao: 'APROVADO' | 'RECUSADO';
 }

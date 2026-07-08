@@ -25,6 +25,7 @@ import {
   UpdateOrdemServicoDto,
   ListQueryDto,
   GerarOrcamentoDto,
+  NotificacaoAprovacaoOrcamentoDto,
 } from '../dto/ordem-servico.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
@@ -96,31 +97,49 @@ export class OrdemServicoController {
   @Roles(Role.RECEPCIONISTA)
   @ApiOperation({
     summary: 'Criar nova ordem de serviço',
-    description: 'Cria uma nova ordem de serviço. Requer role de RECEPCIONISTA.',
+    description:
+      'Cria uma nova ordem de serviço recebendo cliente, veículo, serviços e peças. Calcula o orçamento e cria OS com status RECEIVED.',
   })
   @ApiBody({ type: CreateOrdemServicoDto })
-  @ApiResponse({ status: 201, description: 'Ordem de serviço criada com sucesso' })
+  @ApiResponse({ status: 201, description: 'Ordem de serviço criada com sucesso, retorna o ID.' })
   @ApiResponse({ status: 400, description: 'Validação falhou - dados inválidos' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role RECEPCIONISTA' })
-  @ApiResponse({ status: 404, description: 'Veículo ou cliente não encontrado' })
-  criar(@Body() dto: CreateOrdemServicoDto) {
-    return this.criarUseCase.execute(dto);
+  async criar(@Body() dto: CreateOrdemServicoDto) {
+    const os = await this.criarUseCase.execute(dto);
+    return { id: os.id };
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar todas as ordens de serviço (paginado)' })
+  @ApiOperation({
+    summary: 'Listar ordens de serviço ativas por prioridade',
+    description:
+      'Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
+  })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
-  @ApiQuery({ name: 'search', type: String, required: false, example: 'troca' })
-  @ApiResponse({ status: 200, description: 'Lista retornada com sucesso' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de OS ativas ordenadas por prioridade',
+    schema: {
+      example: {
+        data: [
+          {
+            id: 'uuid',
+            veiculoId: 'uuid',
+            clienteId: 'uuid',
+            status: 'IN_PROGRESS',
+            descricao: 'Troca de óleo',
+            created_at: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+        pagination: { page: 1, limit: 10, total: 5, totalPages: 1 },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  listar(@Query() query: ListQueryDto, @CurrentUser() _user: AuthUser) {
-    return this.listarUseCase.execute(
-      Number(query.page) || 1,
-      Number(query.limit) || 10,
-      query.search
-    );
+  listar(@Query() query: ListQueryDto) {
+    return this.listarUseCase.execute(Number(query.page) || 1, Number(query.limit) || 10);
   }
 
   @Get('tempo-medio')
@@ -300,6 +319,32 @@ export class OrdemServicoController {
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   aprovarServicoPrestado(@Param('id', ParseUUIDPipe) id: string) {
     return this.aprovarServicoPrestadoUseCase.execute(id);
+  }
+
+  @Post(':id/aprovar-servico')
+  @Public()
+  @ApiOperation({
+    summary:
+      'Webhook: aprovação ou recusa de orçamento pelo cliente (AWAITING_APPROVAL → IN_PROGRESS | CLOSED_WITHOUT_EXECUTION)',
+    description:
+      'Endpoint público para receber notificações externas de aprovação ou recusa do orçamento. Aprovação move a OS para Em Execução; recusa encerra sem execução.',
+  })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiBody({ type: NotificacaoAprovacaoOrcamentoDto })
+  @ApiResponse({ status: 201, description: 'Decisão registrada. OS atualizada conforme decisão' })
+  @ApiResponse({
+    status: 400,
+    description: 'OS não está em Aguardando Aprovação ou orçamento inválido',
+  })
+  @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
+  notificarAprovacaoOrcamento(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: NotificacaoAprovacaoOrcamentoDto
+  ) {
+    if (dto.decisao === 'APROVADO') {
+      return this.aprovarOrcamentoUseCase.execute(id);
+    }
+    return this.recusarOrcamentoUseCase.execute(id);
   }
 
   @Patch(':id/registrar-entrega')

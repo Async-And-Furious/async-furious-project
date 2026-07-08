@@ -82,6 +82,17 @@ export class ClienteRepository implements IClienteRepository {
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
 
+  async findByDocumento(documento: string): Promise<Cliente | null> {
+    const ormEntity = await this.prisma.cliente.findUnique({
+      where: { documento },
+      include: { veiculos: true },
+    });
+
+    if (!ormEntity) return null;
+
+    return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
+  }
+
   async update(id: string, data: UpdateClienteInput): Promise<Cliente> {
     await this.findById(id);
 

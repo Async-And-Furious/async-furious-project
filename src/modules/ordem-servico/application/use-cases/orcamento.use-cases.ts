@@ -1,6 +1,6 @@
-import { NotFoundException } from '@nestjs/common';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
-import { EmissorEventos } from '../../../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
+import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -12,15 +12,16 @@ export class AprovarOrcamentoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {
-    await this.ordemServicoRepository.findOne(id_ordem_servico);
+    const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
+    os.podeAprovarOuRecusarOrcamento();
 
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id_ordem_servico);
     if (!orcamento) {
-      throw new NotFoundException('Nenhum orçamento encontrado para esta Ordem de Serviço.');
+      throw new EntityNotFoundException('Orcamento', id_ordem_servico);
     }
 
     if (orcamento.status !== 'PENDING') {
@@ -44,15 +45,16 @@ export class RecusarOrcamentoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly emissor: EmissorEventos
+    private readonly emissor: IEmissorEventos
   ) {}
 
   async execute(id_ordem_servico: string): Promise<Orcamento> {
-    await this.ordemServicoRepository.findOne(id_ordem_servico);
+    const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
+    os.podeAprovarOuRecusarOrcamento();
 
     const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id_ordem_servico);
     if (!orcamento) {
-      throw new NotFoundException('Nenhum orçamento encontrado para esta Ordem de Serviço.');
+      throw new EntityNotFoundException('Orcamento', id_ordem_servico);
     }
 
     if (orcamento.status !== 'PENDING') {

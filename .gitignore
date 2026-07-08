@@ -16,6 +16,7 @@ prisma/migrations/
 .env.development
 .env.production
 !.env.example
+.github/agents
 
 # IDE
 .idea/
@@ -69,3 +70,21 @@ Thumbs.db
 .sisyphus/
 .opencode/
 REVISAO_FINAL.md
+docs/superpowers
+
+# Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfplan
+tfplan
+
+# KinD kubeconfig dumps (contain private keys)
+infra/environments/local/async-furious-config
+
+# Terraform lock files (runtime artifacts)
+*.tfstate.lock.info
+
+# Terminal session recordings
+typescript

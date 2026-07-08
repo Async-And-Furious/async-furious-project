@@ -1,4 +1,4 @@
-import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
+import { PrismaService } from '../../src/shared/infrastructure/database/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
 
