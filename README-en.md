@@ -432,7 +432,9 @@ curl http://localhost:30000/api/v1
 
 ### CI/CD
 
-Pull requests that change `infra/**` or `k8s/**` automatically run `terraform validate` and `terraform plan` through `.github/workflows/terraform.yml`. CI does not run `apply`.
+Pull requests that change `infra/**` or `k8s/**` automatically run `terraform validate` and `terraform plan` through `.github/workflows/terraform.yml` (fast, no cluster is created).
+
+On push to `main`/`develop` (or via manual `workflow_dispatch`), the same workflow runs a second job that applies the infrastructure for real: it builds the Docker image, provisions an ephemeral `kind` cluster with `terraform apply`, deploys the app, runs a smoke test against `/api/v1`, and tears everything down with `terraform destroy`. This runs entirely inside the GitHub-hosted runner using Docker — no cloud account is involved. It reuses `scripts/local-up.sh`, the same script used for local provisioning.
 
 ### EKS Migration
 

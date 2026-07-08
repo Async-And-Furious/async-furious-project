@@ -13,6 +13,7 @@ locals {
 
 provider "kubectl" {
   load_config_file       = false
+  apply_retry_count      = 5
   host                   = local.kube.clusters[0].cluster.server
   cluster_ca_certificate = base64decode(local.kube.clusters[0].cluster["certificate-authority-data"])
   client_certificate     = base64decode(local.kube.users[0].user["client-certificate-data"])
@@ -21,7 +22,8 @@ provider "kubectl" {
 
 # metrics-server required for HPA to function in KinD
 resource "kubectl_manifest" "metrics_server" {
-  yaml_body = <<-YAML
+  wait_for_rollout = false
+  yaml_body        = <<-YAML
     apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -82,7 +84,8 @@ resource "kubectl_manifest" "metrics_server_service" {
 }
 
 resource "kubectl_manifest" "metrics_server_apiservice" {
-  yaml_body  = <<-YAML
+  wait_for_rollout = false
+  yaml_body        = <<-YAML
     apiVersion: apiregistration.k8s.io/v1
     kind: APIService
     metadata:
@@ -97,7 +100,7 @@ resource "kubectl_manifest" "metrics_server_apiservice" {
       groupPriorityMinimum: 100
       versionPriority: 100
   YAML
-  depends_on = [kubectl_manifest.metrics_server_service]
+  depends_on       = [kubectl_manifest.metrics_server_service]
 }
 
 resource "kubectl_manifest" "namespace" {
@@ -135,8 +138,9 @@ resource "kubectl_manifest" "db_statefulset" {
 }
 
 resource "kubectl_manifest" "app_deployment" {
-  yaml_body  = file("${var.k8s_manifests_path}/app/deployment.yaml")
-  depends_on = [kubectl_manifest.configmap, kubectl_manifest.secret, kubectl_manifest.db_statefulset]
+  wait_for_rollout = false
+  yaml_body        = file("${var.k8s_manifests_path}/app/deployment.yaml")
+  depends_on       = [kubectl_manifest.configmap, kubectl_manifest.secret, kubectl_manifest.db_statefulset]
 }
 
 resource "kubectl_manifest" "app_service" {
