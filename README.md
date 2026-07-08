@@ -49,6 +49,69 @@ Usamos Node.js com NestJS pela arquitetura modular e pela injecao de dependencia
 
 ---
 
+## Escalabilidade e Automacao de Infraestrutura
+
+Com o aumento da demanda e a expansao para novas unidades, a oficina precisa garantir alta disponibilidade do sistema mesmo em picos de atendimento. Para isso, a infraestrutura evoluiu com:
+
+- **Infraestrutura escalavel**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 replicas, escalando por CPU > 70% ou memoria > 80%).
+- **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migracao documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
+- **Pipeline de CI/CD**: GitHub Actions valida build, testes automatizados e infraestrutura (`terraform validate` + `plan`) a cada Pull Request.
+- **Qualidade e organizacao do codigo**: Clean Architecture + DDD, com cobertura minima de testes de 85%.
+
+### Diagrama de Arquitetura
+
+```mermaid
+flowchart TB
+    C[Cliente HTTP]
+
+    subgraph CI["CI/CD - GitHub Actions"]
+        T1["tests.yml<br/>build + testes automatizados"]
+        T2["terraform.yml<br/>terraform validate + plan"]
+    end
+
+    subgraph IaC["Terraform (/infra)"]
+        KC["modulo kind-cluster<br/>provisiona o cluster"]
+        KA["modulo kubernetes-apps<br/>aplica manifests de /k8s"]
+        KC --> KA
+    end
+
+    subgraph K8s["Cluster Kubernetes (kind local / EKS)"]
+        direction TB
+        SVC["Service NodePort<br/>:30000 -> :3000"]
+        subgraph DEPLOY["Deployment async-furious-api<br/>2-5 pods via HPA"]
+            API1[Pod API]
+            API2[Pod API]
+        end
+        CM[ConfigMap]
+        SEC[Secret]
+        SVC --> DEPLOY
+        CM -.env.-> DEPLOY
+        SEC -.env.-> DEPLOY
+        subgraph DB["StatefulSet postgres"]
+            PG[("Postgres 15")]
+        end
+        PVC["PVC 1Gi"]
+        PG --- PVC
+        DEPLOY -->|Prisma| PG
+    end
+
+    C --> SVC
+    T2 -.PR.-> IaC
+    KA -->|kubectl_manifest| K8s
+```
+
+### Fluxo de Deploy
+
+1. A imagem Docker da API e construida localmente e carregada no cluster kind (`kind load docker-image`).
+2. Terraform (`infra/environments/local`) provisiona o cluster kind e aplica os manifests de `/k8s` — namespace, ConfigMap, Secret, StatefulSet do Postgres e Deployment/Service/HPA da API.
+3. O init container `migrate` roda `prisma migrate deploy` antes de cada pod da API iniciar.
+4. O HPA escala os pods da API de 2 a 5 replicas conforme o consumo de CPU/memoria.
+5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisao humana antes de qualquer `apply` real.
+
+Detalhes de execucao (scripts, comandos manuais, troubleshooting) estao na secao [Infraestrutura como Codigo](#infraestrutura-como-codigo-terraform--kubernetes).
+
+---
+
 ## Pre-requisitos
 
 - Node.js 20+
@@ -115,11 +178,11 @@ Depois de iniciar o projeto, acesse o Swagger em:
 http://localhost:3000/api/docs
 ```
 
-A colecao Insomnia com as rotas configuradas fica em:
+A colecao completa das APIs (formato Insomnia v5) fica versionada no repositorio e pode ser importada diretamente pelo link:
 
-```text
-docs/http/insomnia.yaml
-```
+[docs/http/insomnia.yaml](https://github.com/Async-And-Furious/async-furious-project/blob/develop/docs/http/insomnia.yaml)
+
+Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`, escolhendo `From File` (apos baixar o arquivo) ou `From URL` (colando o link acima).
 
 ### Rotas
 
