@@ -53,18 +53,14 @@ export class CriarOrdemServicoUseCase {
   }): Promise<OrdemDeServico> {
     // 1. Criar ou Obter Cliente
     let cliente = await this.clienteRepository.findByDocumento(data.cliente.documento);
-    if (!cliente) {
-      cliente = await this.clienteRepository.create(data.cliente);
-    }
+    cliente ??= await this.clienteRepository.create(data.cliente);
 
     // 2. Criar ou Obter Veículo
     let veiculo = await this.veiculoRepository.findByPlaca(data.veiculo.placa);
-    if (!veiculo) {
-      veiculo = await this.veiculoRepository.create({
-        ...data.veiculo,
-        clienteId: cliente.id,
-      });
-    }
+    veiculo ??= await this.veiculoRepository.create({
+      ...data.veiculo,
+      clienteId: cliente.id,
+    });
 
     // 3. Obter Preços e Calcular Totais
     let valorTotalServicos = 0;

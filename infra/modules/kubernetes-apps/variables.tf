@@ -5,7 +5,7 @@ variable "kubeconfig" {
 
 variable "app_image" {
   type    = string
-  default = "async-furious-api:latest"
+  default = "async-furious-api:local"
 }
 
 variable "app_replicas" {

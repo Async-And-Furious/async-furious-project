@@ -40,12 +40,10 @@ COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/prisma ./prisma/
 COPY --from=builder /app/dist ./dist/
 
-# Create non-root user
+# Create non-root user and change ownership
 RUN groupadd --gid 1001 nodejs && \
-    useradd --uid 1001 --gid nodejs --shell /usr/sbin/nologin --create-home nodejs
-
-# Change ownership
-RUN chown -R nodejs:nodejs /app
+    useradd --uid 1001 --gid nodejs --shell /usr/sbin/nologin --create-home nodejs && \
+    chown -R nodejs:nodejs /app
 
 # Switch to non-root user
 USER nodejs

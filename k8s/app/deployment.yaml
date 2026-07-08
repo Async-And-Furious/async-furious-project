@@ -4,7 +4,7 @@ metadata:
   name: async-furious-api
   namespace: async-furious
 spec:
-  replicas: 2
+  replicas: ${app_replicas}
   selector:
     matchLabels:
       app: async-furious-api
@@ -13,9 +13,10 @@ spec:
       labels:
         app: async-furious-api
     spec:
+      automountServiceAccountToken: false
       initContainers:
         - name: migrate
-          image: async-furious-api:latest
+          image: ${app_image}
           imagePullPolicy: Never
           command: ["node_modules/.bin/prisma", "migrate", "deploy"]
           envFrom:
@@ -25,7 +26,7 @@ spec:
                 name: async-furious-secret
       containers:
         - name: api
-          image: async-furious-api:latest
+          image: ${app_image}
           imagePullPolicy: Never
           ports:
             - containerPort: 3000
@@ -33,9 +34,11 @@ spec:
             requests:
               cpu: "100m"
               memory: "128Mi"
+              ephemeral-storage: "256Mi"
             limits:
               cpu: "500m"
               memory: "512Mi"
+              ephemeral-storage: "512Mi"
           envFrom:
             - configMapRef:
                 name: async-furious-config

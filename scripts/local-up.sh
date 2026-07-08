@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CLUSTER_NAME="async-furious"
-IMAGE_NAME="async-furious-api:latest"
+IMAGE_NAME="async-furious-api:local"
 INFRA_DIR="$(cd "$(dirname "$0")/../infra/environments/local" && pwd)"
 NAMESPACE="async-furious"
 
@@ -29,13 +29,16 @@ load_secrets() {
     source "$(dirname "$0")/../.env.local"
   fi
 
+  # Terraform maps TF_VAR_<name> to var.<name> case-sensitively, so the suffix
+  # must match the lowercase variable names (db_password, jwt_secret) declared
+  # in infra/environments/local/variables.tf — ALL_CAPS here would break it.
   if [[ -z "${TF_VAR_db_password:-}" ]]; then
     read -r -s -p "Enter DB password: " TF_VAR_db_password; echo
-    export TF_VAR_db_password
+    export TF_VAR_db_password # NOSONAR
   fi
   if [[ -z "${TF_VAR_jwt_secret:-}" ]]; then
     read -r -s -p "Enter JWT secret:  " TF_VAR_jwt_secret; echo
-    export TF_VAR_jwt_secret
+    export TF_VAR_jwt_secret # NOSONAR
   fi
 }
 

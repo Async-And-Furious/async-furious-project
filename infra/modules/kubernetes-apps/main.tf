@@ -139,8 +139,11 @@ resource "kubectl_manifest" "db_statefulset" {
 
 resource "kubectl_manifest" "app_deployment" {
   wait_for_rollout = false
-  yaml_body        = file("${var.k8s_manifests_path}/app/deployment.yaml")
-  depends_on       = [kubectl_manifest.configmap, kubectl_manifest.secret, kubectl_manifest.db_statefulset]
+  yaml_body = templatefile("${var.k8s_manifests_path}/app/deployment.yaml", {
+    app_image    = var.app_image
+    app_replicas = var.app_replicas
+  })
+  depends_on = [kubectl_manifest.configmap, kubectl_manifest.secret, kubectl_manifest.db_statefulset]
 }
 
 resource "kubectl_manifest" "app_service" {
