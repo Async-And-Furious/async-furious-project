@@ -56,11 +56,23 @@ build_image() {
 }
 
 # ── terraform ─────────────────────────────────────────────────────────────────
-terraform_apply() {
+# Applied in two passes: first just the kind cluster, so the image can be
+# loaded into it before the app Deployment (imagePullPolicy: Never) is
+# created. Otherwise pods land with ErrImageNeverPull and burn the readiness
+# wait timeout retrying pulls until load_image finally lands.
+terraform_init() {
   log "Running terraform init..."
   terraform -chdir="$INFRA_DIR" init -upgrade -input=false
+}
 
-  log "Running terraform apply..."
+terraform_apply_cluster() {
+  log "Running terraform apply (kind cluster only)..."
+  terraform -chdir="$INFRA_DIR" apply -auto-approve -input=false -target=module.kind_cluster
+  ok "Terraform apply (cluster) complete"
+}
+
+terraform_apply_full() {
+  log "Running terraform apply (full)..."
   terraform -chdir="$INFRA_DIR" apply -auto-approve -input=false
   ok "Terraform apply complete"
 }
@@ -138,8 +150,10 @@ case "$CMD" in
     check_prereqs
     load_secrets
     build_image
-    terraform_apply
+    terraform_init
+    terraform_apply_cluster
     load_image
+    terraform_apply_full
     wait_for_pod_ready "app=postgres" 180
     wait_for_postgres
     wait_for_pod_ready "app=async-furious-api" 300
