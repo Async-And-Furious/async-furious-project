@@ -94,6 +94,20 @@ jobs:
         if: always()
         run: kubectl get all -n async-furious || true
 
+      - name: Logs dos pods (debug em caso de falha)
+        if: always()
+        run: |
+          for pod in $(kubectl get pods -n async-furious -l app=async-furious-api -o jsonpath='{.items[*].metadata.name}'); do
+            echo "### describe $pod ###"
+            kubectl describe pod "$pod" -n async-furious || true
+            for c in migrate seed api; do
+              echo "### logs $pod -c $c ###"
+              kubectl logs "$pod" -n async-furious -c "$c" || true
+              echo "### logs $pod -c $c --previous ###"
+              kubectl logs "$pod" -n async-furious -c "$c" --previous || true
+            done
+          done
+
       - name: Destruir cluster (terraform destroy)
         if: always()
         run: ./scripts/local-up.sh down
