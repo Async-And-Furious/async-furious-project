@@ -24,6 +24,7 @@ docker-compose*.yaml
 test/
 docs/
 scripts/
+!scripts/seed.ts
 .eslintignore
 .prettierignore
 README*.md

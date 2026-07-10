@@ -46,6 +46,8 @@ jobs:
         env:
           TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
           TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
+          TF_VAR_seed_admin_email: ${{ secrets.TF_VAR_SEED_ADMIN_EMAIL }}
+          TF_VAR_seed_admin_password: ${{ secrets.TF_VAR_SEED_ADMIN_PASSWORD }}
 
       - name: Upload Plan
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -64,6 +66,8 @@ jobs:
     env:
       TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
       TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
+      TF_VAR_seed_admin_email: ${{ secrets.TF_VAR_SEED_ADMIN_EMAIL }}
+      TF_VAR_seed_admin_password: ${{ secrets.TF_VAR_SEED_ADMIN_PASSWORD }}
 
     steps:
       - name: Checkout

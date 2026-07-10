@@ -114,10 +114,12 @@ resource "kubectl_manifest" "configmap" {
 
 resource "kubectl_manifest" "secret" {
   yaml_body = templatefile("${var.k8s_manifests_path}/config/secret.yaml", {
-    jwt_secret  = var.jwt_secret
-    db_password = var.db_password
-    db_name     = var.db_name
-    db_user     = var.db_user
+    jwt_secret          = var.jwt_secret
+    db_password         = var.db_password
+    db_name             = var.db_name
+    db_user             = var.db_user
+    seed_admin_email    = var.seed_admin_email
+    seed_admin_password = var.seed_admin_password
   })
   depends_on = [kubectl_manifest.namespace]
 }
