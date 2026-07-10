@@ -15,13 +15,18 @@ RUN corepack enable pnpm && corepack prepare pnpm@9 --activate && pnpm install -
 # Copy only necessary files for build (explicit, not recursive)
 COPY src/ ./src/
 COPY prisma/ ./prisma/
-COPY nest-cli.json tsconfig.json tsconfig.build.json ./
+COPY scripts/seed.ts ./scripts/seed.ts
+COPY nest-cli.json tsconfig.json tsconfig.build.json tsconfig.scripts.json ./
 
 # Generate Prisma client
 RUN pnpm prisma generate
 
 # Build the application
 RUN pnpm build
+
+# Compile standalone scripts (e.g. seed) to plain JS for the prod image,
+# since ts-node is a devDependency and isn't shipped there
+RUN pnpm exec tsc -p tsconfig.scripts.json
 
 # Remove devDependencies (build tooling like Nest/Angular CLI) so they never
 # ship in the production image
@@ -39,6 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
 COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/prisma ./prisma/
 COPY --from=builder /app/dist ./dist/
+COPY --from=builder /app/dist-scripts ./dist-scripts/
 
 # Create non-root user and change ownership
 RUN groupadd --gid 1001 nodejs && \

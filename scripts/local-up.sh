@@ -30,8 +30,9 @@ load_secrets() {
   fi
 
   # Terraform maps TF_VAR_<name> to var.<name> case-sensitively, so the suffix
-  # must match the lowercase variable names (db_password, jwt_secret) declared
-  # in infra/environments/local/variables.tf — ALL_CAPS here would break it.
+  # must match the lowercase variable names (db_password, jwt_secret,
+  # seed_admin_email, seed_admin_password) declared in
+  # infra/environments/local/variables.tf — ALL_CAPS here would break it.
   if [[ -z "${TF_VAR_db_password:-}" ]]; then
     read -r -s -p "Enter DB password: " TF_VAR_db_password; echo
     export TF_VAR_db_password # NOSONAR
@@ -39,6 +40,14 @@ load_secrets() {
   if [[ -z "${TF_VAR_jwt_secret:-}" ]]; then
     read -r -s -p "Enter JWT secret:  " TF_VAR_jwt_secret; echo
     export TF_VAR_jwt_secret # NOSONAR
+  fi
+  if [[ -z "${TF_VAR_seed_admin_email:-}" ]]; then
+    read -r -p "Enter seed admin email: " TF_VAR_seed_admin_email
+    export TF_VAR_seed_admin_email
+  fi
+  if [[ -z "${TF_VAR_seed_admin_password:-}" ]]; then
+    read -r -s -p "Enter seed admin password: " TF_VAR_seed_admin_password; echo
+    export TF_VAR_seed_admin_password # NOSONAR
   fi
 }
 

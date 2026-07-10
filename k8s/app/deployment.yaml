@@ -24,6 +24,15 @@ spec:
                 name: async-furious-config
             - secretRef:
                 name: async-furious-secret
+        - name: seed
+          image: ${app_image}
+          imagePullPolicy: Never
+          command: ["node", "dist-scripts/seed.js"]
+          envFrom:
+            - configMapRef:
+                name: async-furious-config
+            - secretRef:
+                name: async-furious-secret
       containers:
         - name: api
           image: ${app_image}

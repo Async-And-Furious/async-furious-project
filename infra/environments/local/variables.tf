@@ -42,3 +42,12 @@ variable "jwt_secret" {
   type      = string
   sensitive = true
 }
+
+variable "seed_admin_email" {
+  type = string
+}
+
+variable "seed_admin_password" {
+  type      = string
+  sensitive = true
+}

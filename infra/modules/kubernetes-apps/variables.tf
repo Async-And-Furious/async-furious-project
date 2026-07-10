@@ -33,6 +33,15 @@ variable "jwt_secret" {
   sensitive = true
 }
 
+variable "seed_admin_email" {
+  type = string
+}
+
+variable "seed_admin_password" {
+  type      = string
+  sensitive = true
+}
+
 variable "k8s_manifests_path" {
   type    = string
   default = "../../../k8s"

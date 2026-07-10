@@ -352,7 +352,8 @@ Use `scripts/local-up.sh` — it runs every step in the correct order:
 ./scripts/local-up.sh down
 ```
 
-Set `TF_VAR_db_password` and `TF_VAR_jwt_secret` as environment variables or in `.env.local`
+Set `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email` and
+`TF_VAR_seed_admin_password` as environment variables or in `.env.local`
 before running — the script will prompt interactively if they are not found.
 
 ### Start the local environment (manual)
@@ -366,6 +367,8 @@ docker build -t async-furious-api:latest .
 # 2. Sensitive variables used by Terraform
 export TF_VAR_db_password="postgres"
 export TF_VAR_jwt_secret="dev-secret"
+export TF_VAR_seed_admin_email="admin@oficina.com"
+export TF_VAR_seed_admin_password="changeme123"
 
 # 3. Create the cluster and apply manifests
 cd infra/environments/local
