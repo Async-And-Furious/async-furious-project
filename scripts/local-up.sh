@@ -33,22 +33,19 @@ load_secrets() {
   # must match the lowercase variable names (db_password, jwt_secret,
   # seed_admin_email, seed_admin_password) declared in
   # infra/environments/local/variables.tf — ALL_CAPS here would break it.
-  if [[ -z "${TF_VAR_db_password:-}" ]]; then
-    read -r -s -p "Enter DB password: " TF_VAR_db_password; echo
-    export TF_VAR_db_password # NOSONAR
-  fi
-  if [[ -z "${TF_VAR_jwt_secret:-}" ]]; then
-    read -r -s -p "Enter JWT secret:  " TF_VAR_jwt_secret; echo
-    export TF_VAR_jwt_secret # NOSONAR
-  fi
-  if [[ -z "${TF_VAR_seed_admin_email:-}" ]]; then
-    read -r -p "Enter seed admin email: " TF_VAR_seed_admin_email
-    export TF_VAR_seed_admin_email
-  fi
-  if [[ -z "${TF_VAR_seed_admin_password:-}" ]]; then
-    read -r -s -p "Enter seed admin password: " TF_VAR_seed_admin_password; echo
-    export TF_VAR_seed_admin_password # NOSONAR
-  fi
+  local required=(TF_VAR_db_password TF_VAR_jwt_secret TF_VAR_seed_admin_email TF_VAR_seed_admin_password)
+  local prompts=("Enter DB password: " "Enter JWT secret:  " "Enter seed admin email: " "Enter seed admin password: ")
+
+  for i in "${!required[@]}"; do
+    local var="${required[$i]}"
+    if [[ -z "${!var:-}" ]]; then
+      if [[ ! -t 0 ]]; then
+        die "$var is not set and no TTY is available to prompt for it (CI run). Set it as a repo/environment secret."
+      fi
+      read -r -s -p "${prompts[$i]}" "$var"; echo
+      export "$var" # NOSONAR
+    fi
+  done
 }
 
 # ── docker build ──────────────────────────────────────────────────────────────
