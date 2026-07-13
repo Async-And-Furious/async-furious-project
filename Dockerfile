@@ -1,34 +1,44 @@
 # Build stage
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
+# Install system dependencies:
+# - openssl: required by Prisma query engine
+# - python3 + make + g++: required to compile bcrypt native module
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends openssl python3 make g++ && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN corepack enable pnpm && corepack prepare pnpm@9 --activate && pnpm install --frozen-lockfile
+# Install dependencies WITHOUT running postinstall scripts.
+# pnpm 11 blocks build scripts by default; we run them manually below.
+RUN corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy only necessary files for build (explicit, not recursive)
 COPY src/ ./src/
 COPY prisma/ ./prisma/
 COPY nest-cli.json tsconfig.json tsconfig.build.json ./
 
-# Generate Prisma client
+# Generate Prisma client with the correct binary target (debian-openssl-3.0.x)
 RUN pnpm prisma generate
+
+# Compile bcrypt native module (skipped by --ignore-scripts above)
+RUN pnpm rebuild bcrypt
 
 # Build the application
 RUN pnpm build
 
 # Production stage
-FROM node:20-slim AS production
+FROM node:22-slim AS production
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
+# Install runtime dependencies only (openssl for Prisma engine)
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends openssl && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy only built artifacts and runtime dependencies
@@ -36,9 +46,9 @@ COPY --from=builder /app/node_modules ./node_modules/
 COPY --from=builder /app/prisma ./prisma/
 COPY --from=builder /app/dist ./dist/
 
-# Create non-root user
-RUN groupadd --gid 1001 nodejs && \
-    useradd --uid 1001 --gid nodejs --shell /usr/sbin/nologin --create-home nodejs
+# Create non-root user (Debian syntax, not Alpine)
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs nodejs
 
 # Change ownership
 RUN chown -R nodejs:nodejs /app
