@@ -8,9 +8,9 @@ terraform {
 }
 
 resource "kind_cluster" "this" {
-  name            = var.cluster_name
-  node_image      = "kindest/node:${var.kubernetes_version}"
-  wait_for_ready  = true
+  name           = var.cluster_name
+  node_image     = "kindest/node:${var.kubernetes_version}"
+  wait_for_ready = true
 
   kind_config {
     kind        = "Cluster"

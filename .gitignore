@@ -8,7 +8,6 @@ out/
 
 # Prisma
 /src/generated/prisma
-prisma/migrations/
 
 # Environment files
 .env

@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist-scripts",
+    "rootDir": "./scripts",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["scripts/seed.ts"]
+}

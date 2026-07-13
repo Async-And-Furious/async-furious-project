@@ -173,27 +173,18 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
     {
       provide: CriarOrdemServicoUseCase,
       useFactory: (
-        osRepo: OrdemServicoRepository,
-        clienteRepo: ClienteRepository,
-        veiculoRepo: VeiculoRepository,
-        servicoRepo: ServicoRepository,
-        pecaRepo: PecaInsumoRepository,
-        osServicoRepo: OsServicoRepository,
-        osPecaRepo: OsPecaRepository,
-        orcRepo: OrcamentoRepository,
-        barramento: EmissorEventos
-      ) =>
-        new CriarOrdemServicoUseCase(
-          osRepo,
-          clienteRepo,
-          veiculoRepo,
-          servicoRepo,
-          pecaRepo,
-          osServicoRepo,
-          osPecaRepo,
-          orcRepo,
-          barramento
-        ),
+        ...deps: [
+          OrdemServicoRepository,
+          ClienteRepository,
+          VeiculoRepository,
+          ServicoRepository,
+          PecaInsumoRepository,
+          OsServicoRepository,
+          OsPecaRepository,
+          OrcamentoRepository,
+          EmissorEventos,
+        ]
+      ) => new CriarOrdemServicoUseCase(...deps),
       inject: [
         OrdemServicoRepository,
         ClienteRepository,

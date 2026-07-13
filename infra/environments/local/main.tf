@@ -1,4 +1,5 @@
 terraform {
+  # CI trigger: harmless Terraform-only change.
   required_version = ">= 1.6.0"
 
   required_providers {
@@ -31,5 +32,7 @@ module "kubernetes_apps" {
   db_user             = var.db_user
   db_password         = var.db_password
   jwt_secret          = var.jwt_secret
+  seed_admin_email    = var.seed_admin_email
+  seed_admin_password = var.seed_admin_password
   k8s_manifests_path  = "${path.root}/../../../k8s"
 }

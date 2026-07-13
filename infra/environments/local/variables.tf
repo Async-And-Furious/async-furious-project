@@ -15,7 +15,7 @@ variable "node_port" {
 
 variable "app_image" {
   type    = string
-  default = "async-furious-api:latest"
+  default = "async-furious-api:local"
 }
 
 variable "app_replicas" {
@@ -39,6 +39,15 @@ variable "db_password" {
 }
 
 variable "jwt_secret" {
+  type      = string
+  sensitive = true
+}
+
+variable "seed_admin_email" {
+  type = string
+}
+
+variable "seed_admin_password" {
   type      = string
   sensitive = true
 }

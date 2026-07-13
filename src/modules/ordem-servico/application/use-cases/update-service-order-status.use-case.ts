@@ -3,9 +3,8 @@ import { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-ev
 import { StatusTransitionService } from '../../domain/services/status-transition.service';
 import { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { IStatusHistoryRepository } from '../../domain/interfaces/status-history.interface';
-import { OSStatus } from '../../domain/entities/ordem-servico.entity';
+import { OSStatus, OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
-import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 
 export class UpdateServiceOrderStatusUseCase {
   constructor(

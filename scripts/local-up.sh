@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CLUSTER_NAME="async-furious"
-IMAGE_NAME="async-furious-api:latest"
+IMAGE_NAME="async-furious-api:local"
 INFRA_DIR="$(cd "$(dirname "$0")/../infra/environments/local" && pwd)"
 NAMESPACE="async-furious"
 
@@ -29,14 +29,23 @@ load_secrets() {
     source "$(dirname "$0")/../.env.local"
   fi
 
-  if [[ -z "${TF_VAR_db_password:-}" ]]; then
-    read -r -s -p "Enter DB password: " TF_VAR_db_password; echo
-    export TF_VAR_db_password
-  fi
-  if [[ -z "${TF_VAR_jwt_secret:-}" ]]; then
-    read -r -s -p "Enter JWT secret:  " TF_VAR_jwt_secret; echo
-    export TF_VAR_jwt_secret
-  fi
+  # Terraform maps TF_VAR_<name> to var.<name> case-sensitively, so the suffix
+  # must match the lowercase variable names (db_password, jwt_secret,
+  # seed_admin_email, seed_admin_password) declared in
+  # infra/environments/local/variables.tf — ALL_CAPS here would break it.
+  local required=(TF_VAR_db_password TF_VAR_jwt_secret TF_VAR_seed_admin_email TF_VAR_seed_admin_password)
+  local prompts=("Enter DB password: " "Enter JWT secret:  " "Enter seed admin email: " "Enter seed admin password: ")
+
+  for i in "${!required[@]}"; do
+    local var="${required[$i]}"
+    if [[ -z "${!var:-}" ]]; then
+      if [[ ! -t 0 ]]; then
+        die "$var is not set and no TTY is available to prompt for it (CI run). Set it as a repo/environment secret."
+      fi
+      read -r -s -p "${prompts[$i]}" "$var"; echo
+      export "$var" # NOSONAR
+    fi
+  done
 }
 
 # ── docker build ──────────────────────────────────────────────────────────────
@@ -47,11 +56,23 @@ build_image() {
 }
 
 # ── terraform ─────────────────────────────────────────────────────────────────
-terraform_apply() {
+# Applied in two passes: first just the kind cluster, so the image can be
+# loaded into it before the app Deployment (imagePullPolicy: Never) is
+# created. Otherwise pods land with ErrImageNeverPull and burn the readiness
+# wait timeout retrying pulls until load_image finally lands.
+terraform_init() {
   log "Running terraform init..."
   terraform -chdir="$INFRA_DIR" init -upgrade -input=false
+}
 
-  log "Running terraform apply..."
+terraform_apply_cluster() {
+  log "Running terraform apply (kind cluster only)..."
+  terraform -chdir="$INFRA_DIR" apply -auto-approve -input=false -target=module.kind_cluster
+  ok "Terraform apply (cluster) complete"
+}
+
+terraform_apply_full() {
+  log "Running terraform apply (full)..."
   terraform -chdir="$INFRA_DIR" apply -auto-approve -input=false
   ok "Terraform apply complete"
 }
@@ -129,8 +150,10 @@ case "$CMD" in
     check_prereqs
     load_secrets
     build_image
-    terraform_apply
+    terraform_init
+    terraform_apply_cluster
     load_image
+    terraform_apply_full
     wait_for_pod_ready "app=postgres" 180
     wait_for_postgres
     wait_for_pod_ready "app=async-furious-api" 300

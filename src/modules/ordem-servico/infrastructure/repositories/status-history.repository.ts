@@ -4,7 +4,7 @@ import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 import { OSStatus } from '../../domain/entities/ordem-servico.entity';
 
 export class StatusHistoryRepository implements IStatusHistoryRepository {
-  private prisma = new PrismaClient();
+  private readonly prisma = new PrismaClient();
 
   async create(historico: HistoricoStatus): Promise<HistoricoStatus> {
     const created = await this.prisma.historicoStatusOS.create({

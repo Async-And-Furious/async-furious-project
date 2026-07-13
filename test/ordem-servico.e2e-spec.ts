@@ -6,7 +6,7 @@ import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
-import { randomInt } from 'crypto';
+import { randomInt } from 'node:crypto';
 
 describe('OrdemServico Happy Flow (e2e)', () => {
   let app: INestApplication;
