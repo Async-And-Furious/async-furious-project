@@ -141,12 +141,12 @@ Edite o `.env`:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workshop"
-JWT_SECRET="sua-chave-secreta-aqui"
+JWT_SECRET="change-me-in-production-use-openssl-rand-hex-32"
 PORT=3000
 BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
-SEED_ADMIN_EMAIL="seu-email-admin"
-SEED_ADMIN_PASSWORD="sua-senha-admin"
+SEED_ADMIN_EMAIL="admin@oficina.com"
+SEED_ADMIN_PASSWORD="changeme123"
 ```
 
 ### 3. Iniciar com Docker para desenvolvimento
@@ -429,7 +429,7 @@ docker build -t async-furious-api:latest .
 
 # 2. Variaveis sensiveis usadas pelo Terraform
 export TF_VAR_db_password="postgres"
-export TF_VAR_jwt_secret="dev-secret"
+export TF_VAR_jwt_secret="change-me-in-production-use-openssl-rand-hex-32"
 export TF_VAR_seed_admin_email="admin@oficina.com"
 export TF_VAR_seed_admin_password="changeme123"
 
