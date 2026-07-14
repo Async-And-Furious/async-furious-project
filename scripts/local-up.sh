@@ -34,7 +34,8 @@ load_secrets() {
   # seed_admin_email, seed_admin_password) declared in
   # infra/environments/local/variables.tf — ALL_CAPS here would break it.
   local required=(TF_VAR_db_password TF_VAR_jwt_secret TF_VAR_seed_admin_email TF_VAR_seed_admin_password)
-  local prompts=("Enter DB password: " "Enter JWT secret:  " "Enter seed admin email: " "Enter seed admin password: ")
+  local prompts=("Enter DB password [postgres]: " "Enter JWT secret [change-me-in-production-use-openssl-rand-hex-32]: " "Enter seed admin email [admin@oficina.com]: " "Enter seed admin password [changeme123]: ")
+  local defaults=("postgres" "change-me-in-production-use-openssl-rand-hex-32" "admin@oficina.com" "changeme123")
 
   for i in "${!required[@]}"; do
     local var="${required[$i]}"
@@ -43,6 +44,10 @@ load_secrets() {
         die "$var is not set and no TTY is available to prompt for it (CI run). Set it as a repo/environment secret."
       fi
       read -r -s -p "${prompts[$i]}" "$var"; echo
+      if [[ -z "${!var:-}" ]]; then
+        printf -v "$var" '%s' "${defaults[$i]}"
+        warn "Using default value for $var (local dev only — do not use in production)"
+      fi
       export "$var" # NOSONAR
     fi
   done
@@ -130,7 +135,21 @@ smoke_test() {
 # ── teardown ──────────────────────────────────────────────────────────────────
 teardown() {
   log "Destroying local environment..."
-  terraform -chdir="$INFRA_DIR" destroy -auto-approve -input=false
+  if ! terraform -chdir="$INFRA_DIR" destroy -auto-approve -input=false; then
+    warn "terraform destroy failed — state may be stale, will reset it after removing the kind cluster"
+  fi
+
+  if kind get clusters 2>/dev/null | grep -qx "$CLUSTER_NAME"; then
+    log "Deleting kind cluster '$CLUSTER_NAME'..."
+    kind delete cluster --name "$CLUSTER_NAME"
+  fi
+
+  # A destroy against an already-gone cluster can leave terraform.tfstate
+  # pointing at resources that no longer exist. The kind cluster is now gone
+  # regardless (deleted above), so any leftover state is guaranteed stale —
+  # wipe it so the next `up` starts from a clean slate instead of treating
+  # phantom state entries as "already applied" against a brand-new cluster.
+  rm -f "$INFRA_DIR"/terraform.tfstate "$INFRA_DIR"/terraform.tfstate.backup
   ok "Environment destroyed"
 }
 

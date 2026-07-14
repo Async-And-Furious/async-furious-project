@@ -78,12 +78,12 @@ Edit `.env`:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/workshop"
-JWT_SECRET="your-secret-here"
+JWT_SECRET="change-me-in-production-use-openssl-rand-hex-32"
 PORT=3000
 BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
-SEED_ADMIN_EMAIL="your-admin-email"
-SEED_ADMIN_PASSWORD="your-admin-password"
+SEED_ADMIN_EMAIL="admin@oficina.com"
+SEED_ADMIN_PASSWORD="changeme123"
 ```
 
 ### 3. Start with Docker for development
@@ -366,7 +366,7 @@ docker build -t async-furious-api:latest .
 
 # 2. Sensitive variables used by Terraform
 export TF_VAR_db_password="postgres"
-export TF_VAR_jwt_secret="dev-secret"
+export TF_VAR_jwt_secret="change-me-in-production-use-openssl-rand-hex-32"
 export TF_VAR_seed_admin_email="admin@oficina.com"
 export TF_VAR_seed_admin_password="changeme123"
 
