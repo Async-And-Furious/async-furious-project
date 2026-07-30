@@ -47,6 +47,9 @@ unresolved **version** mismatch across environments:
   retention (cheap, disposable).
 - prod: `multi_az = true`, `deletion_protection = true`, 7-day backup
   retention.
-- Master password is injected via `TF_VAR_db_password` (existing CI secret
-  pattern, matching the main app repo). Storing it in Secrets Manager
-  instead is deferred to RFC-006 (secrets strategy), still open.
+- Master password uses RDS-managed master user password
+  (`manage_master_user_password = true`): AWS generates and stores it in
+  Secrets Manager directly, never in Terraform state or a CI secret. The
+  Lambda's DB client reads it from Secrets Manager at runtime — how it
+  authenticates to fetch that secret (IAM role vs. static ARN reference)
+  is deferred to RFC-006 (secrets strategy), still open.
