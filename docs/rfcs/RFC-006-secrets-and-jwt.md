@@ -4,6 +4,10 @@
 
 Accepted — 2026-07-30
 
+**Source of truth**: this file. A copy exists in `repo-auth-serverless`
+for local visibility since it implements this RFC — update here first,
+then sync.
+
 ## Context
 
 HANDOFF.md decision list (§20) leaves three related items open:
