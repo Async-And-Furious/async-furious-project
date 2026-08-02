@@ -445,6 +445,18 @@ See `infra/environments/aws/README.md`.
 
 ---
 
+## Architectural Documentation (Phase 3)
+
+The full documentation for the Phase 3 distributed architecture (four
+repositories, centralized authentication via API Gateway + Serverless
+Function, Kubernetes/EKS, managed database, observability, CI/CD, ADRs and
+RFCs) lives in [docs/README.md](./docs/README.md).
+
+It explicitly distinguishes what is **implemented today** (this repository,
+local monolith) from what is **Phase 3 proposal** (decided via ADR/RFC, but
+still at skeleton stage in the `repo-auth-serverless`, `repo-k8s-infra` and
+`repo-db-infra` repositories).
+
 ## Code Conventions
 
 See [AGENTS.md](./AGENTS.md) for naming conventions, TypeScript/NestJS patterns, and import policies.
