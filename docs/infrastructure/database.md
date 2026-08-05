@@ -426,3 +426,79 @@ tabelas de suporte/junção, não conceitos de negócio nomeados no documento):
   `PedidoFornecedor.status` e `Pagamento.status` são `text` livre, com os
   valores válidos garantidos só por convenção no código da aplicação, não
   pelo banco.
+
+## Justificativa do PostgreSQL
+
+A engine nunca esteve realmente em aberto: a aplicação usa PostgreSQL
+exclusivamente via Prisma desde o primeiro commit que criou o schema
+(`c8f7167`, 25/03), com `datasource db { provider = "postgresql" }`. Trocar
+de engine (por exemplo para MySQL) significaria reescrever schema,
+migrations e revalidar toda a lógica de negócio contra outro dialeto SQL,
+sem nenhuma justificativa registrada para esse custo.
+
+O ponto que ficou de fato em aberto foi a **versão**, que divergia entre
+ambientes (ver [Estado por ambiente](#estado-por-ambiente)): CI já usava
+`postgres:16`, dev local e o `StatefulSet` do Kubernetes local usavam
+`postgres:15-alpine`, e a versão do RDS estava indefinida. Esse
+raciocínio, e a decisão de fixar **PostgreSQL 16** em todos os ambientes,
+foi formalizado pelo trigo na RFC de banco (PR #172, branch
+`docs/database-justification-pg16`, status "Accepted" no próprio arquivo) e
+na [ADR-0004](https://github.com/Async-And-Furious/async-furious-project/blob/doc/ArchDocs_diagrams/docs/adr/0004-banco-dados-gerenciado.md)
+da PR #175. Não duplicado aqui: a RFC já resolve a questão, este documento
+só referencia a conclusão porque ela é pré-requisito pro resto do modelo de
+dados.
+
+PostgreSQL gerenciado (RDS) também satisfaz diretamente o requisito de
+"banco de dados gerenciado" da Fase 3: backups automáticos, criptografia em
+repouso e failover Multi-AZ em produção, sem operação manual de banco.
+
+## Justificativa do Prisma
+
+Não existe ADR, RFC nem discussão registrada escolhendo Prisma sobre outro
+ORM (TypeORM, Sequelize etc.) — foi a escolha de scaffold desde o commit
+inicial (`ed2258d`, "Scaffold NestJS API, Prisma, Docker, Auth") e nunca foi
+revisitada. A justificativa abaixo é técnica, baseada no uso real observado
+no repositório, não em uma decisão formal documentada:
+
+- **Tipagem forte ponta a ponta**: o Prisma Client é gerado a partir do
+  `schema.prisma` (`generator client { provider = "prisma-client-js" }`) e
+  os repositórios em `src/modules/*/infrastructure/repositories/*.ts`
+  consomem esse client tipado, eliminando a categoria de erro "coluna não
+  existe"/"tipo errado" em tempo de compilação, coerente com o resto do
+  projeto ser 100% TypeScript.
+- **Migrations como parte do fluxo de deploy**: `prisma migrate dev` no
+  desenvolvimento local (`AGENTS.md`, `pnpm run dev`) e `prisma migrate
+  deploy` rodando no init container `migrate` antes de cada pod da API
+  subir no Kubernetes (README, seção de Infraestrutura). O modelo de
+  migrations do Prisma já está integrado ao pipeline de deploy real do
+  projeto, trocar de ORM agora re-abriria essa integração também.
+- **Alinhamento com Clean Architecture**: o `PrismaService` fica isolado na
+  camada `infrastructure` de cada módulo (regra de dependência
+  `presentation -> application -> domain <- infrastructure` descrita no
+  README), então o Prisma Client nunca vaza pra `domain`/`application` —
+  detalhe de implementação que o próprio ORM não impõe, mas que o projeto
+  segue de forma consistente nos módulos auditados aqui.
+
+## Decisões de evolução do modelo
+
+Reconstruído a partir do `git log` de `prisma/schema.prisma` (não é uma
+transcrição de nenhuma ADR/RFC existente, porque nenhuma cobre a evolução
+do schema até o momento desta tarefa):
+
+| Data | Commit | O que mudou | Por quê (quando registrado na mensagem do commit) |
+| --- | --- | --- | --- |
+| 2026-03-25 | `c8f7167` | Schema inicial: `User`, engine PostgreSQL via Prisma. | Scaffold do projeto. |
+| 2026-04-22 | `47544a0` | Campos de `Customer`/`Vehicle`/`ServiceOrder` renomeados pra português no schema (`nome`, `telefone`, `placa`, `id_veiculo` etc.), mas as colunas físicas mantidas em inglês via `@map()`. | "Alinhar o código à linguagem ubíqua definida no `ddd.md`", sem exigir migration (só troca de nome no lado do Prisma). |
+| 2026-04-25 | `8f8a662` | `Orcamento` extraído de `ServiceOrder` para tabela própria com relação 1:1. Os campos `valor_total_*`, `estimate_status` saem da OS; o campo booleano `orcamento_aprovado` é removido e substituído pelo enum `EstimateStatus` (que já existia) como único indicador de status do orçamento. | Mensagem do commit: "extract Orcamento as standalone DDD entity with own table and repository". |
+| 2026-04-28 | `7ff1656` | `@map()`/`@@map()` removidos de `Cliente`, `Veiculo`, `OrdemServico`, `Orcamento`: as tabelas e colunas físicas passam a ser literalmente os nomes em português (antes só o Prisma Client via, o banco continuava em inglês). | "Renomeando as tabelas pra português" — sem justificativa adicional na mensagem do commit. É esta decisão que fixou a convenção "nome do model = nome físico da tabela, PascalCase, sem `@@map`" que a maioria do schema segue hoje. |
+| 2026-04-28 | `ec0fa66` | Tabela de junção `OsPeca` adicionada, relacionando `OrdemServico` e `Peca`. | "add OsPeca model and establish relationships in OrdemServico and Peca". |
+| 2026-05-01 | `41179b6` | Módulo Financeiro: tabela `Pagamento` adicionada, já com `@@map("pagamentos")` (snake_case) — quebrando a convenção fixada três dias antes em `7ff1656`. | "Criação de módulo Financeiro", sem justificativa da escolha de nomenclatura na mensagem do commit. |
+| 2026-06-02 | `f85cdc4` | Tabela de junção `OsServico` adicionada, espelhando o padrão de `OsPeca` para o par `OrdemServico`/`Servico`. | "Criação de fluxo de os-servico". |
+| 2026-07-07 | `03693e9` | Tabela `HistoricoStatusOS` adicionada, também com `@@map("historico_status_os")` (snake_case), repetindo a divergência de `Pagamento`. | "implementação de módulo webhook de status da ordem". |
+
+A divergência de nomenclatura registrada na seção
+[Convenções observadas](#convenções-observadas-e-onde-elas-quebram) tem
+origem clara aqui: `Pagamento` e `HistoricoStatusOS` foram criadas **depois**
+de `7ff1656` fixar a convenção PascalCase-sem-`@@map`, mas os dois commits
+que as criaram usaram `@@map` pra `snake_case` em vez de seguir a convenção
+recém-decidida. Nenhum commit posterior unificou isso.
