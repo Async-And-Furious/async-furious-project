@@ -508,6 +508,12 @@ Consulte `infra/environments/aws/README.md`.
 
 ---
 
+## Persistencia e Modelo de Dados
+
+A documentacao completa da camada de persistencia (diagrama ER, modelo relacional tabela a tabela, mapeamento entre entidades de dominio e tabelas, justificativas do PostgreSQL e do Prisma, estrategia de persistencia e o historico de decisoes de evolucao do schema) esta em [docs/infrastructure/database.md](./docs/infrastructure/database.md).
+
+---
+
 ## Convencoes de Codigo
 
 Consulte [AGENTS.md](./AGENTS.md) para convencoes de nomenclatura, padroes TypeScript/NestJS e politicas de imports.

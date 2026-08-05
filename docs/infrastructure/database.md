@@ -502,3 +502,32 @@ origem clara aqui: `Pagamento` e `HistoricoStatusOS` foram criadas **depois**
 de `7ff1656` fixar a convenção PascalCase-sem-`@@map`, mas os dois commits
 que as criaram usaram `@@map` pra `snake_case` em vez de seguir a convenção
 recém-decidida. Nenhum commit posterior unificou isso.
+
+## Estratégia de persistência
+
+- **`PrismaService`** (`src/shared/infrastructure/database/prisma.service.ts`)
+  é um provider NestJS único que estende `PrismaClient` e gerencia o ciclo
+  de vida da conexão via `onModuleInit`/`onModuleDestroy`
+  (`$connect`/`$disconnect`). Todo o resto do código acessa o banco através
+  dele, nunca instanciando `PrismaClient` diretamente.
+- **Padrão repository**: cada bounded context define a interface do
+  repositório em `domain/interfaces/*.ts` (ex.: `IClienteRepository`, em
+  `src/modules/cadastro/domain/interfaces/cliente.interface.ts`) e a
+  implementação concreta em `infrastructure/repositories/*.ts` (ex.:
+  `ClienteRepository`), que injeta o `PrismaService` no construtor e é o
+  único lugar que fala Prisma Client diretamente. Isso é o que faz a regra
+  de dependência `presentation -> application -> domain <- infrastructure`
+  (README, seção "Estrutura do Projeto") valer também pra persistência: use
+  cases dependem da interface, não do Prisma.
+- **Transações**: usadas quando uma operação de negócio precisa de mais de
+  uma escrita atômica. Exemplo real,
+  `OsPecaRepository.replaceAll` (`src/modules/ordem-servico/infrastructure/repositories/os-peca.repository.ts`):
+  apaga todos os itens de peça de uma OS e recria a lista nova dentro de um
+  único `prisma.$transaction`, evitando um estado intermediário com a OS
+  sem itens caso a segunda escrita falhe.
+- **Migrations**: `prisma migrate dev` no fluxo de desenvolvimento local
+  (`pnpm run dev`, `AGENTS.md`) e `prisma migrate deploy` rodando no init
+  container `migrate`, antes de cada pod da API subir no Kubernetes
+  (README, seção de Infraestrutura). O schema é a fonte de verdade; as
+  migrations em `prisma/migrations/` são geradas a partir dele, não
+  escritas à mão.
