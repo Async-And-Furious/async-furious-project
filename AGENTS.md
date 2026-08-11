@@ -290,3 +290,19 @@ PORT=3000
 - NestJS: https://docs.nestjs.com/
 - Prisma: https://prisma.io/docs/
 - Clean Architecture: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `Async-And-Furious/async-furious-project`, managed via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), label string equal to role name. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` (not yet created) + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
