@@ -1,0 +1,89 @@
+name: Deploy to EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment approval gate
+        required: true
+        type: environment
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  K8S_NAMESPACE: async-furious
+  K8S_SECRET_NAME: async-furious-secret
+
+jobs:
+  deploy:
+    # This runner must have network access to the private EKS API endpoint.
+    runs-on: [self-hosted, linux, eks-private]
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure AWS Academy credentials
+        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' && secrets.AWS_SESSION_TOKEN != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Configure AWS credentials with OIDC
+        if: ${{ secrets.AWS_ACCESS_KEY_ID == '' || secrets.AWS_SECRET_ACCESS_KEY == '' || secrets.AWS_SESSION_TOKEN == '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push image tagged by commit SHA
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          docker build --pull -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "uri=$REGISTRY/$ECR_REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
+      - name: Configure kubectl for existing EKS cluster
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+      - name: Verify cluster access and managed database Secret
+        run: |
+          kubectl cluster-info
+          kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" >/dev/null
+          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.DATABASE_URL}')"
+      - name: Render AWS overlay with image digest
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          render_dir=$(mktemp -d)
+          migration_dir=$(mktemp -d)
+          cp -R k8s "$render_dir/k8s"
+          cp -R k8s "$migration_dir/k8s"
+          sed -i 's/\${app_replicas}/2/; s|\${app_image}|async-furious-api:immutable-placeholder|' "$render_dir/k8s/app/deployment.yaml"
+          sed -i 's/\${app_replicas}/2/; s|\${app_image}|async-furious-api:immutable-placeholder|' "$migration_dir/k8s/app/deployment.yaml"
+          sed -i '/DB_HOST:/d' "$render_dir/k8s/config/configmap.yaml"
+          sed -i '/DB_HOST:/d' "$migration_dir/k8s/config/configmap.yaml"
+          sed -i '/  - path: configmap-patch.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
+          sed -i '/  - path: configmap-patch.yaml/d' "$migration_dir/k8s/overlays/aws/kustomization.yaml"
+          sed -i '/app\/deployment.yaml/d; /app\/service.yaml/d; /app\/hpa.yaml/d; /- ingress.yaml/d; /deployment-patch.yaml/d' "$migration_dir/k8s/overlays/aws/kustomization.yaml"
+          sed -i "s|name: async-furious-migrate$|name: async-furious-migrate-$GITHUB_SHA|" "$migration_dir/k8s/overlays/aws/migration-job.yaml"
+          kubectl kustomize --load-restrictor LoadRestrictionsNone "$migration_dir/k8s/overlays/aws" >/tmp/async-furious-aws-migration.yaml
+          sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws-migration.yaml
+          kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws-migration.yaml
+          kubectl wait --for=condition=complete "job/async-furious-migrate-$GITHUB_SHA" --namespace "$K8S_NAMESPACE" --timeout=600s
+          sed -i '/- migration-job.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
+          kubectl kustomize --load-restrictor LoadRestrictionsNone "$render_dir/k8s/overlays/aws" >/tmp/async-furious-aws.yaml
+          sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws.yaml
+          kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws.yaml
+      - name: Wait for API rollout
+        run: kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=300s

@@ -30,7 +30,7 @@ describe('JwtStrategy', () => {
     };
     authService.validateUser.mockResolvedValue(mockUser);
 
-    const payload = { sub: 'user-1', email: 'test@test.com' };
+    const payload = { sub: 'user-1', email: 'test@test.com', role: Role.ADMIN };
     const result = await strategy.validate(payload);
 
     expect(result).toEqual(mockUser);
@@ -40,7 +40,7 @@ describe('JwtStrategy', () => {
   it('should throw UnauthorizedException when user not found in DB', async () => {
     authService.validateUser.mockResolvedValue(null);
 
-    const payload = { sub: 'user-1', email: 'test@test.com' };
+    const payload = { sub: 'user-1', email: 'test@test.com', role: Role.ADMIN };
 
     await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
   });
@@ -53,10 +53,22 @@ describe('JwtStrategy', () => {
     };
     authService.validateUser.mockResolvedValue(dbUser);
 
-    const payload = { sub: 'user-1', email: 'test@test.com' };
+    const payload = { sub: 'user-1', email: 'test@test.com', role: Role.ADMIN };
     const result = await strategy.validate(payload);
 
     expect(result.role).toBe(Role.RECEPCIONISTA);
     expect(result.role).not.toBe(payload.role);
+  });
+
+  it('configures RS256 verification without changing the HS256 default', () => {
+    const rsConfig = {
+      get: jest.fn((key: string) => {
+        if (key === 'JWT_ALGORITHM') return 'RS256';
+        if (key === 'JWT_PUBLIC_KEY') return 'public-key';
+        return undefined;
+      }),
+    } as unknown as ConfigService;
+
+    expect(() => new JwtStrategy(rsConfig, authService)).not.toThrow();
   });
 });

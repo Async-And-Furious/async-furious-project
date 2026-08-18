@@ -4,10 +4,9 @@ metadata:
   name: async-furious-service
   namespace: async-furious
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: async-furious-api
   ports:
     - port: 3000
       targetPort: 3000
-      nodePort: 30000

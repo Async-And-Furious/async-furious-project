@@ -327,12 +327,13 @@ Local infrastructure is provisioned with Terraform on a local Kubernetes cluster
   /modules/kind-cluster              # Creates a kind cluster with control-plane and worker
   /modules/kubernetes-apps           # Applies manifests through the kubectl provider
   /environments/local                # Local environment
-  /environments/aws/README.md        # EKS migration stub
+  /environments/aws/README.md        # Manual deployment to existing EKS
 
 /k8s
   namespace.yaml
   /config    configmap.yaml, secret.yaml
   /app       deployment.yaml, service.yaml, hpa.yaml
+  /overlays/aws  # Internal ALB Ingress and digest-based EKS deployment
   /database  statefulset.yaml, service.yaml, pvc.yaml
 ```
 
@@ -441,7 +442,11 @@ On push to `main`/`develop` (or via manual `workflow_dispatch`), the same workfl
 
 ### EKS Migration
 
-See `infra/environments/aws/README.md`.
+See `infra/environments/aws/README.md`. The manual
+`.github/workflows/deploy-eks.yml` workflow pushes a commit-SHA-tagged image
+to ECR and applies `k8s/overlays/aws` by digest after GitHub Environment
+approval. The EKS cluster, AWS Load Balancer Controller, and application
+Secret must already exist; the workflow provisions no AWS resources.
 
 ---
 

@@ -22,17 +22,20 @@ describe('PecaInsumoRepository', () => {
 
   let mockPrismaService: MockPrismaService;
 
-  const mockPecaInsumo: PecaInsumo = {
-    id: '123',
-    nome: 'Filtro de Óleo',
-    codigo: 'FO-001',
-    descricao: 'Filtro de óleo para motor 1.0',
-    preco: 29.9,
-    quantidade_estoque: 10,
-    quantidade_minima: 2,
-    created_at: new Date(),
-    updated_at: new Date(),
-  };
+  const mockPecaInsumo: PecaInsumo = Object.assign(
+    {
+      id: '123',
+      nome: 'Filtro de Óleo',
+      codigo: 'FO-001',
+      descricao: 'Filtro de óleo para motor 1.0',
+      preco: 29.9,
+      quantidade_estoque: 10,
+      quantidade_minima: 2,
+      created_at: new Date(),
+      updated_at: new Date(),
+    },
+    PecaInsumo.prototype
+  );
 
   beforeEach(async () => {
     mockPrismaService = {

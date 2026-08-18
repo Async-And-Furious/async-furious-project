@@ -100,11 +100,11 @@ flowchart TB
     KA -->|kubectl_manifest| K8s
 ```
 
-### Fluxo de Deploy
+### Fluxo de Deploy (ClusterIP; EKS usa o ingress/load balancer aprovado)
 
-1. A imagem Docker da API e construida localmente e carregada no cluster kind (`kind load docker-image`).
+1. A imagem Docker da API e construida localmente e carregada no cluster kind (`kind load docker-image`) ou publicada no ECR para o EKS.
 2. Terraform (`infra/environments/local`) provisiona o cluster kind e aplica os manifests de `/k8s` — namespace, ConfigMap, Secret, StatefulSet do Postgres e Deployment/Service/HPA da API.
-3. O init container `migrate` roda `prisma migrate deploy` antes de cada pod da API iniciar.
+3. Execute o Job de migracao controlado uma vez por versao (`kubectl create -f k8s/app/migration-job.yaml`) antes do Deployment; os pods nao rodam migration ou seed.
 4. O HPA escala os pods da API de 2 a 5 replicas conforme o consumo de CPU/memoria.
 5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisao humana antes de qualquer `apply` real.
 
@@ -390,12 +390,13 @@ A infraestrutura local e provisionada com Terraform em um cluster Kubernetes loc
   /modules/kind-cluster              # Cria cluster kind com control-plane e worker
   /modules/kubernetes-apps           # Aplica manifests via kubectl provider
   /environments/local                # Ambiente local
-  /environments/aws/README.md        # Stub para migracao EKS
+  /environments/aws/README.md        # Deploy manual para EKS existente
 
 /k8s
   namespace.yaml
   /config    configmap.yaml, secret.yaml
   /app       deployment.yaml, service.yaml, hpa.yaml
+  /overlays/aws  # Ingress ALB interno e deploy EKS por digest
   /database  statefulset.yaml, service.yaml, pvc.yaml
 ```
 
@@ -504,7 +505,11 @@ Em push para `main`/`develop` (ou via `workflow_dispatch` manual), o mesmo workf
 
 ### Migracao para EKS
 
-Consulte `infra/environments/aws/README.md`.
+Consulte `infra/environments/aws/README.md`. O workflow manual
+`.github/workflows/deploy-eks.yml` publica a imagem no ECR com a SHA do commit
+e aplica `k8s/overlays/aws` por digest, após aprovação do GitHub Environment.
+O cluster EKS, o ALB Controller e o Secret da aplicação devem existir
+previamente; nenhum recurso AWS é provisionado pelo workflow.
 
 ---
 

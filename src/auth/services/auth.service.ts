@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../shared/infrastructure/database/prisma.service';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { Role } from '../enums/role.enum';
+import type { AuthenticatedUser, JwtPayload } from '../types/auth.types';
 
 @Injectable()
 export class AuthService {
@@ -86,6 +87,20 @@ export class AuthService {
     });
     if (!user) return null;
     return { id: user.id, email: user.email, role: user.role as Role };
+  }
+
+  async validateTokenSubject(payload: JwtPayload): Promise<AuthenticatedUser | null> {
+    const user = await this.validateUser(payload.sub);
+    if (user) return user;
+
+    const documento = payload.cpf ?? payload.documento ?? payload.sub;
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { documento },
+      select: { id: true, email: true, ativo: true },
+    });
+    if (!cliente?.ativo) return null;
+
+    return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
   }
 
   async findById(id: string) {

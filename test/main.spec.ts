@@ -167,7 +167,7 @@ describe('Main Bootstrap', () => {
 
       const enableCorsSpy = jest.spyOn(app, 'enableCors');
 
-      const allowedOrigins = process.env.ALLOWED_ORIGINS;
+      const allowedOrigins = process.env.ALLOWED_ORIGINS as string | undefined;
       const origins = allowedOrigins ? allowedOrigins.split(',') : true;
       app.enableCors({
         origin: origins,

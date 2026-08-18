@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../namespace.yaml
+  - ../../config/configmap.yaml
+  - ../../app/deployment.yaml
+  - ../../app/service.yaml
+  - ../../app/hpa.yaml
+  - ingress.yaml
+  - migration-job.yaml
+images:
+  - name: async-furious-api
+    newName: async-furious-api
+    newTag: immutable-placeholder
+patches:
+  - path: configmap-patch.yaml
+  - path: deployment-patch.yaml

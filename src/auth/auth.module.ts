@@ -16,13 +16,17 @@ import { RolesGuard } from './guards/roles.guard';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const secret = config.get<string>('JWT_SECRET');
+        const algorithm = (config.get<string>('JWT_ALGORITHM') ?? 'HS256') as 'HS256' | 'RS256';
+        const secret =
+          algorithm === 'RS256'
+            ? config.get<string>('JWT_PRIVATE_KEY')
+            : config.get<string>('JWT_SECRET');
         if (!secret) {
-          throw new Error('JWT_SECRET environment variable is required');
+          throw new Error('JWT signing key environment variable is required');
         }
         return {
           secret,
-          signOptions: { expiresIn: '1h' },
+          signOptions: { expiresIn: '1h', algorithm },
         };
       },
     }),

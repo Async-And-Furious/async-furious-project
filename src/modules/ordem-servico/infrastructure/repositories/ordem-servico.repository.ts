@@ -66,6 +66,9 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
         status: 'RECEIVED',
       },
     });
+    await this.prisma.historicoStatusOS?.create({
+      data: { ordem_servico_id: record.id, status_novo: 'RECEIVED' },
+    });
     return this.mapToEntity(record);
   }
 

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: async-furious-config
+  namespace: async-furious
+data:
+  DB_HOST: "${DB_HOST}"
