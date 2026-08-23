@@ -22,10 +22,10 @@ já foi feita na branch não mesclada `docs/database-justification-pg16`, mas
 
 ## Modelo de dados (via Prisma)
 
-Ver `AGENTS.md` (tabela "Key Models") e `prisma/schema.prisma` para o
-mapeamento completo entidade↔tabela. Não duplicado aqui para evitar
-divergência entre duas fontes — `prisma/schema.prisma` é sempre a fonte de
-verdade.
+Ver `docs/contexto-tecnico-consolidado.md` §6 (tabela entidade de
+domínio ↔ tabela Prisma) e `prisma/schema.prisma` para o mapeamento
+completo. Não duplicado aqui para evitar divergência entre fontes —
+`prisma/schema.prisma` é sempre a fonte de verdade.
 
 ## [PROPOSTA FASE 3] RDS — configuração decidida
 

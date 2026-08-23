@@ -57,8 +57,7 @@ por contexto), não *se* seria monólito.
 
 ## Referências
 
-- `AGENTS.md` (seção "Architecture", tabela "Modules (4 domain modules)")
 - `README.md` (seção "Estrutura do Projeto")
 - [`docs/ddd.md`](../ddd.md) §3 (nota de nomenclatura)
-- `docs/contexto-tecnico-consolidado.md` §2
+- `docs/contexto-tecnico-consolidado.md` §2 (tabela dos 4 módulos de domínio)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #7)

@@ -42,12 +42,14 @@ sem registro de por que não Hexagonal especificamente.
 ## Consequências positivas
 
 - Regras de negócio (entidades, use cases) são testáveis sem subir banco ou
-  framework — confirmado pelo padrão de teste em `AGENTS.md`
-  (`jest.Mocked<IClienteRepository>`).
+  framework — confirmado pelo padrão de teste descrito em
+  `docs/contexto-tecnico-consolidado.md` §2 (mock de interfaces de
+  repositório, ex.: `jest.Mocked<IClienteRepository>`).
 - Trocar Prisma por outro ORM, ou adicionar um segundo mecanismo de entrega
   (ex.: fila) não exigiria tocar no domínio.
 - Regra é enforçada como convenção documentada e revisável em code review
-  (`AGENTS.md` "Critical Rules").
+  (`docs/contexto-tecnico-consolidado.md` §2, "Princípios e decisões de
+  padrão").
 
 ## Consequências negativas
 
@@ -65,7 +67,6 @@ sem registro de por que não Hexagonal especificamente.
 
 ## Referências
 
-- `AGENTS.md` (seção "Architecture", regras de camada)
 - [`docs/ddd.md`](../ddd.md)
-- `docs/contexto-tecnico-consolidado.md` §2
+- `docs/contexto-tecnico-consolidado.md` §2 (regras de camada, princípios de padrão)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #1)

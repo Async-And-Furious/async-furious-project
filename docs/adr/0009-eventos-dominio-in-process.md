@@ -22,8 +22,8 @@ e um publicador `EmissorEventos`
 com interface no domínio em `src/shared/domain/interfaces/emissor-eventos.interface.ts`).
 Não há message broker externo (Kafka, RabbitMQ, SQS). Listeners de eventos
 ficam na camada de infraestrutura, mantendo as políticas de application
-livres de framework (regra explícita em `AGENTS.md`: "Event listeners stay
-in infrastructure").
+livres de framework — mesma regra de dependência unidirecional registrada
+em [ADR-0006](./0006-clean-architecture-ddd.md).
 
 ## Alternativas consideradas
 
@@ -66,7 +66,7 @@ distintos nas Fases 1/2).
 - `src/shared/domain/events/domain-event.base.ts`
 - `src/shared/domain/interfaces/emissor-eventos.interface.ts`
 - `src/shared/infrastructure/emissor-eventos/emissor-eventos.service.ts`
-- `AGENTS.md` ("Event listeners stay in infrastructure")
+- [ADR-0006 — Clean Architecture + DDD](./0006-clean-architecture-ddd.md)
 - [`docs/ddd.md`](../ddd.md) §5
 - `docs/contexto-tecnico-consolidado.md` §8
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #6)

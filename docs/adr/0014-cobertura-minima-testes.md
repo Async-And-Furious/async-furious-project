@@ -66,5 +66,4 @@ métrica cair abaixo de 80%.
 
 - `jest.config.js:33-39`
 - `README.md` (seção "Thresholds de Cobertura")
-- `AGENTS.md`
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #13)

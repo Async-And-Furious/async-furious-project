@@ -57,7 +57,6 @@ de descarte de outras opções.
 ## Referências
 
 - `README.md` (seção "Tecnologias")
-- `AGENTS.md` (seção "Tech Stack", "Database")
 - `prisma/schema.prisma`
-- `docs/contexto-tecnico-consolidado.md` §8
+- `docs/contexto-tecnico-consolidado.md` §8 (decisões consolidadas de stack)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (pontos #2, #3, #4)
