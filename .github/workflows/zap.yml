@@ -67,6 +67,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
           JWT_SECRET: zap-test-jwt-secret-key
+          JWT_CUSTOMER_PUBLIC_KEY: zap-test-jwt-customer-public-key
           PORT: 3000
 
       - name: Aguardar aplicação ficar pronta

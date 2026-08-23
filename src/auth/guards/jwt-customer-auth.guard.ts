@@ -5,7 +5,7 @@ import { Observable } from 'rxjs';
 import { isPublicRoute, assertAuthenticated } from './public-route.util';
 
 @Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
+export class JwtCustomerAuthGuard extends AuthGuard('jwt-customer') {
   constructor(private reflector: Reflector) {
     super();
   }

@@ -61,6 +61,7 @@ jobs:
         run: pnpm run test:e2e
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run lint
