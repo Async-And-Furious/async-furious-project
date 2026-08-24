@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  generateName: async-furious-migrate-
+  name: async-furious-migrate
   namespace: async-furious
   labels:
     app: async-furious-api
