@@ -71,6 +71,7 @@ jobs:
         run: pnpm run start > app.log 2>&1 & echo $! > app.pid
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
+          JWT_CUSTOMER_PUBLIC_KEY: zap-test-jwt-customer-public-key
           PORT: 3000
 
       - name: Aguardar aplicação ficar pronta

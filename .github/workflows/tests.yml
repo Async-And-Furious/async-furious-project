@@ -61,6 +61,7 @@ jobs:
         run: pnpm run test:e2e -- --runInBand
         env:
           JWT_SECRET: ci-disposable-jwt-secret
+          JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
 
       - name: Run lint
