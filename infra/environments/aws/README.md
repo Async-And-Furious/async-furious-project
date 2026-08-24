@@ -28,11 +28,12 @@ Required repository/environment configuration:
 - Normal mode (the default) requires the AWS Load Balancer Controller for the
   internal ALB Ingress. AWS Academy mode does not use the controller or IRSA;
   it renders no Ingress and changes `async-furious-service` to `LoadBalancer`.
-- The GitHub Actions runner must be self-hosted, labeled `linux` and
-  `eks-private`, and have network/DNS access to the private EKS API endpoint.
-  Keep the EKS endpoint private; do not make it public to accommodate the
-  runner. The runner also needs Docker, AWS CLI, and `kubectl`. OIDC access is
-  required only when using the OIDC fallback.
+- In normal mode, the GitHub Actions runner must be self-hosted, labeled
+  `linux` and `eks-private`, and have network/DNS access to the private EKS API
+  endpoint. Academy mode uses `ubuntu-latest` instead. Keep the EKS endpoint
+  private for normal mode; the hosted runner requires an Academy cluster endpoint
+  reachable from GitHub-hosted infrastructure. Both modes need Docker, AWS CLI,
+  and `kubectl`. OIDC access is required only when using the OIDC fallback.
 
 ## Rotate AWS Academy credentials
 

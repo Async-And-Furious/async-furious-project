@@ -26,8 +26,8 @@ env:
 
 jobs:
   deploy:
-    # This runner must have network access to the private EKS API endpoint.
-    runs-on: [self-hosted, linux, eks-private]
+    # Academy uses a hosted runner; normal mode requires the private-EKS runner.
+    runs-on: ${{ fromJSON(inputs.aws_academy && '["ubuntu-latest"]' || '["self-hosted", "linux", "eks-private"]') }}
     environment: ${{ inputs.environment }}
     env:
       AWS_ACADEMY: ${{ inputs.aws_academy }}

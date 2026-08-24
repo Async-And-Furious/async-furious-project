@@ -1,5 +1,19 @@
 # Agent log
 
+## 2026-08-24 - Academy runner selection
+
+- Academy deploys now use `ubuntu-latest`; normal deploys retain the
+  `[self-hosted, linux, eks-private]` runner labels. Credential handling,
+  Service/NLB mode, secret synchronization, and health checks are unchanged.
+- No secrets, deployment, commit, or push was run.
+
+## 2026-08-24 - Academy deployment contract
+
+- Academy mode now selects an explicit AWS NLB and materializes only the three
+  required application Secret keys from protected AWS references. Missing
+  references fail closed; normal mode retains the pre-existing Secret check.
+- No secrets, infrastructure apply, merge, or push was run.
+
 ## 2026-08-23 - Cross-repository JWT contract
 
 - Consumer contract: RS256 only in production, public-key verification through

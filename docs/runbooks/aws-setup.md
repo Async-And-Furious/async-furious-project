@@ -166,6 +166,18 @@ This is what the `apply` job in each repo's `ci.yml` targets
 7. Push to `develop` in either repo → watch `plan` run for real → approve
    `apply` in the Actions tab when ready.
 
+## 9. EKS deployment runner selection
+
+In `async-furious-project`, dispatch `.github/workflows/deploy-eks.yml` with
+`aws_academy=true` to run on `ubuntu-latest`. Academy mode still uses the
+temporary AWS Academy session credentials when present, synchronizes the
+application Secret, uses the NLB Service overlay, and performs the migration,
+rollout, and live health checks.
+
+Normal mode keeps the `[self-hosted, linux, eks-private]` runner labels and the
+ALB Ingress path. The self-hosted runner must have network and DNS access to the
+private EKS API endpoint; do not expose that endpoint to accommodate it.
+
 Expect the first real `plan` to surface things a `-backend=false` local
 validate can't catch (IAM permission gaps, AZ availability, quota limits)
 — that's normal, budget time to iterate once real credentials exist.
