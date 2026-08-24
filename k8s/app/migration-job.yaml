@@ -21,6 +21,15 @@ spec:
           image: ${app_image}
           imagePullPolicy: IfNotPresent
           command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+              ephemeral-storage: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              ephemeral-storage: 1Gi
           envFrom:
             - configMapRef:
                 name: async-furious-config
