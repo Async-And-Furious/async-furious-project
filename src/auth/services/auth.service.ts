@@ -69,6 +69,12 @@ export class AuthService {
   }
 
   private generateToken(user: { id: string; email: string; role: string }) {
+    if (
+      this.config.get<string>('NODE_ENV') === 'production' &&
+      !this.config.get<string>('JWT_PRIVATE_KEY')
+    ) {
+      throw new Error('Production JWT signing is disabled without JWT_PRIVATE_KEY');
+    }
     const payload = { sub: user.id, email: user.email, role: user.role as Role };
     return {
       access_token: this.jwtService.sign(payload),
@@ -93,9 +99,8 @@ export class AuthService {
     const user = await this.validateUser(payload.sub);
     if (user) return user;
 
-    const documento = payload.cpf ?? payload.documento ?? payload.sub;
     const cliente = await this.prisma.cliente.findUnique({
-      where: { documento },
+      where: { id: payload.sub },
       select: { id: true, email: true, ativo: true },
     });
     if (!cliente?.ativo) return null;

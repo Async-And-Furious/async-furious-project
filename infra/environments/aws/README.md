@@ -13,8 +13,12 @@ Required repository/environment configuration:
   When all three Academy secrets are present, the workflow uses them directly;
   otherwise it falls back to OIDC and `AWS_DEPLOY_ROLE_ARN`.
 - Before deployment, the `async-furious` namespace must already contain the
-  managed Secret `async-furious-secret` with non-empty `DATABASE_URL` and
-  `JWT_SECRET` keys. `DATABASE_URL` must point to the AWS managed database;
+  managed Secret `async-furious-secret` with non-empty `DATABASE_URL`,
+  `JWT_PUBLIC_KEY`, and explicitly provisioned `JWT_PRIVATE_KEY` keys. The
+  ConfigMap must set `JWT_ALGORITHM=RS256`, `JWT_ISSUER=repo-auth-serverless`,
+  `JWT_AUDIENCE=async-furious-project`, and `JWT_EXPIRES_IN=1800`. The private
+  key is runtime secret material and must never be committed.
+  `DATABASE_URL` must point to the AWS managed database;
   the workflow does not accept or construct a local PostgreSQL `DB_HOST`.
 - The AWS Load Balancer Controller must already be installed in EKS.
 - The GitHub Actions runner must be self-hosted, labeled `linux` and

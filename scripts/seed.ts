@@ -8,9 +8,13 @@ const prisma = new PrismaClient();
 
 const email = process.env.SEED_ADMIN_EMAIL;
 const password = process.env.SEED_ADMIN_PASSWORD;
+const recepcionistaPassword = process.env.SEED_RECEPCIONISTA_PASSWORD;
+const mecanicoPassword = process.env.SEED_MECANICO_PASSWORD;
 
-if (!email || !password) {
-  console.error('❌ SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set');
+if (!email || !password || !recepcionistaPassword || !mecanicoPassword) {
+  console.error(
+    '❌ SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_RECEPCIONISTA_PASSWORD and SEED_MECANICO_PASSWORD must be set'
+  );
   console.error('   Add these to your .env file');
   process.exit(1);
 }
@@ -443,7 +447,7 @@ async function seedAdmin(): Promise<void> {
       role: 'ADMIN',
     },
   });
-  console.log(`  ✅ Admin criado/atualizado: ${email}`);
+  console.log('  ✅ Admin criado/atualizado');
 }
 
 async function seedRecepcionista(): Promise<void> {
@@ -453,7 +457,7 @@ async function seedRecepcionista(): Promise<void> {
     console.log('  ⏭  Recepcionista já existe, pulando');
     return;
   }
-  const hashedPassword = await bcrypt.hash('recep123', 10);
+  const hashedPassword = await bcrypt.hash(recepcionistaPassword ?? '', 10);
   await prisma.user.create({
     data: {
       email: recepEmail,
@@ -462,7 +466,7 @@ async function seedRecepcionista(): Promise<void> {
       role: 'RECEPCIONISTA',
     },
   });
-  console.log(`  ✅ Recepcionista criada: ${recepEmail}`);
+  console.log('  ✅ Recepcionista criada');
 }
 
 async function seedMecanico(): Promise<void> {
@@ -472,7 +476,7 @@ async function seedMecanico(): Promise<void> {
     console.log('  ⏭  Mecânico já existe, pulando');
     return;
   }
-  const hashedPassword = await bcrypt.hash('mecanico123', 10);
+  const hashedPassword = await bcrypt.hash(mecanicoPassword ?? '', 10);
   await prisma.user.create({
     data: {
       email: mecEmail,
@@ -481,7 +485,7 @@ async function seedMecanico(): Promise<void> {
       role: 'MECANICO',
     },
   });
-  console.log(`  ✅ Mecânico criado: ${mecEmail}`);
+  console.log('  ✅ Mecânico criado');
 }
 
 async function seedLoop<T>(
@@ -734,8 +738,8 @@ async function seed(): Promise<void> {
 }
 
 seed()
-  .catch((error) => {
-    console.error('❌ Seed falhou:', error);
+  .catch(() => {
+    console.error('❌ Seed falhou');
     process.exit(1);
   })
   .finally(async () => {

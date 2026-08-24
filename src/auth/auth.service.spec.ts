@@ -202,7 +202,7 @@ describe('AuthService', () => {
   });
 
   describe('validateTokenSubject', () => {
-    it('accepts an active customer identified by CPF claims', async () => {
+    it('accepts an active customer identified by stable customer id', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.cliente.findUnique.mockResolvedValue({
         id: 'cliente-id',
@@ -210,15 +210,13 @@ describe('AuthService', () => {
         ativo: true,
       });
 
-      await expect(
-        service.validateTokenSubject({ sub: '12345678901', cpf: '12345678901' })
-      ).resolves.toEqual({
+      await expect(service.validateTokenSubject({ sub: 'cliente-id' })).resolves.toEqual({
         id: 'cliente-id',
         email: 'cliente@example.com',
         role: 'CLIENTE',
       });
       expect(mockPrisma.cliente.findUnique).toHaveBeenCalledWith({
-        where: { documento: '12345678901' },
+        where: { id: 'cliente-id' },
         select: { id: true, email: true, ativo: true },
       });
     });
@@ -231,7 +229,14 @@ describe('AuthService', () => {
         ativo: false,
       });
 
-      await expect(service.validateTokenSubject({ sub: '12345678901' })).resolves.toBeNull();
+      await expect(service.validateTokenSubject({ sub: 'cliente-id' })).resolves.toBeNull();
+    });
+
+    it('rejects a nonexistent customer', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockResolvedValue(null);
+
+      await expect(service.validateTokenSubject({ sub: 'missing-id' })).resolves.toBeNull();
     });
   });
 

@@ -82,8 +82,10 @@ JWT_SECRET="change-me-in-production-use-openssl-rand-hex-32"
 PORT=3000
 BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
-SEED_ADMIN_EMAIL="admin@oficina.com"
-SEED_ADMIN_PASSWORD="changeme123"
+SEED_ADMIN_EMAIL="admin@example.invalid"
+SEED_ADMIN_PASSWORD="replace-with-disposable-local-secret"
+SEED_RECEPCIONISTA_PASSWORD="replace-with-disposable-local-secret"
+SEED_MECANICO_PASSWORD="replace-with-disposable-local-secret"
 ```
 
 ### 3. Start with Docker for development
@@ -104,6 +106,18 @@ docker compose up -d
 ```
 
 The application is available at `http://localhost:3000`.
+
+### Production JWT
+
+Production follows the shared contract: `RS256`, `JWT_PUBLIC_KEY`,
+`JWT_ISSUER=repo-auth-serverless`, `JWT_AUDIENCE=async-furious-project`, and
+`JWT_EXPIRES_IN=1800`. The service verifies tokens issued by the shared
+authenticator. `JWT_PRIVATE_KEY` may only be supplied through a managed Secret
+when this process is explicitly authorized to sign; without it, local
+production signing fails closed. Never commit keys.
+
+The local example above uses `HS256` and `JWT_SECRET` for development and tests
+only; this fallback is not accepted in production.
 
 ---
 
@@ -354,7 +368,7 @@ Use `scripts/local-up.sh` — it runs every step in the correct order:
 ```
 
 Set `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email` and
-`TF_VAR_seed_admin_password` as environment variables or in `.env.local`
+`TF_VAR_seed_admin_password`, `TF_VAR_seed_recepcionista_password` and `TF_VAR_seed_mecanico_password` as environment variables or in `.env.local`
 before running — the script will prompt interactively if they are not found.
 
 ### Start the local environment (manual)
@@ -368,8 +382,10 @@ docker build -t async-furious-api:latest .
 # 2. Sensitive variables used by Terraform
 export TF_VAR_db_password="postgres"
 export TF_VAR_jwt_secret="change-me-in-production-use-openssl-rand-hex-32"
-export TF_VAR_seed_admin_email="admin@oficina.com"
-export TF_VAR_seed_admin_password="changeme123"
+export TF_VAR_seed_admin_email="admin@example.invalid"
+export TF_VAR_seed_admin_password="<disposable-local-secret>"
+export TF_VAR_seed_recepcionista_password="<disposable-local-secret>"
+export TF_VAR_seed_mecanico_password="<disposable-local-secret>"
 
 # 3. Create the cluster and apply manifests
 cd infra/environments/local
@@ -428,9 +444,9 @@ curl http://localhost:30000/api/v1
 
 ### Important notes
 
-- Kubernetes probes must point to `/api/v1`, not `/health`.
+- Kubernetes liveness/startup and ALB probes use `/api/v1/health/live`; readiness uses `/api/v1/health/ready`.
 - If you see `ErrImageNeverPull`, load the image with `kind load docker-image` or use `./scripts/local-up.sh reload`.
-- The `migrate` init container runs `prisma migrate deploy` before each API pod starts.
+- AWS runs a commit/attempt-named, idempotent Prisma migration Job before the API rollout. Failed rollouts are diagnosed, not automatically rolled back.
 - HPA requires metrics-server, which is installed automatically by the `kubernetes-apps` module.
 - If Prisma reports authentication failure against `postgres-service`, check that `TF_VAR_db_password` and the existing PostgreSQL password match. In disposable local environments, destroying and recreating the cluster/volume also fixes it.
 

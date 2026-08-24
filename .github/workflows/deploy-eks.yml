@@ -26,8 +26,20 @@ jobs:
     environment: ${{ inputs.environment }}
     steps:
       - uses: actions/checkout@v4
+      - name: Detect Academy credentials
+        id: credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          if [[ -n "$AWS_ACCESS_KEY_ID" && -n "$AWS_SECRET_ACCESS_KEY" && -n "$AWS_SESSION_TOKEN" ]]; then
+            echo 'use_academy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'use_academy=false' >> "$GITHUB_OUTPUT"
+          fi
       - name: Configure AWS Academy credentials
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != '' && secrets.AWS_SESSION_TOKEN != '' }}
+        if: ${{ steps.credentials.outputs.use_academy == 'true' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
@@ -35,7 +47,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
       - name: Configure AWS credentials with OIDC
-        if: ${{ secrets.AWS_ACCESS_KEY_ID == '' || secrets.AWS_SECRET_ACCESS_KEY == '' || secrets.AWS_SESSION_TOKEN == '' }}
+        if: ${{ steps.credentials.outputs.use_academy != 'true' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: ${{ env.AWS_REGION }}
@@ -58,6 +70,15 @@ jobs:
       - name: Verify cluster access and managed database Secret
         run: |
           kubectl cluster-info
+          for key in JWT_PUBLIC_KEY JWT_PRIVATE_KEY DATABASE_URL; do
+            test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath="{.data.$key}")" || { echo "Missing required secret key: $key" >&2; exit 1; }
+          done
+          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_PUBLIC_KEY}')"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_ALGORITHM}')" = "RS256"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_ISSUER}')" = "repo-auth-serverless"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_AUDIENCE}')" = "async-furious-project"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_EXPIRES_IN}')" = "1800"
+          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_PRIVATE_KEY}')"
           kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" >/dev/null
           test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.DATABASE_URL}')"
       - name: Render AWS overlay with image digest
@@ -73,17 +94,46 @@ jobs:
           sed -i 's/\${app_replicas}/2/; s|\${app_image}|async-furious-api:immutable-placeholder|' "$migration_dir/k8s/app/deployment.yaml"
           sed -i '/DB_HOST:/d' "$render_dir/k8s/config/configmap.yaml"
           sed -i '/DB_HOST:/d' "$migration_dir/k8s/config/configmap.yaml"
-          sed -i '/  - path: configmap-patch.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
-          sed -i '/  - path: configmap-patch.yaml/d' "$migration_dir/k8s/overlays/aws/kustomization.yaml"
           sed -i '/app\/deployment.yaml/d; /app\/service.yaml/d; /app\/hpa.yaml/d; /- ingress.yaml/d; /deployment-patch.yaml/d' "$migration_dir/k8s/overlays/aws/kustomization.yaml"
-          sed -i "s|name: async-furious-migrate$|name: async-furious-migrate-$GITHUB_SHA|" "$migration_dir/k8s/overlays/aws/migration-job.yaml"
+           migration_job_name="async-furious-migrate-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+           test "${#migration_job_name}" -le 63
+           sed -i "s|name: async-furious-migrate$|name: $migration_job_name|" "$migration_dir/k8s/overlays/aws/migration-job.yaml"
           kubectl kustomize --load-restrictor LoadRestrictionsNone "$migration_dir/k8s/overlays/aws" >/tmp/async-furious-aws-migration.yaml
           sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws-migration.yaml
           kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws-migration.yaml
-          kubectl wait --for=condition=complete "job/async-furious-migrate-$GITHUB_SHA" --namespace "$K8S_NAMESPACE" --timeout=600s
+          kubectl wait --for=condition=complete "job/$migration_job_name" --namespace "$K8S_NAMESPACE" --timeout=600s
           sed -i '/- migration-job.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
           kubectl kustomize --load-restrictor LoadRestrictionsNone "$render_dir/k8s/overlays/aws" >/tmp/async-furious-aws.yaml
           sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws.yaml
           kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws.yaml
       - name: Wait for API rollout
         run: kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=300s
+      - name: Diagnose rollout failure
+        if: ${{ failure() }}
+        run: |
+          kubectl describe deployment/async-furious-api --namespace "$K8S_NAMESPACE" || true
+          kubectl get pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api -o wide || true
+          kubectl describe pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api || true
+          kubectl logs --namespace "$K8S_NAMESPACE" -l app=async-furious-api --all-containers --tail=200 || true
+      - name: Detect HML smoke configuration
+        id: hml
+        env:
+          HML_BASE_URL: ${{ vars.HML_BASE_URL }}
+          HML_EMAIL: ${{ secrets.HML_EMAIL }}
+          HML_PASSWORD: ${{ secrets.HML_PASSWORD }}
+        run: |
+          if [[ -n "$HML_BASE_URL" && -n "$HML_EMAIL" && -n "$HML_PASSWORD" ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Protected HML smoke test
+        if: ${{ steps.hml.outputs.enabled == 'true' }}
+        env:
+          HML_BASE_URL: ${{ vars.HML_BASE_URL }}
+          HML_EMAIL: ${{ secrets.HML_EMAIL }}
+          HML_PASSWORD: ${{ secrets.HML_PASSWORD }}
+        run: bash scripts/protected-smoke.sh
+      - name: Protected HML smoke test skipped
+        if: ${{ steps.hml.outputs.enabled != 'true' }}
+        run: "echo 'HML protected smoke test skipped: required HML configuration is not present.'"

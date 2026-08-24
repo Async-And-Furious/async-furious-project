@@ -10,8 +10,6 @@ export interface JwtPayload {
   sub: string;
   email?: string;
   role?: Role;
-  cpf?: string;
-  documento?: string;
   iss?: string;
   aud?: string | string[];
   iat?: number;

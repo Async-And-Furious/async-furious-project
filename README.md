@@ -145,8 +145,10 @@ JWT_SECRET="change-me-in-production-use-openssl-rand-hex-32"
 PORT=3000
 BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
-SEED_ADMIN_EMAIL="admin@oficina.com"
-SEED_ADMIN_PASSWORD="changeme123"
+SEED_ADMIN_EMAIL="admin@example.invalid"
+SEED_ADMIN_PASSWORD="replace-with-disposable-local-secret"
+SEED_RECEPCIONISTA_PASSWORD="replace-with-disposable-local-secret"
+SEED_MECANICO_PASSWORD="replace-with-disposable-local-secret"
 ```
 
 ### 3. Iniciar com Docker para desenvolvimento
@@ -167,6 +169,18 @@ docker compose up -d
 ```
 
 A aplicacao fica disponivel em `http://localhost:3000`.
+
+### JWT em producao
+
+Em producao, o contrato compartilhado exige `RS256`, `JWT_PUBLIC_KEY`,
+`JWT_ISSUER=repo-auth-serverless`, `JWT_AUDIENCE=async-furious-project` e
+`JWT_EXPIRES_IN=1800`. O servico verifica tokens emitidos pelo autenticador
+compartilhado; `JWT_PRIVATE_KEY` somente deve ser fornecida por um Secret
+gerenciado quando este processo for explicitamente autorizado a assinar.
+Sem ela, a assinatura local de producao falha fechada. Nunca versione chaves.
+
+O exemplo local acima usa `HS256` e `JWT_SECRET` apenas para desenvolvimento e
+testes; essa alternativa nao e aceita em producao.
 
 ---
 
@@ -416,8 +430,9 @@ Use o script `scripts/local-up.sh` — ele executa todos os passos na ordem corr
 ./scripts/local-up.sh down
 ```
 
-As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email`
-e `TF_VAR_seed_admin_password` podem ser exportadas antes ou definidas em
+As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email`,
+`TF_VAR_seed_admin_password`, `TF_VAR_seed_recepcionista_password` e
+`TF_VAR_seed_mecanico_password` podem ser exportadas antes ou definidas em
 `.env.local` — o script solicita interativamente se nao encontrar.
 
 ### Subir o ambiente local (manual)
@@ -431,8 +446,10 @@ docker build -t async-furious-api:latest .
 # 2. Variaveis sensiveis usadas pelo Terraform
 export TF_VAR_db_password="postgres"
 export TF_VAR_jwt_secret="change-me-in-production-use-openssl-rand-hex-32"
-export TF_VAR_seed_admin_email="admin@oficina.com"
-export TF_VAR_seed_admin_password="changeme123"
+export TF_VAR_seed_admin_email="admin@example.invalid"
+export TF_VAR_seed_admin_password="<disposable-local-secret>"
+export TF_VAR_seed_recepcionista_password="<disposable-local-secret>"
+export TF_VAR_seed_mecanico_password="<disposable-local-secret>"
 
 # 3. Criar cluster e aplicar os manifests
 cd infra/environments/local
@@ -444,6 +461,8 @@ kind load docker-image async-furious-api:latest --name async-furious
 
 # 5. Recriar pods da API
 kubectl rollout restart deployment/async-furious-api -n async-furious
+kubectl rollout status deployment/async-furious-api -n async-furious --timeout=240s
+curl http://localhost:30000/api/v1/health/live
 ```
 
 ### Acompanhar o deploy

@@ -4,8 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from '../services/auth.service';
 import { JwtPayload } from '../types/auth.types';
-
-type JwtAlgorithm = 'HS256' | 'RS256';
+import { resolveJwtContract } from '../jwt.config';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -13,7 +12,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private config: ConfigService,
     private authService: AuthService
   ) {
-    const algorithm = (config.get<string>('JWT_ALGORITHM') ?? 'HS256') as JwtAlgorithm;
+    const contract = resolveJwtContract(config);
+    const { algorithm } = contract;
     const verificationKey =
       algorithm === 'RS256'
         ? config.get<string>('JWT_PUBLIC_KEY')
@@ -27,10 +27,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       ignoreExpiration: false,
       secretOrKey: verificationKey,
       algorithms: [algorithm],
+      issuer: contract.issuer,
+      audience: contract.audience,
+      maxAge: `${contract.expiresIn}s`,
     });
   }
 
   async validate(payload: JwtPayload) {
+    if (!payload.sub?.trim() || !payload.iss || !payload.aud || typeof payload.exp !== 'number') {
+      throw new UnauthorizedException();
+    }
     const user =
       typeof this.authService.validateTokenSubject === 'function'
         ? await this.authService.validateTokenSubject(payload)

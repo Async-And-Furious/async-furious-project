@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { createJwtModuleOptions } from './jwt.config';
 
 @Module({
   imports: [
@@ -15,20 +16,7 @@ import { RolesGuard } from './guards/roles.guard';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const algorithm = (config.get<string>('JWT_ALGORITHM') ?? 'HS256') as 'HS256' | 'RS256';
-        const secret =
-          algorithm === 'RS256'
-            ? config.get<string>('JWT_PRIVATE_KEY')
-            : config.get<string>('JWT_SECRET');
-        if (!secret) {
-          throw new Error('JWT signing key environment variable is required');
-        }
-        return {
-          secret,
-          signOptions: { expiresIn: '1h', algorithm },
-        };
-      },
+      useFactory: createJwtModuleOptions,
     }),
   ],
   controllers: [AuthController],
