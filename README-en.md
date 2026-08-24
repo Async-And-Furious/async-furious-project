@@ -461,8 +461,21 @@ On push to `main`/`develop` (or via manual `workflow_dispatch`), the same workfl
 See `infra/environments/aws/README.md`. The manual
 `.github/workflows/deploy-eks.yml` workflow pushes a commit-SHA-tagged image
 to ECR and applies `k8s/overlays/aws` by digest after GitHub Environment
-approval. The EKS cluster, AWS Load Balancer Controller, and application
-Secret must already exist; the workflow provisions no AWS resources.
+approval. Normal mode uses the ALB Ingress and requires the AWS Load Balancer
+Controller. For AWS Academy, dispatch with `aws_academy=true`: the workflow
+removes the Ingress, patches the Service to `LoadBalancer` (no IRSA or IAM
+resources), waits for the external hostname/IP, and publishes
+`http://<endpoint>:3000` in the summary. Auth should use that URL without a
+trailing slash and call endpoints under `/api/v1`, such as
+`POST <backend-url>/api/v1/auth/login`. The EKS cluster must already exist; the
+workflow provisions no AWS resources. In `aws_academy=true`, configure the
+protected GitHub Environment with secrets `DATABASE_SECRET_ARN` and
+`JWT_PRIVATE_KEY_SECRET_ARN`, plus the variable `JWT_PUBLIC_KEY_PARAMETER_NAME`.
+The runner reads the RDS JSON contract (`username`, `password`, `host`, `port`,
+`dbname`), reads both JWT values from AWS, constructs `DATABASE_URL`, and
+applies only `DATABASE_URL`, `JWT_PRIVATE_KEY`, and `JWT_PUBLIC_KEY` to the
+Kubernetes Secret. It fails closed when any reference is absent. Normal mode
+still requires its pre-existing managed Secret and is unchanged.
 
 ---
 

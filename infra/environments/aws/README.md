@@ -12,15 +12,22 @@ Required repository/environment configuration:
   `AWS_SESSION_TOKEN`.
   When all three Academy secrets are present, the workflow uses them directly;
   otherwise it falls back to OIDC and `AWS_DEPLOY_ROLE_ARN`.
-- Before deployment, the `async-furious` namespace must already contain the
-  managed Secret `async-furious-secret` with non-empty `DATABASE_URL`,
-  `JWT_PUBLIC_KEY`, and explicitly provisioned `JWT_PRIVATE_KEY` keys. The
-  ConfigMap must set `JWT_ALGORITHM=RS256`, `JWT_ISSUER=repo-auth-serverless`,
-  `JWT_AUDIENCE=async-furious-project`, and `JWT_EXPIRES_IN=1800`. The private
-  key is runtime secret material and must never be committed.
-  `DATABASE_URL` must point to the AWS managed database;
-  the workflow does not accept or construct a local PostgreSQL `DB_HOST`.
-- The AWS Load Balancer Controller must already be installed in EKS.
+- In normal mode, before deployment, the `async-furious` namespace must already
+  contain the managed Secret `async-furious-secret` with non-empty
+  `DATABASE_URL`, `JWT_PUBLIC_KEY`, and explicitly provisioned
+  `JWT_PRIVATE_KEY` keys. In Academy mode, configure the protected GitHub
+  Environment with secrets `DATABASE_SECRET_ARN` and
+  `JWT_PRIVATE_KEY_SECRET_ARN`, plus variable `JWT_PUBLIC_KEY_PARAMETER_NAME`.
+  The workflow fails closed if these references are absent, reads the RDS
+  Secrets Manager JSON fields `username`, `password`, `host`, `port`, and
+  `dbname`, reads both JWT values from AWS, constructs `DATABASE_URL`, and
+  applies only the three required keys to `async-furious-secret`. Values are
+  never logged or committed. The ConfigMap must set `JWT_ALGORITHM=RS256`,
+  `JWT_ISSUER=repo-auth-serverless`, `JWT_AUDIENCE=async-furious-project`, and
+  `JWT_EXPIRES_IN=1800`.
+- Normal mode (the default) requires the AWS Load Balancer Controller for the
+  internal ALB Ingress. AWS Academy mode does not use the controller or IRSA;
+  it renders no Ingress and changes `async-furious-service` to `LoadBalancer`.
 - The GitHub Actions runner must be self-hosted, labeled `linux` and
   `eks-private`, and have network/DNS access to the private EKS API endpoint.
   Keep the EKS endpoint private; do not make it public to accommodate the
@@ -51,10 +58,22 @@ $environmentName` from each `gh secret set` command. Rotate all three values
 together when AWS Academy issues a new session; expired sessions must be
 replaced before dispatching the workflow.
 
-The `k8s/overlays/aws` overlay keeps the ClusterIP Service, adds an internal
-ALB Ingress, references the existing ConfigMap/Secret, and includes the
-controlled Prisma migration Job. The workflow pushes a commit-SHA-tagged ECR
-image and applies it by digest. It renders numeric AWS replicas without
-changing local manifests, runs and waits for the migration Job before applying
-the API Deployment, and stops if the migration fails. It does not provision
-AWS or run Terraform.
+The `k8s/overlays/aws` overlay keeps the ClusterIP Service and adds an internal
+ALB Ingress by default. Dispatch `.github/workflows/deploy-eks.yml` with
+`aws_academy=true` for Academy mode; the workflow removes `ingress.yaml`,
+patches the Service to `LoadBalancer`, waits for its external hostname/IP, and
+publishes `http://<endpoint>:3000` in the workflow summary. The workflow
+references the existing ConfigMap/Secret, includes the controlled Prisma
+migration Job, pushes a commit-SHA-tagged ECR image, applies it by digest, and
+stops if migration, rollout, or the live health check fails. It does not
+provision AWS, create IAM resources, or run Terraform.
+
+### Backend URL contract for Auth
+
+Use the published backend URL as Auth's backend base URL, without a trailing
+slash: `http://<service-external-hostname-or-ip>:3000`. Auth calls the API under
+`/api/v1`; for example, CPF authentication is `POST
+<backend-url>/api/v1/auth/login` with its existing request contract. The API
+returns JWTs for protected application routes; Auth should forward the token in
+the `Authorization: Bearer <jwt>` header. In normal ALB mode, substitute the
+ALB hostname (normally `http://<alb-hostname>`) for the Academy URL.
