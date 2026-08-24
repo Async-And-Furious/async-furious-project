@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: async-furious-config
+  namespace: async-furious
+data:
+  NODE_ENV: "production"
+  DB_HOST: "${DB_HOST}"
+  JWT_ALGORITHM: "RS256"
+  JWT_ISSUER: "repo-auth-serverless"
+  JWT_AUDIENCE: "async-furious-project"
+  JWT_EXPIRES_IN: "1800"

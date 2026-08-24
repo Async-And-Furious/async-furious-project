@@ -33,6 +33,8 @@ module "kubernetes_apps" {
   db_password         = var.db_password
   jwt_secret          = var.jwt_secret
   seed_admin_email    = var.seed_admin_email
-  seed_admin_password = var.seed_admin_password
+  seed_admin_password         = var.seed_admin_password
+  seed_recepcionista_password = var.seed_recepcionista_password
+  seed_mecanico_password      = var.seed_mecanico_password
   k8s_manifests_path  = "${path.root}/../../../k8s"
 }

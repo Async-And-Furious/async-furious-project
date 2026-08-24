@@ -14,29 +14,10 @@ spec:
         app: async-furious-api
     spec:
       automountServiceAccountToken: false
-      initContainers:
-        - name: migrate
-          image: ${app_image}
-          imagePullPolicy: Never
-          command: ["node_modules/.bin/prisma", "migrate", "deploy"]
-          envFrom:
-            - configMapRef:
-                name: async-furious-config
-            - secretRef:
-                name: async-furious-secret
-        - name: seed
-          image: ${app_image}
-          imagePullPolicy: Never
-          command: ["node", "dist-scripts/seed.js"]
-          envFrom:
-            - configMapRef:
-                name: async-furious-config
-            - secretRef:
-                name: async-furious-secret
       containers:
         - name: api
           image: ${app_image}
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           resources:
@@ -55,13 +36,19 @@ spec:
                 name: async-furious-secret
           readinessProbe:
             httpGet:
-              path: /api/v1
+              path: /api/v1/health/ready
               port: 3000
             initialDelaySeconds: 10
             periodSeconds: 5
           livenessProbe:
             httpGet:
-              path: /api/v1
+              path: /api/v1/health/live
               port: 3000
             initialDelaySeconds: 30
             periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: 3000
+            failureThreshold: 30
+            periodSeconds: 5

@@ -7,8 +7,10 @@ import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcrypt';
 import { createAdminToken } from './support/fixtures';
 
+let plateSequence = 0;
+
 function generateValidPlaca(prefix: string = 'ABC'): string {
-  const suffix = Date.now().toString().slice(-4);
+  const suffix = String(1000 + plateSequence++).slice(-4);
   return `${prefix.slice(0, 3)}${suffix[0]}${suffix[1]}${suffix[2]}${suffix[3]}`.slice(0, 7);
 }
 

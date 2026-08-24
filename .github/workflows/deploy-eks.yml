@@ -1,0 +1,200 @@
+name: Deploy to EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment approval gate
+        required: true
+        type: environment
+      aws_academy:
+        description: Use AWS Academy Service LoadBalancer mode (without ALB Ingress)
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  K8S_NAMESPACE: async-furious
+  K8S_SECRET_NAME: async-furious-secret
+
+jobs:
+  deploy:
+    # This runner must have network access to the private EKS API endpoint.
+    runs-on: [self-hosted, linux, eks-private]
+    environment: ${{ inputs.environment }}
+    env:
+      AWS_ACADEMY: ${{ inputs.aws_academy }}
+      DATABASE_SECRET_ARN: ${{ secrets.DATABASE_SECRET_ARN }}
+      JWT_PRIVATE_KEY_SECRET_ARN: ${{ secrets.JWT_PRIVATE_KEY_SECRET_ARN }}
+      JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect Academy credentials
+        id: credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          if [[ -n "$AWS_ACCESS_KEY_ID" && -n "$AWS_SECRET_ACCESS_KEY" && -n "$AWS_SESSION_TOKEN" ]]; then
+            echo 'use_academy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'use_academy=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Configure AWS Academy credentials
+        if: ${{ steps.credentials.outputs.use_academy == 'true' }}
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Configure AWS credentials with OIDC
+        if: ${{ steps.credentials.outputs.use_academy != 'true' }}
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+      - name: Build and push image tagged by commit SHA
+        id: image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          docker build --pull -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "uri=$REGISTRY/$ECR_REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
+      - name: Configure kubectl for existing EKS cluster
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+      - name: Materialize Academy application Secret
+        if: ${{ inputs.aws_academy }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_SECRET_ARN" || { echo 'Academy configuration is missing DATABASE_SECRET_ARN.' >&2; exit 1; }
+          test -n "$JWT_PRIVATE_KEY_SECRET_ARN" || { echo 'Academy configuration is missing JWT_PRIVATE_KEY_SECRET_ARN.' >&2; exit 1; }
+          test -n "$JWT_PUBLIC_KEY_PARAMETER_NAME" || { echo 'Academy configuration is missing JWT_PUBLIC_KEY_PARAMETER_NAME.' >&2; exit 1; }
+          work_dir=$(mktemp -d)
+          trap 'rm -rf "$work_dir"' EXIT
+          aws secretsmanager get-secret-value --secret-id "$DATABASE_SECRET_ARN" --query SecretString --output text > "$work_dir/database.json"
+          aws secretsmanager get-secret-value --secret-id "$JWT_PRIVATE_KEY_SECRET_ARN" --query SecretString --output text > "$work_dir/jwt-private-key"
+          aws ssm get-parameter --name "$JWT_PUBLIC_KEY_PARAMETER_NAME" --with-decryption --query Parameter.Value --output text > "$work_dir/jwt-public-key"
+          db_username=$(jq -er '.username' "$work_dir/database.json")
+          db_password=$(jq -er '.password' "$work_dir/database.json")
+          db_host=$(jq -er '.host' "$work_dir/database.json")
+          db_port=$(jq -er '.port // 5432' "$work_dir/database.json")
+          db_name=$(jq -er '.dbname' "$work_dir/database.json")
+          database_url=$(jq -nr --arg username "$db_username" --arg password "$db_password" --arg host "$db_host" --arg port "$db_port" --arg dbname "$db_name" '"postgresql://" + ($username|@uri) + ":" + ($password|@uri) + "@" + $host + ":" + $port + "/" + ($dbname|@uri) + "?schema=public"')
+          test -s "$work_dir/jwt-private-key"
+          test -s "$work_dir/jwt-public-key"
+          kubectl create secret generic "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" --from-literal=DATABASE_URL="$database_url" --from-file=JWT_PRIVATE_KEY="$work_dir/jwt-private-key" --from-file=JWT_PUBLIC_KEY="$work_dir/jwt-public-key" --dry-run=client -o yaml > "$work_dir/secret.yaml"
+          kubectl apply --dry-run=client -o yaml -f "$work_dir/secret.yaml" | kubectl apply -f -
+      - name: Verify cluster access and managed database Secret
+        run: |
+          kubectl cluster-info
+          for key in JWT_PUBLIC_KEY JWT_PRIVATE_KEY DATABASE_URL; do
+            test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath="{.data.$key}")" || { echo "Missing required secret key: $key" >&2; exit 1; }
+          done
+          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_PUBLIC_KEY}')"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_ALGORITHM}')" = "RS256"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_ISSUER}')" = "repo-auth-serverless"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_AUDIENCE}')" = "async-furious-project"
+          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_EXPIRES_IN}')" = "1800"
+          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_PRIVATE_KEY}')"
+          kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" >/dev/null
+          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.DATABASE_URL}')"
+      - name: Render AWS overlay with image digest
+        env:
+          IMAGE_URI: ${{ steps.image.outputs.uri }}
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+        run: |
+          render_dir=$(mktemp -d)
+          migration_dir=$(mktemp -d)
+          cp -R k8s "$render_dir/k8s"
+          cp -R k8s "$migration_dir/k8s"
+          sed -i 's/\${app_replicas}/2/; s|\${app_image}|async-furious-api:immutable-placeholder|' "$render_dir/k8s/app/deployment.yaml"
+          sed -i 's/\${app_replicas}/2/; s|\${app_image}|async-furious-api:immutable-placeholder|' "$migration_dir/k8s/app/deployment.yaml"
+          sed -i '/DB_HOST:/d' "$render_dir/k8s/config/configmap.yaml"
+          sed -i '/DB_HOST:/d' "$migration_dir/k8s/config/configmap.yaml"
+          sed -i '/app\/deployment.yaml/d; /app\/service.yaml/d; /app\/hpa.yaml/d; /- ingress.yaml/d; /deployment-patch.yaml/d' "$migration_dir/k8s/overlays/aws/kustomization.yaml"
+           migration_job_name="async-furious-migrate-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+           test "${#migration_job_name}" -le 63
+           sed -i "s|name: async-furious-migrate$|name: $migration_job_name|" "$migration_dir/k8s/overlays/aws/migration-job.yaml"
+          kubectl kustomize --load-restrictor LoadRestrictionsNone "$migration_dir/k8s/overlays/aws" >/tmp/async-furious-aws-migration.yaml
+          sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws-migration.yaml
+          kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws-migration.yaml
+          kubectl wait --for=condition=complete "job/$migration_job_name" --namespace "$K8S_NAMESPACE" --timeout=600s
+          sed -i '/- migration-job.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
+          if [[ "$AWS_ACADEMY" == 'true' ]]; then
+            sed -i '/- ingress.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
+            sed -i '/deployment-patch.yaml/a\  - path: academy-service-patch.yaml' "$render_dir/k8s/overlays/aws/kustomization.yaml"
+          fi
+          sed -i '/- migration-job.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
+          kubectl kustomize --load-restrictor LoadRestrictionsNone "$render_dir/k8s/overlays/aws" >/tmp/async-furious-aws.yaml
+          sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws.yaml
+          kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws.yaml
+      - name: Wait for API rollout
+        run: kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=300s
+      - name: Wait for Academy Service endpoint
+        if: ${{ inputs.aws_academy }}
+        id: academy_endpoint
+        run: |
+          deadline=$(($(date +%s) + 600))
+          while (( $(date +%s) < deadline )); do
+            hostname=$(kubectl get service async-furious-service --namespace "$K8S_NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            ip=$(kubectl get service async-furious-service --namespace "$K8S_NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            endpoint="${hostname:-$ip}"
+            if [[ -n "$endpoint" ]]; then
+              backend_url="http://$endpoint:3000"
+              echo "backend_url=$backend_url" >> "$GITHUB_OUTPUT"
+              {
+                echo '### AWS Academy backend'
+                echo "- Backend URL: $backend_url"
+                echo "- Health: $backend_url/api/v1/health/live"
+              } >> "$GITHUB_STEP_SUMMARY"
+              curl --fail --retry 30 --retry-delay 10 --retry-connrefused "$backend_url/api/v1/health/live"
+              exit 0
+            fi
+            sleep 10
+          done
+          kubectl describe service async-furious-service --namespace "$K8S_NAMESPACE"
+          exit 1
+      - name: Diagnose rollout failure
+        if: ${{ failure() }}
+        run: |
+          kubectl describe deployment/async-furious-api --namespace "$K8S_NAMESPACE" || true
+          kubectl get pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api -o wide || true
+          kubectl describe pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api || true
+          kubectl logs --namespace "$K8S_NAMESPACE" -l app=async-furious-api --all-containers --tail=200 || true
+      - name: Detect HML smoke configuration
+        id: hml
+        env:
+          HML_BASE_URL: ${{ vars.HML_BASE_URL }}
+          HML_EMAIL: ${{ secrets.HML_EMAIL }}
+          HML_PASSWORD: ${{ secrets.HML_PASSWORD }}
+        run: |
+          if [[ -n "$HML_BASE_URL" && -n "$HML_EMAIL" && -n "$HML_PASSWORD" ]]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Protected HML smoke test
+        if: ${{ steps.hml.outputs.enabled == 'true' }}
+        env:
+          HML_BASE_URL: ${{ vars.HML_BASE_URL }}
+          HML_EMAIL: ${{ secrets.HML_EMAIL }}
+          HML_PASSWORD: ${{ secrets.HML_PASSWORD }}
+        run: bash scripts/protected-smoke.sh
+      - name: Protected HML smoke test skipped
+        if: ${{ steps.hml.outputs.enabled != 'true' }}
+        run: "echo 'HML protected smoke test skipped: required HML configuration is not present.'"

@@ -1,12 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
-import request, { SuperTest } from 'supertest';
-import { App } from 'supertest/types';
+import request from 'supertest';
 import { AppModule } from './../src/app.module';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
-  let server: SuperTest<App>;
+  let server: ReturnType<typeof request>;
 
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -15,12 +14,12 @@ describe('AppController (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-    server = request(app.getHttpServer() as unknown as App);
+    server = request(app.getHttpServer());
   });
 
-  it('/ (GET) - health check', () => {
+  it('/api/v1/health/live (GET) - liveness check', () => {
     return server
-      .get('/')
+      .get('/api/v1/health/live')
       .expect(200)
       .expect((res) => {
         expect(res.body).toHaveProperty('status', 'ok');
