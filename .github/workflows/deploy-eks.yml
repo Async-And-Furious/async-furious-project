@@ -4,9 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: GitHub Environment approval gate
+        description: Target environment
         required: true
-        type: environment
+        default: hml
+        type: choice
+        options: [hml, prod]
       aws_academy:
         description: Use AWS Academy Service LoadBalancer mode (without ALB Ingress)
         required: true
@@ -18,7 +20,7 @@ permissions:
   id-token: write
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
   K8S_NAMESPACE: async-furious
@@ -28,7 +30,6 @@ jobs:
   deploy:
     # Academy uses a hosted runner; normal mode requires the private-EKS runner.
     runs-on: ${{ fromJSON(inputs.aws_academy && '["ubuntu-latest"]' || '["self-hosted", "linux", "eks-private"]') }}
-    environment: ${{ inputs.environment }}
     env:
       AWS_ACADEMY: ${{ inputs.aws_academy }}
       DATABASE_SECRET_ARN: ${{ secrets.DATABASE_SECRET_ARN }}
@@ -77,6 +78,10 @@ jobs:
           echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
       - name: Configure kubectl for existing EKS cluster
         run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+      - name: Ensure application namespace
+        # The overlay also declares this namespace, but the Secret below has to
+        # land before the overlay is applied, so create it up front.
+        run: kubectl apply -f k8s/namespace.yaml
       - name: Materialize Academy application Secret
         if: ${{ inputs.aws_academy }}
         run: |
@@ -101,18 +106,11 @@ jobs:
           kubectl apply --dry-run=client -o yaml -f "$work_dir/secret.yaml" | kubectl apply -f -
       - name: Verify cluster access and managed database Secret
         run: |
+          set -euo pipefail
           kubectl cluster-info
           for key in JWT_PUBLIC_KEY JWT_PRIVATE_KEY DATABASE_URL; do
             test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath="{.data.$key}")" || { echo "Missing required secret key: $key" >&2; exit 1; }
           done
-          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_PUBLIC_KEY}')"
-          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_ALGORITHM}')" = "RS256"
-          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_ISSUER}')" = "repo-auth-serverless"
-          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_AUDIENCE}')" = "async-furious-project"
-          test "$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_EXPIRES_IN}')" = "1800"
-          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.JWT_PRIVATE_KEY}')"
-          kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" >/dev/null
-          test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath='{.data.DATABASE_URL}')"
       - name: Render AWS overlay with image digest
         env:
           IMAGE_URI: ${{ steps.image.outputs.uri }}
@@ -143,6 +141,18 @@ jobs:
           kubectl kustomize --load-restrictor LoadRestrictionsNone "$render_dir/k8s/overlays/aws" >/tmp/async-furious-aws.yaml
           sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws.yaml
           kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws.yaml
+      - name: Verify JWT contract ConfigMap
+        # Runs after the overlay apply: the ConfigMap is part of that overlay.
+        run: |
+          set -euo pipefail
+          expect() {
+            actual=$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath="{.data.$1}")
+            test "$actual" = "$2" || { echo "ConfigMap $1 is '$actual', expected '$2'." >&2; exit 1; }
+          }
+          expect JWT_ALGORITHM RS256
+          expect JWT_ISSUER repo-auth-serverless
+          expect JWT_AUDIENCE async-furious-project
+          expect JWT_EXPIRES_IN 1800
       - name: Wait for API rollout
         run: kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=300s
       - name: Wait for Academy Service endpoint
