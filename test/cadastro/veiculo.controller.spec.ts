@@ -15,6 +15,7 @@ import {
 import { VeiculoResponseDto } from '../../src/modules/cadastro/presentation/dto/veiculo.response.dto';
 import { Veiculo } from '../../src/modules/cadastro/domain/entities/veiculo.entity';
 import { AuthUser } from '../../src/auth/types/auth.types';
+import { Role } from '../../src/auth/enums/role.enum';
 
 interface MockUseCase {
   execute: jest.Mock;
@@ -36,8 +37,8 @@ describe('VeiculoController', () => {
   const mockAuthUser: AuthUser = {
     id: 'user-123',
     email: 'admin@test.com',
-    name: 'Admin',
-    role: 'admin',
+
+    role: Role.ADMIN,
   };
 
   const mockVeiculoResponse: VeiculoResponseDto = {

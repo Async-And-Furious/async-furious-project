@@ -8,8 +8,10 @@ export interface AuthenticatedUser {
 
 export interface JwtPayload {
   sub: string;
-  email: string;
-  role: Role;
+  email?: string;
+  role?: Role;
+  iss?: string;
+  aud?: string | string[];
   iat?: number;
   exp?: number;
 }

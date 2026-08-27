@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../shared/infrastructure/database/prisma.service';
 import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { Role } from '../enums/role.enum';
+import type { AuthenticatedUser, JwtPayload } from '../types/auth.types';
 
 @Injectable()
 export class AuthService {
@@ -68,6 +69,12 @@ export class AuthService {
   }
 
   private generateToken(user: { id: string; email: string; role: string }) {
+    if (
+      this.config.get<string>('NODE_ENV') === 'production' &&
+      !this.config.get<string>('JWT_PRIVATE_KEY')
+    ) {
+      throw new Error('Production JWT signing is disabled without JWT_PRIVATE_KEY');
+    }
     const payload = { sub: user.id, email: user.email, role: user.role as Role };
     return {
       access_token: this.jwtService.sign(payload),
@@ -86,6 +93,19 @@ export class AuthService {
     });
     if (!user) return null;
     return { id: user.id, email: user.email, role: user.role as Role };
+  }
+
+  async validateTokenSubject(payload: JwtPayload): Promise<AuthenticatedUser | null> {
+    const user = await this.validateUser(payload.sub);
+    if (user) return user;
+
+    const cliente = await this.prisma.cliente.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, ativo: true },
+    });
+    if (!cliente?.ativo) return null;
+
+    return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
   }
 
   async findById(id: string) {

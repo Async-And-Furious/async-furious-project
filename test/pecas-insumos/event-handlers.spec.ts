@@ -253,7 +253,7 @@ describe('PecasInsumos Event handlers', () => {
           pecas: [{ pecaId: 'peca-inexistente', quantidadeNecessaria: 1 }],
         },
       ]);
-      repo.findOne.mockResolvedValue(null);
+      repo.findOne.mockResolvedValue(null as unknown as PecaInsumo);
 
       await handler.handle(
         new EstoqueAtualizadoAposRecebimento([{ pecaId: 'peca-inexistente', novaQuantidade: 0 }])
@@ -318,7 +318,7 @@ describe('PecasInsumos Event handlers', () => {
       );
 
       reservaRepo.existsByOrdemId.mockResolvedValue(false);
-      repo.findOne.mockResolvedValue(null);
+      repo.findOne.mockResolvedValue(null as unknown as PecaInsumo);
 
       await expect(
         handler.handle({
@@ -355,9 +355,18 @@ describe('PecasInsumos Event handlers', () => {
       pedidoFornecedorRepo.create.mockResolvedValue({
         id: 'pedido-1',
         fornecedor_id: 'fornecedor-1',
-        itens: [{ id_peca: 'peca-1', quantidade_solicitada: 5 }],
+        itens: [
+          {
+            id: 'item-1',
+            id_pedido_fornecedor: 'pedido-1',
+            id_peca: 'peca-1',
+            quantidade_solicitada: 5,
+            quantidade_recebida: 0,
+          },
+        ],
         status: 'PENDENTE',
         criado_em: new Date(),
+        atualizado_em: new Date(),
       });
 
       await useCase.execute({
@@ -408,7 +417,7 @@ describe('PecasInsumos Event handlers', () => {
         emissor,
         mockFornecedorGateway
       );
-      repo.findOne.mockResolvedValue(null);
+      repo.findOne.mockResolvedValue(null as unknown as PecaInsumo);
 
       await expect(
         useCase.execute({
@@ -433,6 +442,7 @@ describe('PecasInsumos Event handlers', () => {
         itens: [],
         status: 'PENDENTE',
         criado_em: new Date(),
+        atualizado_em: new Date(),
       });
 
       await useCase.execute({
@@ -537,7 +547,7 @@ describe('PecasInsumos Event handlers', () => {
           },
         ],
       });
-      repo.findOne.mockResolvedValue(null);
+      repo.findOne.mockResolvedValue(null as unknown as PecaInsumo);
 
       await useCase.execute({ pedidoId: 'pedido-1' });
 

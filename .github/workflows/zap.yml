@@ -53,20 +53,24 @@ jobs:
       - name: Gerar cliente Prisma
         run: npx prisma generate
 
-      - name: Preparar banco e seed
+      - name: Preparar banco e seed com credenciais descartáveis
         run: |
+          echo "SEED_ADMIN_EMAIL=ci-${GITHUB_RUN_ID}@invalid.example" >> "$GITHUB_ENV"
+          echo "SEED_ADMIN_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          export SEED_ADMIN_EMAIL="ci-${GITHUB_RUN_ID}@invalid.example"
+          export SEED_ADMIN_PASSWORD="$(openssl rand -hex 32)"
+          export SEED_RECEPCIONISTA_PASSWORD="$(openssl rand -hex 32)"
+          export SEED_MECANICO_PASSWORD="$(openssl rand -hex 32)"
+          echo "JWT_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
           npx prisma db push --skip-generate
           npx ts-node scripts/seed.ts
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
-          SEED_ADMIN_EMAIL: admin@oficina.com
-          SEED_ADMIN_PASSWORD: changeme123
 
       - name: Iniciar aplicação
         run: pnpm run start > app.log 2>&1 & echo $! > app.pid
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
-          JWT_SECRET: zap-test-jwt-secret-key
           JWT_CUSTOMER_PUBLIC_KEY: zap-test-jwt-customer-public-key
           PORT: 3000
 
@@ -75,7 +79,7 @@ jobs:
           APP_PID=$(cat app.pid)
           for i in $(seq 1 30); do
             kill -0 "$APP_PID" 2>/dev/null || { echo "❌ App morreu"; cat app.log; exit 1; }
-            curl -sf http://localhost:3000/api/v1/ && echo "App pronta!" && exit 0
+            curl -sf http://localhost:3000/api/v1/health/live && echo "App pronta!" && exit 0
             echo "Aguardando... ($i/30)" && sleep 3
           done
           echo "❌ App não respondeu após 90s" && cat app.log && exit 1

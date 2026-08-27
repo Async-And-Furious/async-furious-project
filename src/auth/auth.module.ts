@@ -9,6 +9,7 @@ import { JwtCustomerStrategy } from './strategies/jwt-customer.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtCustomerAuthGuard } from './guards/jwt-customer-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { createJwtModuleOptions } from './jwt.config';
 
 @Module({
   imports: [
@@ -17,16 +18,7 @@ import { RolesGuard } from './guards/roles.guard';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
-        const secret = config.get<string>('JWT_SECRET');
-        if (!secret) {
-          throw new Error('JWT_SECRET environment variable is required');
-        }
-        return {
-          secret,
-          signOptions: { expiresIn: '1h' },
-        };
-      },
+      useFactory: createJwtModuleOptions,
     }),
   ],
   controllers: [AuthController],

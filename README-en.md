@@ -82,8 +82,10 @@ JWT_SECRET="change-me-in-production-use-openssl-rand-hex-32"
 PORT=3000
 BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
-SEED_ADMIN_EMAIL="admin@oficina.com"
-SEED_ADMIN_PASSWORD="changeme123"
+SEED_ADMIN_EMAIL="admin@example.invalid"
+SEED_ADMIN_PASSWORD="replace-with-disposable-local-secret"
+SEED_RECEPCIONISTA_PASSWORD="replace-with-disposable-local-secret"
+SEED_MECANICO_PASSWORD="replace-with-disposable-local-secret"
 ```
 
 ### 3. Start with Docker for development
@@ -104,6 +106,18 @@ docker compose up -d
 ```
 
 The application is available at `http://localhost:3000`.
+
+### Production JWT
+
+Production follows the shared contract: `RS256`, `JWT_PUBLIC_KEY`,
+`JWT_ISSUER=repo-auth-serverless`, `JWT_AUDIENCE=async-furious-project`, and
+`JWT_EXPIRES_IN=1800`. The service verifies tokens issued by the shared
+authenticator. `JWT_PRIVATE_KEY` may only be supplied through a managed Secret
+when this process is explicitly authorized to sign; without it, local
+production signing fails closed. Never commit keys.
+
+The local example above uses `HS256` and `JWT_SECRET` for development and tests
+only; this fallback is not accepted in production.
 
 ---
 
@@ -327,12 +341,13 @@ Local infrastructure is provisioned with Terraform on a local Kubernetes cluster
   /modules/kind-cluster              # Creates a kind cluster with control-plane and worker
   /modules/kubernetes-apps           # Applies manifests through the kubectl provider
   /environments/local                # Local environment
-  /environments/aws/README.md        # EKS migration stub
+  /environments/aws/README.md        # Manual deployment to existing EKS
 
 /k8s
   namespace.yaml
   /config    configmap.yaml, secret.yaml
   /app       deployment.yaml, service.yaml, hpa.yaml
+  /overlays/aws  # Internal ALB Ingress and digest-based EKS deployment
   /database  statefulset.yaml, service.yaml, pvc.yaml
 ```
 
@@ -353,7 +368,7 @@ Use `scripts/local-up.sh` — it runs every step in the correct order:
 ```
 
 Set `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email` and
-`TF_VAR_seed_admin_password` as environment variables or in `.env.local`
+`TF_VAR_seed_admin_password`, `TF_VAR_seed_recepcionista_password` and `TF_VAR_seed_mecanico_password` as environment variables or in `.env.local`
 before running — the script will prompt interactively if they are not found.
 
 ### Start the local environment (manual)
@@ -367,8 +382,10 @@ docker build -t async-furious-api:latest .
 # 2. Sensitive variables used by Terraform
 export TF_VAR_db_password="postgres"
 export TF_VAR_jwt_secret="change-me-in-production-use-openssl-rand-hex-32"
-export TF_VAR_seed_admin_email="admin@oficina.com"
-export TF_VAR_seed_admin_password="changeme123"
+export TF_VAR_seed_admin_email="admin@example.invalid"
+export TF_VAR_seed_admin_password="<disposable-local-secret>"
+export TF_VAR_seed_recepcionista_password="<disposable-local-secret>"
+export TF_VAR_seed_mecanico_password="<disposable-local-secret>"
 
 # 3. Create the cluster and apply manifests
 cd infra/environments/local
@@ -427,9 +444,9 @@ curl http://localhost:30000/api/v1
 
 ### Important notes
 
-- Kubernetes probes must point to `/api/v1`, not `/health`.
+- Kubernetes liveness/startup and ALB probes use `/api/v1/health/live`; readiness uses `/api/v1/health/ready`.
 - If you see `ErrImageNeverPull`, load the image with `kind load docker-image` or use `./scripts/local-up.sh reload`.
-- The `migrate` init container runs `prisma migrate deploy` before each API pod starts.
+- AWS runs a commit/attempt-named, idempotent Prisma migration Job before the API rollout. Failed rollouts are diagnosed, not automatically rolled back.
 - HPA requires metrics-server, which is installed automatically by the `kubernetes-apps` module.
 - If Prisma reports authentication failure against `postgres-service`, check that `TF_VAR_db_password` and the existing PostgreSQL password match. In disposable local environments, destroying and recreating the cluster/volume also fixes it.
 
@@ -441,21 +458,26 @@ On push to `main`/`develop` (or via manual `workflow_dispatch`), the same workfl
 
 ### EKS Migration
 
-See `infra/environments/aws/README.md`.
+See `infra/environments/aws/README.md`. The manual
+`.github/workflows/deploy-eks.yml` workflow pushes a commit-SHA-tagged image
+to ECR and applies `k8s/overlays/aws` by digest after GitHub Environment
+approval. Normal mode uses the ALB Ingress and requires the AWS Load Balancer
+Controller. For AWS Academy, dispatch with `aws_academy=true`: the workflow
+removes the Ingress, patches the Service to `LoadBalancer` (no IRSA or IAM
+resources), waits for the external hostname/IP, and publishes
+`http://<endpoint>:3000` in the summary. Auth should use that URL without a
+trailing slash and call endpoints under `/api/v1`, such as
+`POST <backend-url>/api/v1/auth/login`. The EKS cluster must already exist; the
+workflow provisions no AWS resources. In `aws_academy=true`, configure the
+protected GitHub Environment with secrets `DATABASE_SECRET_ARN` and
+`JWT_PRIVATE_KEY_SECRET_ARN`, plus the variable `JWT_PUBLIC_KEY_PARAMETER_NAME`.
+The runner reads the RDS JSON contract (`username`, `password`, `host`, `port`,
+`dbname`), reads both JWT values from AWS, constructs `DATABASE_URL`, and
+applies only `DATABASE_URL`, `JWT_PRIVATE_KEY`, and `JWT_PUBLIC_KEY` to the
+Kubernetes Secret. It fails closed when any reference is absent. Normal mode
+still requires its pre-existing managed Secret and is unchanged.
 
 ---
-
-## Architectural Documentation (Phase 3)
-
-The full documentation for the Phase 3 distributed architecture (four
-repositories, centralized authentication via API Gateway + Serverless
-Function, Kubernetes/EKS, managed database, observability, CI/CD, ADRs and
-RFCs) lives in [docs/README.md](./docs/README.md).
-
-It explicitly distinguishes what is **implemented today** (this repository,
-local monolith) from what is **Phase 3 proposal** (decided via ADR/RFC, but
-still at skeleton stage in the `repo-auth-serverless`, `repo-k8s-infra` and
-`repo-db-infra` repositories).
 
 ## Code Conventions
 

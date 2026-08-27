@@ -174,12 +174,22 @@ export class OrdemServicoController {
   }
 
   @Get(':id/status')
+  @Public()
   @ApiOperation({ summary: 'Consultar status da OS (para o cliente)' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   consultarStatus(@Param('id', ParseUUIDPipe) id: string) {
+    return this.consultarStatusUseCase.execute(id);
+  }
+
+  @Get(':id/rastreamento')
+  @Public()
+  @ApiOperation({ summary: 'Rastreamento público da ordem de serviço' })
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Status atual da OS' })
+  rastrear(@Param('id', ParseUUIDPipe) id: string) {
     return this.consultarStatusUseCase.execute(id);
   }
 
