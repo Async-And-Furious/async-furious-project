@@ -19,6 +19,10 @@ permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: deploy-eks-${{ inputs.environment }}
+  cancel-in-progress: false
+
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
@@ -76,8 +80,56 @@ jobs:
           docker push "$IMAGE"
           echo "uri=$REGISTRY/$ECR_REPOSITORY" >> "$GITHUB_OUTPUT"
           echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
+      - name: Allow Academy HML runner to reach EKS
+        if: ${{ inputs.aws_academy && inputs.environment == 'hml' }}
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl --fail --silent --show-error --ipv4 --proto '=https' https://checkip.amazonaws.com)
+          runner_ip=$(python3 - "$runner_ip" <<'PY'
+          import ipaddress
+          import sys
+
+          address = ipaddress.ip_address(sys.argv[1])
+          if address.version != 4 or not address.is_global:
+              raise SystemExit(f"Runner address is not a globally routable IPv4: {address}")
+          print(address)
+          PY
+          )
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          deadline=$((SECONDS + 600))
+          while ! update_id=$(aws eks update-cluster-config \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=$runner_ip/32" \
+            --query 'update.id' \
+            --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting the EKS endpoint update.' >&2; exit 1; }
+            sleep 10
+          done
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == 'Successful' ]] && exit 0
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint update ended with status $status." >&2; exit 1; }
+            sleep 10
+          done
+          echo 'Timed out waiting for the EKS endpoint update.' >&2
+          exit 1
       - name: Configure kubectl for existing EKS cluster
         run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+      - name: Wait for authenticated Academy HML cluster access
+        if: ${{ inputs.aws_academy && inputs.environment == 'hml' }}
+        run: |
+          deadline=$((SECONDS + 300))
+          while (( SECONDS < deadline )); do
+            kubectl get --raw=/readyz && exit 0
+            sleep 10
+          done
+          echo 'Timed out waiting for authenticated EKS API access.' >&2
+          exit 1
       - name: Ensure application namespace
         # The overlay also declares this namespace, but the Secret below has to
         # land before the overlay is applied, so create it up front.
@@ -208,3 +260,31 @@ jobs:
       - name: Protected HML smoke test skipped
         if: ${{ steps.hml.outputs.enabled != 'true' }}
         run: "echo 'HML protected smoke test skipped: required HML configuration is not present.'"
+      - name: Disable Academy HML public EKS endpoint
+        if: ${{ always() && inputs.aws_academy && inputs.environment == 'hml' }}
+        run: |
+          set -euo pipefail
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          deadline=$((SECONDS + 600))
+          while ! update_id=$(aws eks update-cluster-config \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config 'endpointPrivateAccess=true,endpointPublicAccess=false' \
+            --query 'update.id' \
+            --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceNotFoundException* ]] && { printf '%s\n' "$error" >&2; exit 0; }
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting public endpoint cleanup.' >&2; exit 1; }
+            sleep 10
+          done
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == 'Successful' ]] && exit 0
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint cleanup ended with status $status." >&2; exit 1; }
+            sleep 10
+          done
+          echo 'Timed out waiting for public endpoint cleanup.' >&2
+          exit 1
