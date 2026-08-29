@@ -1,0 +1,174 @@
+name: Cleanup Academy HML EKS application
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: hml
+        type: choice
+        options: [hml]
+      aws_academy:
+        description: Confirm this is an AWS Academy environment
+        required: true
+        type: boolean
+        default: true
+      operation:
+        description: Plan or remove the application namespace
+        required: true
+        default: destroy-plan
+        type: choice
+        options: [destroy-plan, destroy]
+      confirm:
+        description: Type DESTROY HML when operation is destroy
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-eks-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  K8S_NAMESPACE: async-furious
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard Academy HML cleanup inputs
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+          AWS_ACADEMY: ${{ inputs.aws_academy }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_ENVIRONMENT" == 'hml' ]] || { echo 'Only HML cleanup is allowed.' >&2; exit 1; }
+          [[ "$AWS_ACADEMY" == 'true' ]] || { echo 'Cleanup requires AWS Academy mode.' >&2; exit 1; }
+          [[ "$OPERATION" == 'destroy-plan' || "$OPERATION" == 'destroy' ]] || { echo 'Unsupported cleanup operation.' >&2; exit 1; }
+          [[ "$OPERATION" != 'destroy' || "$CONFIRM" == 'DESTROY HML' ]] || { echo 'Destroy requires exact confirmation: DESTROY HML' >&2; exit 1; }
+      - name: Configure AWS Academy credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Detect EKS cluster
+        id: cluster
+        run: |
+          set -euo pipefail
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          if aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" >/dev/null 2>"$error_file"; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+          elif grep -q 'ResourceNotFoundException' "$error_file"; then
+            cat "$error_file" >&2
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+            echo '### Cleanup result: EKS cluster is absent; nothing to remove.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat "$error_file" >&2
+            exit 1
+          fi
+      - name: Allow runner to reach Academy HML EKS
+        if: ${{ steps.cluster.outputs.exists == 'true' }}
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl --fail --silent --show-error --ipv4 --proto '=https' https://checkip.amazonaws.com)
+          runner_ip=$(python3 - "$runner_ip" <<'PY'
+          import ipaddress
+          import sys
+
+          address = ipaddress.ip_address(sys.argv[1])
+          if address.version != 4 or not address.is_global:
+              raise SystemExit(f"Runner address is not a globally routable IPv4: {address}")
+          print(address)
+          PY
+          )
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          deadline=$((SECONDS + 600))
+          while ! update_id=$(aws eks update-cluster-config \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=$runner_ip/32" \
+            --query 'update.id' \
+            --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting the EKS endpoint update.' >&2; exit 1; }
+            sleep 10
+          done
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == 'Successful' ]] && exit 0
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint update ended with status $status." >&2; exit 1; }
+            sleep 10
+          done
+          echo 'Timed out waiting for the EKS endpoint update.' >&2
+          exit 1
+      - name: Configure kubectl
+        if: ${{ steps.cluster.outputs.exists == 'true' }}
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+      - name: Wait for authenticated cluster access
+        if: ${{ steps.cluster.outputs.exists == 'true' }}
+        run: |
+          deadline=$((SECONDS + 300))
+          while (( SECONDS < deadline )); do
+            kubectl get --raw=/readyz && exit 0
+            sleep 10
+          done
+          echo 'Timed out waiting for authenticated EKS API access.' >&2
+          exit 1
+      - name: Preview application namespace
+        if: ${{ steps.cluster.outputs.exists == 'true' && inputs.operation == 'destroy-plan' }}
+        run: |
+          set -euo pipefail
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          if kubectl get namespace "$K8S_NAMESPACE" >/dev/null 2>"$error_file"; then
+            echo "### Cleanup preview: namespace \`$K8S_NAMESPACE\` exists and needs removal." >> "$GITHUB_STEP_SUMMARY"
+          elif grep -q 'NotFound' "$error_file"; then
+            echo "### Cleanup preview: namespace \`$K8S_NAMESPACE\` is absent; nothing to remove." >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat "$error_file" >&2
+            exit 1
+          fi
+      - name: Remove application namespace
+        if: ${{ steps.cluster.outputs.exists == 'true' && inputs.operation == 'destroy' }}
+        run: kubectl delete namespace "$K8S_NAMESPACE" --ignore-not-found --wait --timeout=10m
+      - name: Disable Academy HML public EKS endpoint
+        if: ${{ always() && steps.cluster.outputs.exists == 'true' }}
+        run: |
+          set -euo pipefail
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          deadline=$((SECONDS + 600))
+          while ! update_id=$(aws eks update-cluster-config \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config 'endpointPrivateAccess=true,endpointPublicAccess=false' \
+            --query 'update.id' \
+            --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceNotFoundException* ]] && { printf '%s\n' "$error" >&2; exit 0; }
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting public endpoint cleanup.' >&2; exit 1; }
+            sleep 10
+          done
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == 'Successful' ]] && exit 0
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint cleanup ended with status $status." >&2; exit 1; }
+            sleep 10
+          done
+          echo 'Timed out waiting for public endpoint cleanup.' >&2
+          exit 1
