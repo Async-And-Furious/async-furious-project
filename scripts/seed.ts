@@ -1,10 +1,17 @@
 import dotenv from 'dotenv';
-import { PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
+import { Prisma, PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
 
 dotenv.config();
 
 const prisma = new PrismaClient();
+type SeedClient = Prisma.TransactionClient;
+
+function stableSeedId(value: string): string {
+  const hash = createHash('sha256').update(value).digest('hex');
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
+}
 
 const email = process.env.SEED_ADMIN_EMAIL;
 const password = process.env.SEED_ADMIN_PASSWORD;
@@ -431,91 +438,89 @@ const PECAS_INSUMOS = [
   },
 ];
 
-async function seedAdmin(): Promise<void> {
-  const hashedPassword = await bcrypt.hash(password ?? '', 10);
-  await prisma.user.upsert({
-    where: { email: email?.toLowerCase()?.trim() ?? '' },
-    update: { password: hashedPassword },
-    create: {
-      email: email?.toLowerCase()?.trim() ?? '',
-      password: hashedPassword,
-      name: 'Admin User',
-      role: 'ADMIN',
-    },
-  });
+async function seedAdmin(db: SeedClient): Promise<void> {
+  const normalizedEmail = email?.toLowerCase()?.trim() ?? '';
+  const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
+  if (!existing) {
+    const hashedPassword = await bcrypt.hash(password ?? '', 10);
+    try {
+      await db.user.create({
+        data: {
+          id: stableSeedId(`user:${normalizedEmail}`),
+          email: normalizedEmail,
+          password: hashedPassword,
+          name: 'Admin User',
+          role: 'ADMIN',
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+        throw error;
+      await db.user.findUniqueOrThrow({ where: { email: normalizedEmail } });
+    }
+  }
   console.log(`  ✅ Admin criado/atualizado: ${email}`);
 }
 
-async function seedRecepcionista(): Promise<void> {
+async function seedRecepcionista(db: SeedClient): Promise<void> {
   const recepEmail = 'recepcionista@oficina.com';
-  const existing = await prisma.user.findFirst({ where: { email: recepEmail } });
-  if (existing) {
-    console.log('  ⏭  Recepcionista já existe, pulando');
-    return;
+  const existing = await db.user.findUnique({ where: { email: recepEmail } });
+  if (!existing) {
+    const hashedPassword = await bcrypt.hash('recep123', 10);
+    try {
+      await db.user.create({
+        data: {
+          id: stableSeedId(`user:${recepEmail}`),
+          email: recepEmail,
+          password: hashedPassword,
+          name: 'Recepcionista Padrão',
+          role: 'RECEPCIONISTA',
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+        throw error;
+      await db.user.findUniqueOrThrow({ where: { email: recepEmail } });
+    }
   }
-  const hashedPassword = await bcrypt.hash('recep123', 10);
-  await prisma.user.create({
-    data: {
-      email: recepEmail,
-      password: hashedPassword,
-      name: 'Recepcionista Padrão',
-      role: 'RECEPCIONISTA',
-    },
-  });
   console.log(`  ✅ Recepcionista criada: ${recepEmail}`);
 }
 
-async function seedMecanico(): Promise<void> {
+async function seedMecanico(db: SeedClient): Promise<void> {
   const mecEmail = 'mecanico@oficina.com';
-  const existing = await prisma.user.findFirst({ where: { email: mecEmail } });
-  if (existing) {
-    console.log('  ⏭  Mecânico já existe, pulando');
-    return;
+  const existing = await db.user.findUnique({ where: { email: mecEmail } });
+  if (!existing) {
+    const hashedPassword = await bcrypt.hash('mecanico123', 10);
+    try {
+      await db.user.create({
+        data: {
+          id: stableSeedId(`user:${mecEmail}`),
+          email: mecEmail,
+          password: hashedPassword,
+          name: 'Mecânico Padrão',
+          role: 'MECANICO',
+        },
+      });
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+        throw error;
+      await db.user.findUniqueOrThrow({ where: { email: mecEmail } });
+    }
   }
-  const hashedPassword = await bcrypt.hash('mecanico123', 10);
-  await prisma.user.create({
-    data: {
-      email: mecEmail,
-      password: hashedPassword,
-      name: 'Mecânico Padrão',
-      role: 'MECANICO',
-    },
-  });
   console.log(`  ✅ Mecânico criado: ${mecEmail}`);
 }
 
-async function seedLoop<T>(
-  label: string,
-  items: T[],
-  findExisting: (item: T) => Promise<unknown>,
-  createItem: (item: T) => Promise<unknown>
-): Promise<void> {
-  let criados = 0;
-  let pulados = 0;
-  for (const item of items) {
-    if (await findExisting(item)) {
-      pulados++;
-      continue;
-    }
-    await createItem(item);
-    criados++;
-  }
-  console.log(`  ✅ ${label}: ${criados} criados, ${pulados} já existiam`);
-}
-
-async function seedClientes(): Promise<string[]> {
+async function seedClientes(db: SeedClient): Promise<string[]> {
   const ids: string[] = [];
   let criados = 0;
   let pulados = 0;
   for (const c of CLIENTES) {
-    const existing = await prisma.cliente.findFirst({ where: { documento: c.documento } });
-    if (existing) {
-      ids.push(existing.id);
-      pulados++;
-      continue;
-    }
-    const created = await prisma.cliente.create({
-      data: {
+    const existing = await db.cliente.findUnique({ where: { documento: c.documento } });
+    const cliente = await db.cliente.upsert({
+      where: { documento: c.documento },
+      update: {},
+      create: {
+        id: stableSeedId(`cliente:${c.documento}`),
         nome: c.nome,
         email: c.email,
         telefone: c.telefone,
@@ -523,26 +528,26 @@ async function seedClientes(): Promise<string[]> {
         tipo_documento: c.tipoDocumento,
       },
     });
-    ids.push(created.id);
-    criados++;
+    ids.push(cliente.id);
+    if (existing) pulados++;
+    else criados++;
   }
   console.log(`  ✅ Clientes: ${criados} criados, ${pulados} já existiam`);
   return ids;
 }
 
-async function seedVeiculos(clienteIds: string[]): Promise<void> {
+async function seedVeiculos(db: SeedClient, clienteIds: string[]): Promise<void> {
   let criados = 0;
   let pulados = 0;
   for (let i = 0; i < VEICULOS_TEMPLATE.length; i++) {
     const v = VEICULOS_TEMPLATE[i];
-    const existing = await prisma.veiculo.findFirst({ where: { placa: v.placa } });
-    if (existing) {
-      pulados++;
-      continue;
-    }
     const clienteId = clienteIds[i % clienteIds.length];
-    await prisma.veiculo.create({
-      data: {
+    const existing = await db.veiculo.findUnique({ where: { placa: v.placa } });
+    await db.veiculo.upsert({
+      where: { placa: v.placa },
+      update: {},
+      create: {
+        id: stableSeedId(`veiculo:${v.placa}`),
         placa: v.placa,
         marca: v.marca,
         modelo: v.modelo,
@@ -551,41 +556,94 @@ async function seedVeiculos(clienteIds: string[]): Promise<void> {
         id_cliente: clienteId,
       },
     });
-    criados++;
+    if (existing) pulados++;
+    else criados++;
   }
   console.log(`  ✅ Veículos: ${criados} criados, ${pulados} já existiam`);
 }
 
-async function seedServicos(): Promise<void> {
-  await seedLoop(
-    'Serviços',
-    SERVICOS,
-    (s) => prisma.servico.findFirst({ where: { nome: s.nome } }),
-    (s) => prisma.servico.create({ data: { nome: s.nome, descricao: s.descricao, preco: s.preco } })
-  );
+async function seedServicos(db: SeedClient): Promise<void> {
+  let criados = 0;
+  let pulados = 0;
+  for (const s of SERVICOS) {
+    let created = false;
+    const id = stableSeedId(`servico:${s.nome}`);
+    let lastConflict: Prisma.PrismaClientKnownRequestError | undefined;
+
+    // `nome` is intentionally not unique: an existing service with this name
+    // must be preserved, while the deterministic id makes this seed safe to
+    // run concurrently.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const existing = await db.servico.findFirst({ where: { nome: s.nome } });
+      if (existing) break;
+
+      try {
+        await db.servico.create({
+          data: {
+            id,
+            nome: s.nome,
+            descricao: s.descricao,
+            preco: s.preco,
+          },
+        });
+        created = true;
+        break;
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+          throw error;
+        }
+        lastConflict = error;
+        // Re-read both identities. The winner may have used the same seed id,
+        // or may be a pre-existing record with the same non-unique name.
+        const [byName, byId] = await Promise.all([
+          db.servico.findFirst({ where: { nome: s.nome } }),
+          db.servico.findUnique({ where: { id } }),
+        ]);
+        if (byName || byId) break;
+      }
+    }
+    if (lastConflict && !created) {
+      const existing = await db.servico.findFirst({ where: { nome: s.nome } });
+      const seeded = await db.servico.findUnique({ where: { id } });
+      if (!existing && !seeded) throw lastConflict;
+    }
+    if (created) criados++;
+    else pulados++;
+  }
+  console.log(`  ✅ Serviços: ${criados} criados, ${pulados} já existiam`);
 }
 
-async function seedPecasInsumos(): Promise<void> {
-  await seedLoop(
-    'Peças/Insumos',
-    PECAS_INSUMOS,
-    (p) => prisma.peca.findFirst({ where: { codigo: p.codigo } }),
-    (p) =>
-      prisma.peca.create({
-        data: {
-          nome: p.nome,
-          codigo: p.codigo,
-          descricao: p.descricao,
-          preco: p.preco,
-          quantidade_estoque: p.quantidade_estoque,
-          quantidade_minima: p.quantidade_minima,
-        },
-      })
-  );
+async function seedPecasInsumos(db: SeedClient): Promise<void> {
+  let criados = 0;
+  let pulados = 0;
+  for (const p of PECAS_INSUMOS) {
+    const existing = await db.peca.findUnique({ where: { codigo: p.codigo } });
+    await db.peca.upsert({
+      where: { codigo: p.codigo },
+      update: {},
+      create: {
+        id: stableSeedId(`peca:${p.codigo}`),
+        nome: p.nome,
+        codigo: p.codigo,
+        descricao: p.descricao,
+        preco: p.preco,
+        quantidade_estoque: p.quantidade_estoque,
+        quantidade_minima: p.quantidade_minima,
+      },
+    });
+    if (existing) pulados++;
+    else criados++;
+  }
+  console.log(`  ✅ Peças/Insumos: ${criados} criados, ${pulados} já existiam`);
 }
 
-async function seedOrdensServico(clienteIds: string[]): Promise<void> {
-  const veiculos = await prisma.veiculo.findMany({ take: 10 });
+async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<void> {
+  const seededVehicleIds = VEICULOS_TEMPLATE.map(({ placa }) => stableSeedId(`veiculo:${placa}`));
+  const veiculos = await db.veiculo.findMany({
+    where: { id: { in: seededVehicleIds } },
+    orderBy: { id: 'asc' },
+    take: 10,
+  });
   if (veiculos.length === 0) return;
 
   const OS_TEMPLATES = [
@@ -681,28 +739,51 @@ async function seedOrdensServico(clienteIds: string[]): Promise<void> {
     const veiculo = veiculos[i % veiculos.length];
     const clienteId = clienteIds[i % clienteIds.length];
 
-    const existing = await prisma.ordemServico.findFirst({
+    const existing = await db.ordemServico.findFirst({
       where: { id_veiculo: veiculo.id, descricao: template.descricao },
     });
 
-    if (existing) {
-      puladas++;
-      continue;
+    let os = existing;
+    if (!os) {
+      const id = stableSeedId(`${veiculo.id}:${template.descricao}`);
+      try {
+        os = await db.ordemServico.create({
+          data: {
+            id,
+            id_veiculo: veiculo.id,
+            id_cliente: clienteId,
+            status: template.status,
+            descricao: template.descricao,
+          },
+        });
+      } catch (error) {
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+          throw error;
+        os = await db.ordemServico.findFirst({
+          where: { id_veiculo: veiculo.id, descricao: template.descricao },
+        });
+        if (!os) throw error;
+      }
     }
 
-    const os = await prisma.ordemServico.create({
-      data: {
-        id_veiculo: veiculo.id,
-        id_cliente: clienteId,
-        status: template.status,
-        descricao: template.descricao,
-      },
-    });
+    if (existing) {
+      puladas++;
+    } else {
+      criadas++;
+    }
 
     if (template.orcamento) {
       const { valor_total_servicos, valor_total_pecas, status } = template.orcamento;
-      await prisma.orcamento.create({
-        data: {
+      await db.orcamento.upsert({
+        where: { id_ordem_servico: os.id },
+        update: {
+          valor_total_servicos,
+          valor_total_pecas,
+          valor_total_geral: valor_total_servicos + valor_total_pecas,
+          status,
+        },
+        create: {
+          id: stableSeedId(`orcamento:${os.id}`),
           id_ordem_servico: os.id,
           valor_total_servicos,
           valor_total_pecas,
@@ -711,8 +792,6 @@ async function seedOrdensServico(clienteIds: string[]): Promise<void> {
         },
       });
     }
-
-    criadas++;
   }
 
   console.log(`  ✅ Ordens de Serviço: ${criadas} criadas, ${puladas} já existiam`);
@@ -721,14 +800,20 @@ async function seedOrdensServico(clienteIds: string[]): Promise<void> {
 async function seed(): Promise<void> {
   console.log('🌱 Seedando banco de dados...\n');
 
-  await seedAdmin();
-  await seedRecepcionista();
-  await seedMecanico();
-  const clienteIds = await seedClientes();
-  await seedVeiculos(clienteIds);
-  await seedServicos();
-  await seedPecasInsumos();
-  await seedOrdensServico(clienteIds);
+  await prisma.$transaction(
+    async (db) => {
+      await seedAdmin(db);
+      await seedRecepcionista(db);
+      await seedMecanico(db);
+      const clienteIds = await seedClientes(db);
+      await seedVeiculos(db, clienteIds);
+      await seedServicos(db);
+      await seedPecasInsumos(db);
+      await seedOrdensServico(db, clienteIds);
+    },
+    // Keep the complete seed atomic while allowing its many writes to finish.
+    { maxWait: 10_000, timeout: 120_000 }
+  );
 
   console.log('\n🎉 Seed concluído com sucesso!');
 }
