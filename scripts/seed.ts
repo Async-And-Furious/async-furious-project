@@ -633,6 +633,73 @@ async function seedPecasInsumos(db: SeedClient): Promise<void> {
   console.log(`  ✅ Peças/Insumos: ${criados} criados, ${pulados} já existiam`);
 }
 
+type OrderTemplate = {
+  descricao: string;
+  status: SOStatus;
+  orcamento: {
+    valor_total_servicos: number;
+    valor_total_pecas: number;
+    status: EstimateStatus;
+  } | null;
+};
+
+type SeedOrder = Awaited<ReturnType<SeedClient['ordemServico']['create']>>;
+
+async function findOrCreateOrdem(
+  db: SeedClient,
+  veiculoId: string,
+  clienteId: string,
+  template: OrderTemplate
+): Promise<{ os: SeedOrder; existing: boolean }> {
+  const where = { id_veiculo: veiculoId, descricao: template.descricao };
+  const existing = await db.ordemServico.findFirst({ where });
+  if (existing) return { os: existing, existing: true };
+
+  try {
+    const os = await db.ordemServico.create({
+      data: {
+        id: stableSeedId(`${veiculoId}:${template.descricao}`),
+        id_veiculo: veiculoId,
+        id_cliente: clienteId,
+        status: template.status,
+        descricao: template.descricao,
+      },
+    });
+    return { os, existing: false };
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+      throw error;
+    const os = await db.ordemServico.findFirst({ where });
+    if (!os) throw error;
+    return { os, existing: false };
+  }
+}
+
+async function upsertOrcamento(
+  db: SeedClient,
+  osId: string,
+  orcamento: NonNullable<OrderTemplate['orcamento']>
+): Promise<void> {
+  const { valor_total_servicos, valor_total_pecas, status } = orcamento;
+  await db.orcamento.upsert({
+    where: { id_ordem_servico: osId },
+    update: {
+      valor_total_servicos,
+      valor_total_pecas,
+      valor_total_geral: valor_total_servicos + valor_total_pecas,
+      status,
+    },
+    create: {
+      id: stableSeedId(`orcamento:${osId}`),
+      id_ordem_servico: osId,
+      valor_total_servicos,
+      valor_total_pecas,
+      valor_total_geral: valor_total_servicos + valor_total_pecas,
+      status,
+    },
+  });
+}
+
 async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<void> {
   const seededVehicleIds = VEICULOS_TEMPLATE.map(({ placa }) => stableSeedId(`veiculo:${placa}`));
   const veiculos = await db.veiculo.findMany({
@@ -642,7 +709,7 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
   });
   if (veiculos.length === 0) return;
 
-  const OS_TEMPLATES = [
+  const OS_TEMPLATES: OrderTemplate[] = [
     {
       descricao: 'Troca de óleo e revisão completa do motor',
       status: SOStatus.RECEIVED,
@@ -735,58 +802,15 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
     const veiculo = veiculos[i % veiculos.length];
     const clienteId = clienteIds[i % clienteIds.length];
 
-    const existing = await db.ordemServico.findFirst({
-      where: { id_veiculo: veiculo.id, descricao: template.descricao },
-    });
-
-    let os = existing;
-    if (!os) {
-      const id = stableSeedId(`${veiculo.id}:${template.descricao}`);
-      try {
-        os = await db.ordemServico.create({
-          data: {
-            id,
-            id_veiculo: veiculo.id,
-            id_cliente: clienteId,
-            status: template.status,
-            descricao: template.descricao,
-          },
-        });
-      } catch (error) {
-        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
-          throw error;
-        os = await db.ordemServico.findFirst({
-          where: { id_veiculo: veiculo.id, descricao: template.descricao },
-        });
-        if (!os) throw error;
-      }
-    }
-
-    if (existing) {
+    const result = await findOrCreateOrdem(db, veiculo.id, clienteId, template);
+    if (result.existing) {
       puladas++;
     } else {
       criadas++;
     }
 
     if (template.orcamento) {
-      const { valor_total_servicos, valor_total_pecas, status } = template.orcamento;
-      await db.orcamento.upsert({
-        where: { id_ordem_servico: os.id },
-        update: {
-          valor_total_servicos,
-          valor_total_pecas,
-          valor_total_geral: valor_total_servicos + valor_total_pecas,
-          status,
-        },
-        create: {
-          id: stableSeedId(`orcamento:${os.id}`),
-          id_ordem_servico: os.id,
-          valor_total_servicos,
-          valor_total_pecas,
-          valor_total_geral: valor_total_servicos + valor_total_pecas,
-          status,
-        },
-      });
+      await upsertOrcamento(db, result.os.id, template.orcamento);
     }
   }
 
