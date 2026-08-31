@@ -16,6 +16,9 @@ describe('AuthService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    cliente: {
+      findUnique: jest.fn(),
+    },
   };
 
   const mockJwtService = {
@@ -195,6 +198,45 @@ describe('AuthService', () => {
       const result = await service.validateUser('nonexistent-id');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('validateTokenSubject', () => {
+    it('accepts an active customer identified by stable customer id', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockResolvedValue({
+        id: 'cliente-id',
+        email: 'cliente@example.com',
+        ativo: true,
+      });
+
+      await expect(service.validateTokenSubject({ sub: 'cliente-id' })).resolves.toEqual({
+        id: 'cliente-id',
+        email: 'cliente@example.com',
+        role: 'CLIENTE',
+      });
+      expect(mockPrisma.cliente.findUnique).toHaveBeenCalledWith({
+        where: { id: 'cliente-id' },
+        select: { id: true, email: true, ativo: true },
+      });
+    });
+
+    it('rejects an inactive customer', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockResolvedValue({
+        id: 'cliente-id',
+        email: 'cliente@example.com',
+        ativo: false,
+      });
+
+      await expect(service.validateTokenSubject({ sub: 'cliente-id' })).resolves.toBeNull();
+    });
+
+    it('rejects a nonexistent customer', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockResolvedValue(null);
+
+      await expect(service.validateTokenSubject({ sub: 'missing-id' })).resolves.toBeNull();
     });
   });
 

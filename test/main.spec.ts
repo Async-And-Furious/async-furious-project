@@ -10,11 +10,14 @@ jest.mock('cookie-parser', () => jest.fn(() => jest.fn()));
 describe('Main Bootstrap', () => {
   let app: INestApplication;
   let originalJwtSecret: string | undefined;
+  let originalJwtCustomerPublicKey: string | undefined;
 
   beforeAll(() => {
     // Salva o valor original e define JWT_SECRET para os testes
     originalJwtSecret = process.env.JWT_SECRET;
     process.env.JWT_SECRET = 'test-jwt-secret-key';
+    originalJwtCustomerPublicKey = process.env.JWT_CUSTOMER_PUBLIC_KEY;
+    process.env.JWT_CUSTOMER_PUBLIC_KEY = 'test-jwt-customer-public-key';
   });
 
   afterAll(() => {
@@ -23,6 +26,11 @@ describe('Main Bootstrap', () => {
       process.env.JWT_SECRET = originalJwtSecret;
     } else {
       delete process.env.JWT_SECRET;
+    }
+    if (originalJwtCustomerPublicKey) {
+      process.env.JWT_CUSTOMER_PUBLIC_KEY = originalJwtCustomerPublicKey;
+    } else {
+      delete process.env.JWT_CUSTOMER_PUBLIC_KEY;
     }
   });
 
@@ -167,7 +175,7 @@ describe('Main Bootstrap', () => {
 
       const enableCorsSpy = jest.spyOn(app, 'enableCors');
 
-      const allowedOrigins = process.env.ALLOWED_ORIGINS;
+      const allowedOrigins = process.env.ALLOWED_ORIGINS as string | undefined;
       const origins = allowedOrigins ? allowedOrigins.split(',') : true;
       app.enableCors({
         origin: origins,

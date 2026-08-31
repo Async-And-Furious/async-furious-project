@@ -36,7 +36,7 @@ describe('RolesGuard', () => {
   it('should return true when user role matches required role', () => {
     setMetadata([Role.ADMIN]);
     const request = { user: { id: '1', email: 'admin@test.com', role: Role.ADMIN } };
-    mockContext.switchToHttp().getRequest.mockReturnValue(request);
+    (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue(request);
 
     expect(guard.canActivate(mockContext)).toBe(true);
   });
@@ -44,14 +44,14 @@ describe('RolesGuard', () => {
   it('should throw ForbiddenException when user role does not match', () => {
     setMetadata([Role.ADMIN]);
     const request = { user: { id: '1', email: 'user@test.com', role: Role.RECEPCIONISTA } };
-    mockContext.switchToHttp().getRequest.mockReturnValue(request);
+    (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue(request);
 
     expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
   });
 
   it('should throw ForbiddenException when user is absent from request', () => {
     setMetadata([Role.ADMIN]);
-    mockContext.switchToHttp().getRequest.mockReturnValue({});
+    (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue({});
 
     expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
   });
@@ -59,7 +59,7 @@ describe('RolesGuard', () => {
   it('should throw ForbiddenException when requiredRoles is empty array', () => {
     setMetadata([]);
     const request = { user: { id: '1', email: 'admin@test.com', role: Role.ADMIN } };
-    mockContext.switchToHttp().getRequest.mockReturnValue(request);
+    (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue(request);
 
     expect(guard.canActivate(mockContext)).toBe(true);
   });
@@ -67,7 +67,7 @@ describe('RolesGuard', () => {
   it('should throw ForbiddenException when user role is undefined', () => {
     setMetadata([Role.ADMIN]);
     const request = { user: { id: '1', email: 'admin@test.com' } };
-    mockContext.switchToHttp().getRequest.mockReturnValue(request);
+    (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue(request);
 
     expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
   });
@@ -75,7 +75,7 @@ describe('RolesGuard', () => {
   it('should handle multiple required roles and match one of them', () => {
     setMetadata([Role.ADMIN, Role.MECANICO]);
     const request = { user: { id: '1', email: 'mecanico@test.com', role: Role.MECANICO } };
-    mockContext.switchToHttp().getRequest.mockReturnValue(request);
+    (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue(request);
 
     expect(guard.canActivate(mockContext)).toBe(true);
   });

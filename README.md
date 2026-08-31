@@ -508,17 +508,11 @@ Consulte `infra/environments/aws/README.md`.
 
 ---
 
-## Documentacao Arquitetural (Fase 3)
+## Persistencia e Modelo de Dados
 
-A documentacao completa da arquitetura distribuida da Fase 3 (quatro
-repositorios, autenticacao centralizada via API Gateway + Function
-Serverless, Kubernetes/EKS, banco de dados gerenciado, observabilidade,
-CI/CD, ADRs e RFCs) esta em [docs/README.md](./docs/README.md).
+A documentacao completa da camada de persistencia (diagrama ER, modelo relacional tabela a tabela, mapeamento entre entidades de dominio e tabelas, justificativas do PostgreSQL e do Prisma, estrategia de persistencia e o historico de decisoes de evolucao do schema) esta em [docs/infrastructure/database.md](./docs/infrastructure/database.md).
 
-Ela distingue explicitamente o que esta **implementado hoje** (este
-repositorio, monolito local) do que e **proposta da Fase 3** (decidida em
-ADR/RFC, mas ainda em estagio de esqueleto nos repositorios
-`repo-auth-serverless`, `repo-k8s-infra` e `repo-db-infra`).
+---
 
 ## Convencoes de Codigo
 

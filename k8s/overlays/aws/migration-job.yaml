@@ -1,0 +1,28 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: async-furious-migrate
+  namespace: async-furious
+  labels:
+    app: async-furious-api
+    job: migration
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: async-furious-api
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: migrate
+          image: async-furious-api:immutable-placeholder
+          imagePullPolicy: IfNotPresent
+          command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+          envFrom:
+            - configMapRef:
+                name: async-furious-config
+            - secretRef:
+                name: async-furious-secret

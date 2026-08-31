@@ -14,7 +14,7 @@ interface MockPrismaPeca {
 
 interface MockPrismaService {
   peca: MockPrismaPeca;
-  osPeca: jest.Mock;
+  osPeca: { findMany: jest.Mock };
 }
 
 describe('PecaInsumoRepository', () => {
@@ -24,9 +24,10 @@ describe('PecaInsumoRepository', () => {
   const mockPecaData = {
     id: 'peca-1',
     nome: 'Óleo Lubrificante',
+    codigo: 'OL-001',
     descricao: 'Óleo 5W30 sintético',
     quantidade_estoque: 10,
-    preco_unitario: 50.0,
+    preco: 50.0,
     created_at: new Date(),
     updated_at: new Date(),
   };
@@ -126,9 +127,10 @@ describe('PecaInsumoRepository', () => {
     it('should create peca insumo', async () => {
       const createData = {
         nome: 'Filtro de Óleo',
+        codigo: 'FO-001',
         descricao: 'Filtro original',
         quantidade_estoque: 5,
-        preco_unitario: 25.0,
+        preco: 25.0,
       };
       mockPrismaService.peca.create.mockResolvedValue({
         ...mockPecaData,

@@ -17,9 +17,10 @@ describe('Cliente Use Cases', () => {
       create: jest.fn(),
       findAll: jest.fn(),
       findById: jest.fn(),
+      findByDocumento: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
-    } as jest.Mocked<IClienteRepository>;
+    } as unknown as jest.Mocked<IClienteRepository>;
   });
 
   describe('CreateClienteUseCase', () => {

@@ -16,6 +16,7 @@ import {
 } from '../dto/peca-insumo.dto';
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import { AuthUser } from '../../../../auth/types/auth.types';
+import { Role } from '../../../../auth/enums/role.enum';
 import {
   SolicitarPecasAoFornecedorUseCase,
   ReceberPecasDoFornecedorUseCase,
@@ -35,21 +36,24 @@ describe('PecaInsumoController', () => {
   const mockAuthUser: AuthUser = {
     id: 'user-123',
     email: 'admin@test.com',
-    name: 'Admin',
-    role: 'admin',
+
+    role: Role.ADMIN,
   };
 
-  const mockPecaInsumo: PecaInsumo = {
-    id: '123',
-    nome: 'Filtro de Óleo',
-    codigo: 'FO-001',
-    descricao: 'Filtro de óleo para motor 1.0',
-    preco: 29.9,
-    quantidade_estoque: 10,
-    quantidade_minima: 2,
-    created_at: new Date(),
-    updated_at: new Date(),
-  };
+  const mockPecaInsumo: PecaInsumo = Object.assign(
+    {
+      id: '123',
+      nome: 'Filtro de Óleo',
+      codigo: 'FO-001',
+      descricao: 'Filtro de óleo para motor 1.0',
+      preco: 29.9,
+      quantidade_estoque: 10,
+      quantidade_minima: 2,
+      created_at: new Date(),
+      updated_at: new Date(),
+    },
+    PecaInsumo.prototype
+  );
 
   beforeEach(async () => {
     mockCreateUseCase = {
@@ -107,7 +111,9 @@ describe('PecaInsumoController', () => {
 
     it('should create a peca insumo without optional fields', async () => {
       const dto: CreatePecaInsumoDto = { nome: 'Vela', codigo: 'VI-001', preco: 15.5 };
-      mockCreateUseCase.execute.mockResolvedValue({ ...mockPecaInsumo, descricao: null });
+      mockCreateUseCase.execute.mockResolvedValue(
+        Object.assign(new PecaInsumo(), mockPecaInsumo, { descricao: null })
+      );
 
       const result = await controller.create(dto);
 
@@ -159,7 +165,9 @@ describe('PecaInsumoController', () => {
   describe('update', () => {
     it('should update a peca insumo', async () => {
       const dto: UpdatePecaInsumoDto = { nome: 'Filtro de Ar', preco: 35.5 };
-      mockUpdateUseCase.execute.mockResolvedValue({ ...mockPecaInsumo, ...dto });
+      mockUpdateUseCase.execute.mockResolvedValue(
+        Object.assign(new PecaInsumo(), mockPecaInsumo, dto)
+      );
 
       const result = await controller.update('123', dto);
 
@@ -171,10 +179,12 @@ describe('PecaInsumoController', () => {
   describe('updateEstoque', () => {
     it('should update stock quantity', async () => {
       const dto: UpdateEstoquePecaInsumoDto = { quantidade: 25 };
-      mockUpdateEstoqueUseCase.execute.mockResolvedValue({
-        ...mockPecaInsumo,
-        quantidade_estoque: 25,
-      });
+      mockUpdateEstoqueUseCase.execute.mockResolvedValue(
+        Object.assign(new PecaInsumo(), {
+          ...mockPecaInsumo,
+          quantidade_estoque: 25,
+        })
+      );
 
       const result = await controller.updateEstoque('123', dto);
 
@@ -184,10 +194,12 @@ describe('PecaInsumoController', () => {
 
     it('should set stock to zero', async () => {
       const dto: UpdateEstoquePecaInsumoDto = { quantidade: 0 };
-      mockUpdateEstoqueUseCase.execute.mockResolvedValue({
-        ...mockPecaInsumo,
-        quantidade_estoque: 0,
-      });
+      mockUpdateEstoqueUseCase.execute.mockResolvedValue(
+        Object.assign(new PecaInsumo(), {
+          ...mockPecaInsumo,
+          quantidade_estoque: 0,
+        })
+      );
 
       const result = await controller.updateEstoque('123', dto);
 

@@ -6,6 +6,15 @@ Proposta — decisão detalhada na RFC de banco do trigo, ainda em PR aberto,
 não mesclado (ver [`docs/rfcs/README.md`](../rfcs/README.md)). **Não
 aplicada em infraestrutura real** (skeleton apenas em `repo-db-infra`).
 
+> **Nota (2026-08-21):** a topologia de rede aqui descrita (RDS dentro da
+> VPC do EKS, ver RFC-004) foi superada pela
+> [RFC-007](../rfcs/RFC-007-rds-public-access.md) — o RDS passa a ser
+> publicamente acessível (security group restrito por CIDR), para viabilizar
+> o acesso direto da Lambda de autenticação via CPF, dado que a `LabRole` da
+> conta AWS Academy não permite permissões de VPC/ENI. Engine/versão
+> (PostgreSQL 16) não são afetados por essa mudança.
+
+
 ## Contexto
 
 A Fase 3 exige um "banco de dados gerenciado". A aplicação já usa
