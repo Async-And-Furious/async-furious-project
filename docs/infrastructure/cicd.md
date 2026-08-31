@@ -11,8 +11,10 @@ Evidência: `.github/workflows/*.yml`.
 | `trivy.yml` | `push` main/develop, `pull_request`, semanal, `workflow_dispatch` | Builda imagem Docker, scan de vulnerabilidades (HIGH/CRITICAL), publica SARIF no code scanning; gate falha o job se houver vulns (mas com `continue-on-error`, não bloqueia hard) |
 | `zap.yml` | `pull_request` main/develop, semanal, `workflow_dispatch` | DAST com OWASP ZAP — baseline scan em PRs, full API scan agendado/manual, contra `/api/docs-json` |
 
-**Cobertura mínima de testes exigida**: 85% statements/lines, 80%
-functions/branches (`AGENTS.md`, `README.md`).
+**Cobertura mínima de testes exigida**: 80% uniforme em todas as métricas
+(`jest.config.js:33-39`) — o `README.md` afirma 85% em statements/lines,
+divergência já registrada em
+[ADR-0014](../adr/0014-cobertura-minima-testes.md).
 
 ## [PROPOSTA FASE 3 — esqueleto] Repositórios satélite
 
