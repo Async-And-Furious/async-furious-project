@@ -47,6 +47,7 @@ model Cliente {
   telefone       String?
   documento      String    @unique
   tipo_documento TaxIdType
+  ativo          Boolean   @default(true)
   created_at     DateTime  @default(now())
   updated_at     DateTime  @updatedAt
 

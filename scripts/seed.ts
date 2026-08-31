@@ -5,6 +5,11 @@ import { createHash } from 'crypto';
 
 dotenv.config();
 
+if (process.env.DEPLOY_ENV === 'prod' && process.env.ALLOW_PRODUCTION_SEED !== 'true') {
+  console.error('Production seed is disabled unless ALLOW_PRODUCTION_SEED=true');
+  process.exit(1);
+}
+
 const prisma = new PrismaClient();
 type SeedClient = Prisma.TransactionClient;
 

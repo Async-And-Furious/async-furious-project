@@ -16,6 +16,9 @@ describe('AuthService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    cliente: {
+      findFirst: jest.fn(),
+    },
   };
 
   const mockJwtService = {
@@ -222,6 +225,25 @@ describe('AuthService', () => {
       const result = await service.findById('nonexistent-id');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('validateCustomer', () => {
+    it('requires an active Cliente identified by token sub', async () => {
+      mockPrisma.cliente.findFirst.mockResolvedValue({
+        id: 'customer-id',
+        email: 'customer@test.com',
+      });
+
+      await expect(service.validateCustomer('customer-id')).resolves.toEqual({
+        id: 'customer-id',
+        email: 'customer@test.com',
+        role: 'RECEPCIONISTA',
+      });
+      expect(mockPrisma.cliente.findFirst).toHaveBeenCalledWith({
+        where: { id: 'customer-id', ativo: true },
+        select: { id: true, email: true },
+      });
     });
   });
 

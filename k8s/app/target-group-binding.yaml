@@ -1,0 +1,11 @@
+apiVersion: elbv2.k8s.aws/v1beta1
+kind: TargetGroupBinding
+metadata:
+  name: async-furious-api
+  namespace: async-furious
+spec:
+  targetGroupARN: "${target_group_arn}"
+  targetType: ip
+  serviceRef:
+    name: async-furious-service
+    port: 3000
