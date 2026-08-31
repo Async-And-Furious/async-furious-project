@@ -107,12 +107,8 @@ jobs:
             done
           done
 
-      - name: Destruir cluster (terraform destroy)
-        if: always()
-        run: ./scripts/local-up.sh down
-
       - name: Terraform + Kubernetes concluido
         if: success()
         run: |
           echo "### ✅ Terraform + Kubernetes concluído" >> "$GITHUB_STEP_SUMMARY"
-          echo "Cluster kind provisionado via Terraform, aplicação implantada, smoke test em /api/v1 respondeu com sucesso, e ambiente destruído ao final do pipeline." >> "$GITHUB_STEP_SUMMARY"
+          echo "Cluster kind provisionado via Terraform, aplicação implantada e smoke test em /api/v1 respondeu com sucesso." >> "$GITHUB_STEP_SUMMARY"

@@ -129,10 +129,11 @@ wait_for_postgres() {
 
 # ── smoke test ────────────────────────────────────────────────────────────────
 smoke_test() {
-  local node_port
-  node_port=$(kubectl get svc -n "$NAMESPACE" async-furious-service \
-    -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "30000")
-  local url="http://localhost:${node_port}/api/v1"
+  local url="http://localhost:30000/api/v1"
+  kubectl port-forward -n "$NAMESPACE" svc/async-furious-service 30000:3000 >/tmp/async-furious-port-forward.log 2>&1 &
+  local port_forward_pid=$!
+  trap 'kill "$port_forward_pid" 2>/dev/null || true' RETURN
+  sleep 2
   log "Smoke test: GET $url"
   local status
   if ! status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url"); then
@@ -190,7 +191,7 @@ case "$CMD" in
     wait_for_postgres
     wait_for_pod_ready "app=async-furious-api" 300
     smoke_test
-    ok "Local environment is UP → http://localhost:$(terraform -chdir="$INFRA_DIR" output -raw app_url 2>/dev/null | grep -oP '\d+$' || echo '30000')"
+    ok "Local environment is UP → $url"
     ;;
   down)
     load_secrets

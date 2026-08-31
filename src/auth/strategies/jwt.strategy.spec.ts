@@ -13,6 +13,7 @@ describe('JwtStrategy', () => {
   beforeEach(() => {
     authService = {
       validateUser: jest.fn(),
+      validateCustomer: jest.fn(),
     } as unknown as jest.Mocked<AuthService>;
 
     config = {
@@ -87,6 +88,53 @@ describe('JwtStrategy', () => {
     expect(result.role).not.toBe(payload.role);
   });
 
+  it('should resolve gateway subject as Cliente.id', async () => {
+    const gatewayValues: Record<string, string> = {
+      AUTH_MODE: 'gateway',
+      JWT_PUBLIC_KEY: 'public-key',
+      JWT_ISSUER: 'auth-lambda',
+      JWT_AUDIENCE: 'workshop-api',
+    };
+    config.get.mockImplementation((key: string) => gatewayValues[key]);
+    strategy = new JwtStrategy(config, authService);
+    const customer: AuthenticatedUser = {
+      id: 'customer-id',
+      email: 'customer@test.com',
+      role: Role.RECEPCIONISTA,
+    };
+    authService.validateCustomer.mockResolvedValue(customer);
+
+    await expect(
+      strategy.validate({
+        sub: 'customer-id',
+        iss: 'auth-lambda',
+        aud: 'workshop-api',
+        exp: 9999999999,
+      })
+    ).resolves.toEqual(customer);
+    expect(authService.validateCustomer).toHaveBeenCalledWith('customer-id');
+  });
+
+  it('should reject a gateway token whose customer does not exist', async () => {
+    const gatewayValues: Record<string, string> = {
+      AUTH_MODE: 'gateway',
+      JWT_PUBLIC_KEY: 'public-key',
+      JWT_ISSUER: 'auth-lambda',
+      JWT_AUDIENCE: 'workshop-api',
+    };
+    config.get.mockImplementation((key: string) => gatewayValues[key]);
+    strategy = new JwtStrategy(config, authService);
+    authService.validateCustomer.mockResolvedValue(null);
+
+    await expect(
+      strategy.validate({
+        sub: 'missing-customer',
+        iss: 'auth-lambda',
+        aud: 'workshop-api',
+        exp: 9999999999,
+      })
+    ).rejects.toThrow(UnauthorizedException);
+  });
   it('configures RS256 verification with the shared contract', () => {
     const rsConfig = {
       get: jest.fn((key: string) => {

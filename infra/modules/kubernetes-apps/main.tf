@@ -116,8 +116,14 @@ resource "kubectl_manifest" "secret" {
   yaml_body = templatefile("${var.k8s_manifests_path}/config/secret.yaml", {
     jwt_secret          = var.jwt_secret
     db_password         = var.db_password
+    jwt_public_key      = var.jwt_public_key
+    webhook_secret      = var.webhook_secret
+    database_url        = var.enable_local_database ? "postgresql://${var.db_user}:${var.db_password}@postgres-service:5432/${var.db_name}?schema=public" : var.database_url
+    db_host             = var.enable_local_database ? "postgres-service" : ""
+    db_port             = "5432"
     db_name             = var.db_name
     db_user             = var.db_user
+    db_sslmode          = var.enable_local_database ? "disable" : "require"
     seed_admin_email    = var.seed_admin_email
     seed_admin_password         = var.seed_admin_password
     seed_recepcionista_password = var.seed_recepcionista_password
@@ -127,16 +133,19 @@ resource "kubectl_manifest" "secret" {
 }
 
 resource "kubectl_manifest" "db_pvc" {
+  count      = var.enable_local_database ? 1 : 0
   yaml_body  = file("${var.k8s_manifests_path}/database/pvc.yaml")
   depends_on = [kubectl_manifest.namespace]
 }
 
 resource "kubectl_manifest" "db_service" {
+  count      = var.enable_local_database ? 1 : 0
   yaml_body  = file("${var.k8s_manifests_path}/database/service.yaml")
   depends_on = [kubectl_manifest.namespace]
 }
 
 resource "kubectl_manifest" "db_statefulset" {
+  count      = var.enable_local_database ? 1 : 0
   yaml_body  = file("${var.k8s_manifests_path}/database/statefulset.yaml")
   depends_on = [kubectl_manifest.configmap, kubectl_manifest.secret, kubectl_manifest.db_pvc]
 }
@@ -147,12 +156,18 @@ resource "kubectl_manifest" "app_deployment" {
     app_image    = var.app_image
     app_replicas = var.app_replicas
   })
-  depends_on = [kubectl_manifest.configmap, kubectl_manifest.secret, kubectl_manifest.db_statefulset]
+  depends_on = [kubectl_manifest.configmap, kubectl_manifest.secret]
 }
 
 resource "kubectl_manifest" "app_service" {
   yaml_body  = file("${var.k8s_manifests_path}/app/service.yaml")
   depends_on = [kubectl_manifest.namespace]
+}
+
+resource "kubectl_manifest" "target_group_binding" {
+  count      = var.target_group_arn == "" ? 0 : 1
+  yaml_body  = templatefile("${var.k8s_manifests_path}/app/target-group-binding.yaml", { target_group_arn = var.target_group_arn })
+  depends_on = [kubectl_manifest.app_service]
 }
 
 resource "kubectl_manifest" "app_hpa" {

@@ -1,16 +1,27 @@
-name: Deploy to EKS
+name: Deploy monolith to Academy EKS
 
 on:
+  push:
+    branches: [develop, main]
+    paths:
+      - 'src/**'
+      - 'prisma/**'
+      - 'scripts/seed.ts'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'Dockerfile'
+      - 'k8s/**'
+      - '.github/workflows/deploy-eks.yml'
   workflow_dispatch:
     inputs:
       environment:
-        description: Target environment
+        description: Logical Academy environment
         required: true
-        default: hml
         type: choice
         options: [hml, prod]
-      aws_academy:
-        description: Use AWS Academy Service LoadBalancer mode (without ALB Ingress)
+        default: hml
+      seed_prod:
+        description: Explicitly allow the production seed job
         required: true
         type: boolean
         default: false
@@ -20,271 +31,603 @@ permissions:
   id-token: write
 
 concurrency:
-  group: app-eks-${{ inputs.environment }}
+  group: app-eks-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'hml') }}
   cancel-in-progress: false
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
   K8S_NAMESPACE: async-furious
-  K8S_SECRET_NAME: async-furious-secret
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
 
 jobs:
-  deploy:
-    # Academy uses a hosted runner; normal mode requires the private-EKS runner.
-    runs-on: ${{ fromJSON(inputs.aws_academy && '["ubuntu-latest"]' || '["self-hosted", "linux", "eks-private"]') }}
-    env:
-      AWS_ACADEMY: ${{ inputs.aws_academy }}
-      DATABASE_SECRET_ARN: ${{ secrets.DATABASE_SECRET_ARN }}
-      JWT_PRIVATE_KEY_SECRET_ARN: ${{ secrets.JWT_PRIVATE_KEY_SECRET_ARN }}
-      JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
+  image:
+    name: Build and publish immutable image
+    if: >-
+      (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')) && 'production' || 'hml' }}
+    outputs:
+      image: ${{ steps.image.outputs.ref }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Detect Academy credentials
-        id: credentials
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d8 # v4
+
+      - name: Configure AWS Academy credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        if: ${{ !(github.event_name == 'push' && github.ref == 'refs/heads/main') && !(github.event_name == 'workflow_dispatch' && inputs.environment == 'prod') }}
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Configure AWS Academy credentials for production
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod') }}
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Credential and ECR preflight
+        run: |
+          set -euo pipefail
+          test -n "$ECR_REPOSITORY" || { echo 'Repository variable ECR_REPOSITORY is required.' >&2; exit 1; }
+          aws sts get-caller-identity >/dev/null
+          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null
+
+      - name: Login to ECR
+        id: registry
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          registry="$account_id.dkr.ecr.$AWS_REGION.amazonaws.com"
+          aws ecr get-login-password | docker login --username AWS --password-stdin "$registry"
+          echo "registry=$registry" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push commit-SHA image
+        id: image
+        env:
+          REGISTRY: ${{ steps.registry.outputs.registry }}
+        run: |
+          set -euo pipefail
+          image="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
+          docker build --pull --tag "$image" .
+          docker push "$image"
+          digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)
+          test -n "$digest" && [[ "$digest" == sha256:* ]] || { echo 'ECR image digest was not returned.' >&2; exit 1; }
+          echo "ref=$REGISTRY/$ECR_REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "### Immutable image digest: \`$REGISTRY/$ECR_REPOSITORY@$digest\`" >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-hml:
+    name: Deploy HML
+    needs: image
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'hml')
+    runs-on: ubuntu-latest
+    environment: hml
+    env:
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
+      TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
+      JWT_ISSUER: ${{ vars.JWT_ISSUER }}
+      JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
+      IMAGE: ${{ needs.image.outputs.image }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d8 # v4
+      - name: Validate AWS Academy credentials
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
-          if [[ -n "$AWS_ACCESS_KEY_ID" && -n "$AWS_SECRET_ACCESS_KEY" && -n "$AWS_SESSION_TOKEN" ]]; then
-            echo 'use_academy=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'use_academy=false' >> "$GITHUB_OUTPUT"
-          fi
+          set -euo pipefail
+          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN; do
+            test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
+          done
       - name: Configure AWS Academy credentials
-        if: ${{ steps.credentials.outputs.use_academy == 'true' }}
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-      - name: Configure AWS credentials with OIDC
-        if: ${{ steps.credentials.outputs.use_academy != 'true' }}
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
-        with:
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-      - name: Login to ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
-      - name: Build and push image tagged by commit SHA
-        id: image
-        env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
-        run: |
-          IMAGE="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
-          docker build --pull -t "$IMAGE" .
-          docker push "$IMAGE"
-          echo "uri=$REGISTRY/$ECR_REPOSITORY" >> "$GITHUB_OUTPUT"
-          echo "digest=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
-      - name: Allow Academy HML runner to reach EKS
-        if: ${{ inputs.aws_academy && inputs.environment == 'hml' }}
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Save original HML EKS endpoint access
         run: |
           set -euo pipefail
+          state_file="$RUNNER_TEMP/eks-hml-endpoint-access.json"
+          aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' \
+            --output json > "$state_file"
+          python3 - "$state_file" <<'PY'
+          import json
+          import sys
+
+          state = json.load(open(sys.argv[1]))
+          if not isinstance(state["publicAccessCidrs"], list):
+              raise SystemExit("EKS public access CIDRs were not returned as a list")
+          PY
+          echo 'Saved original HML EKS endpoint access settings.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Allow HML runner to reach Academy EKS
+        run: |
+          set -euo pipefail
+          state_file="$RUNNER_TEMP/eks-hml-endpoint-access.json"
           runner_ip=$(curl --fail --silent --show-error --ipv4 --proto '=https' https://checkip.amazonaws.com)
           runner_ip=$(python3 - "$runner_ip" <<'PY'
           import ipaddress
           import sys
 
-          address = ipaddress.ip_address(sys.argv[1])
+          address = ipaddress.ip_address(sys.argv[1].strip())
           if address.version != 4 or not address.is_global:
               raise SystemExit(f"Runner address is not a globally routable IPv4: {address}")
           print(address)
+          PY
+          )
+          access=$(python3 - "$state_file" "$runner_ip" <<'PY'
+          import json
+          import sys
+
+          state = json.load(open(sys.argv[1]))
+          cidrs = list(dict.fromkeys([*state["publicAccessCidrs"], f"{sys.argv[2]}/32"]))
+          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess=true,publicAccessCidrs={','.join(cidrs)}")
           PY
           )
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
           deadline=$((SECONDS + 600))
           while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" \
-            --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=$runner_ip/32" \
-            --query 'update.id' \
-            --output text 2>"$error_file"); do
+            --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
             error=$(<"$error_file")
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting the EKS endpoint update.' >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out requesting HML EKS endpoint update.' >&2; exit 1; }
             sleep 10
           done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
             status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
-            [[ "$status" == 'Successful' ]] && exit 0
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint update ended with status $status." >&2; exit 1; }
+            [[ "$status" == 'Successful' ]] && { echo "Temporarily added ${runner_ip}/32 to HML EKS." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "HML EKS endpoint update ended with status $status." >&2; exit 1; }
             sleep 10
           done
-          echo 'Timed out waiting for the EKS endpoint update.' >&2
+          echo 'Timed out waiting for HML EKS endpoint update.' >&2
           exit 1
-      - name: Configure kubectl for existing EKS cluster
-        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-      - name: Wait for authenticated Academy HML cluster access
-        if: ${{ inputs.aws_academy && inputs.environment == 'hml' }}
+      - name: Credential, cluster and state preflight
         run: |
-          deadline=$((SECONDS + 300))
-          while (( SECONDS < deadline )); do
-            kubectl get --raw=/readyz && exit 0
-            sleep 10
+          set -euo pipefail
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+            test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
-          echo 'Timed out waiting for authenticated EKS API access.' >&2
-          exit 1
-      - name: Ensure application namespace
-        # The overlay also declares this namespace, but the Secret below has to
-        # land before the overlay is applied, so create it up front.
-        run: kubectl apply -f k8s/namespace.yaml
-      - name: Materialize Academy application Secret
-        if: ${{ inputs.aws_academy }}
+          aws sts get-caller-identity >/dev/null
+          status=$(aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query 'cluster.status' --output text)
+          [[ "$status" == 'ACTIVE' ]] || { echo "EKS cluster is not ACTIVE: $status" >&2; exit 1; }
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl get --raw=/readyz >/dev/null
+      - name: Apply namespace and configuration
         run: |
           set -euo pipefail
-          test -n "$DATABASE_SECRET_ARN" || { echo 'Academy configuration is missing DATABASE_SECRET_ARN.' >&2; exit 1; }
-          test -n "$JWT_PRIVATE_KEY_SECRET_ARN" || { echo 'Academy configuration is missing JWT_PRIVATE_KEY_SECRET_ARN.' >&2; exit 1; }
-          test -n "$JWT_PUBLIC_KEY_PARAMETER_NAME" || { echo 'Academy configuration is missing JWT_PUBLIC_KEY_PARAMETER_NAME.' >&2; exit 1; }
-          work_dir=$(mktemp -d)
-          trap 'rm -rf "$work_dir"' EXIT
-          aws secretsmanager get-secret-value --secret-id "$DATABASE_SECRET_ARN" --query SecretString --output text > "$work_dir/database.json"
-          aws secretsmanager get-secret-value --secret-id "$JWT_PRIVATE_KEY_SECRET_ARN" --query SecretString --output text > "$work_dir/jwt-private-key"
-          aws ssm get-parameter --name "$JWT_PUBLIC_KEY_PARAMETER_NAME" --with-decryption --query Parameter.Value --output text > "$work_dir/jwt-public-key"
-          db_username=$(jq -er '.username' "$work_dir/database.json")
-          db_password=$(jq -er '.password' "$work_dir/database.json")
-          db_host=$(jq -er '.host' "$work_dir/database.json")
-          db_port=$(jq -er '.port // 5432' "$work_dir/database.json")
-          db_name=$(jq -er '.dbname' "$work_dir/database.json")
-          database_url=$(jq -nr --arg username "$db_username" --arg password "$db_password" --arg host "$db_host" --arg port "$db_port" --arg dbname "$db_name" '"postgresql://" + ($username|@uri) + ":" + ($password|@uri) + "@" + $host + ":" + $port + "/" + ($dbname|@uri) + "?schema=public"')
-          test -s "$work_dir/jwt-private-key"
-          test -s "$work_dir/jwt-public-key"
-          kubectl create secret generic "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" --from-literal=DATABASE_URL="$database_url" --from-file=JWT_PRIVATE_KEY="$work_dir/jwt-private-key" --from-file=JWT_PUBLIC_KEY="$work_dir/jwt-public-key" --dry-run=client -o yaml > "$work_dir/secret.yaml"
-          kubectl apply --dry-run=client -o yaml -f "$work_dir/secret.yaml" | kubectl apply -f -
-      - name: Verify cluster access and managed database Secret
-        run: |
-          set -euo pipefail
-          kubectl cluster-info
-          for key in JWT_PUBLIC_KEY JWT_PRIVATE_KEY DATABASE_URL; do
-            test -n "$(kubectl get secret "$K8S_SECRET_NAME" --namespace "$K8S_NAMESPACE" -o jsonpath="{.data.$key}")" || { echo "Missing required secret key: $key" >&2; exit 1; }
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/config/configmap.yaml
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
+          secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
+          for field in host port dbname username password; do
+            jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
           done
-      - name: Render AWS overlay with image digest
-        env:
-          IMAGE_URI: ${{ steps.image.outputs.uri }}
-          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
-        run: |
-          render_dir=$(mktemp -d)
-          migration_dir=$(mktemp -d)
-          cp -R k8s "$render_dir/k8s"
-          cp -R k8s "$migration_dir/k8s"
-          sed -i 's/\${app_replicas}/2/; s|\${app_image}|async-furious-api:immutable-placeholder|' "$render_dir/k8s/app/deployment.yaml"
-          sed -i 's/\${app_replicas}/2/; s|\${app_image}|async-furious-api:immutable-placeholder|' "$migration_dir/k8s/app/deployment.yaml"
-          sed -i '/DB_HOST:/d' "$render_dir/k8s/config/configmap.yaml"
-          sed -i '/DB_HOST:/d' "$migration_dir/k8s/config/configmap.yaml"
-          sed -i '/app\/deployment.yaml/d; /app\/service.yaml/d; /app\/hpa.yaml/d; /- ingress.yaml/d; /deployment-patch.yaml/d' "$migration_dir/k8s/overlays/aws/kustomization.yaml"
-           migration_job_name="async-furious-migrate-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-           test "${#migration_job_name}" -le 63
-           sed -i "s|name: async-furious-migrate$|name: $migration_job_name|" "$migration_dir/k8s/overlays/aws/migration-job.yaml"
-          kubectl kustomize --load-restrictor LoadRestrictionsNone "$migration_dir/k8s/overlays/aws" >/tmp/async-furious-aws-migration.yaml
-          sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws-migration.yaml
-          kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws-migration.yaml
-          kubectl wait --for=condition=complete "job/$migration_job_name" --namespace "$K8S_NAMESPACE" --timeout=600s
-          sed -i '/- migration-job.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
-          if [[ "$AWS_ACADEMY" == 'true' ]]; then
-            sed -i '/- ingress.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
-            sed -i '/deployment-patch.yaml/a\  - path: academy-service-patch.yaml' "$render_dir/k8s/overlays/aws/kustomization.yaml"
-          fi
-          sed -i '/- migration-job.yaml/d' "$render_dir/k8s/overlays/aws/kustomization.yaml"
-          kubectl kustomize --load-restrictor LoadRestrictionsNone "$render_dir/k8s/overlays/aws" >/tmp/async-furious-aws.yaml
-          sed -i "s|async-furious-api:immutable-placeholder|$IMAGE_URI@$IMAGE_DIGEST|g" /tmp/async-furious-aws.yaml
-          kubectl apply --namespace "$K8S_NAMESPACE" -f /tmp/async-furious-aws.yaml
-      - name: Verify JWT contract ConfigMap
-        # Runs after the overlay apply: the ConfigMap is part of that overlay.
+          export DB_HOST=$(jq -er '.host' <<<"$secret_json")
+          export DB_PORT=$(jq -er '.port | tostring' <<<"$secret_json")
+          export DB_NAME=$(jq -er '.dbname' <<<"$secret_json")
+          export DB_USER=$(jq -er '.username' <<<"$secret_json")
+          export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
+          export DB_SSLMODE=require
+          export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
+          export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
+          kubectl create secret generic async-furious-secret \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" \
+            --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
+            --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
+            --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
+            --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
+            --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+      - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
-          expect() {
-            actual=$(kubectl get configmap async-furious-config --namespace "$K8S_NAMESPACE" -o jsonpath="{.data.$1}")
-            test "$actual" = "$2" || { echo "ConfigMap $1 is '$actual', expected '$2'." >&2; exit 1; }
+          job="async-furious-migrate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $job
+            namespace: $K8S_NAMESPACE
+            labels:
+              app.kubernetes.io/part-of: async-furious
+              app.kubernetes.io/component: migration
+          spec:
+            backoffLimit: 4
+            ttlSecondsAfterFinished: 86400
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                  - name: migrate
+                    image: $IMAGE
+                    imagePullPolicy: IfNotPresent
+                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+                    envFrom:
+                      - configMapRef:
+                          name: async-furious-config
+                      - secretRef:
+                          name: async-furious-secret
+          EOF
+          kubectl wait --for=condition=complete "job/$job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
+            kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+            exit 1
           }
-          expect JWT_ALGORITHM RS256
-          expect JWT_ISSUER repo-auth-serverless
-          expect JWT_AUDIENCE async-furious-project
-          expect JWT_EXPIRES_IN 1800
-      - name: Wait for API rollout
-        run: kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=300s
-      - name: Wait for Academy Service endpoint
-        if: ${{ inputs.aws_academy }}
-        id: academy_endpoint
+          kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+          seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $seed_job
+            namespace: $K8S_NAMESPACE
+            labels:
+              app.kubernetes.io/part-of: async-furious
+              app.kubernetes.io/component: seed
+          spec:
+            backoffLimit: 4
+            ttlSecondsAfterFinished: 86400
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                  - name: seed
+                    image: $IMAGE
+                    imagePullPolicy: IfNotPresent
+                    command: ["node", "dist-scripts/seed.js"]
+                    envFrom:
+                      - configMapRef:
+                          name: async-furious-config
+                      - secretRef:
+                          name: async-furious-secret
+          EOF
+          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
+            kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
+            exit 1
+          }
+          kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
+      - name: Roll out application
         run: |
-          deadline=$(($(date +%s) + 600))
-          while (( $(date +%s) < deadline )); do
-            hostname=$(kubectl get service async-furious-service --namespace "$K8S_NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-            ip=$(kubectl get service async-furious-service --namespace "$K8S_NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-            endpoint="${hostname:-$ip}"
-            if [[ -n "$endpoint" ]]; then
-              backend_url="http://$endpoint:3000"
-              echo "backend_url=$backend_url" >> "$GITHUB_OUTPUT"
-              {
-                echo '### AWS Academy backend'
-                echo "- Backend URL: $backend_url"
-                echo "- Health: $backend_url/api/v1/health/live"
-              } >> "$GITHUB_STEP_SUMMARY"
-              curl --fail --retry 30 --retry-delay 10 --retry-connrefused "$backend_url/api/v1/health/live"
+          set -euo pipefail
+          sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
+          kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
+          kubectl apply -f k8s/app/service.yaml
+          sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl apply -f k8s/app/hpa.yaml
+          kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
+          kubectl wait pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --for=condition=Ready --timeout=5m
+
+      - name: Restore original HML EKS endpoint access
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          state_file="$RUNNER_TEMP/eks-hml-endpoint-access.json"
+          if [[ ! -s "$state_file" ]]; then
+            echo 'No saved HML EKS endpoint state; nothing to restore.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          access=$(python3 - "$state_file" <<'PY'
+          import json
+          import sys
+
+          state = json.load(open(sys.argv[1]))
+          access = f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess={str(state['endpointPublicAccess']).lower()}"
+          if state['publicAccessCidrs']:
+              access += f",publicAccessCidrs={','.join(state['publicAccessCidrs'])}"
+          print(access)
+          PY
+          )
+          error_file=$(mktemp)
+          trap 'status=$?; rm -f "$error_file"; if (( status != 0 )); then echo "### HML EKS endpoint restoration failed (exit $status)." >> "$GITHUB_STEP_SUMMARY"; fi; exit "$status"' EXIT
+          deadline=$((SECONDS + 600))
+          while ! update_id=$(aws eks update-cluster-config \
+            --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceNotFoundException* ]] && { echo 'HML EKS cluster no longer exists; endpoint state cannot be restored.' >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out requesting HML EKS endpoint restoration.' >&2; exit 1; }
+            sleep 10
+          done
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            if [[ "$status" == 'Successful' ]]; then
+              echo '### HML EKS endpoint access restored to the saved original settings.' >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "HML EKS endpoint restoration ended with status $status." >&2; exit 1; }
             sleep 10
           done
-          kubectl describe service async-furious-service --namespace "$K8S_NAMESPACE"
+          echo 'Timed out waiting for HML EKS endpoint restoration.' >&2
           exit 1
-      - name: Diagnose rollout failure
-        if: ${{ failure() }}
-        run: |
-          kubectl describe deployment/async-furious-api --namespace "$K8S_NAMESPACE" || true
-          kubectl get pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api -o wide || true
-          kubectl describe pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api || true
-          kubectl logs --namespace "$K8S_NAMESPACE" -l app=async-furious-api --all-containers --tail=200 || true
-      - name: Detect HML smoke configuration
-        id: hml
+
+  deploy-prod:
+    name: Deploy PROD
+    needs: image
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
+      TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
+      JWT_ISSUER: ${{ vars.JWT_ISSUER }}
+      JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
+      IMAGE: ${{ needs.image.outputs.image }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_PUBLIC_KEY: ${{ secrets.JWT_PUBLIC_KEY }}
+      WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
+      SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d8 # v4
+      - name: Validate AWS Academy credentials
         env:
-          HML_BASE_URL: ${{ vars.HML_BASE_URL }}
-          HML_EMAIL: ${{ secrets.HML_EMAIL }}
-          HML_PASSWORD: ${{ secrets.HML_PASSWORD }}
-        run: |
-          if [[ -n "$HML_BASE_URL" && -n "$HML_EMAIL" && -n "$HML_PASSWORD" ]]; then
-            echo 'enabled=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'enabled=false' >> "$GITHUB_OUTPUT"
-          fi
-      - name: Protected HML smoke test
-        if: ${{ steps.hml.outputs.enabled == 'true' }}
-        env:
-          HML_BASE_URL: ${{ vars.HML_BASE_URL }}
-          HML_EMAIL: ${{ secrets.HML_EMAIL }}
-          HML_PASSWORD: ${{ secrets.HML_PASSWORD }}
-        run: bash scripts/protected-smoke.sh
-      - name: Protected HML smoke test skipped
-        if: ${{ steps.hml.outputs.enabled != 'true' }}
-        run: "echo 'HML protected smoke test skipped: required HML configuration is not present.'"
-      - name: Disable Academy HML public EKS endpoint
-        if: ${{ always() && inputs.aws_academy && inputs.environment == 'hml' }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set -euo pipefail
+          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN; do
+            test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
+          done
+      - name: Configure AWS Academy credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Save original PROD EKS endpoint access
+        run: |
+          set -euo pipefail
+          aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$RUNNER_TEMP/eks-prod-endpoint-access.json"
+      - name: Allow PROD runner to reach Academy EKS
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl --fail --silent --show-error --ipv4 --proto '=https' https://checkip.amazonaws.com)
+          runner_ip=$(python3 - "$runner_ip" <<'PY'
+          import ipaddress, sys
+          address = ipaddress.ip_address(sys.argv[1].strip())
+          if address.version != 4 or not address.is_global:
+              raise SystemExit('Runner address is not a globally routable IPv4')
+          print(address)
+          PY
+          )
+          state_file="$RUNNER_TEMP/eks-prod-endpoint-access.json"
+          access=$(python3 - "$state_file" "$runner_ip" <<'PY'
+          import json, sys
+          state = json.load(open(sys.argv[1]))
+          cidrs = list(dict.fromkeys([*state['publicAccessCidrs'], f'{sys.argv[2]}/32']))
+          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess=true,publicAccessCidrs={','.join(cidrs)}")
+          PY
+          )
+          update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --resources-vpc-config "$access" --query 'update.id' --output text)
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == 'Successful' ]] && exit 0
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "PROD EKS endpoint update ended with status $status." >&2; exit 1; }
+            sleep 10
+          done
+          exit 1
+      - name: Credential, cluster and state preflight
+        run: |
+          set -euo pipefail
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+            test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
+          done
+          aws sts get-caller-identity >/dev/null
+          status=$(aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query 'cluster.status' --output text)
+          [[ "$status" == 'ACTIVE' ]] || { echo "EKS cluster is not ACTIVE: $status" >&2; exit 1; }
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl get --raw=/readyz >/dev/null
+      - name: Apply namespace and configuration
+        run: |
+          set -euo pipefail
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/config/configmap.yaml
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
+          secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
+          for field in host port dbname username password; do
+            jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
+          done
+          export DB_HOST=$(jq -er '.host' <<<"$secret_json")
+          export DB_PORT=$(jq -er '.port | tostring' <<<"$secret_json")
+          export DB_NAME=$(jq -er '.dbname' <<<"$secret_json")
+          export DB_USER=$(jq -er '.username' <<<"$secret_json")
+          export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
+          export DB_SSLMODE=require
+          export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
+          export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
+          kubectl create secret generic async-furious-secret \
+            --namespace "$K8S_NAMESPACE" \
+            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" \
+            --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
+            --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
+            --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
+            --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
+            --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
+            --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+      - name: Run controlled Prisma migration
+        run: |
+          set -euo pipefail
+          job="async-furious-migrate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $job
+            namespace: $K8S_NAMESPACE
+            labels:
+              app.kubernetes.io/part-of: async-furious
+              app.kubernetes.io/component: migration
+          spec:
+            backoffLimit: 4
+            ttlSecondsAfterFinished: 86400
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                  - name: migrate
+                    image: $IMAGE
+                    imagePullPolicy: IfNotPresent
+                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+                    envFrom:
+                      - configMapRef:
+                          name: async-furious-config
+                      - secretRef:
+                          name: async-furious-secret
+          EOF
+          kubectl wait --for=condition=complete "job/$job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
+            kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+            exit 1
+          }
+      - name: Run controlled seed
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.seed_prod == true }}
+        run: |
+          set -euo pipefail
+          seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $seed_job
+            namespace: $K8S_NAMESPACE
+            labels:
+              app.kubernetes.io/part-of: async-furious
+              app.kubernetes.io/component: seed
+          spec:
+            backoffLimit: 4
+            ttlSecondsAfterFinished: 86400
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                  - name: seed
+                    image: $IMAGE
+                    imagePullPolicy: IfNotPresent
+                    command: ["sh", "-c", "DEPLOY_ENV=prod ALLOW_PRODUCTION_SEED=true node dist-scripts/seed.js"]
+                    envFrom:
+                      - configMapRef:
+                          name: async-furious-config
+                      - secretRef:
+                          name: async-furious-secret
+          EOF
+          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m
+          kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
+      - name: Roll out application
+        run: |
+          set -euo pipefail
+          sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
+          kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
+          kubectl apply -f k8s/app/service.yaml
+          sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl apply -f k8s/app/hpa.yaml
+          kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
+          kubectl wait pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --for=condition=Ready --timeout=5m
+
+      - name: Restore original PROD EKS endpoint access
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          state_file="$RUNNER_TEMP/eks-prod-endpoint-access.json"
+          [[ -s "$state_file" ]] || exit 0
+          access=$(python3 - "$state_file" <<'PY'
+          import json, sys
+          state = json.load(open(sys.argv[1]))
+          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess={str(state['endpointPublicAccess']).lower()},publicAccessCidrs={','.join(state['publicAccessCidrs'])}")
+          PY
+          )
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
           deadline=$((SECONDS + 600))
           while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" \
-            --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config 'endpointPrivateAccess=true,endpointPublicAccess=false' \
-            --query 'update.id' \
-            --output text 2>"$error_file"); do
+            --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
             error=$(<"$error_file")
-            [[ "$error" == *ResourceNotFoundException* ]] && { printf '%s\n' "$error" >&2; exit 0; }
+            [[ "$error" == *ResourceNotFoundException* ]] && { echo 'PROD EKS cluster no longer exists; endpoint state cannot be restored.' >&2; exit 0; }
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting public endpoint cleanup.' >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out requesting PROD EKS endpoint restoration.' >&2; exit 1; }
             sleep 10
           done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
             status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
             [[ "$status" == 'Successful' ]] && exit 0
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint cleanup ended with status $status." >&2; exit 1; }
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "PROD EKS endpoint restoration ended with status $status." >&2; exit 1; }
             sleep 10
           done
-          echo 'Timed out waiting for public endpoint cleanup.' >&2
+          echo 'Timed out waiting for PROD EKS endpoint restoration.' >&2
           exit 1
+
+  smoke-hml:
+    name: Smoke test HML gateway
+    needs: deploy-hml
+    if: ${{ needs.deploy-hml.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: hml
+    steps:
+      - name: Check private gateway path
+        env:
+          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
+          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
+          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
+          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"
+
+  smoke-prod:
+    name: Smoke test PROD gateway
+    needs: deploy-prod
+    if: ${{ needs.deploy-prod.result == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check private gateway path
+        env:
+          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
+          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
+          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
+          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"

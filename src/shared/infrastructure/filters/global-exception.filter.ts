@@ -1,12 +1,5 @@
-import {
-  ExceptionFilter,
-  Catch,
-  ArgumentsHost,
-  HttpException,
-  HttpStatus,
-  Logger,
-} from '@nestjs/common';
-import { Response } from 'express';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import { Request, Response } from 'express';
 import { DomainException } from '../../domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../domain/exceptions/entity-not-found.exception';
 
@@ -21,15 +14,14 @@ interface ErrorResponse {
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
-  private readonly logger = new Logger(GlobalExceptionFilter.name);
-
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest();
+    const request = ctx.getRequest<Request & { correlationId?: string }>();
     const headerCorrelationId =
       typeof request.header === 'function' ? request.header('x-correlation-id') : undefined;
-    const correlationId = request.correlationId ?? headerCorrelationId;
+    const correlationId =
+      response.locals?.correlationId || request.correlationId || headerCorrelationId;
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';

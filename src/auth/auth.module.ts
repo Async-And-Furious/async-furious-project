@@ -9,6 +9,7 @@ import { JwtCustomerStrategy } from './strategies/jwt-customer.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtCustomerAuthGuard } from './guards/jwt-customer-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { WebhookAuthGuard } from './guards/webhook-auth.guard';
 import { createJwtModuleOptions } from './jwt.config';
 
 @Module({
@@ -29,6 +30,7 @@ import { createJwtModuleOptions } from './jwt.config';
     JwtAuthGuard,
     JwtCustomerAuthGuard,
     RolesGuard,
+    WebhookAuthGuard,
   ],
   exports: [
     AuthService,
@@ -38,6 +40,7 @@ import { createJwtModuleOptions } from './jwt.config';
     JwtAuthGuard,
     JwtCustomerAuthGuard,
     RolesGuard,
+    WebhookAuthGuard,
   ],
 })
 export class AuthModule {}

@@ -7,7 +7,7 @@
 ## 🚦 Commands
 
 ```bash
-# Development (PostgreSQL + migrations + seed + app on start)
+# Development (local PostgreSQL + migrations + seed + app on start)
 pnpm run dev
 
 # Manual alternatives
@@ -40,7 +40,7 @@ pnpm ts-node scripts/seed.ts
 ### Local Kubernetes (kind + Terraform)
 
 ```bash
-# Full up: build image → terraform apply → load image → wait → migrations → smoke test
+# Local kind only: build image → terraform apply → load image → wait → smoke test
 ./scripts/local-up.sh up
 
 # Rebuild image and reload into existing cluster (no infra teardown)
@@ -108,7 +108,7 @@ presentation → application → domain
 | Framework | NestJS 10.x |
 | Runtime | Node.js 20 (.nvmrc) |
 | Package manager | pnpm (Dockerfile uses pnpm, not npm) |
-| Database | PostgreSQL 15 (docker-compose.dependencies.yml) |
+| Database | PostgreSQL 15 locally; AWS RDS in HML/PROD |
 | ORM | Prisma 5.x |
 | Auth | JWT + bcrypt |
 | API docs | Swagger/OpenAPI |
@@ -149,6 +149,7 @@ npx prisma migrate deploy # Production
 
 - JWT via `@nestjs/jwt` + `@nestjs/passport`
 - Passport strategy: JWT Bearer
+- HML/PROD verify RS256 tokens issued by the CPF Auth Lambda; local uses HS256 email/password auth
 - Guards: `JwtAuthGuard`, `RolesGuard`
 - Auth endpoints: `POST /api/v1/auth/register`, `POST /api/v1/auth/login`
 - Protected routes require `Authorization: Bearer <token>`
@@ -240,7 +241,7 @@ transform: true            // Auto-transform payloads
 - `README-en.md` is the English mirror; update it whenever README content changes.
 - Keep local infra instructions in both READMEs aligned with `k8s/` manifests.
 - Local Kubernetes health/status checks use `GET /api/v1`; do not document `/health` unless the app actually exposes it.
-- For kind deployments using `imagePullPolicy: Never`, document `docker build`, `kind load docker-image`, rollout status, and the `curl http://localhost:30000/api/v1` smoke test together.
+- The AWS service is `ClusterIP` and must be reached through the approved private API Gateway path. Local development uses Docker Compose; do not expose the production service as a NodePort.
 - `scripts/local-up.sh` is the canonical local provisioning entrypoint — keep README infra sections aligned with it.
 
 ---

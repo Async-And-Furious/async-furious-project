@@ -13,7 +13,9 @@ export interface JwtContract {
 
 export function resolveJwtContract(config: ConfigService): JwtContract {
   const production = config.get<string>('NODE_ENV') === 'production';
-  const algorithm = config.get<string>('JWT_ALGORITHM') ?? (production ? undefined : 'HS256');
+  const algorithm =
+    config.get<string>('JWT_ALGORITHM') ??
+    (config.get<string>('AUTH_MODE') === 'gateway' ? 'RS256' : production ? undefined : 'HS256');
   const issuer =
     config.get<string>('JWT_ISSUER') ?? (production ? undefined : 'repo-auth-serverless');
   const audience =

@@ -1,4 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './services/auth.service';
@@ -47,8 +48,11 @@ export class AuthController {
     status: 429,
     description: 'Muitas tentativas - aguarde antes de tentar novamente',
   })
-  async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(@Body() dto: RegisterDto, @Req() request?: Request) {
+    const correlationId: unknown = request?.res?.locals?.correlationId;
+    return typeof correlationId === 'string'
+      ? this.authService.register(dto, correlationId)
+      : this.authService.register(dto);
   }
 
   @Post('login')
@@ -78,7 +82,10 @@ export class AuthController {
     status: 429,
     description: 'Muitas tentativas de login - aguarde antes de tentar novamente',
   })
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(@Body() dto: LoginDto, @Req() request?: Request) {
+    const correlationId: unknown = request?.res?.locals?.correlationId;
+    return typeof correlationId === 'string'
+      ? this.authService.login(dto, correlationId)
+      : this.authService.login(dto);
   }
 }

@@ -1,44 +1,21 @@
-# Agent log
+# Agent Log
 
-## 2026-08-24 - Academy runner selection
+## 2026-08-30
 
-- Academy deploys now use `ubuntu-latest`; normal deploys retain the
-  `[self-hosted, linux, eks-private]` runner labels. Credential handling,
-  Service/NLB mode, secret synchronization, and health checks are unchanged.
-- No secrets, deployment, commit, or push was run.
+- Integrated monolith-side HML/PROD gateway mode: RS256 verification, local HS256 email/password fallback, correlation IDs, JSON request/error telemetry, and live/readiness checks.
+- Protected the service-order webhook with a constant-time shared-secret guard.
+- Removed AWS Kubernetes dependence on in-cluster PostgreSQL. HML/PROD consume `DATABASE_URL` from the protected RDS contract; local-only Terraform may enable its PostgreSQL resources explicitly.
+- Kept controlled Prisma migrations, made HML seed automatic, and gated production seed behind workflow dispatch plus `seed_prod=true`.
+- Kept immutable commit-SHA image publishing, protected production Environment approval, Academy temporary credentials for both logical environments, and endpoint /32 save/restore logic.
+- Validation: `pnpm exec jest --runInBand` passed 709 tests; `pnpm run build` passed; `pnpm run lint` passed with existing warnings; Terraform validation could not complete because required providers are not installed locally.
+- Added AWS Load Balancer Controller TargetGroupBinding, explicit RDS secret connection fields, strict gateway JWT claims/customer subject validation, and PROD EKS endpoint access save/restore. Removed automatic Terraform destroy from CI; local teardown remains manual.
 
-## 2026-08-24 - Academy deployment contract
+## 2026-08-31
 
-- Academy mode now selects an explicit AWS NLB and materializes only the three
-  required application Secret keys from protected AWS references. Missing
-  references fail closed; normal mode retains the pre-existing Secret check.
-- No secrets, infrastructure apply, merge, or push was run.
+- Added backward-safe `Cliente.ativo` migration with default-true backfill; gateway JWT customer validation now accepts Auth Lambda `sub=Cliente.id` only for active customers.
+- Added CloudWatch Embedded Metric Format request metrics and JSON alarm events without a new dependency.
 
-## 2026-08-23 - Cross-repository JWT contract
+## 2026-08-24 - Academy deployment follow-up
 
-- Consumer contract: RS256 only in production, public-key verification through
-  `JWT_PUBLIC_KEY`, issuer `repo-auth-serverless`, audience
-  `async-furious-project`, 1800-second expiry, and `sub=Cliente.id`.
-- Existing email/password routes remain. CPF authentication stays in the auth
-  Lambda; the monolith resolves Lambda subjects to active `Cliente` records by
-  id instead of treating CPF/documento as a subject.
-- AWS deployment checks now require the public key and exact non-secret JWT
-  configuration. No secrets, infrastructure apply, merge, or push was run.
-- Follow-up blocker: the legacy monolith email/password token signer still uses
-  its local signing secret and is not the Lambda-issued RS256 flow; do not use
-  that token for production protected routes until an approved issuer/signing
-  ownership decision exists. Lambda/Prisma RDS SSL mode and CA also need the
-  deployed RDS policy before adding connection options.
-
-## 2026-08-23 - Release readiness fixes
-
-- Health checks use `/api/v1/health/live`; readiness remains
-  `/api/v1/health/ready`. ZAP and E2E no longer probe the root route.
-- Local kind uses a loaded local image; EKS deploys an immutable registry
-  digest and requires an existing cluster, secrets, ALB controller, database,
-  and private runner/AWS access.
-- Migration Jobs are unique per commit and workflow attempt and run before
-  rollout. Rollback is manual after review:
-  `kubectl rollout undo deployment/async-furious-api -n async-furious`.
-- HML protected-route smoke tests skip without real endpoint and credentials;
-  seed identities and secrets are not logged.
+- Academy deploys use hosted runners and Service LoadBalancer mode without ALB/IRSA; normal deployment behavior remains unchanged.
+- Secret synchronization fails closed when required AWS references are missing, and no secrets, deployment, commit, or push was run during this follow-up.

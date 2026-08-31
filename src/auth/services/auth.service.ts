@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -9,15 +9,16 @@ import type { AuthenticatedUser, JwtPayload } from '../types/auth.types';
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, correlationId = 'unknown') {
+    if (this.config.get<string>('AUTH_MODE') === 'gateway') {
+      throw new UnauthorizedException('Cadastro local indisponível neste ambiente');
+    }
     const email = dto.email.toLowerCase().trim();
 
     const existing = await this.prisma.user.findUnique({
@@ -25,7 +26,7 @@ export class AuthService {
     });
 
     if (existing) {
-      this.logger.warn(`Registration attempt for existing email: ${email}`);
+      this.log('registration_rejected', correlationId, { reason: 'email_exists' });
       throw new ConflictException('E-mail já cadastrado');
     }
 
@@ -41,11 +42,14 @@ export class AuthService {
       },
     });
 
-    this.logger.log(`New user registered: ${user.id}`);
+    this.log('user_registered', correlationId, { userId: user.id });
     return this.generateToken(user);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, correlationId = 'unknown') {
+    if (this.config.get<string>('AUTH_MODE') === 'gateway') {
+      throw new UnauthorizedException('Login local indisponível neste ambiente');
+    }
     const email = dto.email.toLowerCase().trim();
 
     const user = await this.prisma.user.findUnique({
@@ -53,18 +57,18 @@ export class AuthService {
     });
 
     if (!user) {
-      this.logger.warn(`Login attempt for non-existent email: ${email}`);
+      this.log('login_rejected', correlationId, { reason: 'user_not_found' });
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password);
 
     if (!isPasswordValid) {
-      this.logger.warn(`Invalid password attempt for user: ${user.id}`);
+      this.log('login_rejected', correlationId, { reason: 'invalid_password', userId: user.id });
       throw new UnauthorizedException('Credenciais inválidas');
     }
 
-    this.logger.log(`User logged in: ${user.id}`);
+    this.log('user_logged_in', correlationId, { userId: user.id });
     return this.generateToken(user);
   }
 
@@ -95,6 +99,15 @@ export class AuthService {
     return { id: user.id, email: user.email, role: user.role as Role };
   }
 
+  async validateCustomer(customerId: string) {
+    const customer = await this.prisma.cliente.findFirst({
+      where: { id: customerId, ativo: true },
+      select: { id: true, email: true },
+    });
+    if (!customer) return null;
+    return { id: customer.id, email: customer.email, role: Role.RECEPCIONISTA };
+  }
+
   async validateTokenSubject(payload: JwtPayload): Promise<AuthenticatedUser | null> {
     const user = await this.validateUser(payload.sub);
     if (user) return user;
@@ -110,5 +123,9 @@ export class AuthService {
 
   async findById(id: string) {
     return this.validateUser(id);
+  }
+
+  private log(event: string, correlationId: string, fields: Record<string, unknown>): void {
+    process.stdout.write(`${JSON.stringify({ event, correlationId, ...fields })}\n`);
   }
 }

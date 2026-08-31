@@ -1,15 +1,15 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { UpdateServiceOrderStatusUseCase } from '../../application/use-cases/update-service-order-status.use-case';
 import { UpdateServiceOrderStatusWebhookDto } from '../dto/update-service-order-status-webhook.dto';
-import { Public } from '../../../../auth/decorators/public.decorator';
+import { WebhookAuthGuard } from '../../../../auth/guards/webhook-auth.guard';
 
 @ApiTags('Webhooks')
 @Controller('webhooks/service-orders')
 export class ServiceOrderStatusWebhookController {
   constructor(private readonly updateServiceOrderStatusUseCase: UpdateServiceOrderStatusUseCase) {}
 
-  @Public()
+  @UseGuards(WebhookAuthGuard)
   @Post('status')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

@@ -19,6 +19,7 @@ out/
 .env.production
 !.env.example
 .github/agents
+.claude/
 
 # IDE
 .idea/

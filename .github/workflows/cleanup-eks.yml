@@ -76,6 +76,25 @@ jobs:
             cat "$error_file" >&2
             exit 1
           fi
+      - name: Save original Academy HML EKS endpoint access
+        id: endpoint
+        if: ${{ steps.cluster.outputs.exists == 'true' }}
+        run: |
+          set -euo pipefail
+          endpoint_config=$(aws eks describe-cluster \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME" \
+            --query 'cluster.resourcesVpcConfig' \
+            --output json)
+          original_public_access=$(jq -er '.endpointPublicAccess' <<<"$endpoint_config")
+          original_private_access=$(jq -er '.endpointPrivateAccess' <<<"$endpoint_config")
+          original_public_cidrs=$(jq -er '.publicAccessCidrs | join(",")' <<<"$endpoint_config")
+          {
+            echo "endpoint_private_access=$original_private_access"
+            echo "endpoint_public_access=$original_public_access"
+            echo "public_access_cidrs=$original_public_cidrs"
+            echo 'saved=true'
+          } >> "$GITHUB_OUTPUT"
       - name: Allow runner to reach Academy HML EKS
         if: ${{ steps.cluster.outputs.exists == 'true' }}
         run: |
@@ -143,9 +162,18 @@ jobs:
           fi
       - name: Remove application namespace
         if: ${{ steps.cluster.outputs.exists == 'true' && inputs.operation == 'destroy' }}
-        run: kubectl delete namespace "$K8S_NAMESPACE" --ignore-not-found --wait --timeout=10m
-      - name: Disable Academy HML public EKS endpoint
-        if: ${{ always() && steps.cluster.outputs.exists == 'true' }}
+        run: |
+          set -euo pipefail
+          kubectl delete jobs --namespace "$K8S_NAMESPACE" \
+            --selector app.kubernetes.io/part-of=async-furious \
+            --ignore-not-found --wait --timeout=10m
+          kubectl delete namespace "$K8S_NAMESPACE" --ignore-not-found --wait --timeout=10m
+      - name: Restore original Academy HML EKS endpoint access
+        if: ${{ always() && steps.cluster.outputs.exists == 'true' && steps.endpoint.outputs.saved == 'true' }}
+        env:
+          ORIGINAL_PRIVATE_ACCESS: ${{ steps.endpoint.outputs.endpoint_private_access }}
+          ORIGINAL_PUBLIC_ACCESS: ${{ steps.endpoint.outputs.endpoint_public_access }}
+          ORIGINAL_PUBLIC_CIDRS: ${{ steps.endpoint.outputs.public_access_cidrs }}
         run: |
           set -euo pipefail
           error_file=$(mktemp)
@@ -154,21 +182,21 @@ jobs:
           while ! update_id=$(aws eks update-cluster-config \
             --region "$AWS_REGION" \
             --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config 'endpointPrivateAccess=true,endpointPublicAccess=false' \
+            --resources-vpc-config "endpointPrivateAccess=$ORIGINAL_PRIVATE_ACCESS,endpointPublicAccess=$ORIGINAL_PUBLIC_ACCESS,publicAccessCidrs=$ORIGINAL_PUBLIC_CIDRS" \
             --query 'update.id' \
             --output text 2>"$error_file"); do
             error=$(<"$error_file")
             [[ "$error" == *ResourceNotFoundException* ]] && { printf '%s\n' "$error" >&2; exit 0; }
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting public endpoint cleanup.' >&2; exit 1; }
+            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting public endpoint restoration.' >&2; exit 1; }
             sleep 10
           done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
             status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
             [[ "$status" == 'Successful' ]] && exit 0
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint cleanup ended with status $status." >&2; exit 1; }
+            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint restoration ended with status $status." >&2; exit 1; }
             sleep 10
           done
-          echo 'Timed out waiting for public endpoint cleanup.' >&2
+          echo 'Timed out waiting for public endpoint restoration.' >&2
           exit 1
