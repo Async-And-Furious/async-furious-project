@@ -13,23 +13,21 @@ if (process.env.DEPLOY_ENV === 'prod' && process.env.ALLOW_PRODUCTION_SEED !== '
 const prisma = new PrismaClient();
 type SeedClient = Prisma.TransactionClient;
 
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`${name} must be set`);
+  return value;
+}
+
 function stableSeedId(value: string): string {
   const hash = createHash('sha256').update(value).digest('hex');
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-${hash.slice(12, 16)}-${hash.slice(16, 20)}-${hash.slice(20, 32)}`;
 }
 
-const email = process.env.SEED_ADMIN_EMAIL;
-const password = process.env.SEED_ADMIN_PASSWORD;
-const recepcionistaPassword = process.env.SEED_RECEPCIONISTA_PASSWORD;
-const mecanicoPassword = process.env.SEED_MECANICO_PASSWORD;
-
-if (!email || !password || !recepcionistaPassword || !mecanicoPassword) {
-  console.error(
-    '❌ SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_RECEPCIONISTA_PASSWORD and SEED_MECANICO_PASSWORD must be set'
-  );
-  console.error('   Add these to your .env file');
-  process.exit(1);
-}
+const email = requiredEnv('SEED_ADMIN_EMAIL');
+const password = requiredEnv('SEED_ADMIN_PASSWORD');
+const recepcionistaPassword = requiredEnv('SEED_RECEPCIONISTA_PASSWORD');
+const mecanicoPassword = requiredEnv('SEED_MECANICO_PASSWORD');
 
 const CLIENTES = [
   {

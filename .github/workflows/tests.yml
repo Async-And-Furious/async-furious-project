@@ -51,6 +51,8 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
 
       - name: Push database schema
         run: npx prisma db push --skip-generate
