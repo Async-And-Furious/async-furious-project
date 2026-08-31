@@ -100,11 +100,11 @@ flowchart TB
     KA -->|kubectl_manifest| K8s
 ```
 
-### Fluxo de Deploy (ClusterIP; EKS usa o ingress/load balancer aprovado)
+### Fluxo de Deploy
 
-1. A imagem Docker da API e construida localmente e carregada no cluster kind (`kind load docker-image`) ou publicada no ECR para o EKS.
+1. A imagem Docker da API e construida localmente e carregada no cluster kind (`kind load docker-image`).
 2. Terraform (`infra/environments/local`) provisiona o cluster kind e aplica os manifests de `/k8s` — namespace, ConfigMap, Secret, StatefulSet do Postgres e Deployment/Service/HPA da API.
-3. Execute o Job de migracao controlado uma vez por versao (`kubectl create -f k8s/app/migration-job.yaml`) antes do Deployment; os pods nao rodam migration ou seed.
+3. O init container `migrate` roda `prisma migrate deploy` antes de cada pod da API iniciar.
 4. O HPA escala os pods da API de 2 a 5 replicas conforme o consumo de CPU/memoria.
 5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisao humana antes de qualquer `apply` real.
 
@@ -145,10 +145,8 @@ JWT_SECRET="change-me-in-production-use-openssl-rand-hex-32"
 PORT=3000
 BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
-SEED_ADMIN_EMAIL="admin@example.invalid"
-SEED_ADMIN_PASSWORD="replace-with-disposable-local-secret"
-SEED_RECEPCIONISTA_PASSWORD="replace-with-disposable-local-secret"
-SEED_MECANICO_PASSWORD="replace-with-disposable-local-secret"
+SEED_ADMIN_EMAIL="admin@oficina.com"
+SEED_ADMIN_PASSWORD="changeme123"
 ```
 
 ### 3. Iniciar com Docker para desenvolvimento
@@ -169,18 +167,6 @@ docker compose up -d
 ```
 
 A aplicacao fica disponivel em `http://localhost:3000`.
-
-### JWT em producao
-
-Em producao, o contrato compartilhado exige `RS256`, `JWT_PUBLIC_KEY`,
-`JWT_ISSUER=repo-auth-serverless`, `JWT_AUDIENCE=async-furious-project` e
-`JWT_EXPIRES_IN=1800`. O servico verifica tokens emitidos pelo autenticador
-compartilhado; `JWT_PRIVATE_KEY` somente deve ser fornecida por um Secret
-gerenciado quando este processo for explicitamente autorizado a assinar.
-Sem ela, a assinatura local de producao falha fechada. Nunca versione chaves.
-
-O exemplo local acima usa `HS256` e `JWT_SECRET` apenas para desenvolvimento e
-testes; essa alternativa nao e aceita em producao.
 
 ---
 
@@ -404,13 +390,12 @@ A infraestrutura local e provisionada com Terraform em um cluster Kubernetes loc
   /modules/kind-cluster              # Cria cluster kind com control-plane e worker
   /modules/kubernetes-apps           # Aplica manifests via kubectl provider
   /environments/local                # Ambiente local
-  /environments/aws/README.md        # Deploy manual para EKS existente
+  /environments/aws/README.md        # Stub para migracao EKS
 
 /k8s
   namespace.yaml
   /config    configmap.yaml, secret.yaml
   /app       deployment.yaml, service.yaml, hpa.yaml
-  /overlays/aws  # Ingress ALB interno e deploy EKS por digest
   /database  statefulset.yaml, service.yaml, pvc.yaml
 ```
 
@@ -430,9 +415,8 @@ Use o script `scripts/local-up.sh` — ele executa todos os passos na ordem corr
 ./scripts/local-up.sh down
 ```
 
-As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email`,
-`TF_VAR_seed_admin_password`, `TF_VAR_seed_recepcionista_password` e
-`TF_VAR_seed_mecanico_password` podem ser exportadas antes ou definidas em
+As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email`
+e `TF_VAR_seed_admin_password` podem ser exportadas antes ou definidas em
 `.env.local` — o script solicita interativamente se nao encontrar.
 
 ### Subir o ambiente local (manual)
@@ -446,10 +430,8 @@ docker build -t async-furious-api:latest .
 # 2. Variaveis sensiveis usadas pelo Terraform
 export TF_VAR_db_password="postgres"
 export TF_VAR_jwt_secret="change-me-in-production-use-openssl-rand-hex-32"
-export TF_VAR_seed_admin_email="admin@example.invalid"
-export TF_VAR_seed_admin_password="<disposable-local-secret>"
-export TF_VAR_seed_recepcionista_password="<disposable-local-secret>"
-export TF_VAR_seed_mecanico_password="<disposable-local-secret>"
+export TF_VAR_seed_admin_email="admin@oficina.com"
+export TF_VAR_seed_admin_password="changeme123"
 
 # 3. Criar cluster e aplicar os manifests
 cd infra/environments/local
@@ -461,8 +443,6 @@ kind load docker-image async-furious-api:latest --name async-furious
 
 # 5. Recriar pods da API
 kubectl rollout restart deployment/async-furious-api -n async-furious
-kubectl rollout status deployment/async-furious-api -n async-furious --timeout=240s
-curl http://localhost:30000/api/v1/health/live
 ```
 
 ### Acompanhar o deploy
@@ -524,24 +504,13 @@ Em push para `main`/`develop` (ou via `workflow_dispatch` manual), o mesmo workf
 
 ### Migracao para EKS
 
-Consulte `infra/environments/aws/README.md`. O workflow manual
-`.github/workflows/deploy-eks.yml` publica a imagem no ECR com a SHA do commit
-e aplica `k8s/overlays/aws` por digest, após aprovação do GitHub Environment.
-Por padrão, ele usa Ingress ALB interno e requer o AWS Load Balancer Controller.
-Para uma conta AWS Academy, marque `aws_academy=true` no dispatch: o workflow
-remove o Ingress, usa `Service` `LoadBalancer` (sem IRSA ou recursos IAM),
-aguarda o hostname/IP externo e publica `http://<endpoint>:3000` no resumo.
-O backend que Auth deve consumir é essa URL sem barra final, com endpoints sob
-`/api/v1` (por exemplo, `POST <backend-url>/api/v1/auth/login`). O cluster EKS
-deve existir previamente; nenhum recurso AWS é provisionado pelo
-workflow. Em `aws_academy=true`, configure no GitHub Environment protegido as
-secrets `DATABASE_SECRET_ARN` e `JWT_PRIVATE_KEY_SECRET_ARN`, e a variable
-`JWT_PUBLIC_KEY_PARAMETER_NAME`. O runner le o JSON RDS (`username`, `password`,
-`host`, `port`, `dbname`), le as chaves JWT pelas referencias AWS, monta
-`DATABASE_URL` e aplica somente `DATABASE_URL`, `JWT_PRIVATE_KEY` e
-`JWT_PUBLIC_KEY` ao Secret. A etapa falha fechada se qualquer referencia
-faltar. No modo normal, o Secret gerenciado continua sendo preexistente e o
-comportamento nao muda.
+Consulte `infra/environments/aws/README.md`.
+
+---
+
+## Persistencia e Modelo de Dados
+
+A documentacao completa da camada de persistencia (diagrama ER, modelo relacional tabela a tabela, mapeamento entre entidades de dominio e tabelas, justificativas do PostgreSQL e do Prisma, estrategia de persistencia e o historico de decisoes de evolucao do schema) esta em [docs/infrastructure/database.md](./docs/infrastructure/database.md).
 
 ---
 
