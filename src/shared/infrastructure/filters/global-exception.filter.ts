@@ -9,6 +9,7 @@ interface ErrorResponse {
   error: string;
   timestamp: string;
   path: string;
+  correlationId?: string;
 }
 
 @Catch()
@@ -16,8 +17,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-    const correlationId = response.locals?.correlationId || 'unknown';
+    const request = ctx.getRequest<Request & { correlationId?: string }>();
+    const headerCorrelationId =
+      typeof request.header === 'function' ? request.header('x-correlation-id') : undefined;
+    const correlationId =
+      response.locals?.correlationId || request.correlationId || headerCorrelationId;
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';
@@ -54,10 +58,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       error,
       timestamp: new Date().toISOString(),
       path: request.url,
+      ...(correlationId ? { correlationId } : {}),
     };
 
     process.stderr.write(
-      `${JSON.stringify({ event: 'http_error', correlationId, method: request.method, path: request.url, statusCode, error, message })}\n`
+      `${JSON.stringify({
+        level: Number(statusCode) >= 500 ? 'error' : 'warn',
+        event: 'http_error',
+        correlationId,
+        method: request.method,
+        path: request.url,
+        statusCode,
+        error,
+        message,
+      })}\n`
     );
 
     response.status(statusCode).json(errorResponse);

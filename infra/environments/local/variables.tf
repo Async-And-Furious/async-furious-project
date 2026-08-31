@@ -51,3 +51,13 @@ variable "seed_admin_password" {
   type      = string
   sensitive = true
 }
+
+variable "seed_recepcionista_password" {
+  type      = string
+  sensitive = true
+}
+
+variable "seed_mecanico_password" {
+  type      = string
+  sensitive = true
+}

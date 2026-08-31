@@ -14,3 +14,8 @@
 
 - Added backward-safe `Cliente.ativo` migration with default-true backfill; gateway JWT customer validation now accepts Auth Lambda `sub=Cliente.id` only for active customers.
 - Added CloudWatch Embedded Metric Format request metrics and JSON alarm events without a new dependency.
+
+## 2026-08-24 - Academy deployment follow-up
+
+- Academy deploys use hosted runners and Service LoadBalancer mode without ALB/IRSA; normal deployment behavior remains unchanged.
+- Secret synchronization fails closed when required AWS references are missing, and no secrets, deployment, commit, or push was run during this follow-up.

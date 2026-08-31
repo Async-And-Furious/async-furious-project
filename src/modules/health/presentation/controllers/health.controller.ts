@@ -1,11 +1,10 @@
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { Controller, Get } from '@nestjs/common';
 import { Public } from '../../../../auth/decorators/public.decorator';
 import { HealthService } from '../../application/services/health.service';
 import { HealthResponseDto } from '../../application/dto/health-response.dto';
 
-@Controller()
+@Controller('health')
 @ApiTags('Health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
@@ -26,17 +25,14 @@ export class HealthController {
   }
 
   @Public()
-  @Get('health/live')
+  @Get('live')
   live(): HealthResponseDto {
-    return this.healthService.check();
+    return this.healthService.live();
   }
 
   @Public()
-  @Get('health/ready')
-  async ready(@Res() response: Response): Promise<void> {
-    const result = await this.healthService.ready();
-    response
-      .status(result.status === 'ok' ? HttpStatus.OK : HttpStatus.SERVICE_UNAVAILABLE)
-      .json(result);
+  @Get('ready')
+  ready(): Promise<HealthResponseDto> {
+    return this.healthService.ready();
   }
 }

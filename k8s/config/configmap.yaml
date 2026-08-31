@@ -4,7 +4,7 @@ metadata:
   name: async-furious-config
   namespace: async-furious
 data:
-  NODE_ENV: "production"
+  NODE_ENV: "development"
   PORT: "3000"
   AUTH_MODE: "local"
   DEPLOY_ENV: "local"
@@ -12,3 +12,7 @@ data:
   JWT_AUDIENCE: ""
   DB_NAME: "workshop"
   DB_USER: "postgres"
+  JWT_ALGORITHM: "HS256"
+  JWT_ISSUER: "repo-auth-serverless"
+  JWT_AUDIENCE: "async-furious-project"
+  JWT_EXPIRES_IN: "1800"

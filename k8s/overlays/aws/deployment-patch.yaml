@@ -1,0 +1,15 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: async-furious-api
+  namespace: async-furious
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: api
+          image: async-furious-api:immutable-placeholder
+          envFrom:
+            - secretRef:
+                name: async-furious-secret

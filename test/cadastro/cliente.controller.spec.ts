@@ -14,6 +14,7 @@ import {
 } from '../../src/modules/cadastro/presentation/dto/cliente.dto';
 import { Cliente } from '../../src/modules/cadastro/domain/entities/cliente.entity';
 import { AuthUser } from '../../src/auth/types/auth.types';
+import { Role } from '../../src/auth/enums/role.enum';
 
 describe('ClienteController', () => {
   let controller: ClienteController;
@@ -26,8 +27,8 @@ describe('ClienteController', () => {
   const mockAuthUser: AuthUser = {
     id: 'user-123',
     email: 'admin@test.com',
-    name: 'Admin',
-    role: 'admin',
+
+    role: Role.ADMIN,
   };
 
   const mockCliente: Cliente = {

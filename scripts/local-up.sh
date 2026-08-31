@@ -31,11 +31,11 @@ load_secrets() {
 
   # Terraform maps TF_VAR_<name> to var.<name> case-sensitively, so the suffix
   # must match the lowercase variable names (db_password, jwt_secret,
-  # seed_admin_email, seed_admin_password) declared in
+  # seed_admin_email, seed_admin_password, seed_recepcionista_password, seed_mecanico_password) declared in
   # infra/environments/local/variables.tf — ALL_CAPS here would break it.
-  local required=(TF_VAR_db_password TF_VAR_jwt_secret TF_VAR_seed_admin_email TF_VAR_seed_admin_password)
-  local prompts=("Enter DB password [postgres]: " "Enter JWT secret [change-me-in-production-use-openssl-rand-hex-32]: " "Enter seed admin email [admin@oficina.com]: " "Enter seed admin password [changeme123]: ")
-  local defaults=("postgres" "change-me-in-production-use-openssl-rand-hex-32" "admin@oficina.com" "changeme123")
+  local required=(TF_VAR_db_password TF_VAR_jwt_secret TF_VAR_seed_admin_email TF_VAR_seed_admin_password TF_VAR_seed_recepcionista_password TF_VAR_seed_mecanico_password)
+  local prompts=("Enter DB password: " "Enter JWT secret: " "Enter seed admin email: " "Enter seed admin password: " "Enter seed recepcionista password: " "Enter seed mecanico password: ")
+  local defaults=("" "" "" "" "" "")
 
   for i in "${!required[@]}"; do
     local var="${required[$i]}"
@@ -77,8 +77,19 @@ terraform_apply_cluster() {
 }
 
 terraform_apply_full() {
-  log "Running terraform apply (full)..."
-  terraform -chdir="$INFRA_DIR" apply -auto-approve -input=false
+  local plan_file="$INFRA_DIR/.tfplan"
+  log "Generating Terraform plan (full)..."
+  if ! terraform -chdir="$INFRA_DIR" plan -input=false -out="$plan_file"; then
+    rm -f "$plan_file"
+    die "Terraform plan failed; local environment was not deployed"
+  fi
+
+  log "Applying the local Terraform plan..."
+  if ! terraform -chdir="$INFRA_DIR" apply -input=false "$plan_file"; then
+    rm -f "$plan_file"
+    die "Terraform apply failed; check the Terraform and Kubernetes output"
+  fi
+  rm -f "$plan_file"
   ok "Terraform apply complete"
 }
 
@@ -125,11 +136,13 @@ smoke_test() {
   sleep 2
   log "Smoke test: GET $url"
   local status
-  status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" || echo "000")
+  if ! status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url"); then
+    status="000"
+  fi
   if [[ "$status" == "200" ]]; then
     ok "App responding (HTTP $status)"
   else
-    warn "App returned HTTP $status — check logs: kubectl logs -n $NAMESPACE -l app=async-furious-api"
+    die "Smoke test failed: app returned HTTP $status — check logs: kubectl logs -n $NAMESPACE -l app=async-furious-api"
   fi
 }
 

@@ -125,7 +125,9 @@ resource "kubectl_manifest" "secret" {
     db_user             = var.db_user
     db_sslmode          = var.enable_local_database ? "disable" : "require"
     seed_admin_email    = var.seed_admin_email
-    seed_admin_password = var.seed_admin_password
+    seed_admin_password         = var.seed_admin_password
+    seed_recepcionista_password = var.seed_recepcionista_password
+    seed_mecanico_password      = var.seed_mecanico_password
   })
   depends_on = [kubectl_manifest.namespace]
 }

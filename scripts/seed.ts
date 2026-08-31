@@ -20,9 +20,13 @@ function stableSeedId(value: string): string {
 
 const email = process.env.SEED_ADMIN_EMAIL;
 const password = process.env.SEED_ADMIN_PASSWORD;
+const recepcionistaPassword = process.env.SEED_RECEPCIONISTA_PASSWORD;
+const mecanicoPassword = process.env.SEED_MECANICO_PASSWORD;
 
-if (!email || !password) {
-  console.error('❌ SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set');
+if (!email || !password || !recepcionistaPassword || !mecanicoPassword) {
+  console.error(
+    '❌ SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_RECEPCIONISTA_PASSWORD and SEED_MECANICO_PASSWORD must be set'
+  );
   console.error('   Add these to your .env file');
   process.exit(1);
 }
@@ -471,7 +475,7 @@ async function seedRecepcionista(db: SeedClient): Promise<void> {
   const recepEmail = 'recepcionista@oficina.com';
   const existing = await db.user.findUnique({ where: { email: recepEmail } });
   if (!existing) {
-    const hashedPassword = await bcrypt.hash('recep123', 10);
+    const hashedPassword = await bcrypt.hash(recepcionistaPassword, 10);
     try {
       await db.user.create({
         data: {
@@ -495,7 +499,7 @@ async function seedMecanico(db: SeedClient): Promise<void> {
   const mecEmail = 'mecanico@oficina.com';
   const existing = await db.user.findUnique({ where: { email: mecEmail } });
   if (!existing) {
-    const hashedPassword = await bcrypt.hash('mecanico123', 10);
+    const hashedPassword = await bcrypt.hash(mecanicoPassword, 10);
     try {
       await db.user.create({
         data: {
@@ -571,51 +575,40 @@ async function seedServicos(db: SeedClient): Promise<void> {
   let criados = 0;
   let pulados = 0;
   for (const s of SERVICOS) {
-    let created = false;
-    const id = stableSeedId(`servico:${s.nome}`);
-    let lastConflict: Prisma.PrismaClientKnownRequestError | undefined;
-
-    // `nome` is intentionally not unique: an existing service with this name
-    // must be preserved, while the deterministic id makes this seed safe to
-    // run concurrently.
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const existing = await db.servico.findFirst({ where: { nome: s.nome } });
-      if (existing) break;
-
-      try {
-        await db.servico.create({
-          data: {
-            id,
-            nome: s.nome,
-            descricao: s.descricao,
-            preco: s.preco,
-          },
-        });
-        created = true;
-        break;
-      } catch (error) {
-        if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
-          throw error;
-        }
-        lastConflict = error;
-        // Re-read both identities. The winner may have used the same seed id,
-        // or may be a pre-existing record with the same non-unique name.
-        const [byName, byId] = await Promise.all([
-          db.servico.findFirst({ where: { nome: s.nome } }),
-          db.servico.findUnique({ where: { id } }),
-        ]);
-        if (byName || byId) break;
-      }
-    }
-    if (lastConflict && !created) {
-      const existing = await db.servico.findFirst({ where: { nome: s.nome } });
-      const seeded = await db.servico.findUnique({ where: { id } });
-      if (!existing && !seeded) throw lastConflict;
-    }
+    const created = await seedServico(db, s);
     if (created) criados++;
     else pulados++;
   }
   console.log(`  ✅ Serviços: ${criados} criados, ${pulados} já existiam`);
+}
+
+async function seedServico(db: SeedClient, service: (typeof SERVICOS)[number]): Promise<boolean> {
+  const id = stableSeedId(`servico:${service.nome}`);
+  let lastConflict: Prisma.PrismaClientKnownRequestError | undefined;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await db.servico.findFirst({ where: { nome: service.nome } })) return false;
+    try {
+      await db.servico.create({
+        data: { id, nome: service.nome, descricao: service.descricao, preco: service.preco },
+      });
+      return true;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+        throw error;
+      lastConflict = error;
+      const [byName, byId] = await Promise.all([
+        db.servico.findFirst({ where: { nome: service.nome } }),
+        db.servico.findUnique({ where: { id } }),
+      ]);
+      if (byName || byId) return false;
+    }
+  }
+  const [existing, seeded] = await Promise.all([
+    db.servico.findFirst({ where: { nome: service.nome } }),
+    db.servico.findUnique({ where: { id } }),
+  ]);
+  if (!existing && !seeded && lastConflict) throw lastConflict;
+  return false;
 }
 
 async function seedPecasInsumos(db: SeedClient): Promise<void> {
@@ -824,8 +817,8 @@ async function seed(): Promise<void> {
 }
 
 seed()
-  .catch((error) => {
-    console.error('❌ Seed falhou:', error);
+  .catch(() => {
+    console.error('❌ Seed falhou');
     process.exit(1);
   })
   .finally(async () => {

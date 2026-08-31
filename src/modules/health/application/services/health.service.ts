@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { HealthResponseDto } from '../dto/health-response.dto';
+import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 
 @Injectable()
 export class HealthService {
@@ -14,12 +14,16 @@ export class HealthService {
     };
   }
 
+  live(): HealthResponseDto {
+    return this.check();
+  }
+
   async ready(): Promise<HealthResponseDto> {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
-      return { ...this.check(), status: 'ok' };
+      return this.check();
     } catch {
-      return { ...this.check(), status: 'down' };
+      throw new ServiceUnavailableException('Database is not ready');
     }
   }
 }

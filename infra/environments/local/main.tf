@@ -37,6 +37,8 @@ module "kubernetes_apps" {
   database_url        = ""
   target_group_arn    = ""
   seed_admin_email    = var.seed_admin_email
-  seed_admin_password = var.seed_admin_password
+  seed_admin_password         = var.seed_admin_password
+  seed_recepcionista_password = var.seed_recepcionista_password
+  seed_mecanico_password      = var.seed_mecanico_password
   k8s_manifests_path  = "${path.root}/../../../k8s"
 }
