@@ -93,9 +93,18 @@ jobs:
         run: |
           set -euo pipefail
           image="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
-          docker build --pull --tag "$image" .
-          docker push "$image"
-          digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          if digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text 2>"$error_file"); then
+            [[ "$digest" == sha256:* ]] || { echo 'ECR image digest was not returned for the existing image.' >&2; exit 1; }
+            echo "Commit-SHA image already exists; reusing $image."
+          else
+            error=$(<"$error_file")
+            [[ "$error" == *ImageNotFoundException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            docker build --pull --tag "$image" .
+            docker push "$image"
+            digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)
+          fi
           test -n "$digest" && [[ "$digest" == sha256:* ]] || { echo 'ECR image digest was not returned.' >&2; exit 1; }
           echo "ref=$REGISTRY/$ECR_REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
