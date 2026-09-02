@@ -24,6 +24,26 @@ on:
         description: Type DESTROY HML when operation is destroy
         required: false
         type: string
+  workflow_call:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: string
+      aws_academy:
+        description: Confirm this is an AWS Academy environment
+        required: true
+        type: boolean
+        default: true
+      operation:
+        description: Plan or remove the application namespace
+        required: true
+        type: string
+        default: destroy-plan
+      confirm:
+        description: Type DESTROY HML when operation is destroy
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -50,16 +70,24 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$TARGET_ENVIRONMENT" == 'hml' ]] || { echo 'Only HML cleanup is allowed.' >&2; exit 1; }
-          [[ "$AWS_ACADEMY" == 'true' ]] || { echo 'Cleanup requires AWS Academy mode.' >&2; exit 1; }
+          [[ "$AWS_ACADEMY" == 'true' || ( "$GITHUB_EVENT_NAME" == 'workflow_call' && "$AWS_ACADEMY" == 'false' ) ]] || { echo 'Cleanup requires AWS Academy mode.' >&2; exit 1; }
           [[ "$OPERATION" == 'destroy-plan' || "$OPERATION" == 'destroy' ]] || { echo 'Unsupported cleanup operation.' >&2; exit 1; }
           [[ "$OPERATION" != 'destroy' || "$CONFIRM" == 'DESTROY HML' ]] || { echo 'Destroy requires exact confirmation: DESTROY HML' >&2; exit 1; }
       - name: Configure AWS Academy credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        if: ${{ inputs.aws_academy == true }}
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Configure AWS IAM user credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        if: ${{ github.event_name == 'workflow_call' && inputs.aws_academy == false }}
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       - name: Detect EKS cluster
         id: cluster
         run: |

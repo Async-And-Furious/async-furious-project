@@ -25,13 +25,24 @@ on:
         required: true
         type: boolean
         default: false
+  workflow_call:
+    inputs:
+      environment:
+        description: Logical Academy environment
+        required: true
+        type: string
+      seed_prod:
+        description: Explicitly allow the production seed job
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   id-token: write
 
 concurrency:
-  group: app-eks-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'hml') }}
+  group: app-eks-${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'hml') }}
   cancel-in-progress: false
 
 env:
@@ -44,9 +55,10 @@ jobs:
     name: Build and publish immutable image
     if: >-
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
-      github.event_name == 'workflow_dispatch'
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
-    environment: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')) && 'production' || 'hml' }}
+    environment: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.environment == 'prod')) && 'production' || 'hml' }}
     outputs:
       image: ${{ steps.image.outputs.ref }}
     steps:
@@ -115,7 +127,8 @@ jobs:
     needs: image
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'hml')
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'hml') ||
+      (github.event_name == 'workflow_call' && inputs.environment == 'hml')
     runs-on: ubuntu-latest
     environment: hml
     env:
@@ -551,7 +564,7 @@ jobs:
             exit 1
           }
       - name: Run controlled seed
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.seed_prod == true }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_prod == true }}
         run: |
           set -euo pipefail
           seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

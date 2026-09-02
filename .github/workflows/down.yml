@@ -1,0 +1,22 @@
+name: HML down
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type DESTROY HML to confirm deletion
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    uses: ./.github/workflows/cleanup-eks.yml
+    with:
+      environment: hml
+      aws_academy: false
+      operation: destroy
+      confirm: ${{ inputs.confirm }}
+    secrets: inherit

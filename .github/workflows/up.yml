@@ -1,0 +1,16 @@
+name: HML up
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/deploy-eks.yml
+    with:
+      environment: hml
+      seed_prod: false
+    secrets: inherit
