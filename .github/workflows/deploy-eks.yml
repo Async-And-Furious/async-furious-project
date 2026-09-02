@@ -286,6 +286,11 @@ jobs:
           EOF
           kubectl wait --for=condition=complete "job/$job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
             kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+            kubectl get job "$job" --namespace "$K8S_NAMESPACE" -o wide || true
+            kubectl get pods --namespace "$K8S_NAMESPACE" --selector "job-name=$job" -o wide || true
+            kubectl describe job "$job" --namespace "$K8S_NAMESPACE" || true
+            kubectl describe pods --namespace "$K8S_NAMESPACE" --selector "job-name=$job" || true
+            kubectl get events --namespace "$K8S_NAMESPACE" --sort-by='.metadata.creationTimestamp' || true
             exit 1
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
@@ -538,6 +543,11 @@ jobs:
           EOF
           kubectl wait --for=condition=complete "job/$job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
             kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+            kubectl get job "$job" --namespace "$K8S_NAMESPACE" -o wide || true
+            kubectl get pods --namespace "$K8S_NAMESPACE" --selector "job-name=$job" -o wide || true
+            kubectl describe job "$job" --namespace "$K8S_NAMESPACE" || true
+            kubectl describe pods --namespace "$K8S_NAMESPACE" --selector "job-name=$job" || true
+            kubectl get events --namespace "$K8S_NAMESPACE" --sort-by='.metadata.creationTimestamp' || true
             exit 1
           }
       - name: Run controlled seed
