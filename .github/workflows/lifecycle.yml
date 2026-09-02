@@ -1,0 +1,150 @@
+name: HML lifecycle orchestrator
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: HML lifecycle operation
+        required: true
+        type: choice
+        options: [up, down]
+        default: up
+      confirm:
+        description: Required for down (type DESTROY HML)
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hml-lifecycle
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  GH_OWNER: Async-And-Furious
+  K8S_REPO: Async-And-Furious/repo-k8s-infra
+  DB_REPO: Async-And-Furious/repo-db-infra
+  AUTH_REPO: Async-And-Furious/repo-auth-serverless
+  APP_REPO: Async-And-Furious/async-furious-project
+
+jobs:
+  lifecycle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate orchestrator access and inputs
+        env:
+          ORCHESTRATOR_TOKEN: ${{ secrets.ORCHESTRATOR_TOKEN }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$ORCHESTRATOR_TOKEN" ]]; then
+            echo 'Missing required repository secret ORCHESTRATOR_TOKEN; cross-repository dispatch cannot continue.' >&2
+            exit 1
+          fi
+          if [[ "$OPERATION" == down && "$CONFIRM" != 'DESTROY HML' ]]; then
+            echo 'The down operation requires confirm="DESTROY HML".' >&2
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run HML lifecycle in order
+        env:
+          GH_TOKEN: ${{ secrets.ORCHESTRATOR_TOKEN }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRM: ${{ inputs.confirm }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          wait_for_run() {
+            local repo=$1 workflow=$2 ref=$3 started=$4 run_id=''
+            for _ in {1..60}; do
+              run_id=$(gh run list --repo "$repo" --workflow "$workflow" --branch "$ref" --limit 10 --json databaseId,createdAt --jq ".[] | select(.createdAt >= \"$started\") | .databaseId" | head -n 1 || true)
+              if [[ -n "$run_id" ]]; then break; fi
+              sleep 5
+            done
+            [[ -n "$run_id" ]] || { echo "Timed out waiting for $repo/$workflow." >&2; return 1; }
+            for _ in {1..120}; do
+              status=$(gh run view "$run_id" --repo "$repo" --json status --jq .status)
+              if [[ "$status" == completed ]]; then
+                conclusion=$(gh run view "$run_id" --repo "$repo" --json conclusion --jq .conclusion)
+                [[ "$conclusion" == success ]] || { echo "$repo/$workflow completed with conclusion $conclusion." >&2; return 1; }
+                return 0
+              fi
+              sleep 10
+            done
+            echo "Timed out polling $repo/$workflow run $run_id." >&2
+            return 1
+          }
+          dispatch() {
+            local repo=$1 workflow=$2 ref=$3; shift 3
+            local started
+            started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            gh workflow run "$workflow" --repo "$repo" --ref "$ref" "$@" >/dev/null
+            wait_for_run "$repo" "$workflow" "$ref" "$started"
+          }
+          set_vars() {
+            local repo=$1 name=$2 value=$3
+            [[ -n "$value" ]] || return 0
+            gh variable set "$name" --repo "$repo" --body "$value" >/dev/null
+          }
+          if [[ "$OPERATION" == up ]]; then
+            dispatch "$K8S_REPO" ci.yml develop -f environment=hml -f action=apply -f academy_mode=false
+            echo 'Kubernetes HML applied.' >> "$GITHUB_STEP_SUMMARY"
+            dispatch "$DB_REPO" ci.yml develop -f environment=hml -f action=apply -f academy_mode=false
+            echo 'Database HML applied.' >> "$GITHUB_STEP_SUMMARY"
+
+            db_json=$(aws rds describe-db-instances --db-instance-identifier tc3-db-hml --output json)
+            db_secret_arn=$(jq -r '.DBInstances[0].MasterUserSecret.SecretArn // empty' <<< "$db_json")
+            if [[ -z "$db_secret_arn" ]]; then
+              db_secret_arn=$(aws secretsmanager list-secrets --filters Key=name,Values=tc3-db-hml --query 'SecretList[0].ARN' --output text)
+              [[ "$db_secret_arn" == None ]] && db_secret_arn=''
+            fi
+            db_host=$(jq -r '.DBInstances[0].Endpoint.Address // empty' <<< "$db_json")
+            db_port=$(jq -r '.DBInstances[0].Endpoint.Port // empty' <<< "$db_json")
+            db_name=$(aws rds describe-db-instances --db-instance-identifier tc3-db-hml --query 'DBInstances[0].DBName' --output text)
+            [[ "$db_name" == None ]] && db_name=''
+            target_group_arn=$(aws elbv2 describe-target-groups --names tc3-hml-app --query 'TargetGroups[0].TargetGroupArn' --output text)
+            load_balancer_arn=$(aws elbv2 describe-load-balancers --names tc3-hml-internal --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+            listener_arn=$(aws elbv2 describe-listeners --load-balancer-arn "$load_balancer_arn" --query 'Listeners[0].ListenerArn' --output text)
+            for value in "$db_secret_arn" "$db_host" "$db_port" "$db_name" "$target_group_arn" "$listener_arn"; do
+              [[ -n "$value" && "$value" != None ]] || { echo 'AWS discovery returned an incomplete HML output.' >&2; exit 1; }
+              echo "::add-mask::$value"
+            done
+            echo '### HML discovery' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Database endpoint, secret ARN, target group, and listener discovered (values withheld).' >> "$GITHUB_STEP_SUMMARY"
+
+            set_vars "$AUTH_REPO" DATABASE_SECRET_ARN "$db_secret_arn"
+            set_vars "$AUTH_REPO" DATABASE_SUBNET_IDS "$(gh variable get DATABASE_SUBNET_IDS --repo "$AUTH_REPO" 2>/dev/null || true)"
+            set_vars "$AUTH_REPO" DATABASE_SECURITY_GROUP_IDS "$(gh variable get DATABASE_SECURITY_GROUP_IDS --repo "$AUTH_REPO" 2>/dev/null || true)"
+            set_vars "$AUTH_REPO" BACKEND_INTEGRATION_URI "$listener_arn"
+            set_vars "$APP_REPO" RDS_SECRET_ARN "$db_secret_arn"
+            set_vars "$APP_REPO" DB_HOST "$db_host"
+            set_vars "$APP_REPO" DB_NAME "$db_name"
+            set_vars "$APP_REPO" DB_PORT "$db_port"
+            set_vars "$APP_REPO" TARGET_GROUP_ARN "$target_group_arn"
+            echo 'Consumer repository variables updated (values withheld).' >> "$GITHUB_STEP_SUMMARY"
+            dispatch "$APP_REPO" deploy-eks.yml develop -f environment=hml -f seed_prod=false
+            echo 'Application deployed to HML EKS.' >> "$GITHUB_STEP_SUMMARY"
+            dispatch "$AUTH_REPO" ci.yml release/v0.1.0 -f environment=hml -f operation=apply -f deploy_auth_only=false
+            echo 'Authentication deployed to HML.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            dispatch "$AUTH_REPO" ci.yml release/v0.1.0 -f environment=hml -f operation=destroy -f deploy_auth_only=false -f confirm='DESTROY HML'
+            echo 'Authentication destroyed.' >> "$GITHUB_STEP_SUMMARY"
+            dispatch "$APP_REPO" cleanup-eks.yml develop -f environment=hml -f aws_academy=false -f operation=destroy -f confirm='DESTROY HML'
+            echo 'Application namespace cleaned up.' >> "$GITHUB_STEP_SUMMARY"
+            dispatch "$DB_REPO" ci.yml develop -f environment=hml -f action=destroy -f academy_mode=false -f confirm='DESTROY HML'
+            echo 'Database destroyed without snapshot.' >> "$GITHUB_STEP_SUMMARY"
+            dispatch "$K8S_REPO" ci.yml develop -f environment=hml -f action=destroy -f academy_mode=false -f confirm='DESTROY HML'
+            echo 'Kubernetes HML destroyed; JWT Secrets Manager/SSM resources and state were not targeted.' >> "$GITHUB_STEP_SUMMARY"
+          fi
