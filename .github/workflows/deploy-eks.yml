@@ -121,6 +121,9 @@ jobs:
     env:
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
       RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
+      DB_HOST: ${{ vars.DB_HOST }}
+      DB_NAME: ${{ vars.DB_NAME }}
+      DB_PORT: ${{ vars.DB_PORT || '5432' }}
       TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
@@ -216,7 +219,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -231,12 +234,9 @@ jobs:
           kubectl apply -f k8s/config/configmap.yaml
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
-          for field in host port dbname username password; do
+          for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
           done
-          export DB_HOST=$(jq -er '.host' <<<"$secret_json")
-          export DB_PORT=$(jq -er '.port | tostring' <<<"$secret_json")
-          export DB_NAME=$(jq -er '.dbname' <<<"$secret_json")
           export DB_USER=$(jq -er '.username' <<<"$secret_json")
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           export DB_SSLMODE=require
@@ -389,6 +389,9 @@ jobs:
     env:
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
       RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
+      DB_HOST: ${{ vars.DB_HOST }}
+      DB_NAME: ${{ vars.DB_NAME }}
+      DB_PORT: ${{ vars.DB_PORT || '5432' }}
       TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
@@ -468,7 +471,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -483,12 +486,9 @@ jobs:
           kubectl apply -f k8s/config/configmap.yaml
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
-          for field in host port dbname username password; do
+          for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
           done
-          export DB_HOST=$(jq -er '.host' <<<"$secret_json")
-          export DB_PORT=$(jq -er '.port | tostring' <<<"$secret_json")
-          export DB_NAME=$(jq -er '.dbname' <<<"$secret_json")
           export DB_USER=$(jq -er '.username' <<<"$secret_json")
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           export DB_SSLMODE=require
