@@ -55,7 +55,7 @@ jobs:
     name: Build and publish immutable image
     if: >-
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && (inputs.environment == 'hml' || (inputs.environment == 'prod' && github.ref == 'refs/heads/main'))) ||
       github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     environment: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.environment == 'prod')) && 'production' || 'hml' }}
@@ -161,6 +161,9 @@ jobs:
           test -n "$JWT_PUBLIC_KEY_SECRET_ARN" || { echo 'Repository variable JWT_PUBLIC_KEY_SECRET_ARN is required.' >&2; exit 1; }
           jwt_public_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PUBLIC_KEY_SECRET_ARN" --query SecretString --output text)
           test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key secret is empty.' >&2; exit 1; }
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
+          done <<< "$jwt_public_key"
           delimiter="JWT_PUBLIC_KEY_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           {
             printf 'JWT_PUBLIC_KEY<<%s\n' "$delimiter"
@@ -252,6 +255,8 @@ jobs:
           done
           export DB_USER=$(jq -er '.username' <<<"$secret_json")
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
+          printf '::add-mask::%s\n' "$DB_USER"
+          printf '::add-mask::%s\n' "$DB_PASSWORD"
           export DB_SSLMODE=require
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
@@ -298,7 +303,7 @@ jobs:
                           name: async-furious-secret
           EOF
           kubectl wait --for=condition=complete "job/$job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
-            kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+            kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true --ignore-errors=true || true
             kubectl get job "$job" --namespace "$K8S_NAMESPACE" -o wide || true
             kubectl get pods --namespace "$K8S_NAMESPACE" --selector "job-name=$job" -o wide || true
             kubectl describe job "$job" --namespace "$K8S_NAMESPACE" || true
@@ -401,7 +406,7 @@ jobs:
     needs: image
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: production
     env:
