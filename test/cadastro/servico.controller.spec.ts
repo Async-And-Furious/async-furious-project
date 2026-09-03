@@ -363,13 +363,15 @@ describe('ServicoController', () => {
     it('should handle findAll error', async () => {
       mockListUseCase.execute.mockRejectedValue(new Error('Database error'));
 
-      await expect(controller.findAll({} as ListQueryDto)).rejects.toThrow('Database error');
+      await expect(controller.findAll({} as ListQueryDto, mockUser)).rejects.toThrow(
+        'Database error'
+      );
     });
 
     it('should handle findOne error', async () => {
       mockGetUseCase.execute.mockRejectedValue(new Error('Not found'));
 
-      await expect(controller.findOne('invalid')).rejects.toThrow('Not found');
+      await expect(controller.findOne('invalid', mockUser)).rejects.toThrow('Not found');
     });
 
     it('should handle update error', async () => {

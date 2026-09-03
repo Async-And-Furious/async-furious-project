@@ -35,7 +35,7 @@ Backend para **gestao integrada de oficina mecanica**, desenvolvido como Tech Ch
 | ------ | ---------- |
 | Framework | NestJS 10.x |
 | Linguagem | TypeScript 5.x |
-| Banco de dados | PostgreSQL 15 |
+| Banco de dados | PostgreSQL local; RDS na AWS |
 | ORM | Prisma |
 | Autenticacao | JWT + bcrypt |
 | Documentacao | Swagger / OpenAPI |
@@ -77,7 +77,7 @@ flowchart TB
 
     subgraph K8s["Cluster Kubernetes (kind local / EKS)"]
         direction TB
-        SVC["Service NodePort<br/>:30000 -> :3000"]
+        SVC["Private ClusterIP Service<br/>:3000"]
         subgraph DEPLOY["Deployment async-furious-api<br/>2-5 pods via HPA"]
             API1[Pod API]
             API2[Pod API]
@@ -87,12 +87,8 @@ flowchart TB
         SVC --> DEPLOY
         CM -.env.-> DEPLOY
         SEC -.env.-> DEPLOY
-        subgraph DB["StatefulSet postgres"]
-            PG[("Postgres 15")]
-        end
-        PVC["PVC 1Gi"]
-        PG --- PVC
-        DEPLOY -->|Prisma| PG
+        RDS[("AWS RDS PostgreSQL")]
+        DEPLOY -->|Prisma via explicit RDS connection secret| RDS
     end
 
     C --> SVC
@@ -103,8 +99,8 @@ flowchart TB
 ### Fluxo de Deploy
 
 1. A imagem Docker da API e construida localmente e carregada no cluster kind (`kind load docker-image`).
-2. Terraform (`infra/environments/local`) provisiona o cluster kind e aplica os manifests de `/k8s` — namespace, ConfigMap, Secret, StatefulSet do Postgres e Deployment/Service/HPA da API.
-3. O init container `migrate` roda `prisma migrate deploy` antes de cada pod da API iniciar.
+2. O PostgreSQL local e usado apenas no Docker Compose. HML/PROD recebem o ARN de um secret RDS com `host`, `port`, `dbname`, `username` e `password`; a aplicacao consome esse contrato explicito.
+3. A pipeline executa um Job controlado com `prisma migrate deploy`; migrations nao rodam no startup dos pods.
 4. O HPA escala os pods da API de 2 a 5 replicas conforme o consumo de CPU/memoria.
 5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisao humana antes de qualquer `apply` real.
 
@@ -167,6 +163,8 @@ docker compose up -d
 ```
 
 A aplicacao fica disponivel em `http://localhost:3000`.
+
+Em HML/PROD, o fluxo e `API Gateway -> CPF Auth Lambda (RS256) -> Authorizer -> monolito privado`. O monolito nao e exposto diretamente; seus pods usam o `DATABASE_URL` do RDS. `GET /api/v1/health/live` verifica o processo e `GET /api/v1/health/ready` verifica o banco.
 
 ---
 
@@ -395,7 +393,7 @@ A infraestrutura local e provisionada com Terraform em um cluster Kubernetes loc
 /k8s
   namespace.yaml
   /config    configmap.yaml, secret.yaml
-  /app       deployment.yaml, service.yaml, hpa.yaml
+  /app       deployment.yaml, service.yaml, target-group-binding.yaml, hpa.yaml
   /database  statefulset.yaml, service.yaml, pvc.yaml
 ```
 
@@ -405,7 +403,7 @@ Use o script `scripts/local-up.sh` — ele executa todos os passos na ordem corr
 
 ```bash
 # Provisiona tudo: build da imagem, cluster kind, Terraform apply,
-# carrega imagem nos nos, aguarda Postgres, roda migrations Prisma e smoke test
+# carrega imagem nos nos, aguarda PostgreSQL local, roda migrations Prisma e smoke test
 ./scripts/local-up.sh up
 
 # Rebuild da imagem + reload no cluster (sem recriar infra)
@@ -418,6 +416,11 @@ Use o script `scripts/local-up.sh` — ele executa todos os passos na ordem corr
 As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email`
 e `TF_VAR_seed_admin_password` podem ser exportadas antes ou definidas em
 `.env.local` — o script solicita interativamente se nao encontrar.
+
+No deploy EKS, as variaveis `RDS_SECRET_ARN`, `TARGET_GROUP_ARN`, `JWT_ISSUER` e
+`JWT_AUDIENCE` sao obrigatorias no Environment. O secret RDS deve conter
+`host`, `port`, `dbname`, `username` e `password`. O ARN e aplicado pelo
+`TargetGroupBinding` do AWS Load Balancer Controller.
 
 ### Subir o ambiente local (manual)
 
@@ -494,17 +497,23 @@ curl http://localhost:30000/api/v1
 - Se aparecer `ErrImageNeverPull`, carregue a imagem com `kind load docker-image` ou use `./scripts/local-up.sh reload`.
 - O init container `migrate` roda `prisma migrate deploy` antes de cada pod da API iniciar.
 - O HPA requer o metrics-server, que e instalado automaticamente pelo modulo `kubernetes-apps`.
-- Se aparecer erro de autenticacao do Prisma contra `postgres-service`, confira se `TF_VAR_db_password` e o password do Postgres existente sao iguais. Em ambiente local descartavel, destruir e recriar o cluster/volume tambem resolve.
+- Se aparecer erro de autenticacao do Prisma contra `postgres-service`, confira se `TF_VAR_db_password` e o password do PostgreSQL local existente sao iguais. Em ambiente local descartavel, destruir e recriar o cluster/volume tambem resolve.
 
 ### CI/CD
 
 Pull requests que alterem `infra/**` ou `k8s/**` executam automaticamente `terraform validate` e `terraform plan` via `.github/workflows/terraform.yml` (rapido, nenhum cluster e criado).
 
-Em push para `main`/`develop` (ou via `workflow_dispatch` manual), o mesmo workflow roda um segundo job que aplica a infraestrutura de verdade: builda a imagem Docker, provisiona um cluster `kind` efemero com `terraform apply`, implanta a aplicacao, roda um smoke test em `/api/v1` e destroi tudo com `terraform destroy` ao final. Isso roda inteiramente dentro do runner do GitHub usando Docker — nenhuma conta de nuvem e envolvida. O job reutiliza o `scripts/local-up.sh`, o mesmo script usado no provisionamento local.
+Em push para `main`/`develop` (ou via `workflow_dispatch` manual), o mesmo workflow roda um segundo job que aplica a infraestrutura de verdade: builda a imagem Docker, provisiona um cluster `kind` efemero com `terraform apply`, implanta a aplicacao e roda um smoke test em `/api/v1`. A limpeza permanece manual e somente para HML. Isso roda inteiramente dentro do runner do GitHub usando Docker — nenhuma conta de nuvem e envolvida. O job reutiliza o `scripts/local-up.sh`, o mesmo script usado no provisionamento local.
 
 ### Migracao para EKS
 
 Consulte `infra/environments/aws/README.md`.
+
+---
+
+## Persistencia e Modelo de Dados
+
+A documentacao completa da camada de persistencia (diagrama ER, modelo relacional tabela a tabela, mapeamento entre entidades de dominio e tabelas, justificativas do PostgreSQL e do Prisma, estrategia de persistencia e o historico de decisoes de evolucao do schema) esta em [docs/infrastructure/database.md](./docs/infrastructure/database.md).
 
 ---
 

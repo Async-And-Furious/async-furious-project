@@ -51,17 +51,20 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
 
       - name: Push database schema
         run: npx prisma db push --skip-generate
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
 
       - name: Run e2e tests
         run: pnpm run test:e2e
         env:
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ci-disposable-jwt-secret
+          JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
 
       - name: Run lint
         run: pnpm run lint

@@ -32,7 +32,13 @@ module "kubernetes_apps" {
   db_user             = var.db_user
   db_password         = var.db_password
   jwt_secret          = var.jwt_secret
+  jwt_public_key      = ""
+  webhook_secret      = "local-webhook-secret"
+  database_url        = ""
+  target_group_arn    = ""
   seed_admin_email    = var.seed_admin_email
-  seed_admin_password = var.seed_admin_password
+  seed_admin_password         = var.seed_admin_password
+  seed_recepcionista_password = var.seed_recepcionista_password
+  seed_mecanico_password      = var.seed_mecanico_password
   k8s_manifests_path  = "${path.root}/../../../k8s"
 }

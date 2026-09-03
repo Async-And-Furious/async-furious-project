@@ -4,7 +4,7 @@ import { Public } from '../../../../auth/decorators/public.decorator';
 import { HealthService } from '../../application/services/health.service';
 import { HealthResponseDto } from '../../application/dto/health-response.dto';
 
-@Controller()
+@Controller('health')
 @ApiTags('Health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
@@ -22,5 +22,17 @@ export class HealthController {
   })
   check(): HealthResponseDto {
     return this.healthService.check();
+  }
+
+  @Public()
+  @Get('live')
+  live(): HealthResponseDto {
+    return this.healthService.live();
+  }
+
+  @Public()
+  @Get('ready')
+  ready(): Promise<HealthResponseDto> {
+    return this.healthService.ready();
   }
 }

@@ -1,3 +1,6 @@
+# Local-only docs — put anything you don't want versioned in here
+docs/local/
+
 # Dependencies
 node_modules/
 
@@ -16,6 +19,7 @@ out/
 .env.production
 !.env.example
 .github/agents
+.claude/
 
 # IDE
 .idea/

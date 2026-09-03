@@ -42,19 +42,14 @@ jobs:
 
       - name: Terraform Plan
         working-directory: infra/environments/local
-        run: terraform plan -out=tfplan
+        run: terraform plan -input=false
         env:
           TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
           TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
           TF_VAR_seed_admin_email: ${{ secrets.TF_VAR_SEED_ADMIN_EMAIL }}
           TF_VAR_seed_admin_password: ${{ secrets.TF_VAR_SEED_ADMIN_PASSWORD }}
-
-      - name: Upload Plan
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: tfplan
-          path: infra/environments/local/tfplan
-          retention-days: 7
+          TF_VAR_seed_recepcionista_password: ${{ secrets.TF_VAR_SEED_RECEPCIONISTA_PASSWORD }}
+          TF_VAR_seed_mecanico_password: ${{ secrets.TF_VAR_SEED_MECANICO_PASSWORD }}
 
   # main/develop e execucao manual: aplica de verdade num cluster kind efemero no proprio runner
   # (kind usa apenas containers Docker, ja disponivel no runner ubuntu-latest — nao depende de nuvem)
@@ -62,12 +57,16 @@ jobs:
     name: Terraform Apply + Deploy no kind
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    # The local plan is generated and applied by local-up.sh only after this gate.
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'homolog' }}
 
     env:
       TF_VAR_db_password: ${{ secrets.TF_VAR_DB_PASSWORD }}
       TF_VAR_jwt_secret: ${{ secrets.TF_VAR_JWT_SECRET }}
       TF_VAR_seed_admin_email: ${{ secrets.TF_VAR_SEED_ADMIN_EMAIL }}
       TF_VAR_seed_admin_password: ${{ secrets.TF_VAR_SEED_ADMIN_PASSWORD }}
+      TF_VAR_seed_recepcionista_password: ${{ secrets.TF_VAR_SEED_RECEPCIONISTA_PASSWORD }}
+      TF_VAR_seed_mecanico_password: ${{ secrets.TF_VAR_SEED_MECANICO_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -108,12 +107,8 @@ jobs:
             done
           done
 
-      - name: Destruir cluster (terraform destroy)
-        if: always()
-        run: ./scripts/local-up.sh down
-
       - name: Terraform + Kubernetes concluido
         if: success()
         run: |
           echo "### ✅ Terraform + Kubernetes concluído" >> "$GITHUB_STEP_SUMMARY"
-          echo "Cluster kind provisionado via Terraform, aplicação implantada, smoke test em /api/v1 respondeu com sucesso, e ambiente destruído ao final do pipeline." >> "$GITHUB_STEP_SUMMARY"
+          echo "Cluster kind provisionado via Terraform, aplicação implantada e smoke test em /api/v1 respondeu com sucesso." >> "$GITHUB_STEP_SUMMARY"

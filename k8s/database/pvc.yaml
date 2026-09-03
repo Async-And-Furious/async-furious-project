@@ -1,11 +1,8 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-pvc
+  name: postgres-data
   namespace: async-furious
 spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 1Gi } }

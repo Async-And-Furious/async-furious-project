@@ -16,6 +16,10 @@ describe('AuthService', () => {
       findUnique: jest.fn(),
       create: jest.fn(),
     },
+    cliente: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+    },
   };
 
   const mockJwtService = {
@@ -198,6 +202,45 @@ describe('AuthService', () => {
     });
   });
 
+  describe('validateTokenSubject', () => {
+    it('accepts an active customer identified by stable customer id', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockResolvedValue({
+        id: 'cliente-id',
+        email: 'cliente@example.com',
+        ativo: true,
+      });
+
+      await expect(service.validateTokenSubject({ sub: 'cliente-id' })).resolves.toEqual({
+        id: 'cliente-id',
+        email: 'cliente@example.com',
+        role: 'CLIENTE',
+      });
+      expect(mockPrisma.cliente.findUnique).toHaveBeenCalledWith({
+        where: { id: 'cliente-id' },
+        select: { id: true, email: true, ativo: true },
+      });
+    });
+
+    it('rejects an inactive customer', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockResolvedValue({
+        id: 'cliente-id',
+        email: 'cliente@example.com',
+        ativo: false,
+      });
+
+      await expect(service.validateTokenSubject({ sub: 'cliente-id' })).resolves.toBeNull();
+    });
+
+    it('rejects a nonexistent customer', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockResolvedValue(null);
+
+      await expect(service.validateTokenSubject({ sub: 'missing-id' })).resolves.toBeNull();
+    });
+  });
+
   describe('findById', () => {
     it('should return user by id', async () => {
       const user = {
@@ -222,6 +265,25 @@ describe('AuthService', () => {
       const result = await service.findById('nonexistent-id');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('validateCustomer', () => {
+    it('requires an active Cliente identified by token sub', async () => {
+      mockPrisma.cliente.findFirst.mockResolvedValue({
+        id: 'customer-id',
+        email: 'customer@test.com',
+      });
+
+      await expect(service.validateCustomer('customer-id')).resolves.toEqual({
+        id: 'customer-id',
+        email: 'customer@test.com',
+        role: 'RECEPCIONISTA',
+      });
+      expect(mockPrisma.cliente.findFirst).toHaveBeenCalledWith({
+        where: { id: 'customer-id', ativo: true },
+        select: { id: true, email: true },
+      });
     });
   });
 

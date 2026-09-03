@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import type { Request, Response, NextFunction } from 'express';
+import { randomUUID } from 'crypto';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './shared/infrastructure/filters/global-exception.filter';
 
@@ -11,6 +12,55 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   app.use(cookieParser());
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const correlationId = req.header('x-correlation-id')?.trim() || randomUUID();
+    res.setHeader('x-correlation-id', correlationId);
+    res.locals.correlationId = correlationId;
+    const startedAt = process.hrtime.bigint();
+    res.on('finish', () => {
+      const latencyMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+      const route = req.route?.path ?? req.path;
+      const latency = Number(latencyMs.toFixed(2));
+      const error = res.statusCode >= 400;
+      process.stdout.write(
+        `${JSON.stringify({
+          _aws: {
+            Timestamp: Date.now(),
+            CloudWatchMetrics: [
+              {
+                Namespace: process.env.CLOUDWATCH_METRIC_NAMESPACE ?? 'AsyncFurious/API',
+                Dimensions: [['Method', 'Route']],
+                Metrics: [
+                  { Name: 'RequestCount', Unit: 'Count' },
+                  { Name: 'ErrorCount', Unit: 'Count' },
+                  { Name: 'LatencyMs', Unit: 'Milliseconds' },
+                ],
+              },
+            ],
+          },
+          event: 'http_request',
+          correlationId,
+          method: req.method,
+          path: req.originalUrl,
+          Method: req.method,
+          Route: route,
+          statusCode: res.statusCode,
+          latencyMs: latency,
+          RequestCount: 1,
+          ErrorCount: error ? 1 : 0,
+          LatencyMs: latency,
+          error,
+        })}\n`
+      );
+      if (res.statusCode >= 500 || latency >= Number(process.env.HTTP_LATENCY_ALARM_MS ?? 2000)) {
+        process.stdout.write(
+          `${JSON.stringify({ event: 'http_alarm', correlationId, method: req.method, route, statusCode: res.statusCode, latencyMs: latency })}\n`
+        );
+      }
+    });
+    next();
+  });
 
   app.use(
     helmet({
