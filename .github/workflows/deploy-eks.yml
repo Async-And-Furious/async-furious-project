@@ -55,7 +55,7 @@ jobs:
     name: Build and publish immutable image
     if: >-
       (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && (inputs.environment == 'hml' || (inputs.environment == 'prod' && github.ref == 'refs/heads/main'))) ||
       github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     environment: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.environment == 'prod')) && 'production' || 'hml' }}
@@ -406,7 +406,7 @@ jobs:
     needs: image
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod')
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: production
     env:
