@@ -20,6 +20,9 @@
 - Updated HML/PROD EKS deploys to read the Auth public key from the
   `JWT_PUBLIC_KEY_PARAMETER_NAME` SSM parameter contract, with decryption and
   line-by-line masking; no AWS changes were applied.
+- Made commit-SHA ECR publishing race-safe for immutable tags: successful pushes
+  and concurrent immutable-tag conflicts both resolve and validate the ECR
+  digest without deleting or overwriting images.
 
 ## 2026-08-24 - Academy deployment follow-up
 
