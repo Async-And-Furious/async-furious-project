@@ -1,10 +1,16 @@
-name: HML down
+name: HML / PROD down
 
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: hml
+        type: choice
+        options: [hml, prod]
       confirm:
-        description: Type DESTROY HML to confirm deletion
+        description: Type DESTROY HML or DESTROY PROD to confirm deletion
         required: true
         type: string
 
@@ -15,8 +21,8 @@ jobs:
   cleanup:
     uses: ./.github/workflows/cleanup-eks.yml
     with:
-      environment: hml
-      aws_academy: false
+      environment: ${{ inputs.environment }}
+      aws_academy: ${{ inputs.environment == 'prod' }}
       operation: destroy
       confirm: ${{ inputs.confirm }}
     secrets: inherit

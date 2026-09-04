@@ -1,4 +1,4 @@
-name: Cleanup Academy HML EKS application
+name: Cleanup Academy EKS application
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
         required: true
         default: hml
         type: choice
-        options: [hml]
+        options: [hml, prod]
       aws_academy:
         description: Confirm this is an AWS Academy environment
         required: true
@@ -21,7 +21,7 @@ on:
         type: choice
         options: [destroy-plan, destroy]
       confirm:
-        description: Type DESTROY HML when operation is destroy
+        description: Type DESTROY HML or DESTROY PROD when operation is destroy
         required: false
         type: string
   workflow_call:
@@ -41,7 +41,7 @@ on:
         type: string
         default: destroy-plan
       confirm:
-        description: Type DESTROY HML when operation is destroy
+        description: Type DESTROY HML or DESTROY PROD when operation is destroy
         required: false
         type: string
 
@@ -56,12 +56,15 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
   K8S_NAMESPACE: async-furious
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  ECR_CLEANUP_OWNED: ${{ vars.ECR_CLEANUP_OWNED }}
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'prod' && 'production' || 'hml' }}
     steps:
-      - name: Guard Academy HML cleanup inputs
+      - name: Guard cleanup inputs
         env:
           TARGET_ENVIRONMENT: ${{ inputs.environment }}
           AWS_ACADEMY: ${{ inputs.aws_academy }}
@@ -69,10 +72,12 @@ jobs:
           CONFIRM: ${{ inputs.confirm }}
         run: |
           set -euo pipefail
-          [[ "$TARGET_ENVIRONMENT" == 'hml' ]] || { echo 'Only HML cleanup is allowed.' >&2; exit 1; }
+          [[ "$TARGET_ENVIRONMENT" == 'hml' || "$TARGET_ENVIRONMENT" == 'prod' ]] || { echo 'Unsupported cleanup environment.' >&2; exit 1; }
+          [[ "$TARGET_ENVIRONMENT" != 'prod' || "$GITHUB_EVENT_NAME" == 'workflow_dispatch' || "$GITHUB_WORKFLOW_REF" == */.github/workflows/down.yml@* ]] || { echo 'Production cleanup is available only through workflow_dispatch.' >&2; exit 1; }
           [[ "$AWS_ACADEMY" == 'true' || ( ( "$GITHUB_EVENT_NAME" == 'workflow_dispatch' || "$GITHUB_EVENT_NAME" == 'workflow_call' ) && "$AWS_ACADEMY" == 'false' ) ]] || { echo 'Cleanup requires AWS Academy mode.' >&2; exit 1; }
           [[ "$OPERATION" == 'destroy-plan' || "$OPERATION" == 'destroy' ]] || { echo 'Unsupported cleanup operation.' >&2; exit 1; }
-          [[ "$OPERATION" != 'destroy' || "$CONFIRM" == 'DESTROY HML' ]] || { echo 'Destroy requires exact confirmation: DESTROY HML' >&2; exit 1; }
+          expected_confirmation="DESTROY ${TARGET_ENVIRONMENT^^}"
+          [[ "$OPERATION" != 'destroy' || "$CONFIRM" == "$expected_confirmation" ]] || { echo "Destroy requires exact confirmation: $expected_confirmation" >&2; exit 1; }
       - name: Configure AWS Academy credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         if: ${{ inputs.aws_academy == true }}
@@ -174,13 +179,15 @@ jobs:
           done
           echo 'Timed out waiting for authenticated EKS API access.' >&2
           exit 1
-      - name: Preview application namespace
+      - name: Preview application resources
         if: ${{ steps.cluster.outputs.exists == 'true' && inputs.operation == 'destroy-plan' }}
         run: |
           set -euo pipefail
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
-          if kubectl get namespace "$K8S_NAMESPACE" >/dev/null 2>"$error_file"; then
+          if [[ "$TARGET_ENVIRONMENT" == 'prod' ]]; then
+            echo "### Cleanup preview: production application resources in \`$K8S_NAMESPACE\` are targeted; shared resources remain." >> "$GITHUB_STEP_SUMMARY"
+          elif kubectl get namespace "$K8S_NAMESPACE" >/dev/null 2>"$error_file"; then
             echo "### Cleanup preview: namespace \`$K8S_NAMESPACE\` exists and needs removal." >> "$GITHUB_STEP_SUMMARY"
           elif grep -q 'NotFound' "$error_file"; then
             echo "### Cleanup preview: namespace \`$K8S_NAMESPACE\` is absent; nothing to remove." >> "$GITHUB_STEP_SUMMARY"
@@ -188,14 +195,39 @@ jobs:
             cat "$error_file" >&2
             exit 1
           fi
-      - name: Remove application namespace
+      - name: Remove application resources
         if: ${{ steps.cluster.outputs.exists == 'true' && inputs.operation == 'destroy' }}
         run: |
           set -euo pipefail
-          kubectl delete jobs --namespace "$K8S_NAMESPACE" \
-            --selector app.kubernetes.io/part-of=async-furious \
-            --ignore-not-found --wait --timeout=10m
-          kubectl delete namespace "$K8S_NAMESPACE" --ignore-not-found --wait --timeout=10m
+          if [[ "$TARGET_ENVIRONMENT" == 'prod' ]]; then
+            # deploy-eks.yml owns these application resources; leave ExternalSecrets,
+            # PVCs, the namespace, and shared infrastructure untouched.
+            kubectl delete targetgroupbinding/async-furious-api deployment/async-furious-api \
+              service/async-furious-service hpa/async-furious-hpa \
+              configmap/async-furious-config secret/async-furious-secret \
+              --namespace "$K8S_NAMESPACE" --ignore-not-found --wait --timeout=10m
+            kubectl delete jobs --namespace "$K8S_NAMESPACE" \
+              --selector app.kubernetes.io/part-of=async-furious \
+              --ignore-not-found --wait --timeout=10m
+          else
+            kubectl delete jobs --namespace "$K8S_NAMESPACE" \
+              --selector app.kubernetes.io/part-of=async-furious \
+              --ignore-not-found --wait --timeout=10m
+            kubectl delete namespace "$K8S_NAMESPACE" --ignore-not-found --wait --timeout=10m
+          fi
+      - name: Remove production-owned ECR images
+        if: ${{ inputs.environment == 'prod' && inputs.operation == 'destroy' }}
+        run: |
+          set -euo pipefail
+          [[ "$ECR_CLEANUP_OWNED" == 'true' ]] || { echo 'Production ECR cleanup is disabled unless this workflow owns the repository.' >&2; exit 1; }
+          test -n "$ECR_REPOSITORY" || { echo 'ECR_REPOSITORY is required for production cleanup.' >&2; exit 1; }
+          image_tags=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --filter tagStatus=TAGGED --query 'imageDetails[].imageTags[]' --output text | tr '\t' '\n' | awk '/^[0-9a-f]{40}$/')
+          if [[ -n "$image_tags" ]]; then
+            while IFS= read -r tag; do
+              aws ecr batch-delete-image --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$tag"
+            done <<< "$image_tags"
+          fi
+          echo 'Removed only commit-SHA images published by deploy-eks.yml; the ECR repository remains intact.' >> "$GITHUB_STEP_SUMMARY"
       - name: Restore original Academy HML EKS endpoint access
         if: ${{ always() && steps.cluster.outputs.exists == 'true' && steps.endpoint.outputs.saved == 'true' }}
         env:
