@@ -57,7 +57,7 @@ env:
   EKS_CLUSTER_NAME: tc3-eks-${{ inputs.environment }}
   TARGET_ENVIRONMENT: ${{ inputs.environment }}
   K8S_NAMESPACE: async-furious
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_OVERRIDE || format('tc3-app-{0}', inputs.environment) }}
   ECR_CLEANUP_OWNED: ${{ vars.ECR_CLEANUP_OWNED }}
 
 jobs:
@@ -220,7 +220,6 @@ jobs:
         if: ${{ inputs.environment == 'prod' && inputs.operation == 'destroy' }}
         run: |
           set -euo pipefail
-          [[ "$ECR_CLEANUP_OWNED" == 'true' ]] || { echo 'Production ECR cleanup is disabled unless this workflow owns the repository.' >&2; exit 1; }
           test -n "$ECR_REPOSITORY" || { echo 'ECR_REPOSITORY is required for production cleanup.' >&2; exit 1; }
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
@@ -230,6 +229,7 @@ jobs:
             echo 'Production ECR repository is absent; nothing to remove.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+          [[ "$ECR_CLEANUP_OWNED" == 'true' ]] || { echo 'Production ECR cleanup is disabled unless this workflow owns the repository.' >&2; exit 1; }
           image_tags=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --filter tagStatus=TAGGED --query 'imageDetails[].imageTags[]' --output text | tr '\t' '\n' | awk '/^[0-9a-f]{40}$/')
           if [[ -n "$image_tags" ]]; then
             while IFS= read -r tag; do
