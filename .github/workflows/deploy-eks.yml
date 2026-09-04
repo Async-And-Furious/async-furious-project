@@ -104,16 +104,33 @@ jobs:
           set -euo pipefail
           image="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
           error_file=$(mktemp)
-          trap 'rm -f "$error_file"' EXIT
+          push_error_file=$(mktemp)
+          trap 'rm -f "$error_file" "$push_error_file"' EXIT
           if digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text 2>"$error_file"); then
             [[ "$digest" == sha256:* ]] || { echo 'ECR image digest was not returned for the existing image.' >&2; exit 1; }
             echo "Commit-SHA image already exists; reusing $image."
           else
             error=$(<"$error_file")
-            [[ "$error" == *ImageNotFoundException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            [[ "$error" == *ImageNotFoundException* ]] || { echo 'Unable to determine whether the ECR image exists.' >&2; exit 1; }
             docker build --pull --tag "$image" .
-            docker push "$image"
-            digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)
+            if docker push "$image" >"$push_error_file" 2>&1; then
+              if ! digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text); then
+                echo 'ECR image was pushed, but its digest could not be retrieved.' >&2
+                exit 1
+              fi
+            else
+              push_error=$(<"$push_error_file")
+              push_error_lower=$(printf '%s' "$push_error" | tr '[:upper:]' '[:lower:]')
+              [[ "$push_error_lower" == *'already exists'* && ( "$push_error_lower" == *'immutable'* || "$push_error_lower" == *'tag invalid'* ) ]] || {
+                echo 'Docker push failed for a reason other than an existing immutable tag.' >&2
+                exit 1
+              }
+              if ! digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text); then
+                echo 'Immutable ECR tag exists, but its digest could not be retrieved.' >&2
+                exit 1
+              fi
+              echo "Commit-SHA image was published concurrently; reusing $image."
+            fi
           fi
           test -n "$digest" && [[ "$digest" == sha256:* ]] || { echo 'ECR image digest was not returned.' >&2; exit 1; }
           echo "ref=$REGISTRY/$ECR_REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
