@@ -417,10 +417,12 @@ As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email
 e `TF_VAR_seed_admin_password` podem ser exportadas antes ou definidas em
 `.env.local` — o script solicita interativamente se nao encontrar.
 
-No deploy EKS, as variaveis `RDS_SECRET_ARN`, `TARGET_GROUP_ARN`, `JWT_ISSUER` e
-`JWT_AUDIENCE` sao obrigatorias no Environment. O secret RDS deve conter
-`host`, `port`, `dbname`, `username` e `password`. O ARN e aplicado pelo
-`TargetGroupBinding` do AWS Load Balancer Controller.
+No deploy EKS, as variaveis `TARGET_GROUP_ARN`, `JWT_ISSUER` e `JWT_AUDIENCE`
+sao obrigatorias no Environment. Os outputs atuais de `repo-db-infra` sao lidos
+do state remoto por ambiente (`db_connection_secret_arn`, `db_host`, `db_port`,
+`db_name` e `db_ssl_mode`); portanto, nao configure um ARN RDS estatico no
+GitHub. O secret RDS e lido em runtime e seus valores nao sao impressos. O ARN
+do TargetGroupBinding continua vindo do Environment.
 
 ### Subir o ambiente local (manual)
 

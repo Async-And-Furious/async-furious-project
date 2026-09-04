@@ -133,10 +133,6 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
-      RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
-      DB_HOST: ${{ vars.DB_HOST }}
-      DB_NAME: ${{ vars.DB_NAME }}
-      DB_PORT: ${{ vars.DB_PORT || '5432' }}
       TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
@@ -172,6 +168,31 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Resolve database outputs from repo-db-infra state
+        env:
+          DEPLOY_ENV: hml
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-db-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-db-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          secret_arn=$(jq -er '.outputs.db_connection_secret_arn.value // .outputs.db_secret_arn.value' "$state_file")
+          db_host=$(jq -er '.outputs.db_host.value' "$state_file")
+          db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
+          db_name=$(jq -er '.outputs.db_name.value' "$state_file")
+          db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
+          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$secret_arn"
+          printf '::add-mask::%s\n' "$db_host"
+          {
+            printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
+            printf 'DB_HOST=%s\n' "$db_host"
+            printf 'DB_PORT=%s\n' "$db_port"
+            printf 'DB_NAME=%s\n' "$db_name"
+            printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+          } >> "$GITHUB_ENV"
       - name: Save original HML EKS endpoint access
         run: |
           set -euo pipefail
@@ -235,7 +256,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -257,7 +278,6 @@ jobs:
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           printf '::add-mask::%s\n' "$DB_USER"
           printf '::add-mask::%s\n' "$DB_PASSWORD"
-          export DB_SSLMODE=require
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
@@ -413,10 +433,6 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
       K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
-      RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
-      DB_HOST: ${{ vars.DB_HOST }}
-      DB_NAME: ${{ vars.DB_NAME }}
-      DB_PORT: ${{ vars.DB_PORT || '5432' }}
       TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
@@ -463,6 +479,31 @@ jobs:
           } >> "$GITHUB_ENV"
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Resolve database outputs from repo-db-infra state
+        env:
+          DEPLOY_ENV: prod
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-db-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-db-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          secret_arn=$(jq -er '.outputs.db_connection_secret_arn.value // .outputs.db_secret_arn.value' "$state_file")
+          db_host=$(jq -er '.outputs.db_host.value' "$state_file")
+          db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
+          db_name=$(jq -er '.outputs.db_name.value' "$state_file")
+          db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
+          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$secret_arn"
+          printf '::add-mask::%s\n' "$db_host"
+          {
+            printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
+            printf 'DB_HOST=%s\n' "$db_host"
+            printf 'DB_PORT=%s\n' "$db_port"
+            printf 'DB_NAME=%s\n' "$db_name"
+            printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+          } >> "$GITHUB_ENV"
       - name: Save original PROD EKS endpoint access
         run: |
           set -euo pipefail
@@ -499,7 +540,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -519,7 +560,8 @@ jobs:
           done
           export DB_USER=$(jq -er '.username' <<<"$secret_json")
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
-          export DB_SSLMODE=require
+          printf '::add-mask::%s\n' "$DB_USER"
+          printf '::add-mask::%s\n' "$DB_PASSWORD"
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \

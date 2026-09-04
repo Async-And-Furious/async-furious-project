@@ -28,7 +28,6 @@ It fails closed without these repository-scoped values, which
 | ------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | secret                            | AWS Academy session                                                                                         |
 | `AWS_DEPLOY_ROLE_ARN`                                               | secret                            | `LabRole` in Academy mode                                                                                   |
-| `DATABASE_SECRET_ARN`                                               | secret                            | discovered from RDS                                                                                         |
 | `JWT_PRIVATE_KEY_SECRET_ARN`                                        | secret                            | operator record                                                                                             |
 | `JWT_PUBLIC_KEY_PARAMETER_NAME`                                     | variable (repository/environment) | SSM parameter published by `repo-auth-serverless` (`/tc3/hml/jwt/public-key` or `/tc3/prod/jwt/public-key`) |
 | `AWS_REGION`, `ECR_REPOSITORY`, `EKS_CLUSTER_NAME`                  | variable                          | `scripts/aws_lab.py`                                                                                        |
@@ -37,3 +36,10 @@ The deployment workflow uses the `hml` and `production` GitHub Environments, so
 set `JWT_PUBLIC_KEY_PARAMETER_NAME` in the matching repository/environment
 configuration. The workflow reads the value from SSM Parameter Store with
 decryption and masks the public key before exporting it to the deployment.
+
+Before applying Kubernetes configuration, the workflow reads the selected
+`repo-db-infra/<hml|prod>/terraform.tfstate` from the account-qualified
+`tc3-tfstate-<account-id>` bucket. It obtains `db_connection_secret_arn`,
+`db_host`, `db_port`, `db_name`, and `db_ssl_mode` from the canonical outputs;
+database connection values are therefore not GitHub variables. The state file
+and fetched credentials are never printed.
