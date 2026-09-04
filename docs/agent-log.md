@@ -15,6 +15,12 @@
 - Added backward-safe `Cliente.ativo` migration with default-true backfill; gateway JWT customer validation now accepts Auth Lambda `sub=Cliente.id` only for active customers.
 - Added CloudWatch Embedded Metric Format request metrics and JSON alarm events without a new dependency.
 
+## 2026-09-04
+
+- Updated HML/PROD EKS deploys to read the Auth public key from the
+  `JWT_PUBLIC_KEY_PARAMETER_NAME` SSM parameter contract, with decryption and
+  line-by-line masking; no AWS changes were applied.
+
 ## 2026-08-24 - Academy deployment follow-up
 
 - Academy deploys use hosted runners and Service LoadBalancer mode without ALB/IRSA; normal deployment behavior remains unchanged.
