@@ -24,14 +24,16 @@ kustomization against the cluster created by `repo-k8s-infra`.
 It fails closed without these repository-scoped values, which
 `scripts/aws_lab.py` sets before dispatching it:
 
-| Name | Kind | Source |
-|---|---|---|
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | secret | AWS Academy session |
-| `AWS_DEPLOY_ROLE_ARN` | secret | `LabRole` in Academy mode |
-| `DATABASE_SECRET_ARN` | secret | discovered from RDS |
-| `JWT_PRIVATE_KEY_SECRET_ARN` | secret | operator record |
-| `JWT_PUBLIC_KEY_PARAMETER_NAME` | variable | operator record |
-| `AWS_REGION`, `ECR_REPOSITORY`, `EKS_CLUSTER_NAME` | variable | `scripts/aws_lab.py` |
+| Name                                                                | Kind                              | Source                                                                                                      |
+| ------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | secret                            | AWS Academy session                                                                                         |
+| `AWS_DEPLOY_ROLE_ARN`                                               | secret                            | `LabRole` in Academy mode                                                                                   |
+| `DATABASE_SECRET_ARN`                                               | secret                            | discovered from RDS                                                                                         |
+| `JWT_PRIVATE_KEY_SECRET_ARN`                                        | secret                            | operator record                                                                                             |
+| `JWT_PUBLIC_KEY_PARAMETER_NAME`                                     | variable (repository/environment) | SSM parameter published by `repo-auth-serverless` (`/tc3/hml/jwt/public-key` or `/tc3/prod/jwt/public-key`) |
+| `AWS_REGION`, `ECR_REPOSITORY`, `EKS_CLUSTER_NAME`                  | variable                          | `scripts/aws_lab.py`                                                                                        |
 
-Nothing is environment-scoped: the workflow declares no GitHub Environment, so
-a value set with `gh secret set --env hml` would never resolve.
+The deployment workflow uses the `hml` and `production` GitHub Environments, so
+set `JWT_PUBLIC_KEY_PARAMETER_NAME` in the matching repository/environment
+configuration. The workflow reads the value from SSM Parameter Store with
+decryption and masks the public key before exporting it to the deployment.

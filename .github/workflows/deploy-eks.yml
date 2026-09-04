@@ -140,7 +140,7 @@ jobs:
       TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
-      JWT_PUBLIC_KEY_SECRET_ARN: ${{ vars.JWT_PUBLIC_KEY_SECRET_ARN }}
+      JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
@@ -155,12 +155,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      - name: Fetch JWT public key from Secrets Manager
+      - name: Fetch JWT public key from SSM Parameter Store
         run: |
           set -euo pipefail
-          test -n "$JWT_PUBLIC_KEY_SECRET_ARN" || { echo 'Repository variable JWT_PUBLIC_KEY_SECRET_ARN is required.' >&2; exit 1; }
-          jwt_public_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PUBLIC_KEY_SECRET_ARN" --query SecretString --output text)
-          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key secret is empty.' >&2; exit 1; }
+          test -n "$JWT_PUBLIC_KEY_PARAMETER_NAME" || { echo 'Repository/environment variable JWT_PUBLIC_KEY_PARAMETER_NAME is required.' >&2; exit 1; }
+          jwt_public_key=$(aws ssm get-parameter --name "$JWT_PUBLIC_KEY_PARAMETER_NAME" --with-decryption --query 'Parameter.Value' --output text)
+          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key parameter is empty.' >&2; exit 1; }
           while IFS= read -r line; do
             [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
           done <<< "$jwt_public_key"
@@ -235,7 +235,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -420,7 +420,7 @@ jobs:
       TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
-      JWT_PUBLIC_KEY_SECRET_ARN: ${{ vars.JWT_PUBLIC_KEY_SECRET_ARN }}
+      JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
@@ -446,12 +446,15 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-      - name: Fetch JWT public key from Secrets Manager
+      - name: Fetch JWT public key from SSM Parameter Store
         run: |
           set -euo pipefail
-          test -n "$JWT_PUBLIC_KEY_SECRET_ARN" || { echo 'Repository variable JWT_PUBLIC_KEY_SECRET_ARN is required.' >&2; exit 1; }
-          jwt_public_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PUBLIC_KEY_SECRET_ARN" --query SecretString --output text)
-          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key secret is empty.' >&2; exit 1; }
+          test -n "$JWT_PUBLIC_KEY_PARAMETER_NAME" || { echo 'Repository/environment variable JWT_PUBLIC_KEY_PARAMETER_NAME is required.' >&2; exit 1; }
+          jwt_public_key=$(aws ssm get-parameter --name "$JWT_PUBLIC_KEY_PARAMETER_NAME" --with-decryption --query 'Parameter.Value' --output text)
+          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key parameter is empty.' >&2; exit 1; }
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
+          done <<< "$jwt_public_key"
           delimiter="JWT_PUBLIC_KEY_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           {
             printf 'JWT_PUBLIC_KEY<<%s\n' "$delimiter"
@@ -496,7 +499,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
