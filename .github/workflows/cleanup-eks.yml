@@ -57,13 +57,14 @@ env:
   EKS_CLUSTER_NAME: tc3-eks-${{ inputs.environment }}
   TARGET_ENVIRONMENT: ${{ inputs.environment }}
   K8S_NAMESPACE: async-furious
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_OVERRIDE || format('tc3-app-{0}', inputs.environment) }}
   ECR_CLEANUP_OWNED: ${{ vars.ECR_CLEANUP_OWNED }}
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment == 'prod' && 'production' || 'hml' }}
+    env:
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY_OVERRIDE || format('tc3-app-{0}', inputs.environment) }}
     steps:
       - name: Guard cleanup inputs
         env:
