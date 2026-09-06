@@ -312,6 +312,9 @@ jobs:
       - name: Free HML pod capacity for migration
         run: |
           set -euo pipefail
+          nodegroup=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --query 'nodegroups[0]' --output text)
+          update_id=$(aws eks update-nodegroup-config --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --scaling-config minSize=2,maxSize=3,desiredSize=3 --query 'update.id' --output text)
+          aws eks wait nodegroup-active --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup"
           if kubectl get deployment/async-furious-api --namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
             kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=0
             kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=5m
