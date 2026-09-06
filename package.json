@@ -5,6 +5,9 @@
   "author": "",
   "private": true,
   "license": "UNLICENSED",
+  "pnpm": {
+    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "bcrypt", "prisma"]
+  },
   "scripts": {
     "prebuild": "prisma generate",
     "build": "nest build",
