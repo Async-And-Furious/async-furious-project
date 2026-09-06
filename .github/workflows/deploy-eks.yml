@@ -316,6 +316,8 @@ jobs:
             kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=0
             kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=5m
           fi
+          kubectl delete jobs --namespace "$K8S_NAMESPACE" \
+            --selector app.kubernetes.io/component=migration --ignore-not-found=true --wait=true
       - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
