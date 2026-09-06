@@ -13,13 +13,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends openssl python3 make g++
 
 # Copy package files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml ./
 
-# Allow only the explicitly listed native/build dependencies in the workspace
-# settings; all other package scripts remain blocked by pnpm.
+# Install without lifecycle scripts; native bcrypt is rebuilt explicitly below.
 # Cache mount keeps the pnpm store across builds so unchanged deps aren't re-fetched.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    corepack enable pnpm && pnpm install --frozen-lockfile
+    corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy only necessary files for build (explicit, not recursive)
 COPY src/ ./src/
@@ -31,7 +30,7 @@ COPY nest-cli.json tsconfig.json tsconfig.build.json tsconfig.scripts.json ./
 RUN pnpm prisma generate
 
 # Compile bcrypt native module (skipped by --ignore-scripts above)
-RUN pnpm rebuild bcrypt
+RUN npm rebuild bcrypt --build-from-source
 
 # Build the application
 RUN pnpm build
