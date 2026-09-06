@@ -15,11 +15,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
-# Install dependencies WITHOUT running postinstall scripts.
-# pnpm 11 blocks build scripts by default; we run them manually below.
+# Allow only the explicitly listed native/build dependencies in the workspace
+# settings; all other package scripts remain blocked by pnpm.
 # Cache mount keeps the pnpm store across builds so unchanged deps aren't re-fetched.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
+    corepack enable pnpm && pnpm install --frozen-lockfile
 
 # Copy only necessary files for build (explicit, not recursive)
 COPY src/ ./src/
