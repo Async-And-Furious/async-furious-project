@@ -305,6 +305,7 @@ jobs:
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
@@ -576,6 +577,7 @@ jobs:
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
