@@ -369,6 +369,7 @@ jobs:
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl apply -f k8s/app/service.yaml
           sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
@@ -659,6 +660,7 @@ jobs:
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl apply -f k8s/app/service.yaml
           sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
