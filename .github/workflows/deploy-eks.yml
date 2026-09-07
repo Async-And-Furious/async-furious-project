@@ -344,7 +344,7 @@ jobs:
                   - name: migrate
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
-                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+                    command: ["sh", "-c", "node_modules/.bin/prisma migrate deploy || { status=$?; sleep 600; exit $status; }"]
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
