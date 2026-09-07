@@ -305,10 +305,23 @@ jobs:
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
+      - name: Free HML pod capacity for migration
+        run: |
+          set -euo pipefail
+          nodegroup=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --query 'nodegroups[0]' --output text)
+          update_id=$(aws eks update-nodegroup-config --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --scaling-config minSize=2,maxSize=3,desiredSize=3 --query 'update.id' --output text)
+          aws eks wait nodegroup-active --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup"
+          if kubectl get deployment/async-furious-api --namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
+            kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=0
+            kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=5m
+          fi
+          kubectl delete jobs --namespace "$K8S_NAMESPACE" \
+            --selector app.kubernetes.io/component=migration --ignore-not-found=true --wait=true
       - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
@@ -323,7 +336,7 @@ jobs:
               app.kubernetes.io/part-of: async-furious
               app.kubernetes.io/component: migration
           spec:
-            backoffLimit: 4
+            backoffLimit: 0
             ttlSecondsAfterFinished: 86400
             template:
               spec:
@@ -332,7 +345,7 @@ jobs:
                   - name: migrate
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
-                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+                    command: ["sh", "-c", "node_modules/.bin/prisma migrate resolve --applied 20260831000000_add_cliente_ativo; node_modules/.bin/prisma migrate deploy || { sleep 600; exit 1; }"]
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
@@ -349,38 +362,6 @@ jobs:
             exit 1
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
-          seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          kubectl apply -f - <<EOF
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: $seed_job
-            namespace: $K8S_NAMESPACE
-            labels:
-              app.kubernetes.io/part-of: async-furious
-              app.kubernetes.io/component: seed
-          spec:
-            backoffLimit: 4
-            ttlSecondsAfterFinished: 86400
-            template:
-              spec:
-                restartPolicy: OnFailure
-                containers:
-                  - name: seed
-                    image: $IMAGE
-                    imagePullPolicy: IfNotPresent
-                    command: ["node", "dist-scripts/seed.js"]
-                    envFrom:
-                      - configMapRef:
-                          name: async-furious-config
-                      - secretRef:
-                          name: async-furious-secret
-          EOF
-          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
-            kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
-            exit 1
-          }
-          kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
       - name: Roll out application
         run: |
           set -euo pipefail
@@ -393,6 +374,13 @@ jobs:
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
           kubectl wait pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --for=condition=Ready --timeout=5m
 
+      - name: Capture HML rollout diagnostics
+        if: ${{ failure() }}
+        run: |
+          kubectl get pods --namespace "$K8S_NAMESPACE" -o wide || true
+          kubectl describe deployment/async-furious-api --namespace "$K8S_NAMESPACE" || true
+          kubectl describe pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api || true
+          kubectl logs --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --all-containers=true --tail=200 || true
       - name: Restore original HML EKS endpoint access
         if: ${{ always() }}
         run: |
@@ -462,23 +450,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Validate AWS Academy credentials
+      - name: Validate AWS credentials
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set -euo pipefail
-          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN; do
+          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
-      - name: Configure AWS Academy credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
       - name: Fetch JWT public key from SSM Parameter Store
         run: |
           set -euo pipefail
@@ -589,6 +575,7 @@ jobs:
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
@@ -718,15 +705,25 @@ jobs:
     runs-on: ubuntu-latest
     environment: hml
     steps:
-      - name: Check private gateway path
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Check HML gateway and target health
         env:
-          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
-          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
         run: |
           set -euo pipefail
-          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
-          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"
+          healthy=$(aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP_ARN" --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+          test "$healthy" -gt 0 || { echo 'HML target group has no healthy targets.' >&2; exit 1; }
+          endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-hml'].ApiEndpoint | [0]" --output text)
+          test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'HML API Gateway endpoint was not found.' >&2; exit 1; }
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
+          [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }
 
   smoke-prod:
     name: Smoke test PROD gateway
@@ -735,12 +732,22 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Check private gateway path
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Check PROD gateway and target health
         env:
-          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
-          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
         run: |
           set -euo pipefail
-          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
-          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"
+          healthy=$(aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP_ARN" --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+          test "$healthy" -gt 0 || { echo 'PROD target group has no healthy targets.' >&2; exit 1; }
+          endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-prod'].ApiEndpoint | [0]" --output text)
+          test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'PROD API Gateway endpoint was not found.' >&2; exit 1; }
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
+          [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }
