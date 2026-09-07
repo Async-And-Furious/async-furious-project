@@ -335,7 +335,7 @@ jobs:
               app.kubernetes.io/part-of: async-furious
               app.kubernetes.io/component: migration
           spec:
-            backoffLimit: 4
+            backoffLimit: 0
             ttlSecondsAfterFinished: 86400
             template:
               spec:
