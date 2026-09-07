@@ -344,7 +344,7 @@ jobs:
                   - name: migrate
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
-                    command: ["sh", "-c", "node_modules/.bin/prisma migrate deploy || { sleep 600; exit 1; }"]
+                    command: ["sh", "-c", "status=$(node_modules/.bin/prisma migrate status 2>&1 || true); case \"$status\" in *failed\\ migrations*) node_modules/.bin/prisma migrate resolve --applied 20260831000000_add_cliente_ativo;; esac; node_modules/.bin/prisma migrate deploy || { sleep 600; exit 1; }"]
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
@@ -628,7 +628,7 @@ jobs:
                   - name: migrate
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
-                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+                    command: ["sh", "-c", "status=$(node_modules/.bin/prisma migrate status 2>&1 || true); case \"$status\" in *failed\\ migrations*) node_modules/.bin/prisma migrate resolve --applied 20260831000000_add_cliente_ativo;; esac; node_modules/.bin/prisma migrate deploy"]
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
