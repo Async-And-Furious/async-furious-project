@@ -361,41 +361,6 @@ jobs:
             exit 1
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
-          nodegroup=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --query 'nodegroups[0]' --output text)
-          aws eks update-nodegroup-config --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --scaling-config minSize=2,maxSize=3,desiredSize=3 >/dev/null
-          aws eks wait nodegroup-active --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup"
-          seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          kubectl apply -f - <<EOF
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: $seed_job
-            namespace: $K8S_NAMESPACE
-            labels:
-              app.kubernetes.io/part-of: async-furious
-              app.kubernetes.io/component: seed
-          spec:
-            backoffLimit: 4
-            ttlSecondsAfterFinished: 86400
-            template:
-              spec:
-                restartPolicy: OnFailure
-                containers:
-                  - name: seed
-                    image: $IMAGE
-                    imagePullPolicy: IfNotPresent
-                    command: ["node", "dist-scripts/seed.js"]
-                    envFrom:
-                      - configMapRef:
-                          name: async-furious-config
-                      - secretRef:
-                          name: async-furious-secret
-          EOF
-          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
-            kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
-            exit 1
-          }
-          kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
       - name: Roll out application
         run: |
           set -euo pipefail
