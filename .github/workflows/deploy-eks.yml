@@ -373,7 +373,6 @@ jobs:
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
-          kubectl wait pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --for=condition=Ready --timeout=5m
 
       - name: Capture HML rollout diagnostics
         if: ${{ failure() }}
@@ -664,7 +663,6 @@ jobs:
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
-          kubectl wait pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --for=condition=Ready --timeout=5m
 
       - name: Restore original PROD EKS endpoint access
         if: ${{ always() }}
