@@ -450,23 +450,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Validate AWS Academy credentials
+      - name: Validate AWS credentials
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set -euo pipefail
-          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN; do
+          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
-      - name: Configure AWS Academy credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
       - name: Fetch JWT public key from SSM Parameter Store
         run: |
           set -euo pipefail
@@ -707,15 +705,25 @@ jobs:
     runs-on: ubuntu-latest
     environment: hml
     steps:
-      - name: Check private gateway path
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Check HML gateway and target health
         env:
-          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
-          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
         run: |
           set -euo pipefail
-          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
-          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"
+          healthy=$(aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP_ARN" --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+          test "$healthy" -gt 0 || { echo 'HML target group has no healthy targets.' >&2; exit 1; }
+          endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-hml'].ApiEndpoint | [0]" --output text)
+          test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'HML API Gateway endpoint was not found.' >&2; exit 1; }
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
+          [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }
 
   smoke-prod:
     name: Smoke test PROD gateway
@@ -724,12 +732,22 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Check private gateway path
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: us-east-1
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Check PROD gateway and target health
         env:
-          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
-          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
         run: |
           set -euo pipefail
-          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
-          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"
+          healthy=$(aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP_ARN" --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+          test "$healthy" -gt 0 || { echo 'PROD target group has no healthy targets.' >&2; exit 1; }
+          endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-prod'].ApiEndpoint | [0]" --output text)
+          test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'PROD API Gateway endpoint was not found.' >&2; exit 1; }
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
+          [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }
