@@ -53,15 +53,16 @@ dentro dessa exigência.
 - Não há rotação de token/refresh token — expiração fixa de 1h força
   reautenticação completa.
 - Duas implementações de autenticação hoje convivem na base de código
-  (esta local + a proposta serverless da Fase 3), sem decisão de como/se
-  unificam — já registrado como risco no ADR-0002.
+  (esta local, para os três papéis administrativos, + o fluxo de cliente/CPF
+  via `repo-auth-serverless`, implementado no PR #182) — por decisão, não
+  por pendência: ver a seção "Decision on staff roles" no ADR-0002.
 
 ## Riscos
 
-- **Baixo**: algoritmo de assinatura JWT (`@nestjs/jwt`, presumivelmente
-  HS256 por padrão) não foi confirmado explicitamente no código lido nesta
-  auditoria — `TODO` verificar configuração exata de `JwtModule.register()`
-  se isso vier a importar para alguma decisão futura.
+- Nenhum risco em aberto: `JwtModule.registerAsync()` resolve o contrato via
+  `createJwtModuleOptions`/`resolveJwtContract` (`src/auth/jwt.config.ts`),
+  que usa HS256 + `JWT_SECRET` para o fluxo de staff fora de produção com
+  RS256, e exige RS256 explicitamente em produção.
 
 ## Referências
 
