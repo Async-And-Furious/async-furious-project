@@ -51,6 +51,20 @@ Usamos Node.js com NestJS pela arquitetura modular e pela injecao de dependencia
 
 ## Escalabilidade e Automacao de Infraestrutura
 
+### Orquestracao AWS entre repositorios
+
+O script `scripts/orchestrate-stack.ps1` usa somente o `gh`, para no primeiro erro e aguarda cada workflow:
+
+```powershell
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action apply
+.\scripts\orchestrate-stack.ps1 -Environment prod -Action apply
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML'
+.\scripts\orchestrate-stack.ps1 -Environment prod -Action destroy -Confirmation 'DESTROY PROD'
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML' -WhatIf
+```
+
+`apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
+
 Com o aumento da demanda e a expansao para novas unidades, a oficina precisa garantir alta disponibilidade do sistema mesmo em picos de atendimento. Para isso, a infraestrutura evoluiu com:
 
 - **Infraestrutura escalavel**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 replicas, escalando por CPU > 70% ou memoria > 80%).
