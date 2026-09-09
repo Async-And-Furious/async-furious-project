@@ -121,9 +121,9 @@ jobs:
             --name "$EKS_CLUSTER_NAME" \
             --query 'cluster.resourcesVpcConfig' \
             --output json)
-          original_public_access=$(jq -er '.endpointPublicAccess' <<<"$endpoint_config")
-          original_private_access=$(jq -er '.endpointPrivateAccess' <<<"$endpoint_config")
-          original_public_cidrs=$(jq -er '.publicAccessCidrs | join(",")' <<<"$endpoint_config")
+          original_public_access=$(jq -r '.endpointPublicAccess' <<<"$endpoint_config")
+          original_private_access=$(jq -r '.endpointPrivateAccess' <<<"$endpoint_config")
+          original_public_cidrs=$(jq -r '.publicAccessCidrs | join(",")' <<<"$endpoint_config")
           {
             echo "endpoint_private_access=$original_private_access"
             echo "endpoint_public_access=$original_public_access"
