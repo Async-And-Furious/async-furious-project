@@ -1,4 +1,12 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Request, Response } from 'express';
 import { DomainException } from '../../domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../domain/exceptions/entity-not-found.exception';
@@ -12,16 +20,16 @@ interface ErrorResponse {
   correlationId?: string;
 }
 
+@Injectable()
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
+  constructor(@InjectPinoLogger(GlobalExceptionFilter.name) private readonly logger: PinoLogger) {}
+
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request & { correlationId?: string }>();
-    const headerCorrelationId =
-      typeof request.header === 'function' ? request.header('x-correlation-id') : undefined;
-    const correlationId =
-      response.locals?.correlationId || request.correlationId || headerCorrelationId;
+    const request = ctx.getRequest<Request>();
+    const correlationId = typeof request.id === 'string' ? request.id : undefined;
 
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message: string | string[] = 'Internal server error';
@@ -61,18 +69,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       ...(correlationId ? { correlationId } : {}),
     };
 
-    process.stderr.write(
-      `${JSON.stringify({
-        level: Number(statusCode) >= 500 ? 'error' : 'warn',
-        event: 'http_error',
-        correlationId,
-        method: request.method,
-        path: request.url,
-        statusCode,
-        error,
-        message,
-      })}\n`
-    );
+    const logPayload = { err: exception, statusCode };
+    const logMessage = `Unhandled exception: ${error}`;
+    if (statusCode >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      this.logger.error(logPayload, logMessage);
+    } else {
+      this.logger.warn(logPayload, logMessage);
+    }
 
     response.status(statusCode).json(errorResponse);
   }

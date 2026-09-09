@@ -1,4 +1,5 @@
 allowBuilds:
+  '@nestjs/core': false
   '@newrelic/fn-inspect': true
   '@newrelic/native-metrics': true
   protobufjs: true

@@ -2,14 +2,15 @@ import 'newrelic';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
-import { GlobalExceptionFilter } from './shared/infrastructure/filters/global-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   app.use(cookieParser());
 
@@ -81,8 +82,6 @@ async function bootstrap() {
       transform: true,
     })
   );
-
-  app.useGlobalFilters(new GlobalExceptionFilter());
 
   await app.listen(process.env.PORT ?? 3000);
 }
