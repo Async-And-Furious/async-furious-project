@@ -1,4 +1,13 @@
+packages:
+  - '.'
+
 allowBuilds:
+  '@nestjs/core': false
   '@newrelic/fn-inspect': true
   '@newrelic/native-metrics': true
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  bcrypt: true
+  prisma: true
   protobufjs: true

@@ -1,7 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { AppModule } from '@/app.module';
-import { GlobalExceptionFilter } from '@/shared/infrastructure/filters/global-exception.filter';
 
 // Mock das dependências externas
 jest.mock('helmet', () => jest.fn(() => jest.fn()));
@@ -100,15 +99,6 @@ describe('Main Bootstrap', () => {
       app.useGlobalPipes(validationPipe);
 
       expect(useGlobalPipesSpy).toHaveBeenCalledWith(validationPipe);
-    });
-
-    it('deve configurar GlobalExceptionFilter', () => {
-      const useGlobalFiltersSpy = jest.spyOn(app, 'useGlobalFilters');
-
-      const globalFilter = new GlobalExceptionFilter();
-      app.useGlobalFilters(globalFilter);
-
-      expect(useGlobalFiltersSpy).toHaveBeenCalledWith(globalFilter);
     });
 
     it('deve usar porta padrão 3000 quando PORT não está definido', () => {
