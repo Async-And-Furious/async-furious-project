@@ -4,9 +4,14 @@
 
 Aceita — decisão de ferramenta tomada (New Relic), instrumentação e
 integração de infraestrutura implementadas em código na issue
-[#163](https://github.com/Async-And-Furious/async-furious-project/issues/163).
-**Pendente**: validação end-to-end (telemetria chegando de fato no New
-Relic) e dashboards/alertas (issues #166/#167), ainda não iniciados.
+[#163](https://github.com/Async-And-Furious/async-furious-project/issues/163),
+logs estruturados da aplicação implementados em código na issue
+[#164](https://github.com/Async-And-Furious/async-furious-project/issues/164)
+(branch `feat/I-164_ImplementarLogsEstruturados`, a partir da branch do
+#163 — o agente New Relic ainda não estava em `develop` quando #164
+começou).
+**Pendente**: validação end-to-end (telemetria e logs chegando de fato no
+New Relic) e dashboards/alertas (issues #166/#167), ainda não iniciados.
 
 ## Contexto
 
@@ -68,18 +73,59 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   cria seu próprio Secret a partir do valor passado em `global.licenseKey`
   (via `set_sensitive` no Terraform, mascarado nos logs de CI).
 
+### O que foi implementado (issue #164)
+
+- **Biblioteca de log estruturado**: adotado `nestjs-pino` (`pino` +
+  `pino-http`) no lugar do log manual (`process.stdout.write`/
+  `process.stderr.write` com `JSON.stringify` na mão). Registrado via
+  `LoggerModule.forRoot(...)` em `app.module.ts`, com bootstrap em
+  `main.ts` (`bufferLogs: true` + `app.useLogger(app.get(Logger))`) — a
+  partir daí, o `Logger` padrão do `@nestjs/common` já usado em 13 pontos
+  do código (event handlers, guards, stubs) passa a sair formatado como
+  JSON via Pino automaticamente, sem precisar editar esses arquivos.
+- **Níveis de severidade reais**: o log por requisição HTTP (antes sempre
+  `level: 'info'`, mesmo em erro 500) agora mapeia por status code —
+  `info` (2xx/3xx), `warn` (4xx), `error` (5xx/exceção). O
+  `GlobalExceptionFilter` segue essa mesma régua para exceções não
+  tratadas.
+- **`GlobalExceptionFilter` migrado para injeção de dependência**: antes
+  instanciado manualmente em `main.ts` (`new GlobalExceptionFilter()`),
+  agora registrado como provider (`APP_FILTER`) em `app.module.ts`,
+  permitindo injetar o logger do Pino. O log interno de cada exceção passa
+  a incluir stack trace e tipo do erro (via serializer padrão do Pino),
+  nunca expostos na resposta HTTP ao cliente — que continua derivando só
+  de `exception.message`.
+- **Correlação de requisição via `correlationId`**: contrato mantido
+  (header `x-correlation-id` do cliente, validado por regex, ou gerado via
+  `randomUUID()`) — agora resolvido uma única vez pelo `pino-http`
+  (`genReqId`) e propagado automaticamente para qualquer log emitido
+  durante aquela requisição (inclusive dentro do `GlobalExceptionFilter`)
+  via `AsyncLocalStorage`, sem precisar repassar o id manualmente.
+- **Duas fontes de log HTTP duplicadas/inconsistentes removidas**: o
+  `RequestLoggingMiddleware` (substituído pelo `pino-http`) e um bloco de
+  middleware solto em `main.ts` que gravava métricas em formato CloudWatch
+  EMF — resíduo de uma estratégia nunca adotada (ver "Contexto" acima) que
+  gerava seu próprio `correlationId` independente do outro middleware,
+  podendo produzir dois ids diferentes para a mesma requisição.
+- **New Relic Logs in Context**: habilitado via variáveis de ambiente do
+  próprio agente `newrelic` (`NEW_RELIC_APPLICATION_LOGGING_ENABLED=true`,
+  `NEW_RELIC_APPLICATION_LOGGING_LOCAL_DECORATING_ENABLED=true`) — decora
+  cada linha de log com `trace.id`/`span.id` da transação APM.
+  `NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED=false` explicitamente,
+  porque o `newrelic-logging` (Fluent Bit) do `repo-k8s-infra` já
+  encaminha o stdout dos pods — deixar o agente também encaminhar
+  duplicaria a ingestão contra o limite do plano gratuito.
+
 ### O que ainda não foi feito
 
-- **Validação end-to-end**: as branches acima existem mas ainda não foram
-  aplicadas contra o ambiente real — não há confirmação de que a telemetria
-  chega no New Relic. Isso é um critério de aceite explícito da issue #163
-  e não deve ser considerado concluído antes de rodar o pipeline de verdade.
-- **Logs estruturados de aplicação** (issue #164): existe hoje um
-  `RequestLoggingMiddleware` (JSON estruturado, `correlationId` por
-  requisição) cobrindo logs de request HTTP, mas não logs de
-  aplicação/domínio em geral.
+- **Validação end-to-end**: as branches de #163 e #164 existem mas ainda
+  não foram aplicadas contra o ambiente real — não há confirmação de que
+  telemetria e logs chegam no New Relic, nem de que a correlação
+  `trace.id`/log realmente funciona. Critério de aceite explícito das duas
+  issues, não deve ser considerado concluído antes de rodar o pipeline de
+  verdade.
 - **Dashboards** (#166) e **alertas** (#167): não iniciados — não fazem
-  sentido antes de #163 estar validado enviando dado real.
+  sentido antes de #163/#164 estarem validados enviando dado real.
 
 ## Alternativas consideradas
 
@@ -123,16 +169,17 @@ Prometheus/Grafana ou Datadog.
 ## Próximos passos
 
 1. Rodar o pipeline (`workflow_dispatch`, ação `plan`, depois `apply`) nos
-   dois repositórios e confirmar telemetria real chegando ao New Relic
-   antes de considerar a issue #163 encerrada.
+   repositórios envolvidos e confirmar telemetria e logs reais chegando ao
+   New Relic (inclusive a correlação `trace.id`/log) antes de considerar as
+   issues #163 e #164 encerradas.
 2. Avaliar, com dado real em mãos, se `nri-metadata-injection` e
    `nri-kube-events` valem o custo de recursos adicional.
-3. Seguir para logs de aplicação (#164), dashboards (#166) e alertas
-   (#167).
+3. Seguir para dashboards (#166) e alertas (#167).
 
 ## Referências
 
 - [`docs/infrastructure/observability.md`](../infrastructure/observability.md)
 - [Visão geral da arquitetura](../architecture/overview.md)
-- Issue [#162](https://github.com/Async-And-Furious/async-furious-project/issues/162) (epic) e [#163](https://github.com/Async-And-Furious/async-furious-project/issues/163)
+- Issue [#162](https://github.com/Async-And-Furious/async-furious-project/issues/162) (epic), [#163](https://github.com/Async-And-Furious/async-furious-project/issues/163) e [#164](https://github.com/Async-And-Furious/async-furious-project/issues/164)
 - [Chart `nri-bundle`](https://github.com/newrelic/helm-charts/tree/master/charts/nri-bundle)
+- [`nestjs-pino`](https://github.com/iamolegga/nestjs-pino)
