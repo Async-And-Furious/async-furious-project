@@ -17,7 +17,7 @@ seguido pelas próximas ADRs.
 | [ADR-0002](./0002-autenticacao-centralizada-api-gateway-serverless.md) | Autenticação centralizada via API Gateway + Function Serverless | Proposta (RFCs do trigo em PR aberto) |
 | [ADR-0003](./0003-kubernetes-eks-orquestracao.md) | Kubernetes/EKS como plataforma de orquestração | Aceita |
 | [ADR-0004](./0004-banco-dados-gerenciado.md) | Banco de dados gerenciado (RDS PostgreSQL) | Proposta (RFC do trigo em PR aberto) |
-| [ADR-0005](./0005-observabilidade.md) | Estratégia de observabilidade | Proposta (sem decisão de ferramenta) |
+| [ADR-0005](./0005-observabilidade.md) | Estratégia de observabilidade | Aceita (implementação em código, pendente validação — issue #163) |
 | [ADR-0006](./0006-clean-architecture-ddd.md) | Clean Architecture + DDD como estilo arquitetural | Aceita |
 | [ADR-0007](./0007-stack-tecnologica-aplicacao.md) | Stack tecnológica da aplicação: NestJS + PostgreSQL + Prisma | Aceita |
 | [ADR-0008](./0008-autenticacao-local-jwt-rbac.md) | Autenticação e autorização locais: JWT + bcrypt + RBAC via guards | Aceita |

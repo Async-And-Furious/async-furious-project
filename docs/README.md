@@ -27,7 +27,8 @@ implantado; **[PENDENTE]** = exigido pela Fase 3, sem decisão ainda.
 
 Ver [adr/README.md](./adr/README.md) — 5 ADRs cobrindo separação em quatro
 repositórios, autenticação centralizada, Kubernetes/EKS, banco gerenciado e
-observabilidade (esta última sem decisão, documentando o gap).
+observabilidade (esta última com decisão tomada — New Relic — implementada
+em código na issue #163, pendente de validação end-to-end).
 
 ## RFCs (decisões técnicas)
 
@@ -69,7 +70,9 @@ já usada no `README.md` raiz e nos arquivos `.mmd` de `docs/`:
 
 - `HANDOFF.md`, citado por todas as RFCs como fonte mestra de decisões, não
   foi localizado em nenhum dos quatro repositórios.
-- Observabilidade: nenhuma ferramenta decidida ([ADR-0005](./adr/0005-observabilidade.md)).
+- Observabilidade: New Relic decidido e implementado em código (issue
+  #163), pendente de validação end-to-end
+  ([ADR-0005](./adr/0005-observabilidade.md)).
 - RFCs/ADRs consolidadas aqui existem em branches remotas ainda não
   mescladas — mesclar é uma ação recomendada, não executada por esta
   auditoria (fora de escopo: esta tarefa não faz commit/push/merge).

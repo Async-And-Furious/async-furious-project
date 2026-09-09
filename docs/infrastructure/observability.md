@@ -1,58 +1,72 @@
 # Observabilidade
 
-> Decisão (inexistente) registrada em [ADR-0005](../adr/0005-observabilidade.md).
-> Este documento existe para deixar o gap explícito, conforme exigido pela
-> tarefa de auditoria — **não é uma proposta de ferramenta**.
+> Decisão registrada em [ADR-0005](../adr/0005-observabilidade.md): New
+> Relic, implementado em código na issue #163, **pendente de validação
+> end-to-end** — este documento reflete o que existe no código das branches
+> `feat/I-163_EstruturarPlataformaObservabilidade` (`async-furious-project`
+> e `repo-k8s-infra`), não uma confirmação de que já está rodando em
+> produção.
 
-## Estado atual: nenhum
+## Estado atual: implementado em código, não validado
 
-Evidência de ausência, reunida por busca em todo o repositório e checagem de
-dependências:
+- **APM da aplicação** (`async-furious-project`): agente `newrelic`
+  instrumentando `src/main.ts`, configurado 100% via variável de ambiente
+  (`NEW_RELIC_NO_CONFIG_FILE=true`, `NEW_RELIC_APP_NAME`,
+  `NEW_RELIC_LICENSE_KEY`). Nome da aplicação difere por ambiente
+  (`async-furious-project-hml` / `-prod`).
+- **Infraestrutura do cluster** (`repo-k8s-infra`): Helm chart `nri-bundle`
+  (versão `8.0.24`) aplicado via `helm_release` no Terraform, com
+  `newrelic-infrastructure`, `newrelic-logging` e `kube-state-metrics`
+  habilitados; `nri-metadata-injection`, `nri-kube-events`,
+  `newrelic-prometheus-agent` e Pixie desabilitados (footprint mínimo,
+  ver ADR-0005 para o porquê).
+- **Segredos**: `NEW_RELIC_LICENSE_KEY` como secret do GitHub em ambos os
+  repositórios, nunca commitado — materializado como Kubernetes Secret via
+  `kubectl create secret` (app) e via o próprio chart (`global.licenseKey`
+  com `set_sensitive` no Terraform).
+- **Nenhuma das duas branches foi aplicada contra o ambiente real ainda** —
+  falta rodar o pipeline (`workflow_dispatch`, `plan` e depois `apply`) e
+  confirmar telemetria chegando ao New Relic.
 
-```
-grep -rniE "prometheus|grafana|opentelemetry|\botel\b|datadog|new relic|
-  newrelic|winston|pino|cloudwatch|correlation.?id|trace.?id|apm\b"
-  src/ k8s/ infra/ docs/ .github/
-# 0 resultados
-```
+## O que já existia e foi reaproveitado (sem mudança)
 
-- `package.json`: nenhuma dependência de logging estruturado
-  (`winston`/`pino`), métricas (`prom-client`), tracing
-  (`@opentelemetry/*`) ou APM (`newrelic`, `datadog`, `sentry`).
-- `src/main.ts`: usa apenas o comportamento padrão do NestJS, sem logger
-  customizado.
-- Nenhum manifest em `k8s/` provisiona um agente de coleta de logs/métricas
-  (Fluent Bit, OpenTelemetry Collector, CloudWatch Agent).
-- Nenhuma RFC, ADR ou branch remota (incluindo as três branches de RFC não
-  mescladas) menciona observabilidade.
+- **Health check**: `GET /api/v1` continua sendo o sinal de saúde usado
+  pelos probes de liveness/readiness do Kubernetes
+  (`k8s/app/deployment.yaml`) — ainda não exportado como uptime check para
+  o New Relic (candidato natural para a issue #165).
+- **HPA**: continua reagindo a CPU/memória via `metrics-server`
+  (`k8s/app/hpa.yaml`) — o `newrelic-infrastructure` passa a dar
+  visibilidade sobre esses mesmos números fora do cluster, mas o HPA em si
+  não foi alterado.
+- **Logs de request HTTP**: o `RequestLoggingMiddleware`
+  (`src/shared/infrastructure/http/request-logging.middleware.ts`) já
+  gerava logs JSON estruturados com `correlationId` por requisição antes
+  desta issue — o que mudou agora é que o `newrelic-logging` (Fluent Bit)
+  passa a encaminhar esse stdout para o New Relic. Logs de
+  aplicação/domínio fora do escopo HTTP ainda não são estruturados (issue
+  #164).
 
-## O que já existe e pode ser reaproveitado (sem decisão nova)
-
-- **Health check**: `GET /api/v1` já é usado pelos probes de liveness e
-  readiness do Kubernetes (`k8s/app/deployment.yaml`) — é o único sinal de
-  saúde hoje, consumido apenas pelo próprio Kubernetes, não exportado para
-  fora do cluster.
-- **HPA**: já reage a CPU/memória via `metrics-server`
-  (`k8s/app/hpa.yaml`), mas sem visibilidade de latência ou taxa de erro de
-  negócio.
-
-## O que a Fase 3 exige e ainda não tem
+## O que a Fase 3 exige e o estado de cada item
 
 | Requisito | Estado |
 |---|---|
-| Logs centralizados | Ausente |
-| Métricas de aplicação (latência, taxa de erro, throughput) | Ausente |
-| Tracing distribuído (Gateway → Lambda → EKS → RDS) | Ausente |
-| Dashboards | Ausente |
-| Alertas | Ausente |
+| Logs centralizados | Implementado em código (forwarding), não validado |
+| Métricas de aplicação (latência, taxa de erro, throughput) | Implementado em código (agente APM), não validado |
+| Métricas de infraestrutura do cluster (CPU/memória por nó) | Implementado em código (`newrelic-infrastructure`), não validado |
+| Tracing distribuído (Gateway → Lambda → EKS → RDS) | Agente cobre a aplicação a partir do EKS; correlação com a Function Serverless não avaliada |
+| Dashboards | Não iniciado (issue #166) |
+| Alertas | Não iniciado (issue #167) |
 
 ## Pendências
 
-- `TODO`: nenhuma ferramenta deve ser escolhida por esta auditoria sem
-  decisão do grupo — ver ADR-0005 para o porquê de não inventar uma escolha
-  aqui.
-- `TODO`: quando uma ferramenta for decidida, os pontos `[PENDENTE]` já
-  marcados em [overview.md](../architecture/overview.md),
+- Rodar o pipeline de verdade (`plan` e `apply`) nos dois repositórios e
+  confirmar telemetria chegando ao New Relic antes de fechar a issue #163.
+- Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o básico
+  estiver validado e a capacidade dos nós do EKS for confirmada com a carga
+  adicional.
+- `TODO`: os pontos `[PENDENTE]` em [overview.md](../architecture/overview.md),
   [authentication-flow.md](../architecture/authentication-flow.md) e
-  [service-order-flow.md](../architecture/service-order-flow.md) devem ser
-  atualizados com o fluxo real.
+  [service-order-flow.md](../architecture/service-order-flow.md) ainda
+  descrevem o fluxo sem observabilidade — atualizar depois que a validação
+  end-to-end confirmar o comportamento real (fora do escopo desta
+  atualização de documentação).
