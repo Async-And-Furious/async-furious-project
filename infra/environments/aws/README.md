@@ -18,6 +18,11 @@ Required repository/environment configuration:
   `JWT_PRIVATE_KEY` keys. In Academy mode, configure the protected GitHub
   Environment with secrets `DATABASE_SECRET_ARN` and
   `JWT_PRIVATE_KEY_SECRET_ARN`, plus variable `JWT_PUBLIC_KEY_PARAMETER_NAME`.
+  The public key variable must contain the SSM parameter name published by
+  `repo-auth-serverless` (for example `/tc3/hml/jwt/public-key` or
+  `/tc3/prod/jwt/public-key`). The workflow reads it with
+  `ssm get-parameter --with-decryption`; it does not use Secrets Manager for
+  the public key.
   The workflow fails closed if these references are absent, reads the RDS
   Secrets Manager JSON fields `username`, `password`, `host`, `port`, and
   `dbname`, reads both JWT values from AWS, constructs `DATABASE_URL`, and
