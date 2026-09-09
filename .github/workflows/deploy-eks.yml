@@ -146,6 +146,8 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      NEW_RELIC_APP_NAME: ${{ vars.NEW_RELIC_APP_NAME }}
+      NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -235,7 +237,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -248,7 +250,7 @@ jobs:
           set -euo pipefail
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
-          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
@@ -271,6 +273,7 @@ jobs:
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --from-literal=NEW_RELIC_LICENSE_KEY="$NEW_RELIC_LICENSE_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
       - name: Run controlled Prisma migration
         run: |
@@ -424,6 +427,8 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      NEW_RELIC_APP_NAME: ${{ vars.NEW_RELIC_APP_NAME }}
+      NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -494,7 +499,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -507,7 +512,7 @@ jobs:
           set -euo pipefail
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
-          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
@@ -528,6 +533,7 @@ jobs:
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --from-literal=NEW_RELIC_LICENSE_KEY="$NEW_RELIC_LICENSE_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
       - name: Run controlled Prisma migration
         run: |
