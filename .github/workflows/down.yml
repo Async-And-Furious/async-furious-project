@@ -22,7 +22,7 @@ jobs:
     uses: ./.github/workflows/cleanup-eks.yml
     with:
       environment: ${{ inputs.environment }}
-      aws_academy: ${{ inputs.environment == 'prod' }}
+      aws_academy: false
       operation: destroy
       confirm: ${{ inputs.confirm }}
     secrets: inherit

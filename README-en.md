@@ -333,6 +333,20 @@ pnpm run format
 
 ## Infrastructure as Code (Terraform + Kubernetes)
 
+### Cross-repository AWS orchestration
+
+`scripts/orchestrate-stack.ps1` uses only `gh`, stops on the first failure, and waits for each workflow:
+
+```powershell
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action apply
+.\scripts\orchestrate-stack.ps1 -Environment prod -Action apply
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML'
+.\scripts\orchestrate-stack.ps1 -Environment prod -Action destroy -Confirmation 'DESTROY PROD'
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML' -WhatIf
+```
+
+`apply` runs k8s `ci.yml`/`apply`, database `ci.yml`/`apply`, app `deploy-eks.yml`, then auth `ci.yml`/`apply`. `destroy` runs app `cleanup-eks.yml`, auth `down.yml`, database `down.yml`, then k8s `down.yml`. All use the `main` ref, `academy_mode/aws_academy=false`, and normal AWS credentials configured as repository secrets. The script never receives secrets, does not call AWS directly, and requires `gh auth login`.
+
 Local infrastructure is provisioned with Terraform on a local Kubernetes cluster created by kind.
 
 ### Prerequisites
