@@ -1,58 +1,92 @@
 # Observabilidade
 
-> Decisão (inexistente) registrada em [ADR-0005](../adr/0005-observabilidade.md).
-> Este documento existe para deixar o gap explícito, conforme exigido pela
-> tarefa de auditoria — **não é uma proposta de ferramenta**.
+> [ADR-0005](../adr/0005-observabilidade.md) registrou a ausência de decisão
+> sobre ferramenta de observabilidade. Isso continua valendo: não há stack
+> escolhida. O que mudou é que a infraestrutura AWS trouxe sinais nativos que
+> antes não existiam, e este documento os registra em vez de repetir que não
+> há nada.
 
-## Estado atual: nenhum
+## 1. O que existe hoje
 
-Evidência de ausência, reunida por busca em todo o repositório e checagem de
-dependências:
+### Logs estruturados
 
-```
-grep -rniE "prometheus|grafana|opentelemetry|\botel\b|datadog|new relic|
-  newrelic|winston|pino|cloudwatch|correlation.?id|trace.?id|apm\b"
-  src/ k8s/ infra/ docs/ .github/
-# 0 resultados
-```
+As três camadas emitem JSON de uma linha por evento, para stdout, com
+correlation ID.
 
-- `package.json`: nenhuma dependência de logging estruturado
-  (`winston`/`pino`), métricas (`prom-client`), tracing
-  (`@opentelemetry/*`) ou APM (`newrelic`, `datadog`, `sentry`).
-- `src/main.ts`: usa apenas o comportamento padrão do NestJS, sem logger
-  customizado.
-- Nenhum manifest em `k8s/` provisiona um agente de coleta de logs/métricas
-  (Fluent Bit, OpenTelemetry Collector, CloudWatch Agent).
-- Nenhuma RFC, ADR ou branch remota (incluindo as três branches de RFC não
-  mescladas) menciona observabilidade.
+| Origem | Evento | Campos |
+|---|---|---|
+| Aplicação (`RequestLoggingMiddleware`) | `http_request` | `correlationId`, `method`, `path`, `statusCode`, `durationMs` |
+| Lambda de autenticação | `authenticate_customer_succeeded` / `_rejected` | `correlation_id`, `duration_ms` |
+| Lambda authorizer | `authorizer_allowed` / `authorizer_denied` | `correlation_id`, `reason`, `duration_ms` |
 
-## O que já existe e pode ser reaproveitado (sem decisão nova)
+O correlation ID atravessa a cadeia inteira. O cliente pode fornecê-lo em
+`x-correlation-id`; o authorizer valida ou gera um, o API Gateway o reescreve
+no header antes de chamar o backend, e o middleware da aplicação aceita o valor
+recebido quando ele bate no padrão `^[a-zA-Z0-9._:-]{1,128}$`, gerando um novo
+caso contrário. O valor volta ao cliente no header da resposta.
 
-- **Health check**: `GET /api/v1` já é usado pelos probes de liveness e
-  readiness do Kubernetes (`k8s/app/deployment.yaml`) — é o único sinal de
-  saúde hoje, consumido apenas pelo próprio Kubernetes, não exportado para
-  fora do cluster.
-- **HPA**: já reage a CPU/memória via `metrics-server`
-  (`k8s/app/hpa.yaml`), mas sem visibilidade de latência ou taxa de erro de
-  negócio.
+Nenhum dos três registra CPF, token ou credencial.
 
-## O que a Fase 3 exige e ainda não tem
+Os logs das Lambdas vão para CloudWatch Logs, em grupos com retenção de 30
+dias. Os logs da aplicação ficam no stdout dos pods, coletados apenas pelo
+`kubectl logs`: não há agente de coleta no cluster.
+
+### Health checks
+
+A aplicação expõe três endpoints públicos: `GET /api/v1/health`,
+`/health/live` e `/health/ready`. O Kubernetes usa `live` para liveness e
+startup, `ready` para readiness. O `ready` é o único que faz verificação real
+de dependência.
+
+### Alarmes CloudWatch
+
+Sete alarmes provisionados por Terraform, todos criados sem `alarm_actions`.
+
+| Origem | Alarme | Limiar |
+|---|---|---|
+| `repo-db-infra` | CPU da instância RDS | 80% |
+| `repo-db-infra` | Armazenamento livre | 2 GiB |
+| `repo-db-infra` | Conexões abertas | 80 |
+| `repo-auth-serverless` | Erros da Lambda de autenticação | métrica `Errors` |
+| `repo-auth-serverless` | Erros da Lambda authorizer | métrica `Errors` |
+| `repo-auth-serverless` | `5XXError` na rota `/auth` | métrica do HTTP API |
+| `repo-auth-serverless` | `5XXError` na rota protegida | métrica do HTTP API |
+
+### Métricas de infraestrutura
+
+`metrics-server` alimenta o HPA com CPU e memória por pod. É a única métrica
+que produz ação automática hoje. CloudWatch coleta as métricas nativas de RDS,
+Lambda, API Gateway e ALB sem configuração adicional.
+
+### Verificação sintética
+
+`smoke-hml` e `smoke-prod` no `deploy-eks.yml` checam, a cada deploy, se o
+target group tem alvo saudável e se o gateway rejeita requisição sem token.
+É uma verificação pontual, não contínua.
+
+## 2. O que continua faltando
 
 | Requisito | Estado |
 |---|---|
-| Logs centralizados | Ausente |
-| Métricas de aplicação (latência, taxa de erro, throughput) | Ausente |
-| Tracing distribuído (Gateway → Lambda → EKS → RDS) | Ausente |
+| Logs centralizados da aplicação | Ausente. Sem Fluent Bit, CloudWatch Agent ou OpenTelemetry Collector no cluster |
+| Destino de notificação dos alarmes | Ausente. Os sete alarmes disparam para o vazio |
+| Métricas de aplicação (latência por rota, taxa de erro de negócio) | Ausente. `durationMs` existe no log, mas não vira métrica |
+| Tracing distribuído | Ausente. O correlation ID permite correlacionar manualmente, mas não há X-Ray nem OTel |
 | Dashboards | Ausente |
-| Alertas | Ausente |
+| Monitoramento sintético contínuo | Ausente. Só o smoke test por deploy |
 
-## Pendências
+## 3. Pendências
 
-- `TODO`: nenhuma ferramenta deve ser escolhida por esta auditoria sem
-  decisão do grupo — ver ADR-0005 para o porquê de não inventar uma escolha
-  aqui.
-- `TODO`: quando uma ferramenta for decidida, os pontos `[PENDENTE]` já
-  marcados em [overview.md](../architecture/overview.md),
+- Anexar destinos aos alarmes existentes. Os módulos já aceitam
+  `alarm_actions` e `alarm_ok_actions` como variáveis; falta decidir o destino
+  (SNS, e-mail, chat) e passar os ARNs. É a menor distância entre o estado
+  atual e alerta funcionando.
+- Decidir a coleta de logs da aplicação. Enquanto não houver agente, o log de
+  um pod morto se perde.
+- ADR-0005 continua sem decisão de stack. As lacunas da tabela acima não devem
+  ser preenchidas por escolha unilateral.
+- Os pontos marcados `[PENDENTE]` em
+  [overview.md](../architecture/overview.md),
   [authentication-flow.md](../architecture/authentication-flow.md) e
-  [service-order-flow.md](../architecture/service-order-flow.md) devem ser
-  atualizados com o fluxo real.
+  [service-order-flow.md](../architecture/service-order-flow.md) precisam ser
+  revistos: parte deles já é coberta pelos sinais nativos descritos aqui.
