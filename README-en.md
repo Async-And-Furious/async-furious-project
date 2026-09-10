@@ -51,11 +51,33 @@ We use Node.js with NestJS for modular architecture and native dependency inject
 
 ## Prerequisites
 
+- Python 3 (for the stack orchestrator)
+- GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker and Docker Compose
 - Terraform 1.6+
 - kind (`go install sigs.k8s.io/kind@latest` or install through your package manager)
+
+### AWS stack orchestration
+
+The cross-repository AWS stack is dispatched and monitored by the standard-library
+Python script `scripts/orchestrate-stack.py`. It requires Python 3 and an authenticated
+GitHub CLI (`gh auth login`). It never receives secrets or calls AWS directly, and
+stops at the first failed workflow:
+
+```bash
+python3 scripts/orchestrate-stack.py --environment hml --action apply
+python3 scripts/orchestrate-stack.py --environment prod --action apply
+python3 scripts/orchestrate-stack.py --environment hml --action apply --app-ref develop
+python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML'
+python3 scripts/orchestrate-stack.py --environment prod --action destroy --confirmation 'DESTROY PROD'
+python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML' --what-if
+```
+
+Application refs default to `develop` for HML and `main` for production. Use
+`--poll-seconds` to change the workflow polling interval. Destroy requires the exact
+confirmation shown above.
 
 ---
 

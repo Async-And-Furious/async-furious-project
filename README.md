@@ -53,16 +53,17 @@ Usamos Node.js com NestJS pela arquitetura modular e pela injecao de dependencia
 
 ### Orquestracao AWS entre repositorios
 
-Este repositorio contem a aplicacao, mas a stack AWS e distribuida em quatro repositorios: `repo-k8s-infra` (EKS/VPC), `repo-db-infra` (RDS), `async-furious-project` (imagem e workloads Kubernetes) e `repo-auth-serverless` (Lambda, API Gateway e authorizer). Para evitar dependencias quebradas, a subida segue `K8s -> DB -> App -> Auth`; a destruicao segue a ordem inversa: `App -> Auth -> DB -> K8s`.
+Este repositorio contem a aplicacao, mas a stack AWS e distribuida em quatro repositorios: `repo-k8s-infra` (EKS/VPC), `repo-db-infra` (RDS), `async-furious-project` (imagem e workloads Kubernetes) e `repo-auth-serverless` (Lambda, API Gateway e authorizer). Para evitar dependencias quebradas, a subida segue `K8s -> DB -> Auth -> App`; a destruicao segue a ordem inversa: `App -> Auth -> DB -> K8s`.
 
-O script `scripts/orchestrate-stack.ps1` usa somente o `gh`, para no primeiro erro e aguarda cada workflow:
+O script `scripts/orchestrate-stack.py` usa Python 3 e somente o `gh`, para no primeiro erro e aguarda cada workflow. Requer Python 3 e o GitHub CLI (`gh`) instalado e autenticado (`gh auth login`):
 
-```powershell
-.\scripts\orchestrate-stack.ps1 -Environment hml -Action apply
-.\scripts\orchestrate-stack.ps1 -Environment prod -Action apply
-.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML'
-.\scripts\orchestrate-stack.ps1 -Environment prod -Action destroy -Confirmation 'DESTROY PROD'
-.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML' -WhatIf
+```bash
+python3 scripts/orchestrate-stack.py --environment hml --action apply
+python3 scripts/orchestrate-stack.py --environment prod --action apply
+python3 scripts/orchestrate-stack.py --environment hml --action apply --app-ref develop
+python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML'
+python3 scripts/orchestrate-stack.py --environment prod --action destroy --confirmation 'DESTROY PROD'
+python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML' --what-if
 ```
 
 `apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
@@ -128,6 +129,8 @@ Detalhes de execucao (scripts, comandos manuais, troubleshooting) estao na secao
 
 ## Pre-requisitos
 
+- Python 3 (for the stack orchestrator)
+- GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
