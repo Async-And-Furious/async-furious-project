@@ -1,12 +1,9 @@
 # Banco de Dados
 
-> Documenta a camada de persistência e o modelo de dados da aplicação, para
-> a demanda "Elaborar Documentação da Persistência e Modelo de Dados" da
-> Fase 3. Este arquivo está sendo escrito em paralelo à
-> [PR #175](https://github.com/Async-And-Furious/async-furious-project/pull/175)
-> (`doc/ArchDocs_diagrams`), que já criou um `docs/infrastructure/database.md`
-> próprio com o estado por ambiente. As duas versões vão precisar de
-> reconciliação manual quando uma das branches for mesclada primeiro.
+> Documenta a camada de persistência e o modelo de dados da aplicação. O
+> estado por ambiente abaixo reflete a infraestrutura já provisionada; para os
+> recursos AWS que a sustentam, ver
+> [aws.md](./aws.md).
 
 ## Estado por ambiente
 
@@ -15,13 +12,13 @@
 | Dev local (`docker compose`) | `docker-compose.dependencies.yml` | `postgres:15-alpine` | `docker-compose.dependencies.yml:3` |
 | CI (`tests.yml`) | Serviço containerizado no runner | `postgres:16` | `.github/workflows/tests.yml:18` |
 | Kubernetes local (`kind`) | `StatefulSet` | `postgres:15-alpine` | `k8s/database/statefulset.yaml:20` |
-| Nuvem (proposto Fase 3) | RDS, provisionado por `repo-db-infra` (`modules/rds`) | PostgreSQL 16 (decidido, não aplicado) | ADR-0004 e RFC de banco (PR #172, branch `docs/database-justification-pg16`); nenhum `terraform apply` executado até o momento |
+| Nuvem (`hml` e `prod`) | RDS `tc3-db-<env>`, provisionado por `repo-db-infra` (`modules/rds`) | PostgreSQL `16.4` | [ADR-0004](../adr/0004-banco-dados-gerenciado.md), [RFC-007](../rfcs/RFC-007-rds-public-access.md) e [database-justification.md](../rfcs/database-justification.md); provisionado e em uso pelo `deploy-eks.yml` |
 
-Existe uma divergência ativa: dev local e o `StatefulSet` do Kubernetes local
-ainda estão em Postgres 15, enquanto o CI já roda 16 e a decisão definitiva
-para produção (RDS) também é 16. A correção já foi feita na branch não
-mesclada `docs/database-justification-pg16` (PR #172), mas não está
-aplicada nesta branch.
+Persiste uma divergência de versão: o `docker compose` de desenvolvimento e o
+`StatefulSet` do cluster `kind` seguem em Postgres 15, enquanto o CI e o RDS
+usam 16. Como o schema é aplicado por `prisma migrate deploy` nos dois casos,
+a divergência não bloqueia o desenvolvimento, mas mantém local e produção em
+engines diferentes.
 
 ## Diagrama ER
 
@@ -441,12 +438,12 @@ ambientes (ver [Estado por ambiente](#estado-por-ambiente)): CI já usava
 `postgres:16`, dev local e o `StatefulSet` do Kubernetes local usavam
 `postgres:15-alpine`, e a versão do RDS estava indefinida. Esse
 raciocínio, e a decisão de fixar **PostgreSQL 16** em todos os ambientes,
-foi formalizado pelo trigo na RFC de banco (PR #172, branch
-`docs/database-justification-pg16`, status "Accepted" no próprio arquivo) e
-na [ADR-0004](https://github.com/Async-And-Furious/async-furious-project/blob/doc/ArchDocs_diagrams/docs/adr/0004-banco-dados-gerenciado.md)
-da PR #175. Não duplicado aqui: a RFC já resolve a questão, este documento
+está formalizado em
+[database-justification.md](../rfcs/database-justification.md) e na
+[ADR-0004](../adr/0004-banco-dados-gerenciado.md), ambas já mescladas em
+`develop`. Não duplicado aqui: a decisão está resolvida lá, este documento
 só referencia a conclusão porque ela é pré-requisito pro resto do modelo de
-dados.
+dados. O RDS provisionado usa `16.4`.
 
 PostgreSQL gerenciado (RDS) também satisfaz diretamente o requisito de
 "banco de dados gerenciado" da Fase 3: backups automáticos, criptografia em
