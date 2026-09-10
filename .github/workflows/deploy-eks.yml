@@ -45,11 +45,6 @@ concurrency:
   group: app-eks-${{ inputs.environment || (github.ref == 'refs/heads/main' && 'prod' || 'hml') }}
   cancel-in-progress: false
 
-env:
-  K8S_NAMESPACE: async-furious
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-
 jobs:
   image:
     name: Build and publish immutable image
@@ -59,6 +54,9 @@ jobs:
       github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     environment: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.environment == 'prod')) && 'production' || 'hml' }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
     outputs:
       image: ${{ steps.image.outputs.ref }}
     steps:
@@ -106,16 +104,33 @@ jobs:
           set -euo pipefail
           image="$REGISTRY/$ECR_REPOSITORY:$GITHUB_SHA"
           error_file=$(mktemp)
-          trap 'rm -f "$error_file"' EXIT
+          push_error_file=$(mktemp)
+          trap 'rm -f "$error_file" "$push_error_file"' EXIT
           if digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text 2>"$error_file"); then
             [[ "$digest" == sha256:* ]] || { echo 'ECR image digest was not returned for the existing image.' >&2; exit 1; }
             echo "Commit-SHA image already exists; reusing $image."
           else
             error=$(<"$error_file")
-            [[ "$error" == *ImageNotFoundException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            [[ "$error" == *ImageNotFoundException* ]] || { echo 'Unable to determine whether the ECR image exists.' >&2; exit 1; }
             docker build --pull --tag "$image" .
-            docker push "$image"
-            digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text)
+            if docker push "$image" >"$push_error_file" 2>&1; then
+              if ! digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text); then
+                echo 'ECR image was pushed, but its digest could not be retrieved.' >&2
+                exit 1
+              fi
+            else
+              push_error=$(<"$push_error_file")
+              push_error_lower=$(printf '%s' "$push_error" | tr '[:upper:]' '[:lower:]')
+              [[ "$push_error_lower" == *'already exists'* && ( "$push_error_lower" == *'immutable'* || "$push_error_lower" == *'tag invalid'* ) ]] || {
+                echo 'Docker push failed for a reason other than an existing immutable tag.' >&2
+                exit 1
+              }
+              if ! digest=$(aws ecr describe-images --repository-name "$ECR_REPOSITORY" --image-ids imageTag="$GITHUB_SHA" --query 'imageDetails[0].imageDigest' --output text); then
+                echo 'Immutable ECR tag exists, but its digest could not be retrieved.' >&2
+                exit 1
+              fi
+              echo "Commit-SHA image was published concurrently; reusing $image."
+            fi
           fi
           test -n "$digest" && [[ "$digest" == sha256:* ]] || { echo 'ECR image digest was not returned.' >&2; exit 1; }
           echo "ref=$REGISTRY/$ECR_REPOSITORY@$digest" >> "$GITHUB_OUTPUT"
@@ -132,15 +147,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: hml
     env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
-      RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
-      DB_HOST: ${{ vars.DB_HOST }}
-      DB_NAME: ${{ vars.DB_NAME }}
-      DB_PORT: ${{ vars.DB_PORT || '5432' }}
-      TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
-      JWT_PUBLIC_KEY_SECRET_ARN: ${{ vars.JWT_PUBLIC_KEY_SECRET_ARN }}
+      JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
@@ -157,12 +169,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      - name: Fetch JWT public key from Secrets Manager
+      - name: Fetch JWT public key from SSM Parameter Store
         run: |
           set -euo pipefail
-          test -n "$JWT_PUBLIC_KEY_SECRET_ARN" || { echo 'Repository variable JWT_PUBLIC_KEY_SECRET_ARN is required.' >&2; exit 1; }
-          jwt_public_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PUBLIC_KEY_SECRET_ARN" --query SecretString --output text)
-          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key secret is empty.' >&2; exit 1; }
+          test -n "$JWT_PUBLIC_KEY_PARAMETER_NAME" || { echo 'Repository/environment variable JWT_PUBLIC_KEY_PARAMETER_NAME is required.' >&2; exit 1; }
+          jwt_public_key=$(aws ssm get-parameter --name "$JWT_PUBLIC_KEY_PARAMETER_NAME" --with-decryption --query 'Parameter.Value' --output text)
+          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key parameter is empty.' >&2; exit 1; }
           while IFS= read -r line; do
             [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
           done <<< "$jwt_public_key"
@@ -172,8 +184,47 @@ jobs:
             printf '%s\n' "$jwt_public_key"
             printf '%s\n' "$delimiter"
           } >> "$GITHUB_ENV"
+      - name: Resolve target group ARN from repo-k8s-infra state
+        env:
+          DEPLOY_ENV: hml
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-k8s-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-k8s-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
+          [[ "$TARGET_GROUP_ARN" =~ ^arn:aws(-[a-z0-9-]+)?:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/[A-Za-z0-9._+=/@-]+/[0-9a-fA-F]+$ ]] || {
+            echo 'repo-k8s-infra target group ARN is missing or invalid.' >&2
+            exit 1
+          }
+          printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Resolve database outputs from repo-db-infra state
+        env:
+          DEPLOY_ENV: hml
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-db-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-db-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          secret_arn=$(jq -er '.outputs.db_connection_secret_arn.value // .outputs.db_secret_arn.value' "$state_file")
+          db_host=$(jq -er '.outputs.db_host.value' "$state_file")
+          db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
+          db_name=$(jq -er '.outputs.db_name.value' "$state_file")
+          db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
+          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$secret_arn"
+          printf '::add-mask::%s\n' "$db_host"
+          {
+            printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
+            printf 'DB_HOST=%s\n' "$db_host"
+            printf 'DB_PORT=%s\n' "$db_port"
+            printf 'DB_NAME=%s\n' "$db_name"
+            printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+          } >> "$GITHUB_ENV"
       - name: Save original HML EKS endpoint access
         run: |
           set -euo pipefail
@@ -259,7 +310,6 @@ jobs:
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           printf '::add-mask::%s\n' "$DB_USER"
           printf '::add-mask::%s\n' "$DB_PASSWORD"
-          export DB_SSLMODE=require
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
@@ -270,11 +320,24 @@ jobs:
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
             --from-literal=NEW_RELIC_LICENSE_KEY="$NEW_RELIC_LICENSE_KEY" \
             --dry-run=client -o yaml | kubectl apply -f -
+      - name: Free HML pod capacity for migration
+        run: |
+          set -euo pipefail
+          nodegroup=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --query 'nodegroups[0]' --output text)
+          update_id=$(aws eks update-nodegroup-config --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --scaling-config minSize=2,maxSize=3,desiredSize=3 --query 'update.id' --output text)
+          aws eks wait nodegroup-active --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup"
+          if kubectl get deployment/async-furious-api --namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
+            kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=0
+            kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=5m
+          fi
+          kubectl delete jobs --namespace "$K8S_NAMESPACE" \
+            --selector app.kubernetes.io/component=migration --ignore-not-found=true --wait=true
       - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
@@ -289,7 +352,7 @@ jobs:
               app.kubernetes.io/part-of: async-furious
               app.kubernetes.io/component: migration
           spec:
-            backoffLimit: 4
+            backoffLimit: 0
             ttlSecondsAfterFinished: 86400
             template:
               spec:
@@ -298,7 +361,7 @@ jobs:
                   - name: migrate
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
-                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+                    command: ["sh", "-c", "node_modules/.bin/prisma migrate resolve --applied 20260831000000_add_cliente_ativo; node_modules/.bin/prisma migrate deploy || { sleep 600; exit 1; }"]
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
@@ -315,38 +378,6 @@ jobs:
             exit 1
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
-          seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          kubectl apply -f - <<EOF
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: $seed_job
-            namespace: $K8S_NAMESPACE
-            labels:
-              app.kubernetes.io/part-of: async-furious
-              app.kubernetes.io/component: seed
-          spec:
-            backoffLimit: 4
-            ttlSecondsAfterFinished: 86400
-            template:
-              spec:
-                restartPolicy: OnFailure
-                containers:
-                  - name: seed
-                    image: $IMAGE
-                    imagePullPolicy: IfNotPresent
-                    command: ["node", "dist-scripts/seed.js"]
-                    envFrom:
-                      - configMapRef:
-                          name: async-furious-config
-                      - secretRef:
-                          name: async-furious-secret
-          EOF
-          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
-            kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
-            exit 1
-          }
-          kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
       - name: Roll out application
         run: |
           set -euo pipefail
@@ -354,11 +385,18 @@ jobs:
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl apply -f k8s/app/service.yaml
           sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
-          kubectl wait pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --for=condition=Ready --timeout=5m
 
+      - name: Capture HML rollout diagnostics
+        if: ${{ failure() }}
+        run: |
+          kubectl get pods --namespace "$K8S_NAMESPACE" -o wide || true
+          kubectl describe deployment/async-furious-api --namespace "$K8S_NAMESPACE" || true
+          kubectl describe pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api || true
+          kubectl logs --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --all-containers=true --tail=200 || true
       - name: Restore original HML EKS endpoint access
         if: ${{ always() }}
         run: |
@@ -413,15 +451,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
-      RDS_SECRET_ARN: ${{ vars.RDS_SECRET_ARN }}
-      DB_HOST: ${{ vars.DB_HOST }}
-      DB_NAME: ${{ vars.DB_NAME }}
-      DB_PORT: ${{ vars.DB_PORT || '5432' }}
-      TARGET_GROUP_ARN: ${{ vars.TARGET_GROUP_ARN }}
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
-      JWT_PUBLIC_KEY_SECRET_ARN: ${{ vars.JWT_PUBLIC_KEY_SECRET_ARN }}
+      JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
@@ -432,37 +467,77 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Validate AWS Academy credentials
+      - name: Validate AWS credentials
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
         run: |
           set -euo pipefail
-          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN; do
+          for value in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
-      - name: Configure AWS Academy credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
         with:
           aws-region: ${{ env.AWS_REGION }}
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-      - name: Fetch JWT public key from Secrets Manager
+      - name: Fetch JWT public key from SSM Parameter Store
         run: |
           set -euo pipefail
-          test -n "$JWT_PUBLIC_KEY_SECRET_ARN" || { echo 'Repository variable JWT_PUBLIC_KEY_SECRET_ARN is required.' >&2; exit 1; }
-          jwt_public_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PUBLIC_KEY_SECRET_ARN" --query SecretString --output text)
-          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key secret is empty.' >&2; exit 1; }
+          test -n "$JWT_PUBLIC_KEY_PARAMETER_NAME" || { echo 'Repository/environment variable JWT_PUBLIC_KEY_PARAMETER_NAME is required.' >&2; exit 1; }
+          jwt_public_key=$(aws ssm get-parameter --name "$JWT_PUBLIC_KEY_PARAMETER_NAME" --with-decryption --query 'Parameter.Value' --output text)
+          test -n "$jwt_public_key" && [[ "$jwt_public_key" != 'None' ]] || { echo 'JWT public key parameter is empty.' >&2; exit 1; }
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
+          done <<< "$jwt_public_key"
           delimiter="JWT_PUBLIC_KEY_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
           {
             printf 'JWT_PUBLIC_KEY<<%s\n' "$delimiter"
             printf '%s\n' "$jwt_public_key"
             printf '%s\n' "$delimiter"
           } >> "$GITHUB_ENV"
+      - name: Resolve target group ARN from repo-k8s-infra state
+        env:
+          DEPLOY_ENV: prod
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-k8s-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-k8s-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
+          [[ "$TARGET_GROUP_ARN" =~ ^arn:aws(-[a-z0-9-]+)?:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/[A-Za-z0-9._+=/@-]+/[0-9a-fA-F]+$ ]] || {
+            echo 'repo-k8s-infra target group ARN is missing or invalid.' >&2
+            exit 1
+          }
+          printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Resolve database outputs from repo-db-infra state
+        env:
+          DEPLOY_ENV: prod
+        run: |
+          set -euo pipefail
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-db-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-db-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          secret_arn=$(jq -er '.outputs.db_connection_secret_arn.value // .outputs.db_secret_arn.value' "$state_file")
+          db_host=$(jq -er '.outputs.db_host.value' "$state_file")
+          db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
+          db_name=$(jq -er '.outputs.db_name.value' "$state_file")
+          db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
+          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$secret_arn"
+          printf '::add-mask::%s\n' "$db_host"
+          {
+            printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
+            printf 'DB_HOST=%s\n' "$db_host"
+            printf 'DB_PORT=%s\n' "$db_port"
+            printf 'DB_NAME=%s\n' "$db_name"
+            printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+          } >> "$GITHUB_ENV"
       - name: Save original PROD EKS endpoint access
         run: |
           set -euo pipefail
@@ -519,7 +594,8 @@ jobs:
           done
           export DB_USER=$(jq -er '.username' <<<"$secret_json")
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
-          export DB_SSLMODE=require
+          printf '::add-mask::%s\n' "$DB_USER"
+          printf '::add-mask::%s\n' "$DB_PASSWORD"
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
@@ -530,6 +606,7 @@ jobs:
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
+            --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
@@ -614,10 +691,10 @@ jobs:
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl apply -f k8s/app/service.yaml
           sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
+          kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
-          kubectl wait pods --namespace "$K8S_NAMESPACE" --selector app=async-furious-api --for=condition=Ready --timeout=5m
 
       - name: Restore original PROD EKS endpoint access
         if: ${{ always() }}
@@ -659,16 +736,35 @@ jobs:
     if: ${{ needs.deploy-hml.result == 'success' }}
     runs-on: ubuntu-latest
     environment: hml
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
     steps:
-      - name: Check private gateway path
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Resolve HML target group ARN from repo-k8s-infra state
         env:
-          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
-          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+          DEPLOY_ENV: hml
         run: |
           set -euo pipefail
-          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
-          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-k8s-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-k8s-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
+          [[ "$TARGET_GROUP_ARN" =~ ^arn:aws(-[a-z0-9-]+)?:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/[A-Za-z0-9._+=/@-]+/[0-9a-fA-F]+$ ]] || { echo 'repo-k8s-infra target group ARN is missing or invalid.' >&2; exit 1; }
+          printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
+      - name: Check HML gateway and target health
+        run: |
+          set -euo pipefail
+          healthy=$(aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP_ARN" --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+          test "$healthy" -gt 0 || { echo 'HML target group has no healthy targets.' >&2; exit 1; }
+          endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-hml'].ApiEndpoint | [0]" --output text)
+          test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'HML API Gateway endpoint was not found.' >&2; exit 1; }
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
+          [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }
 
   smoke-prod:
     name: Smoke test PROD gateway
@@ -676,13 +772,32 @@ jobs:
     if: ${{ needs.deploy-prod.result == 'success' }}
     runs-on: ubuntu-latest
     environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
     steps:
-      - name: Check private gateway path
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: Resolve PROD target group ARN from repo-k8s-infra state
         env:
-          SMOKE_TEST_URL: ${{ vars.SMOKE_TEST_URL }}
-          SMOKE_TEST_TOKEN: ${{ secrets.SMOKE_TEST_TOKEN }}
+          DEPLOY_ENV: prod
         run: |
           set -euo pipefail
-          test -n "$SMOKE_TEST_URL" || { echo 'SMOKE_TEST_URL must point to the approved private gateway path.' >&2; exit 1; }
-          test -n "$SMOKE_TEST_TOKEN" || { echo 'SMOKE_TEST_TOKEN is required.' >&2; exit 1; }
-          curl --fail --silent --show-error --retry 10 --retry-delay 5 --max-time 20 -H "Authorization: Bearer $SMOKE_TEST_TOKEN" "$SMOKE_TEST_URL"
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-k8s-infra-${DEPLOY_ENV}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-k8s-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
+          TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
+          [[ "$TARGET_GROUP_ARN" =~ ^arn:aws(-[a-z0-9-]+)?:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/[A-Za-z0-9._+=/@-]+/[0-9a-fA-F]+$ ]] || { echo 'repo-k8s-infra target group ARN is missing or invalid.' >&2; exit 1; }
+          printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
+      - name: Check PROD gateway and target health
+        run: |
+          set -euo pipefail
+          healthy=$(aws elbv2 describe-target-health --target-group-arn "$TARGET_GROUP_ARN" --query "length(TargetHealthDescriptions[?TargetHealth.State=='healthy'])" --output text)
+          test "$healthy" -gt 0 || { echo 'PROD target group has no healthy targets.' >&2; exit 1; }
+          endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-prod'].ApiEndpoint | [0]" --output text)
+          test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'PROD API Gateway endpoint was not found.' >&2; exit 1; }
+          status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
+          [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }

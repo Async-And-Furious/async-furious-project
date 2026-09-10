@@ -51,6 +51,24 @@ Usamos Node.js com NestJS pela arquitetura modular e pela injecao de dependencia
 
 ## Escalabilidade e Automacao de Infraestrutura
 
+### Orquestracao AWS entre repositorios
+
+Este repositorio contem a aplicacao, mas a stack AWS e distribuida em quatro repositorios: `repo-k8s-infra` (EKS/VPC), `repo-db-infra` (RDS), `async-furious-project` (imagem e workloads Kubernetes) e `repo-auth-serverless` (Lambda, API Gateway e authorizer). Para evitar dependencias quebradas, a subida segue `K8s -> DB -> Auth -> App`; a destruicao segue a ordem inversa: `App -> Auth -> DB -> K8s`.
+
+O script `scripts/orchestrate-stack.py` usa Python 3 e somente o `gh`, para no primeiro erro e aguarda cada workflow. Requer Python 3 e o GitHub CLI (`gh`) instalado e autenticado (`gh auth login`):
+
+```bash
+npm run aws:apply
+npm run aws:apply -- --prod
+npm run aws:destroy -- --confirmation "DESTROY HML"
+npm run aws:destroy -- --prod --confirmation "DESTROY PROD"
+npm run aws:destroy -- --what-if --confirmation "DESTROY HML"
+```
+
+Sem `--prod`, o ambiente padrao e HML. O script tambem aceita `--environment hml|prod`; combinar `--prod` com `--environment hml` e rejeitado. `apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
+
+Use `--what-if` antes de uma operacao destrutiva para conferir a sequencia. O `destroy` exige a confirmacao exata do ambiente (`DESTROY HML` ou `DESTROY PROD`). O script dispara e monitora as GitHub Actions; ele nao substitui os workflows nem executa `terraform` localmente.
+
 Com o aumento da demanda e a expansao para novas unidades, a oficina precisa garantir alta disponibilidade do sistema mesmo em picos de atendimento. Para isso, a infraestrutura evoluiu com:
 
 - **Infraestrutura escalavel**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 replicas, escalando por CPU > 70% ou memoria > 80%).
@@ -110,6 +128,8 @@ Detalhes de execucao (scripts, comandos manuais, troubleshooting) estao na secao
 
 ## Pre-requisitos
 
+- Python 3 (for the stack orchestrator)
+- GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
@@ -417,10 +437,14 @@ As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email
 e `TF_VAR_seed_admin_password` podem ser exportadas antes ou definidas em
 `.env.local` — o script solicita interativamente se nao encontrar.
 
-No deploy EKS, as variaveis `RDS_SECRET_ARN`, `TARGET_GROUP_ARN`, `JWT_ISSUER` e
-`JWT_AUDIENCE` sao obrigatorias no Environment. O secret RDS deve conter
-`host`, `port`, `dbname`, `username` e `password`. O ARN e aplicado pelo
-`TargetGroupBinding` do AWS Load Balancer Controller.
+No deploy EKS, as variaveis `JWT_ISSUER` e `JWT_AUDIENCE` sao obrigatorias no
+Environment. O `TARGET_GROUP_ARN` e resolvido, sem fallback, do output
+`application_target_group_arn` (ou `internal_alb_target_group_arn`) do state
+remoto atual de `repo-k8s-infra` para o ambiente correspondente; o deploy e os
+smokes falham se o state nao puder ser lido ou o ARN for invalido. Os outputs atuais de `repo-db-infra` sao lidos
+do state remoto por ambiente (`db_connection_secret_arn`, `db_host`, `db_port`,
+`db_name` e `db_ssl_mode`); portanto, nao configure um ARN RDS estatico no
+GitHub. O secret RDS e lido em runtime e seus valores nao sao impressos.
 
 ### Subir o ambiente local (manual)
 

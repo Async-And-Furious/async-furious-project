@@ -15,8 +15,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies WITHOUT running postinstall scripts.
-# pnpm 11 blocks build scripts by default; we run them manually below.
+# Install without lifecycle scripts; native bcrypt is rebuilt explicitly below.
 # Cache mount keeps the pnpm store across builds so unchanged deps aren't re-fetched.
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
     corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
@@ -31,7 +30,7 @@ COPY nest-cli.json tsconfig.json tsconfig.build.json tsconfig.scripts.json ./
 RUN pnpm prisma generate
 
 # Compile bcrypt native module (skipped by --ignore-scripts above)
-RUN pnpm rebuild bcrypt
+RUN npm rebuild bcrypt --build-from-source
 
 # Build the application
 RUN pnpm build

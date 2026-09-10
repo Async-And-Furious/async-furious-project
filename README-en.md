@@ -51,11 +51,34 @@ We use Node.js with NestJS for modular architecture and native dependency inject
 
 ## Prerequisites
 
+- Python 3 (for the stack orchestrator)
+- GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker and Docker Compose
 - Terraform 1.6+
 - kind (`go install sigs.k8s.io/kind@latest` or install through your package manager)
+
+### AWS stack orchestration
+
+The cross-repository AWS stack is dispatched and monitored by the standard-library
+Python script `scripts/orchestrate-stack.py`. It requires Python 3 and an authenticated
+GitHub CLI (`gh auth login`). It never receives secrets or calls AWS directly, and
+stops at the first failed workflow:
+
+```bash
+npm run aws:apply
+npm run aws:apply -- --prod
+npm run aws:destroy -- --confirmation "DESTROY HML"
+npm run aws:destroy -- --prod --confirmation "DESTROY PROD"
+npm run aws:destroy -- --what-if --confirmation "DESTROY HML"
+```
+
+Without `--prod`, the environment defaults to HML. The script also accepts
+`--environment hml|prod`; combining `--prod` with `--environment hml` is rejected.
+Application refs default to `develop` for HML and `main` for production. Use
+`--poll-seconds` to change the workflow polling interval. Destroy requires the exact
+confirmation shown above.
 
 ---
 
@@ -309,6 +332,20 @@ pnpm run format
 ---
 
 ## Infrastructure as Code (Terraform + Kubernetes)
+
+### Cross-repository AWS orchestration
+
+`scripts/orchestrate-stack.ps1` uses only `gh`, stops on the first failure, and waits for each workflow:
+
+```powershell
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action apply
+.\scripts\orchestrate-stack.ps1 -Environment prod -Action apply
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML'
+.\scripts\orchestrate-stack.ps1 -Environment prod -Action destroy -Confirmation 'DESTROY PROD'
+.\scripts\orchestrate-stack.ps1 -Environment hml -Action destroy -Confirmation 'DESTROY HML' -WhatIf
+```
+
+`apply` runs k8s `ci.yml`/`apply`, database `ci.yml`/`apply`, app `deploy-eks.yml`, then auth `ci.yml`/`apply`. `destroy` runs app `cleanup-eks.yml`, auth `down.yml`, database `down.yml`, then k8s `down.yml`. All use the `main` ref, `academy_mode/aws_academy=false`, and normal AWS credentials configured as repository secrets. The script never receives secrets, does not call AWS directly, and requires `gh auth login`.
 
 Local infrastructure is provisioned with Terraform on a local Kubernetes cluster created by kind.
 
