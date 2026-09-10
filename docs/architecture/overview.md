@@ -1,158 +1,155 @@
 # Visão Geral da Arquitetura — Async & Furious (Fase 3)
 
-> Este documento distingue explicitamente três camadas de informação:
-> **[ATUAL]** — o que está implementado e rodando hoje neste repositório;
-> **[PROPOSTA FASE 3]** — a arquitetura distribuída alvo, decidida (ADRs/RFCs
-> com Status "Accepted"/"Aceita") mas **ainda não totalmente implementada**;
-> **[PENDENTE]** — o que a Fase 3 exige mas ainda não tem decisão ou evidência
-> no repositório. Nenhum item marcado `[PROPOSTA FASE 3]` ou `[PENDENTE]` deve
-> ser lido como já funcionando em produção.
+> Duas camadas de informação: **[ATUAL]**, o que está implementado e rodando,
+> e **[PENDENTE]**, o que a Fase 3 exige e ainda não tem decisão ou evidência.
+> A marca `[PROPOSTA FASE 3]`, usada em versões anteriores deste documento,
+> foi retirada: a arquitetura distribuída deixou de ser proposta e está
+> provisionada em `hml` e `prod`.
 
 ## 1. Os quatro repositórios
 
-A solução da Fase 3 é dividida em quatro repositórios no GitHub, sob a
-organização `Async-And-Furious`:
+A solução é dividida em quatro repositórios sob a organização
+`Async-And-Furious`.
 
-| Repositório | Papel | Estado (evidência) |
+| Repositório | Papel | Estado |
 |---|---|---|
-| **`async-furious-project`** (este repositório; chamado `repo-application` nas RFCs) | Monólito NestJS com os quatro Bounded Contexts de negócio (`cadastro`, `ordem-servico`, `pecas-insumos`, `financeiro`) + autenticação JWT local | **[ATUAL]** Implementado e funcional — Clean Architecture + DDD, testes, CI (`tests.yml`, `zap.yml`, `trivy.yml`), infra local via `infra/`+`k8s/` |
-| **`repo-auth-serverless`** | Autenticação centralizada: valida CPF do cliente e emite JWT (`authenticate-customer`); autoriza requisições na borda (`authorize-request`, Lambda Authorizer) | **[PROPOSTA FASE 3]** Esqueleto apenas — os dois handlers retornam respostas *placeholder* (`501` / `isAuthorized: false`); nenhuma infraestrutura foi implantada (fonte: README do próprio repositório) |
-| **`repo-k8s-infra`** | Provisionamento de VPC, EKS (e opcionalmente ECR) via Terraform | **[PROPOSTA FASE 3]** Esqueleto apenas — módulos-placeholder, nenhum `terraform apply` executado (fonte: README do próprio repositório) |
-| **`repo-db-infra`** | Provisionamento do banco gerenciado (RDS PostgreSQL) via Terraform | **[PROPOSTA FASE 3]** Esqueleto apenas — nenhum `terraform apply` executado; módulo pendente da decisão de engine/versão, já resolvida em RFC de banco de dados (trigo) mas ainda não aplicada em código |
+| **`async-furious-project`** (este; `repo-application` nas RFCs) | Monólito NestJS com os quatro Bounded Contexts de negócio (`cadastro`, `ordem-servico`, `pecas-insumos`, `financeiro`) | **[ATUAL]** Implementado, testado, com deploy automatizado para EKS |
+| **`repo-auth-serverless`** | Autenticação centralizada: valida CPF e emite JWT RS256 (`authenticate-customer`); autoriza na borda (`authorize-request`) | **[ATUAL]** Handlers implementados e testados; API Gateway, Lambdas, authorizer e VPC Link provisionados por Terraform em `infra/hml` e `infra/prod` |
+| **`repo-k8s-infra`** | VPC, EKS, ECR e ALB interno via Terraform | **[ATUAL]** Módulos completos, incluindo AWS Load Balancer Controller e Metrics Server por Helm |
+| **`repo-db-infra`** | RDS PostgreSQL 16 via Terraform | **[ATUAL]** Módulo completo, com política de exposição distinta por ambiente e três alarmes |
 
-Existe ainda um quinto repositório, **`async-furious-front`** (privado), que é
-o frontend da aplicação. Ele **não faz parte da separação em quatro
-repositórios de backend** definida para a Fase 3 e não é coberto por este
-documento.
+O conteúdo dos três satélites está na branch `release/v0.1.0` de cada um. O
+`main` deles ainda é o esqueleto inicial, e promover as branches de release é
+uma pendência aberta.
 
-> **Lacuna**: todas as RFCs e os READMEs dos três repositórios satélite citam
-> um arquivo `HANDOFF.md` como a lista mestra de decisões (ex.: "HANDOFF.md
-> §5.2", "§6.1", "§20"). Esse arquivo **não foi encontrado em nenhuma branch de
-> nenhum dos quatro repositórios**. `TODO`: localizar/reconstruir esse
-> documento — sem ele, o racional completo de várias decisões não é
-> verificável, apenas o que já foi transcrito nas RFCs trazidas para
-> [`docs/rfcs/`](../rfcs/README.md).
+Existe ainda um quinto repositório, `async-furious-front` (privado), que é o
+frontend. Ele não faz parte da separação em quatro repositórios de backend e
+não é coberto por este documento.
 
-## 2. Diagrama de componentes (C4 — nível Container/Component)
+> **Lacuna**: as RFCs e os READMEs dos satélites citam um `HANDOFF.md` como
+> lista mestra de decisões. Esse arquivo não foi encontrado em nenhuma branch
+> de nenhum dos quatro repositórios. Sem ele, parte do racional só é
+> verificável pelo que já foi transcrito em [`docs/rfcs/`](../rfcs/README.md).
+
+## 2. Diagrama de componentes (C4, nível Container)
 
 ```mermaid
 flowchart TB
-    actor["Ator: Recepcionista / Mecânico / Admin<br/>(usuário administrativo)"]
-    customer["Ator: Cliente final<br/>(sem conta no sistema)"]
+    actor["Ator: Recepcionista / Mecânico / Admin"]
+    customer["Ator: Cliente final"]
 
-    subgraph GW["repo-auth-serverless — PROPOSTA FASE 3"]
+    subgraph GW["repo-auth-serverless"]
         direction TB
-        apigw["API Gateway (HTTP API)<br/>RFC-003: rotas /auth + integração VPC Link"]
-        authFn["Function Serverless: authenticate-customer<br/>valida CPF, emite JWT RS256 (RFC-006)"]
-        authzFn["Function Serverless: authorize-request<br/>Lambda Authorizer, valida JWT nas rotas protegidas"]
-        apigw -->|invoca| authFn
-        apigw -->|invoca como authorizer| authzFn
+        apigw["API Gateway HTTP API<br/>POST /auth e ANY /{proxy+}"]
+        authFn["Lambda authenticate-customer<br/>valida CPF, emite JWT RS256"]
+        authzFn["Lambda authorize-request<br/>Lambda Authorizer"]
+        apigw -->|AWS_PROXY| authFn
+        apigw -->|authorizer| authzFn
     end
 
-    subgraph K8S["repo-k8s-infra — PROPOSTA FASE 3"]
+    subgraph K8S["repo-k8s-infra"]
         direction TB
-        alb["ALB interno (Ingress)<br/>RFC-003: VPC Link aponta para cá"]
+        alb["ALB interno<br/>alvo do VPC Link"]
         subgraph EKS["Cluster EKS"]
-            app["Aplicação NestJS<br/>(async-furious-project / repo-application)<br/>4 Bounded Contexts: cadastro, ordem-servico, pecas-insumos, financeiro"]
+            app["Aplicação NestJS<br/>cadastro, ordem-servico, pecas-insumos, financeiro"]
         end
+        ecr["ECR<br/>imagens por digest"]
         alb --> app
+        ecr -.-> app
     end
 
-    subgraph DB["repo-db-infra — PROPOSTA FASE 3"]
-        rds[("RDS PostgreSQL 16<br/>banco gerenciado")]
+    subgraph DB["repo-db-infra"]
+        rds[("RDS PostgreSQL 16.4")]
     end
 
-    obs["Observabilidade<br/>[PENDENTE] nenhuma ferramenta decidida/implementada"]
+    obs["Observabilidade parcial<br/>logs e alarmes CloudWatch, sem stack decidida"]
 
-    customer -->|"HTTPS: login por CPF"| apigw
-    actor -->|"HTTPS: login por CPF"| apigw
+    customer -->|"HTTPS: autenticação por CPF"| apigw
+    actor -->|"[PENDENTE] sem fluxo na borda"| apigw
     apigw -->|"HTTP_PROXY via VPC Link"| alb
-    app -->|"Prisma / SQL"| rds
-    authFn -.->|"lê segredo (chave privada RS256)<br/>via Secrets Manager"| secretsMgr[("AWS Secrets Manager")]
-    authzFn -.->|"lê chave pública RS256<br/>via SSM Parameter Store"| ssm[("SSM Parameter Store")]
+    app -->|Prisma| rds
+    authFn -->|"consulta Cliente"| rds
+    authFn -.->|"chave privada RS256"| secretsMgr[("Secrets Manager")]
+    authzFn -.->|"chave pública RS256"| ssm[("SSM Parameter Store")]
 
-    app -.->|"[PENDENTE] logs/métricas/traces"| obs
-    apigw -.->|"[PENDENTE]"| obs
-    authFn -.->|"[PENDENTE]"| obs
+    authFn -.-> obs
+    authzFn -.-> obs
+    rds -.-> obs
+    app -.->|"[PENDENTE] sem coleta de logs"| obs
 
-    classDef proposta stroke-dasharray: 4 4
-    class GW,K8S,DB,obs proposta
+    classDef pendente stroke-dasharray: 4 4
+    class obs pendente
 ```
 
-**Legenda**: bordas tracejadas = componentes da **proposta Fase 3**, ainda em
-estágio de esqueleto/placeholder (sem `terraform apply`, sem deploy real).
-Bordas sólidas = estado **atual**, implementado e testado.
-
-### Estado atual (o que roda hoje, sem os componentes acima)
+### O mesmo sistema no ambiente local
 
 ```mermaid
 flowchart TB
     actor2["Ator: Recepcionista / Mecânico / Admin"]
     customer2["Ator: Cliente final"]
-    subgraph MONO["async-furious-project — ATUAL"]
-        api["Aplicação NestJS monolítica<br/>Auth JWT local (JwtStrategy + bcrypt)<br/>4 módulos: cadastro, ordem-servico, pecas-insumos, financeiro"]
+    subgraph MONO["async-furious-project em kind"]
+        api["Aplicação NestJS<br/>AUTH_MODE=local, JWT HS256 + bcrypt"]
     end
-    pg[("PostgreSQL<br/>StatefulSet no cluster kind local")]
+    pg[("PostgreSQL 15<br/>StatefulSet no cluster")]
     actor2 -->|"POST /api/v1/auth/login"| api
     customer2 -->|"rotas @Public() de aprovação de orçamento"| api
     api -->|Prisma| pg
 ```
 
-Hoje, autenticação, autorização e persistência acontecem **dentro do mesmo
-processo NestJS**, num único namespace Kubernetes (`async-furious`), criado
-localmente via `kind` + Terraform (`infra/environments/local`). Não há API
-Gateway, não há função serverless, não há banco gerenciado — ver
-[`docs/infrastructure/kubernetes.md`](../infrastructure/kubernetes.md) e
-[`docs/infrastructure/database.md`](../infrastructure/database.md) para o
-detalhamento.
+No ambiente `kind`, autenticação, autorização e persistência acontecem dentro
+do mesmo processo e do mesmo cluster. Não há API Gateway, Lambda nem banco
+gerenciado. É a mesma base de código: o que muda é `AUTH_MODE` e o destino do
+`DATABASE_URL`. Ver
+[`docs/infrastructure/kubernetes.md`](../infrastructure/kubernetes.md).
 
-## 3. Fluxo de comunicação entre componentes (proposta Fase 3)
+## 3. Fluxo de comunicação entre componentes
 
-1. **Cliente/Ator → API Gateway**: requisição HTTPS chega ao API Gateway
-   (`repo-auth-serverless`, HTTP API — RFC-003 (trigo)).
-2. **API Gateway → Function Serverless (auth)**: rotas `/auth/*` invocam
-   `authenticate-customer`, que valida o CPF e emite um JWT assinado com
-   RS256 (RFC-006 (trigo)).
-3. **API Gateway → Function Serverless (authorizer)**: demais rotas passam
-   primeiro pelo Lambda Authorizer `authorize-request`, que verifica a
-   assinatura do JWT usando a chave pública (SSM Parameter Store).
-4. **API Gateway → Aplicação (EKS)**: requisição autorizada é encaminhada via
-   VPC Link para um Application Load Balancer interno (`repo-k8s-infra`),
-   que roteia para os pods da aplicação NestJS no cluster EKS.
-5. **Aplicação → Banco de Dados**: a aplicação acessa o RDS PostgreSQL
-   (`repo-db-infra`) via Prisma, dentro da mesma VPC (rede privada).
-6. **Observabilidade**: `[PENDENTE]` — nenhuma ferramenta de logs, métricas
-   ou tracing foi decidida ou implementada em nenhum dos quatro repositórios
-   (confirmado por busca sem resultados por termos como `prometheus`,
-   `opentelemetry`, `winston`, `pino`, `cloudwatch` em `src/`, `k8s/`,
-   `infra/`, `package.json`). Ver
+1. **Cliente → API Gateway**: requisição HTTPS chega ao HTTP API
+   `tc3-auth-<env>`, único componente público do sistema
+   ([RFC-003](../rfcs/RFC-003-api-gateway-eks-integration.md)).
+2. **API Gateway → Lambda de autenticação**: `POST /auth` invoca
+   `authenticate-customer`, que valida o CPF, confirma cliente ativo no RDS e
+   emite JWT RS256 com `sub` igual a `Cliente.id`
+   ([RFC-006](../rfcs/RFC-006-secrets-and-jwt.md)).
+3. **API Gateway → Lambda Authorizer**: `ANY /{proxy+}` passa antes por
+   `authorize-request`, que verifica assinatura, emissor, audiência e
+   expiração com a chave pública do SSM.
+4. **API Gateway → Aplicação**: requisição autorizada segue por VPC Link até o
+   ALB interno, que a entrega aos pods registrados via `TargetGroupBinding`.
+5. **Aplicação → Banco**: acesso ao RDS por Prisma, com TLS obrigatório. A
+   aplicação revalida o token e reconfirma que o cliente continua ativo.
+6. **Observabilidade**: parcial. Logs estruturados com correlation ID nas três
+   camadas e sete alarmes CloudWatch, nenhum com destino de notificação, e sem
+   coleta dos logs da aplicação. Ver
    [`docs/infrastructure/observability.md`](../infrastructure/observability.md).
 
 ## 4. Comunicação entre Bounded Contexts
 
-A separação em quatro repositórios da Fase 3 **extrai a autenticação e a
-infraestrutura** para repositórios próprios — ela **não** divide os quatro
-Bounded Contexts de negócio (`cadastro`, `ordem-servico`, `pecas-insumos`,
-`financeiro`), que permanecem dentro do monólito `async-furious-project` e
-continuam se comunicando **em processo**, via `EmissorEventos`/`DomainEvent`
-(ver [`docs/ddd.md`](../ddd.md) §5). RFC-003 (trigo)
-registra explicitamente que uma futura divisão do monólito em microsserviços
-é uma direção **considerada, mas não decidida nem parte do escopo atual** —
-apenas motivou a escolha de ALB/Ingress (em vez de NLB) para não exigir
-retrabalho se isso vier a acontecer.
+A separação em quatro repositórios extrai a autenticação e a infraestrutura
+para repositórios próprios. Ela não divide os quatro Bounded Contexts de
+negócio (`cadastro`, `ordem-servico`, `pecas-insumos`, `financeiro`), que
+permanecem dentro do monólito e continuam se comunicando em processo, via
+`EmissorEventos`/`DomainEvent` (ver [`docs/ddd.md`](../ddd.md) §5). A RFC-003
+registra que dividir o monólito em microsserviços é uma direção considerada,
+não decidida, e que a escolha de ALB em vez de NLB existe para não exigir
+retrabalho caso isso aconteça.
 
-O único Bounded Context que muda de "local" para "cross-repo/cross-processo"
-na proposta Fase 3 é **Segurança e Autenticação**: hoje ele vive dentro do
-monólito (`src/auth/`); na proposta, passa a ser um serviço externo
-(`repo-auth-serverless`) que se comunica com a aplicação por meio de um JWT
-verificável (chave pública), sem acoplamento direto de código — ver revisão
-do Context Map em [`docs/domain/revisao-fase3.md`](../domain/revisao-fase3.md).
+O único Bounded Context que passou de local para cross-processo é **Segurança
+e Autenticação**: ele vivia em `src/auth/` e agora é um serviço externo que se
+comunica com a aplicação por um JWT verificável com chave pública, sem
+acoplamento de código. Ver a revisão do Context Map em
+[`docs/domain/revisao-fase3.md`](../domain/revisao-fase3.md).
+
+Vale a ressalva de que `src/auth/` não desapareceu: ele continua validando o
+token e resolvendo identidade a cada requisição, e ainda atende o modo local.
+A extração foi da emissão do token, não da verificação.
 
 ## 5. Documentos relacionados
 
 - [Diagrama de Componentes detalhado](./component-diagram.md)
-- [Diagrama de Deployment](./deployment-diagram.md)
+- [Diagrama de Implantação](./deployment-diagram.md)
 - [Sequência de autenticação](./authentication-flow.md)
 - [Sequência de abertura de OS](./service-order-flow.md)
-- [ADRs](../adr/README.md) — decisões permanentes de alto nível
-- [RFCs](../rfcs/README.md) — decisões técnicas detalhadas
+- [Infraestrutura AWS](../infrastructure/aws.md)
+- [API Gateway e Lambda](../infrastructure/api-gateway-lambda.md)
+- [ADRs](../adr/README.md) e [RFCs](../rfcs/README.md)
