@@ -129,7 +129,12 @@ def steps_for(environment: str, action: str, app_ref: str, confirmation: str) ->
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--environment", required=True, choices=("hml", "prod"))
+    parser.add_argument(
+        "--environment",
+        choices=("hml", "prod"),
+        help="target environment (default: hml; conflicts with --prod when set to hml)",
+    )
+    parser.add_argument("--prod", action="store_true", help="select the production environment")
     parser.add_argument("--action", required=True, choices=("apply", "destroy"))
     parser.add_argument("--confirmation", default="")
     parser.add_argument("--app-ref", choices=("develop", "main"))
@@ -140,13 +145,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+    if args.prod and args.environment == "hml":
+        raise SystemExit("Conflicting environment flags: --prod cannot be combined with --environment hml.")
+    environment = "prod" if args.prod else (args.environment or "hml")
     if not 5 <= args.poll_seconds <= 300:
         raise SystemExit("--poll-seconds must be between 5 and 300")
-    expected = f"DESTROY {args.environment.upper()}"
+    expected = f"DESTROY {environment.upper()}"
     if args.action == "destroy" and args.confirmation != expected:
         raise SystemExit(f"Destroy requires exact --confirmation '{expected}'.")
-    app_ref = args.app_ref or ("develop" if args.environment == "hml" else "main")
-    steps = steps_for(args.environment, args.action, app_ref, args.confirmation)
+    app_ref = args.app_ref or ("develop" if environment == "hml" else "main")
+    steps = steps_for(environment, args.action, app_ref, args.confirmation)
 
     if shutil.which("gh") is None:
         raise SystemExit("GitHub CLI (gh) is not installed or is not on PATH.")
@@ -157,7 +165,7 @@ def main() -> int:
             inputs = ", ".join(f"{key}={value}" for key, value in step.inputs.items())
             print(f"WhatIf: would dispatch {step.repository}/{step.workflow} on {ref} with inputs: {inputs}")
         else:
-            dispatch_and_wait(step, args.environment, args.action, ref, args.poll_seconds)
+            dispatch_and_wait(step, environment, args.action, ref, args.poll_seconds)
     return 0
 
 

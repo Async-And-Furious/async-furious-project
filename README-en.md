@@ -67,14 +67,15 @@ GitHub CLI (`gh auth login`). It never receives secrets or calls AWS directly, a
 stops at the first failed workflow:
 
 ```bash
-python3 scripts/orchestrate-stack.py --environment hml --action apply
-python3 scripts/orchestrate-stack.py --environment prod --action apply
-python3 scripts/orchestrate-stack.py --environment hml --action apply --app-ref develop
-python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML'
-python3 scripts/orchestrate-stack.py --environment prod --action destroy --confirmation 'DESTROY PROD'
-python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML' --what-if
+npm run aws:apply
+npm run aws:apply -- --prod
+npm run aws:destroy -- --confirmation "DESTROY HML"
+npm run aws:destroy -- --prod --confirmation "DESTROY PROD"
+npm run aws:destroy -- --what-if --confirmation "DESTROY HML"
 ```
 
+Without `--prod`, the environment defaults to HML. The script also accepts
+`--environment hml|prod`; combining `--prod` with `--environment hml` is rejected.
 Application refs default to `develop` for HML and `main` for production. Use
 `--poll-seconds` to change the workflow polling interval. Destroy requires the exact
 confirmation shown above.

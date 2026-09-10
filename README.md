@@ -58,17 +58,16 @@ Este repositorio contem a aplicacao, mas a stack AWS e distribuida em quatro rep
 O script `scripts/orchestrate-stack.py` usa Python 3 e somente o `gh`, para no primeiro erro e aguarda cada workflow. Requer Python 3 e o GitHub CLI (`gh`) instalado e autenticado (`gh auth login`):
 
 ```bash
-python3 scripts/orchestrate-stack.py --environment hml --action apply
-python3 scripts/orchestrate-stack.py --environment prod --action apply
-python3 scripts/orchestrate-stack.py --environment hml --action apply --app-ref develop
-python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML'
-python3 scripts/orchestrate-stack.py --environment prod --action destroy --confirmation 'DESTROY PROD'
-python3 scripts/orchestrate-stack.py --environment hml --action destroy --confirmation 'DESTROY HML' --what-if
+npm run aws:apply
+npm run aws:apply -- --prod
+npm run aws:destroy -- --confirmation "DESTROY HML"
+npm run aws:destroy -- --prod --confirmation "DESTROY PROD"
+npm run aws:destroy -- --what-if --confirmation "DESTROY HML"
 ```
 
-`apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
+Sem `--prod`, o ambiente padrao e HML. O script tambem aceita `--environment hml|prod`; combinar `--prod` com `--environment hml` e rejeitado. `apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
 
-Use `-WhatIf` antes de uma operacao destrutiva para conferir a sequencia. O `destroy` exige a confirmacao exata do ambiente (`DESTROY HML` ou `DESTROY PROD`). O script dispara e monitora as GitHub Actions; ele nao substitui os workflows nem executa `terraform` localmente.
+Use `--what-if` antes de uma operacao destrutiva para conferir a sequencia. O `destroy` exige a confirmacao exata do ambiente (`DESTROY HML` ou `DESTROY PROD`). O script dispara e monitora as GitHub Actions; ele nao substitui os workflows nem executa `terraform` localmente.
 
 Com o aumento da demanda e a expansao para novas unidades, a oficina precisa garantir alta disponibilidade do sistema mesmo em picos de atendimento. Para isso, a infraestrutura evoluiu com:
 

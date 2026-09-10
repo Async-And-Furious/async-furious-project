@@ -1,5 +1,14 @@
 # Agent Log
 
+## 2026-09-10 — Python orchestrator CLI aliases
+
+- Added default-HML selection and the `--prod` alias to the Python stack
+  orchestrator, with explicit conflict validation; added cross-platform npm
+  `aws:apply` and `aws:destroy` forwarding scripts and updated both READMEs.
+- Validation: Python compile, CLI help, HML/PROD apply and destroy dry-runs,
+  conflict rejection, and `package.json` JSON validation passed. No AWS
+  apply/destroy was run.
+
 ## 2026-09-10
 
 - Replaced the PowerShell stack orchestrator with the standard-library Python 3
