@@ -25,6 +25,11 @@ on:
         required: true
         type: boolean
         default: false
+      seed_customer:
+        description: Run the controlled CPF customer seed job
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       environment:
@@ -34,6 +39,11 @@ on:
       seed_prod:
         description: Explicitly allow the production seed job
         required: true
+        type: boolean
+        default: false
+      seed_customer:
+        description: Run the controlled CPF customer seed job
+        required: false
         type: boolean
         default: false
 
@@ -158,6 +168,7 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -375,6 +386,54 @@ jobs:
             exit 1
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+      - name: Require controlled CPF seed input
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_customer == true }}
+        run: |
+          set -euo pipefail
+          test -n "${SEEDED_CPF:-}" || { echo 'SEEDED_CPF environment secret is required for the controlled customer seed.' >&2; exit 1; }
+          printf '::add-mask::%s\n' "$SEEDED_CPF"
+      - name: Run controlled HML customer seed
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_customer == true && inputs.environment == 'hml' }}
+        run: |
+          set -euo pipefail
+          seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          seed_secret="async-furious-seed-secret-${GITHUB_RUN_ID}"
+          trap 'kubectl delete secret "$seed_secret" --namespace "$K8S_NAMESPACE" --ignore-not-found=true' EXIT
+          kubectl create secret generic "$seed_secret" --namespace "$K8S_NAMESPACE" \
+            --from-literal=SEEDED_CPF="$SEEDED_CPF" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $seed_job
+            namespace: $K8S_NAMESPACE
+            labels:
+              app.kubernetes.io/part-of: async-furious
+              app.kubernetes.io/component: seed
+          spec:
+            backoffLimit: 4
+            ttlSecondsAfterFinished: 86400
+            template:
+              spec:
+                restartPolicy: OnFailure
+                containers:
+                  - name: seed
+                    image: $IMAGE
+                    imagePullPolicy: IfNotPresent
+                    command: ["node", "dist-scripts/seed.js"]
+                    env:
+                      - name: DEPLOY_ENV
+                        value: hml
+                    envFrom:
+                      - configMapRef:
+                          name: async-furious-config
+                      - secretRef:
+                          name: async-furious-secret
+                      - secretRef:
+                          name: $seed_secret
+                          optional: true
+          EOF
+          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m
       - name: Roll out application
         run: |
           set -euo pipefail
@@ -459,6 +518,7 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -646,10 +706,16 @@ jobs:
             exit 1
           }
       - name: Run controlled seed
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_prod == true }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_prod == true || inputs.seed_customer == true) }}
         run: |
           set -euo pipefail
           seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          seed_secret="async-furious-seed-secret-${GITHUB_RUN_ID}"
+          trap 'kubectl delete secret "$seed_secret" --namespace "$K8S_NAMESPACE" --ignore-not-found=true' EXIT
+          if [ "${SEEDED_CPF:-}" ]; then
+            kubectl create secret generic "$seed_secret" --namespace "$K8S_NAMESPACE" \
+              --from-literal=SEEDED_CPF="$SEEDED_CPF" --dry-run=client -o yaml | kubectl apply -f -
+          fi
           kubectl apply -f - <<EOF
           apiVersion: batch/v1
           kind: Job
@@ -675,6 +741,9 @@ jobs:
                           name: async-furious-config
                       - secretRef:
                           name: async-furious-secret
+                      - secretRef:
+                          name: $seed_secret
+                          optional: true
           EOF
           kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m
           kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true
