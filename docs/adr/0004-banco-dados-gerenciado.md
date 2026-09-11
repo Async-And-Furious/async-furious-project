@@ -1,10 +1,10 @@
 # ADR-0004: Banco de dados gerenciado (Amazon RDS PostgreSQL)
 
+# ADR-0004: Banco de dados gerenciado (Amazon RDS PostgreSQL)
+
 ## Status
 
-Proposta — decisão detalhada na RFC de banco do trigo, ainda em PR aberto,
-não mesclado (ver [`docs/rfcs/README.md`](../rfcs/README.md)). **Não
-aplicada em infraestrutura real** (skeleton apenas em `repo-db-infra`).
+Aceita e implementada. A RFC de banco ([`database-justification.md`](../rfcs/database-justification.md)) foi mesclada em 2026-08-23 (PR [#172](https://github.com/Async-And-Furious/async-furious-project/pull/172)), o RDS foi efetivamente provisionado em `repo-db-infra` (`modules/rds`), e `docker-compose.dependencies.yml` já usa `postgres:16-alpine`, alinhado ao CI (`postgres:16`).
 
 > **Nota (2026-08-21):** a topologia de rede aqui descrita (RDS dentro da
 > VPC do EKS, ver RFC-004) foi superada pela
@@ -45,7 +45,7 @@ indefinido.
 
 ## Alternativas consideradas
 
-(Registradas na RFC de banco do trigo)
+(Registradas na RFC de banco)
 
 - **Trocar de engine (ex.: MySQL)**: rejeitado — custo de reescrita de
   schema/migrations sem benefício, e o engine nunca esteve realmente em
@@ -64,28 +64,23 @@ indefinido.
 
 ## Consequências negativas
 
-- `docker-compose.dependencies.yml` (ambiente de desenvolvimento local deste
-  repositório) ainda está em `postgres:15-alpine` — a atualização para 16
-  está decidida mas **não aplicada nesta branch** (existe apenas na branch
-  não mesclada `docs/database-justification-pg16`).
+- Nenhuma pendente — `docker-compose.dependencies.yml` já está em
+  `postgres:16-alpine`, alinhado ao RDS e ao CI.
 - Como a senha é gerenciada inteiramente pela RDS, o mecanismo exato pelo
   qual a Lambda `authenticate-customer` a lê em runtime (IAM role vs.
-  referência estática de ARN) foi propositalmente deixado para a RFC-006 do
-  trigo — que resolve apenas a parte de JWT/segredos de autenticação, não a
-  leitura de credenciais do banco pela própria aplicação.
+  referência estática de ARN) foi resolvido pela RFC-006 (Secrets Manager,
+  ver `repo-auth-serverless/src/lib/customer-repository.ts`).
 
 ## Riscos
 
-- **Médio**: nenhum `terraform apply` foi executado em `repo-db-infra` até
-  o momento desta auditoria — a decisão de engine/versão está tomada, mas o
-  banco gerenciado real ainda não existe.
-- **Médio**: a atualização de `docker-compose.dependencies.yml` para
-  `postgres:16-alpine` está numa branch não mesclada — risco de a
-  divergência dev/CI/prod persistir até o merge acontecer.
+- Nenhum pendente relacionado a esta decisão. O RDS está provisionado e em
+  uso em HML e produção (confirmado via smoke test de autenticação — ver
+  [`docs/reports/integracao-api-gateway-auth-serverless.md`](../reports/integracao-api-gateway-auth-serverless.md)).
 
 ## Referências
 
-- RFC de banco (trigo) — ver [`docs/rfcs/README.md`](../rfcs/README.md)
+- RFC de banco — [`database-justification.md`](../rfcs/database-justification.md)
 - `prisma/schema.prisma`
 - [`docs/infrastructure/database.md`](../infrastructure/database.md)
-- README de `repo-db-infra` (consultado via `gh api`)
+- README de `repo-db-infra`
+
