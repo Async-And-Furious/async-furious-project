@@ -33,7 +33,7 @@ def gh(arguments: list[str], *, json_output: bool = False) -> Any:
     if invalid:
         raise RuntimeError("Unsafe value rejected before invoking gh.")
     command = ["gh", *arguments]
-    result = subprocess.run(command, check=False, text=True, capture_output=True)
+    result = subprocess.run(command, check=False, shell=False, text=True, capture_output=True)
     if result.stdout and not json_output:
         print(result.stdout, end="")
     if result.returncode:
