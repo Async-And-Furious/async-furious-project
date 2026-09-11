@@ -16,7 +16,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $owner = 'Async-And-Furious'
 $ref = 'main'
-$appWorkflowRef = if ($PSBoundParameters.ContainsKey('AppRef')) { $AppRef } elseif ($Environment -eq 'hml') { 'develop' } else { 'main' }
 $expectedDestroyConfirmation = "DESTROY $($Environment.ToUpperInvariant())"
 
 if ($Action -eq 'destroy' -and $Confirmation -cne $expectedDestroyConfirmation) {
