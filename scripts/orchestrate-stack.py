@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -15,6 +16,9 @@ from typing import Any
 
 
 OWNER = "Async-And-Furious"
+CI_WORKFLOW = "ci.yml"
+DOWN_WORKFLOW = "down.yml"
+SAFE_CLI_VALUE = re.compile(r"^[A-Za-z0-9._/@:= -]+$")
 
 
 @dataclass(frozen=True)
@@ -25,6 +29,9 @@ class Step:
 
 
 def gh(arguments: list[str], *, json_output: bool = False) -> Any:
+    invalid = [argument for argument in arguments if not SAFE_CLI_VALUE.fullmatch(argument)]
+    if invalid:
+        raise RuntimeError("Unsafe value rejected before invoking gh.")
     command = ["gh", *arguments]
     result = subprocess.run(command, check=False, text=True, capture_output=True)
     if result.stdout and not json_output:
@@ -110,20 +117,20 @@ def dispatch_and_wait(step: Step, environment: str, action: str, ref: str, poll_
         time.sleep(poll_seconds)
 
 
-def steps_for(environment: str, action: str, app_ref: str, confirmation: str) -> list[Step]:
+def steps_for(environment: str, action: str, confirmation: str) -> list[Step]:
     apply_confirmation = "APPLY PROD" if environment == "prod" else ""
     if action == "apply":
         return [
-            Step("repo-k8s-infra", "ci.yml", {"environment": environment, "action": "apply", "academy_mode": "false", "confirm": apply_confirmation}),
-            Step("repo-db-infra", "ci.yml", {"environment": environment, "action": "apply", "academy_mode": "false", "confirm": apply_confirmation}),
-            Step("repo-auth-serverless", "ci.yml", {"environment": environment, "operation": "apply", "deploy_auth_only": "false", "confirm": apply_confirmation}),
+            Step("repo-k8s-infra", CI_WORKFLOW, {"environment": environment, "action": "apply", "academy_mode": "false", "confirm": apply_confirmation}),
+            Step("repo-db-infra", CI_WORKFLOW, {"environment": environment, "action": "apply", "academy_mode": "false", "confirm": apply_confirmation}),
+            Step("repo-auth-serverless", CI_WORKFLOW, {"environment": environment, "operation": "apply", "deploy_auth_only": "false", "confirm": apply_confirmation}),
             Step("async-furious-project", "deploy-eks.yml", {"environment": environment, "seed_prod": "false"}),
         ]
     return [
         Step("async-furious-project", "cleanup-eks.yml", {"environment": environment, "aws_academy": "false", "operation": "destroy", "confirm": confirmation}),
-        Step("repo-auth-serverless", "down.yml", {"environment": environment, "confirm": confirmation}),
-        Step("repo-db-infra", "down.yml", {"environment": environment, "confirm": confirmation}),
-        Step("repo-k8s-infra", "down.yml", {"environment": environment, "confirm": confirmation}),
+        Step("repo-auth-serverless", DOWN_WORKFLOW, {"environment": environment, "confirm": confirmation}),
+        Step("repo-db-infra", DOWN_WORKFLOW, {"environment": environment, "confirm": confirmation}),
+        Step("repo-k8s-infra", DOWN_WORKFLOW, {"environment": environment, "confirm": confirmation}),
     ]
 
 
@@ -143,18 +150,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> int:
-    args = build_parser().parse_args()
+def resolve_environment(args: argparse.Namespace) -> str:
     if args.prod and args.environment == "hml":
         raise SystemExit("Conflicting environment flags: --prod cannot be combined with --environment hml.")
-    environment = "prod" if args.prod else (args.environment or "hml")
+    return "prod" if args.prod else (args.environment or "hml")
+
+
+def validate_args(args: argparse.Namespace, environment: str) -> None:
     if not 5 <= args.poll_seconds <= 300:
         raise SystemExit("--poll-seconds must be between 5 and 300")
-    expected = f"DESTROY {environment.upper()}"
-    if args.action == "destroy" and args.confirmation != expected:
-        raise SystemExit(f"Destroy requires exact --confirmation '{expected}'.")
+    if args.action == "destroy" and args.confirmation != f"DESTROY {environment.upper()}":
+        raise SystemExit(f"Destroy requires exact --confirmation 'DESTROY {environment.upper()}'.")
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    environment = resolve_environment(args)
+    validate_args(args, environment)
     app_ref = args.app_ref or ("develop" if environment == "hml" else "main")
-    steps = steps_for(environment, args.action, app_ref, args.confirmation)
+    steps = steps_for(environment, args.action, args.confirmation)
 
     if shutil.which("gh") is None:
         raise SystemExit("GitHub CLI (gh) is not installed or is not on PATH.")
