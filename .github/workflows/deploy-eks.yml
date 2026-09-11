@@ -433,7 +433,12 @@ jobs:
                           name: $seed_secret
                           optional: true
           EOF
-          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m
+          kubectl wait --for=condition=complete "job/$seed_job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
+            kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true || true
+            kubectl describe job "$seed_job" --namespace "$K8S_NAMESPACE" || true
+            kubectl describe pods --namespace "$K8S_NAMESPACE" --selector "job-name=$seed_job" || true
+            exit 1
+          }
       - name: Roll out application
         run: |
           set -euo pipefail
