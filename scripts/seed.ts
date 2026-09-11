@@ -27,8 +27,8 @@ function stableSeedId(value: string): string {
 
 const email = requiredEnv('SEED_ADMIN_EMAIL');
 const password = requiredEnv('SEED_ADMIN_PASSWORD');
-const recepcionistaPassword = requiredEnv('SEED_RECEPCIONISTA_PASSWORD');
-const mecanicoPassword = requiredEnv('SEED_MECANICO_PASSWORD');
+const recepcionistaPassword = process.env.SEED_RECEPCIONISTA_PASSWORD;
+const mecanicoPassword = process.env.SEED_MECANICO_PASSWORD;
 const seededCpf = process.env.SEEDED_CPF?.replace(/[.\-\s]/g, '');
 if (seededCpf && !cpf.isValid(seededCpf)) throw new Error('SEEDED_CPF must be a valid CPF');
 
@@ -491,6 +491,7 @@ async function seedAdmin(db: SeedClient): Promise<void> {
 }
 
 async function seedRecepcionista(db: SeedClient): Promise<void> {
+  if (!recepcionistaPassword) return;
   const recepEmail = 'recepcionista@oficina.com';
   const existing = await db.user.findUnique({ where: { email: recepEmail } });
   if (!existing) {
@@ -515,6 +516,7 @@ async function seedRecepcionista(db: SeedClient): Promise<void> {
 }
 
 async function seedMecanico(db: SeedClient): Promise<void> {
+  if (!mecanicoPassword) return;
   const mecEmail = 'mecanico@oficina.com';
   const existing = await db.user.findUnique({ where: { email: mecEmail } });
   if (!existing) {
