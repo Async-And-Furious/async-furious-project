@@ -18,7 +18,7 @@ from typing import Any
 OWNER = "Async-And-Furious"
 CI_WORKFLOW = "ci.yml"
 DOWN_WORKFLOW = "down.yml"
-SAFE_CLI_VALUE = re.compile(r"^[A-Za-z0-9._/@:= -]+$")
+SAFE_CLI_VALUE = re.compile(r"^[A-Za-z0-9._/@:=, -]+$")
 
 
 @dataclass(frozen=True)

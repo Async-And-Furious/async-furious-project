@@ -58,14 +58,16 @@ Este repositorio contem a aplicacao, mas a stack AWS e distribuida em quatro rep
 O script `scripts/orchestrate-stack.py` usa Python 3 e somente o `gh`, para no primeiro erro e aguarda cada workflow. Requer Python 3 e o GitHub CLI (`gh`) instalado e autenticado (`gh auth login`):
 
 ```bash
-npm run aws:apply
-npm run aws:apply -- --prod
-npm run aws:destroy -- --confirmation "DESTROY HML"
-npm run aws:destroy -- --prod --confirmation "DESTROY PROD"
-npm run aws:destroy -- --what-if --confirmation "DESTROY HML"
+pnpm aws:apply
+pnpm aws:apply --environment prod
+pnpm aws:destroy --confirmation "DESTROY HML"
+pnpm aws:destroy --environment prod --confirmation "DESTROY PROD"
+pnpm aws:destroy --what-if --confirmation "DESTROY HML"
 ```
 
-Sem `--prod`, o ambiente padrao e HML. O script tambem aceita `--environment hml|prod`; combinar `--prod` com `--environment hml` e rejeitado. `apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
+O repositorio usa pnpm, que repassa os argumentos direto para o script: nao use `--` antes deles, ou o proprio `--` chega ao `argparse` e o comando falha com `unrecognized arguments`. Prefira `--environment prod` a `--prod`: os dois sao equivalentes no script, mas `--prod` tambem e flag do pnpm e pode ser consumida antes de chegar la.
+
+Sem `--environment prod`, o ambiente padrao e HML. Combinar `--prod` com `--environment hml` e rejeitado. `apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
 
 Use `--what-if` antes de uma operacao destrutiva para conferir a sequencia. O `destroy` exige a confirmacao exata do ambiente (`DESTROY HML` ou `DESTROY PROD`). O script dispara e monitora as GitHub Actions; ele nao substitui os workflows nem executa `terraform` localmente.
 
