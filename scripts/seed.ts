@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { Prisma, PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
+import { cpf } from 'cpf-cnpj-validator';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 
@@ -28,6 +29,8 @@ const email = requiredEnv('SEED_ADMIN_EMAIL');
 const password = requiredEnv('SEED_ADMIN_PASSWORD');
 const recepcionistaPassword = requiredEnv('SEED_RECEPCIONISTA_PASSWORD');
 const mecanicoPassword = requiredEnv('SEED_MECANICO_PASSWORD');
+const seededCpf = process.env.SEEDED_CPF?.replace(/[.\-\s]/g, '');
+if (seededCpf && !cpf.isValid(seededCpf)) throw new Error('SEEDED_CPF must be a valid CPF');
 
 const CLIENTES = [
   {
@@ -114,7 +117,25 @@ const CLIENTES = [
     documento: '89012345642',
     tipoDocumento: TaxIdType.CPF,
   },
-];
+] as Array<{
+  nome: string;
+  email: string;
+  telefone: string;
+  documento: string;
+  tipoDocumento: TaxIdType;
+  ativo?: boolean;
+}>;
+
+if (seededCpf) {
+  CLIENTES.push({
+    nome: 'Cliente de smoke test',
+    email: 'auth-smoke@async-furious.invalid',
+    telefone: '',
+    documento: seededCpf,
+    tipoDocumento: TaxIdType.CPF,
+    ativo: true,
+  });
+}
 
 const VEICULOS_TEMPLATE = [
   { placa: 'ABC1D23', marca: 'Toyota', modelo: 'Corolla', ano: 2022, cor: 'Prata' },
@@ -525,7 +546,7 @@ async function seedClientes(db: SeedClient): Promise<string[]> {
     const existing = await db.cliente.findUnique({ where: { documento: c.documento } });
     const cliente = await db.cliente.upsert({
       where: { documento: c.documento },
-      update: {},
+      update: c.ativo === undefined ? {} : { ativo: c.ativo },
       create: {
         id: stableSeedId(`cliente:${c.documento}`),
         nome: c.nome,
