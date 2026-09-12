@@ -833,6 +833,17 @@ jobs:
           test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'HML API Gateway endpoint was not found.' >&2; exit 1; }
           status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
           [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }
+          printf 'GATEWAY_ENDPOINT=%s\n' "$endpoint" >> "$GITHUB_ENV"
+      - name: Print HML deployment URLs
+        run: |
+          set -euo pipefail
+          lb_arn=$(aws elbv2 describe-target-groups --target-group-arns "$TARGET_GROUP_ARN" --query 'TargetGroups[0].LoadBalancerArns[0]' --output text)
+          alb_dns=$(aws elbv2 describe-load-balancers --load-balancer-arns "$lb_arn" --query 'LoadBalancers[0].DNSName' --output text)
+          {
+            echo '### HML deployment URLs'
+            echo "- API Gateway (público, com authorizer): \`$GATEWAY_ENDPOINT\`"
+            echo "- Aplicação/ALB (interno, sem authorizer): \`http://$alb_dns\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   smoke-prod:
     name: Smoke test PROD gateway
@@ -869,3 +880,14 @@ jobs:
           test -n "$endpoint" && [[ "$endpoint" != 'None' ]] || { echo 'PROD API Gateway endpoint was not found.' >&2; exit 1; }
           status=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --retry 3 --max-time 20 "$endpoint/api/v1/health/live")
           [[ "$status" == '401' || "$status" == '403' ]] || { echo "Expected the gateway authorizer to reject an unauthenticated readiness request; received HTTP $status." >&2; exit 1; }
+          printf 'GATEWAY_ENDPOINT=%s\n' "$endpoint" >> "$GITHUB_ENV"
+      - name: Print PROD deployment URLs
+        run: |
+          set -euo pipefail
+          lb_arn=$(aws elbv2 describe-target-groups --target-group-arns "$TARGET_GROUP_ARN" --query 'TargetGroups[0].LoadBalancerArns[0]' --output text)
+          alb_dns=$(aws elbv2 describe-load-balancers --load-balancer-arns "$lb_arn" --query 'LoadBalancers[0].DNSName' --output text)
+          {
+            echo '### PROD deployment URLs'
+            echo "- API Gateway (público, com authorizer): \`$GATEWAY_ENDPOINT\`"
+            echo "- Aplicação/ALB (interno, sem authorizer): \`http://$alb_dns\`"
+          } >> "$GITHUB_STEP_SUMMARY"
