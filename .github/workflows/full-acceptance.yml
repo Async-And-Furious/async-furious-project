@@ -38,6 +38,9 @@ jobs:
           set -euo pipefail
           endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-${TARGET}'].ApiEndpoint | [0]" --output text)
           test -n "$endpoint" -a "$endpoint" != None
+          printf 'staff_input_shape=admin_email_valid:%s admin_password_length:%s recepcionista_password_length:%s mecanico_password_length:%s\n' \
+            "$(python3 -c 'import os; print("true" if "@" in os.environ.get("SEED_ADMIN_EMAIL", "") else "false")')" \
+            "${#SEED_ADMIN_PASSWORD}" "${#SEED_RECEPCIONISTA_PASSWORD}" "${#SEED_MECANICO_PASSWORD}" | tee -a "$GITHUB_STEP_SUMMARY"
           json_status() { python3 - "$1" "$2" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
