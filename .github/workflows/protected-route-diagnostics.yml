@@ -89,6 +89,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          api_id="$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-prod'].ApiId | [0]" --output text)"
           endpoint="$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-prod'].ApiEndpoint | [0]" --output text)"
           auth_payload="$(curl --silent --show-error --max-time 20 -H 'content-type: application/json' -d "$(python -c 'import json,os; print(json.dumps({"cpf":os.environ["SEEDED_CPF"]}))')" --write-out $'\n%{http_code}' "$endpoint/auth")"
           auth_status="${auth_payload##*$'\n'}"; auth_body="${auth_payload%$'\n'*}"
@@ -105,8 +106,44 @@ jobs:
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
           print(json.dumps({'version':d.get('Version'),'last_modified':d.get('LastModified'),'code_sha256':d.get('CodeSha256'),'handler':d.get('Handler'),'runtime':d.get('Runtime')},sort_keys=True))
+          env=(d.get('Environment') or {}).get('Variables',{})
+          open('/tmp/public-name','w').write(env.get('JWT_PUBLIC_KEY_PARAM_NAME',''))
+          open('/tmp/issuer','w').write(env.get('JWT_ISSUER',''))
+          open('/tmp/audience','w').write(env.get('JWT_AUDIENCE',''))
           PY
-          direct_payload="$(TOKEN="$token" python -c 'import json,os; print(json.dumps({"version":"2.0","type":"REQUEST","routeArn":"diagnostic","headers":{"authorization":"Bearer "+os.environ["TOKEN"],"x-correlation-id":"github-prod-direct"},"requestContext":{"requestId":"github-prod-direct"}}))')"
+          auth_config="$RUNNER_TEMP/auth.json"
+          aws lambda get-function-configuration --function-name tc3-auth-prod-auth --output json > "$auth_config"
+          python - "$auth_config" <<'PY'
+          import json,sys
+          env=(json.load(open(sys.argv[1],encoding='utf-8')).get('Environment') or {}).get('Variables',{})
+          open('/tmp/private-arn','w').write(env.get('JWT_PRIVATE_KEY_SECRET_ARN',''))
+          PY
+          public_name="$(cat /tmp/public-name)"; private_arn="$(cat /tmp/private-arn)"
+          aws ssm get-parameter --name "$public_name" --query 'Parameter.Value' --output text > "$RUNNER_TEMP/public-key.pem"
+          aws secretsmanager get-secret-value --secret-id "$private_arn" --query 'SecretString' --output text > "$RUNNER_TEMP/private-secret.json"
+          jwt_issuer="$(cat /tmp/issuer)"; jwt_audience="$(cat /tmp/audience)"
+          TOKEN="$token" PUBLIC_FILE="$RUNNER_TEMP/public-key.pem" PRIVATE_FILE="$RUNNER_TEMP/private-secret.json" JWT_ISSUER="$jwt_issuer" JWT_AUDIENCE="$jwt_audience" node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const token=process.env.TOKEN;
+          const publicPem=fs.readFileSync(process.env.PUBLIC_FILE,'utf8');
+          const secretText=fs.readFileSync(process.env.PRIVATE_FILE,'utf8').trim();
+          const b64=(value)=>Buffer.from(value.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-value.length%4)%4),'base64').toString('utf8');
+          const fingerprint=(pem)=>crypto.createHash('sha256').update(crypto.createPublicKey(pem).export({type:'spki',format:'der'})).digest('hex');
+          const parts=token.split('.'); const header=JSON.parse(b64(parts[0])); const claims=JSON.parse(b64(parts[1]));
+          const publicFingerprint=fingerprint(publicPem); let signerFingerprint=null;
+          try { let secret=JSON.parse(secretText); secret=secret.privateKey||secret.private_key||secret.key||secret.SecretString||secret; signerFingerprint=fingerprint(secret); } catch {}
+          const now=Math.floor(Date.now()/1000);
+          const signatureValid=crypto.verify('RSA-SHA256',Buffer.from(`${parts[0]}.${parts[1]}`),crypto.createPublicKey(publicPem),Buffer.from(b64(parts[2]),'base64'));
+          console.log(JSON.stringify({key_pair_match:signerFingerprint===publicFingerprint,public_key_fingerprint:publicFingerprint,signer_public_key_fingerprint:signerFingerprint,jwt:{alg:header.alg,typ:header.typ,claim_names:Object.keys(claims).sort(),issuer_match:claims.iss===process.env.JWT_ISSUER,audience_match:claims.aud===process.env.JWT_AUDIENCE,signature_valid:signatureValid,not_expired:typeof claims.exp==='number'&&claims.exp>now}}));
+          JS
+          account_id="$(aws sts get-caller-identity --query Account --output text)"; api_host="${endpoint#https://}"; direct_correlation="github-prod-direct-${GITHUB_RUN_ID}"
+          direct_payload="$(TOKEN="$token" CORRELATION="$direct_correlation" API_ID="$api_id" API_HOST="$api_host" ACCOUNT_ID="$account_id" AWS_REGION="$AWS_REGION" python - <<'PY'
+          import json,os,time
+          path='/api/v1/health/live'; method='GET'; correlation=os.environ['CORRELATION']
+          json.dump({'version':'2.0','routeKey':f'{method} {path}','rawPath':path,'rawQueryString':'','headers':{'authorization':'Bearer '+os.environ['TOKEN'],'host':os.environ['API_HOST'],'x-correlation-id':correlation},'requestContext':{'accountId':os.environ['ACCOUNT_ID'],'apiId':os.environ['API_ID'],'domainName':os.environ['API_HOST'],'domainPrefix':os.environ['API_ID'],'http':{'method':method,'path':path,'protocol':'HTTP/1.1','sourceIp':'127.0.0.1','userAgent':'GitHubActions'},'requestId':correlation,'routeKey':f'{method} {path}','stage':'$default','time':'13/Sep/2026:00:00:00 +0000','timeEpoch':int(time.time()*1000)},'stageVariables':None,'isBase64Encoded':False},sys.stdout)
+          PY
+          )"
           aws lambda invoke --function-name "$function_name" --cli-binary-format raw-in-base64-out --payload "$direct_payload" "$RUNNER_TEMP/authorizer-response.json" >/dev/null
           python - "$RUNNER_TEMP/authorizer-response.json" <<'PY'
           import json,sys
