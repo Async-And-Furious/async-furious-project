@@ -1,0 +1,126 @@
+name: Auth and seed database fingerprint diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Protected environment to inspect
+        required: true
+        type: choice
+        options: [hml, prod]
+        default: hml
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  inspect:
+    name: Inspect ${{ inputs.target }} auth/seed database wiring
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'prod' && 'production' || 'hml' }}
+    env:
+      TARGET_ENVIRONMENT: ${{ inputs.target }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
+      SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Read-only fingerprint inspection
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EKS_CLUSTER_NAME" || { echo 'EKS_CLUSTER_NAME is required.' >&2; exit 1; }
+          test -n "$SEEDED_CPF" && [[ "$SEEDED_CPF" =~ ^[0-9]{11}$ ]] || { echo 'SEEDED_CPF must be an 11-digit value.' >&2; exit 1; }
+          printf '::add-mask::%s\n' "$SEEDED_CPF"
+
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          state_file="$RUNNER_TEMP/repo-db-infra-${TARGET_ENVIRONMENT}.tfstate"
+          aws s3 cp "s3://tc3-tfstate-${account_id}/repo-db-infra/${TARGET_ENVIRONMENT}/terraform.tfstate" "$state_file" --only-show-errors
+          rds_secret_arn=$(jq -er '.outputs.db_connection_secret_arn.value // .outputs.db_secret_arn.value' "$state_file")
+          state_host=$(jq -er '.outputs.db_host.value' "$state_file")
+          state_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
+          state_name=$(jq -er '.outputs.db_name.value' "$state_file")
+          printf '::add-mask::%s\n' "$rds_secret_arn"
+          printf '::add-mask::%s\n' "$state_host"
+
+          rds_secret=$(aws secretsmanager get-secret-value --secret-id "$rds_secret_arn" --query SecretString --output text)
+          db_user=$(jq -er '.username' <<<"$rds_secret")
+          db_password=$(jq -er '.password' <<<"$rds_secret")
+          printf '::add-mask::%s\n' "$db_user"
+          printf '::add-mask::%s\n' "$db_password"
+
+          saved_access="$RUNNER_TEMP/eks-access.json"
+          aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --query 'cluster.resourcesVpcConfig.{private:endpointPrivateAccess,public:endpointPublicAccess,cidrs:publicAccessCidrs}' \
+            --output json > "$saved_access"
+          restore() {
+            set +e
+            local access
+            access=$(python3 - "$saved_access" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          print(f"endpointPrivateAccess={str(d['private']).lower()},endpointPublicAccess={str(d['public']).lower()},publicAccessCidrs={','.join(d['cidrs'])}")
+          PY
+            )
+            aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --resources-vpc-config "$access" >/dev/null 2>&1 || true
+          }
+          trap restore EXIT
+          runner_ip=$(curl --fail --silent --show-error --ipv4 https://checkip.amazonaws.com)
+          aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=${runner_ip}/32" >/dev/null
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
+
+          kubernetes_secret=$(kubectl get secret async-furious-secret --namespace "$K8S_NAMESPACE" -o json)
+          app_database_url=$(jq -er '.data.DATABASE_URL' <<<"$kubernetes_secret" | base64 --decode)
+          seed_job_json=$(kubectl get jobs --namespace "$K8S_NAMESPACE" -l app.kubernetes.io/component=seed -o json)
+          seed_job=$(jq -er '[.items[] | select(.status.succeeded == 1)] | sort_by(.status.completionTime) | last' <<<"$seed_job_json")
+          seed_complete=$(jq -r 'if .status.succeeded == 1 then "true" else "false" end' <<<"$seed_job")
+
+          lambda_name="tc3-auth-${TARGET_ENVIRONMENT}-auth"
+          lambda_config=$(aws lambda get-function-configuration --function-name "$lambda_name" --output json)
+          lambda_env=$(jq -r '.Environment.Variables // {}' <<<"$lambda_config")
+          lambda_secret_arn=$(jq -r '.DATABASE_SECRET_ARN // empty' <<<"$lambda_env")
+          lambda_database_url=$(jq -r '.DATABASE_URL // empty' <<<"$lambda_env")
+          lambda_secret_fingerprint='not_configured'
+          if [[ -n "$lambda_secret_arn" ]]; then
+            printf '::add-mask::%s\n' "$lambda_secret_arn"
+            lambda_secret_fingerprint=$(printf '%s' "$lambda_secret_arn" | sha256sum | cut -d' ' -f1)
+            auth_secret=$(aws secretsmanager get-secret-value --secret-id "$lambda_secret_arn" --query SecretString --output text)
+            lambda_database_url=$(jq -r '.connectionString // .url // empty' <<<"$auth_secret")
+          fi
+
+          fingerprint() {
+            URL_VALUE="$1" python3 - <<'PY'
+          import hashlib,os,urllib.parse
+          value=os.environ['URL_VALUE']
+          parsed=urllib.parse.urlparse(value)
+          normalized='|'.join([parsed.hostname or '',str(parsed.port or 5432),parsed.path.lstrip('/'),urllib.parse.parse_qs(parsed.query).get('schema',['public'])[0]])
+          print(hashlib.sha256(normalized.encode()).hexdigest())
+          PY
+          }
+          app_fingerprint=$(fingerprint "$app_database_url")
+          auth_fingerprint=$(fingerprint "$lambda_database_url")
+          state_fingerprint=$(printf '%s|%s|%s|public' "$state_host" "$state_port" "$state_name" | sha256sum | cut -d' ' -f1)
+          app_secret_fingerprint=$(printf '%s' "$rds_secret_arn" | sha256sum | cut -d' ' -f1)
+          app_secret_matches_state=true
+
+          PGPASSWORD="$db_password" psql "host=$state_host port=$state_port dbname=$state_name user=$db_user sslmode=require" \
+            -v ON_ERROR_STOP=1 -v seeded_cpf="$SEEDED_CPF" -Atqc "SELECT CASE WHEN EXISTS (SELECT 1 FROM \"Cliente\" WHERE \"documento\" = :'seeded_cpf' AND \"tipo_documento\" = 'CPF' AND \"ativo\" = true) THEN 'true' ELSE 'false' END" \
+            > "$RUNNER_TEMP/customer-active.txt"
+          customer_active=$(tr -d '\r\n' < "$RUNNER_TEMP/customer-active.txt")
+          [[ "$customer_active" == true || "$customer_active" == false ]]
+
+          printf 'target=%s seed_job_complete=%s customer_exists_active=%s\n' "$TARGET_ENVIRONMENT" "$seed_complete" "$customer_active" >> "$GITHUB_STEP_SUMMARY"
+          printf 'app_db_fingerprint=%s auth_db_fingerprint=%s state_db_fingerprint=%s\n' "$app_fingerprint" "$auth_fingerprint" "$state_fingerprint" >> "$GITHUB_STEP_SUMMARY"
+          printf 'app_rds_secret_fingerprint=%s auth_secret_fingerprint=%s auth_secret_mode=%s\n' "$app_secret_fingerprint" "$lambda_secret_fingerprint" "$(if [[ -n "$lambda_secret_arn" ]]; then echo arn; else echo url; fi)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'database_identity_match=%s app_secret_identity_present=true seed_transaction_complete=%s\n' \
+            "$(if [[ "$app_fingerprint" == "$auth_fingerprint" && "$app_fingerprint" == "$state_fingerprint" ]]; then echo true; else echo false; fi)" "$seed_complete" >> "$GITHUB_STEP_SUMMARY"
