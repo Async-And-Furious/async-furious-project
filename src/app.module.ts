@@ -1,8 +1,9 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 import { DatabaseModule } from './shared/infrastructure/database/database.module';
 import { AuthModule } from './auth/auth.module';
 import { CadastroModule } from './modules/cadastro/cadastro.module';
@@ -12,11 +13,13 @@ import { FinanceiroModule } from './modules/financeiro/financeiro.module';
 import { HealthModule } from './modules/health/health.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { RequestLoggingMiddleware } from './shared/infrastructure/http/request-logging.middleware';
+import { GlobalExceptionFilter } from './shared/infrastructure/filters/global-exception.filter';
+import { pinoHttpOptions } from './shared/infrastructure/logging/pino-logger.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({ pinoHttp: pinoHttpOptions }),
     EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([{ name: 'short', ttl: 60000, limit: 100 }]),
     DatabaseModule,
@@ -31,10 +34,7 @@ import { RequestLoggingMiddleware } from './shared/infrastructure/http/request-l
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_FILTER, useClass: GlobalExceptionFilter },
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestLoggingMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}
