@@ -446,7 +446,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos",
       "name": "POST /servicos",
-      "description": "Role: receptionist",
+      "description": "Role: admin",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -460,7 +460,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -505,7 +505,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos/{{servico_id}}",
       "name": "PATCH /servicos/{{servico_id}}",
-      "description": "Role: receptionist",
+      "description": "Role: admin",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -519,7 +519,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -750,12 +750,13 @@
         {
           "name": "Content-Type",
           "value": "application/json"
+        },
+        {
+          "name": "X-Webhook-Secret",
+          "value": "{{webhook_token}}"
         }
       ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{webhook_token}}"
-      },
+      "authentication": {},
       "_type": "request"
     },
     {

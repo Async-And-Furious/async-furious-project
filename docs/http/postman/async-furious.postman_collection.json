@@ -788,7 +788,7 @@
                 "/servicos"
               ]
             },
-            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -803,7 +803,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{receptionist_token}}",
+                  "value": "{{admin_token}}",
                   "type": "string"
                 }
               ]
@@ -877,7 +877,7 @@
                 "/servicos/{{servico_id}}"
               ]
             },
-            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -892,7 +892,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{receptionist_token}}",
+                  "value": "{{admin_token}}",
                   "type": "string"
                 }
               ]
@@ -1227,6 +1227,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-Webhook-Secret",
+                "value": "{{webhook_token}}"
               }
             ],
             "url": {
@@ -1245,16 +1249,6 @@
                   "language": "json"
                 }
               }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{webhook_token}}",
-                  "type": "string"
-                }
-              ]
             }
           }
         },
