@@ -10,11 +10,13 @@ logs estruturados da aplicação implementados em código na issue
 (branch `feat/I-164_ImplementarLogsEstruturados`, a partir da branch do
 #163 — o agente New Relic ainda não estava em `develop` quando #164
 começou).
-Dashboards (issue #166) com Terraform escrito e validado localmente
-(`repo-k8s-infra`, branch `feat/I-166_DashboardsOps`), ainda não aplicado.
+Dashboards (issue #166) e alertas (issue #167) com Terraform escrito e
+validado localmente (`repo-k8s-infra`, branches `feat/I-166_DashboardsOps`
+e `feat/I-167_AlertasOps`, a segunda em cima da primeira), ainda não
+aplicados.
 **Pendente**: validação end-to-end de #163/#164 (telemetria e logs
-chegando de fato no New Relic), aplicar o Terraform do #166 em HML/PROD, e
-alertas (issue #167), ainda não iniciados.
+chegando de fato no New Relic), e aplicar o Terraform de #166/#167 em
+HML/PROD com teste real de cada condição de alerta.
 
 ## Contexto
 
@@ -134,6 +136,27 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
 - Código validado localmente (`terraform fmt`/`init`/`validate`, contra o
   schema real do provider), ainda não aplicado contra HML/PROD.
 
+### O que foi implementado (issue #167)
+
+- **Política de alertas por ambiente** (`repo-k8s-infra`, branch
+  `feat/I-167_AlertasOps`, em cima da branch do #166): 5 condições NRQL
+  cobrindo indisponibilidade da aplicação, taxa de erro, CPU/memória
+  excessiva e crash loop de pod — todas reaproveitando o mesmo `appName`/
+  `clusterName` já usados no #163/#166, sem instrumentação nova.
+- **Notificação por e-mail**: `newrelic_notification_destination` +
+  `newrelic_notification_channel` (tipo `EMAIL`, produto `IINT`) +
+  `newrelic_workflow` roteando a política inteira pra esse canal. Endereço
+  vem de uma variável (`new_relic_alert_email`), não hardcoded.
+- Schema do provider (`newrelic_alert_policy`,
+  `newrelic_nrql_alert_condition`, `newrelic_notification_destination`,
+  `newrelic_notification_channel`, `newrelic_workflow`) conferido via
+  `terraform providers schema -json` antes de escrever o código, contra a
+  versão real instalada (`newrelic/newrelic v3.97.5`).
+- Código validado localmente, ainda não aplicado contra HML/PROD — e as 5
+  condições ainda não foram exercitadas de verdade (roteiro de teste no
+  comentário original da issue: escalar a app a zero, gerar tráfego de
+  erro, `stress` de CPU/memória num pod, forçar um crash loop).
+
 ### O que ainda não foi feito
 
 - **Validação end-to-end**: as branches de #163 e #164 existem mas ainda
@@ -144,8 +167,9 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   verdade.
 - **Dashboards (#166)**: código pronto, falta aplicar em HML/PROD e
   confirmar visualmente que os widgets carregam dado real.
-- **Alertas** (#167): não iniciado — depende do provider `newrelic` que o
-  #166 introduz.
+- **Alertas (#167)**: código pronto, falta aplicar e testar cada uma das 5
+  condições de verdade (não só confirmar que o Terraform aplica sem
+  erro).
 
 ## Alternativas consideradas
 
@@ -194,8 +218,9 @@ Prometheus/Grafana ou Datadog.
    issues #163 e #164 encerradas.
 2. Avaliar, com dado real em mãos, se `nri-metadata-injection` e
    `nri-kube-events` valem o custo de recursos adicional.
-3. Aplicar o Terraform do #166 (já escrito) em HML/PROD e confirmar os
-   dashboards com dado real; depois seguir para alertas (#167).
+3. Aplicar o Terraform de #166 e #167 (ambos já escritos) em HML/PROD,
+   confirmar os dashboards com dado real e testar cada uma das 5 condições
+   de alerta de verdade (roteiro no comentário original do #167).
 
 ## Referências
 
