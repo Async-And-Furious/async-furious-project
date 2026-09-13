@@ -10,14 +10,16 @@ logs estruturados da aplicação implementados em código na issue
 (branch `feat/I-164_ImplementarLogsEstruturados`, a partir da branch do
 #163 — o agente New Relic ainda não estava em `develop` quando #164
 começou), e monitoramento (issue #165) fechado por reaproveitar #163
-sem exigir mudança de infraestrutura.
+sem exigir mudança de infraestrutura. Dashboards (issue #166) com
+Terraform escrito e validado localmente (`repo-k8s-infra`, branch
+`feat/I-166_DashboardsOps`), ainda não aplicado.
 
 **Validado em HML em 2026-09-13** (consulta direta à API da New Relic):
 infraestrutura do cluster e logs chegando com dado real. **Pendente**:
 o agente APM da aplicação — bug de permissão de arquivo identificado e
 corrigido (`NEW_RELIC_LOG=stdout`), validação end-to-end ainda não
-confirmada — e dashboards/alertas (issues #166/#167), com refinamento
-técnico pronto mas Terraform ainda não escrito. Ver
+confirmada —, aplicar o Terraform do #166 em HML/PROD, e alertas (issue
+#167), ainda não iniciados. Ver
 [`docs/infrastructure/observability.md`](../infrastructure/observability.md)
 para o detalhe do bug e o estado atualizado de cada item.
 
@@ -124,6 +126,21 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   encaminha o stdout dos pods — deixar o agente também encaminhar
   duplicaria a ingestão contra o limite do plano gratuito.
 
+### O que foi implementado (issue #166)
+
+- **Dashboard operacional via Terraform** (`repo-k8s-infra`, branch
+  `feat/I-166_DashboardsOps`, a partir de `main` pelo mesmo motivo do
+  workaround do #163): recurso `newrelic_one_dashboard`, um por ambiente,
+  três páginas (Aplicação, Infraestrutura, Logs), reaproveitando 100% dado
+  já emitido por #163/#164 — nenhuma instrumentação nova.
+- **Provider `newrelic/newrelic`** adicionado ao `versions.tf`, autenticado
+  com uma **User API key** (`new_relic_api_key`, secret
+  `NEW_RELIC_API_KEY`) — diferente da license key de ingestão já usada pelo
+  `nri-bundle`. Variável nova `new_relic_account_id` (secret/variável já
+  criados no `repo-k8s-infra`).
+- Código validado localmente (`terraform fmt`/`init`/`validate`, contra o
+  schema real do provider), ainda não aplicado contra HML/PROD.
+
 ### O que ainda não foi feito
 
 - **Validação end-to-end**: as branches de #163 e #164 existem mas ainda
@@ -132,8 +149,10 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   `trace.id`/log realmente funciona. Critério de aceite explícito das duas
   issues, não deve ser considerado concluído antes de rodar o pipeline de
   verdade.
-- **Dashboards** (#166) e **alertas** (#167): não iniciados — não fazem
-  sentido antes de #163/#164 estarem validados enviando dado real.
+- **Dashboards (#166)**: código pronto, falta aplicar em HML/PROD e
+  confirmar visualmente que os widgets carregam dado real.
+- **Alertas** (#167): não iniciado — depende do provider `newrelic` que o
+  #166 introduz.
 
 ## Alternativas consideradas
 
@@ -182,7 +201,8 @@ Prometheus/Grafana ou Datadog.
    issues #163 e #164 encerradas.
 2. Avaliar, com dado real em mãos, se `nri-metadata-injection` e
    `nri-kube-events` valem o custo de recursos adicional.
-3. Seguir para dashboards (#166) e alertas (#167).
+3. Aplicar o Terraform do #166 (já escrito) em HML/PROD e confirmar os
+   dashboards com dado real; depois seguir para alertas (#167).
 
 ## Referências
 
