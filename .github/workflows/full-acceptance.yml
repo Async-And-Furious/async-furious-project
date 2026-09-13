@@ -68,12 +68,14 @@ jobs:
           fi
 
           orders_file="$RUNNER_TEMP/orders.json"
-          request -H "authorization: Bearer $admin_early_token" "$endpoint/api/v1/ordens-servico" > "$orders_file"
+          export ORDERS_STATUS=$(request -o "$orders_file" -w '%{http_code}' -H "authorization: Bearer $admin_early_token" "$endpoint/api/v1/ordens-servico")
           order_id=$(python3 - "$orders_file" <<'PY'
-          import json,sys
+          import json,os,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
           rows=d.get('data',d if isinstance(d,list) else [])
-          if not rows or not rows[0].get('id'): raise SystemExit('No seeded service order was returned')
+          if not rows or not rows[0].get('id'):
+             print(f'order_lookup_status={os.environ.get("ORDERS_STATUS", "unknown")} response_keys={",".join(sorted(d)) if isinstance(d,dict) else "array"}', file=sys.stderr)
+             raise SystemExit('No seeded service order was returned')
           print(rows[0]['id'])
           PY
           )
