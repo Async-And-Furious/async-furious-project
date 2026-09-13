@@ -907,18 +907,16 @@ async function seedRelations(
     const partId = partIds[index % partIds.length];
     const osServiceId = stableSeedId(`os-servico:${order.id}:${serviceId}`);
     const osPartId = stableSeedId(`os-peca:${order.id}:${partId}`);
-    await db.osServico.upsert({
-      where: { id: osServiceId },
-      update: { quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco },
-      create: { id: osServiceId, id_ordem_servico: order.id, id_servico: serviceId, quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco },
-    });
-    await db.osPeca.upsert({
-      where: { id: osPartId },
-      update: { quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco },
-      create: { id: osPartId, id_ordem_servico: order.id, id_peca: partId, quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco },
-    });
-    orderServices.push(osServiceId);
-    orderParts.push(osPartId);
+    const existingOsService = await db.osServico.findFirst({ where: { id_ordem_servico: order.id, id_servico: serviceId } });
+    const osService = existingOsService
+      ? await db.osServico.update({ where: { id: existingOsService.id }, data: { quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco } })
+      : await db.osServico.create({ data: { id: osServiceId, id_ordem_servico: order.id, id_servico: serviceId, quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco } });
+    const existingOsPart = await db.osPeca.findFirst({ where: { id_ordem_servico: order.id, id_peca: partId } });
+    const osPart = existingOsPart
+      ? await db.osPeca.update({ where: { id: existingOsPart.id }, data: { quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco } })
+      : await db.osPeca.create({ data: { id: osPartId, id_ordem_servico: order.id, id_peca: partId, quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco } });
+    orderServices.push(osService.id);
+    orderParts.push(osPart.id);
 
     if (order.status !== SOStatus.RECEIVED && order.status !== SOStatus.UNDER_DIAGNOSIS) {
       const estimateId = stableSeedId(`orcamento:${order.id}`);
@@ -943,8 +941,11 @@ async function seedRelations(
     }
     if (index % 2 === 0) {
       const reservationId = stableSeedId(`reserva:${order.id}:${partId}`);
-      await db.reservaEstoque.upsert({ where: { id: reservationId }, update: { quantidade: 1 }, create: { id: reservationId, ordem_id: order.id, peca_id: partId, quantidade: 1 } });
-      reservations.push(reservationId);
+      const existingReservation = await db.reservaEstoque.findFirst({ where: { ordem_id: order.id, peca_id: partId } });
+      const reservation = existingReservation
+        ? await db.reservaEstoque.update({ where: { id: existingReservation.id }, data: { quantidade: 1 } })
+        : await db.reservaEstoque.create({ data: { id: reservationId, ordem_id: order.id, peca_id: partId, quantidade: 1 } });
+      reservations.push(reservation.id);
     }
   }
 

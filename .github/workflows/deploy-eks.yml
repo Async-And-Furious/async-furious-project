@@ -425,7 +425,7 @@ jobs:
               app.kubernetes.io/part-of: async-furious
               app.kubernetes.io/component: seed
           spec:
-            backoffLimit: 4
+            backoffLimit: 0
             ttlSecondsAfterFinished: 86400
             template:
               spec:
@@ -438,6 +438,8 @@ jobs:
                     env:
                       - name: DEPLOY_ENV
                         value: hml
+                      - name: SEED_MANIFEST_PATH
+                        value: /tmp/seed-manifest.json
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
@@ -749,7 +751,7 @@ jobs:
               app.kubernetes.io/part-of: async-furious
               app.kubernetes.io/component: seed
           spec:
-            backoffLimit: 4
+            backoffLimit: 0
             ttlSecondsAfterFinished: 86400
             template:
               spec:
@@ -759,6 +761,9 @@ jobs:
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
                     command: ["sh", "-c", "DEPLOY_ENV=prod ALLOW_PRODUCTION_SEED=true node dist-scripts/seed.js"]
+                    env:
+                      - name: SEED_MANIFEST_PATH
+                        value: /tmp/seed-manifest.json
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
