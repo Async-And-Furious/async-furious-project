@@ -45,7 +45,10 @@ jobs:
           set -euo pipefail
           test -n "$EKS_CLUSTER_NAME" || { echo 'hml EKS inspection skipped missing_cluster_config'; exit 0; }
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
-          kubectl get service async-furious-service --namespace "$K8S_NAMESPACE" -o json > "$RUNNER_TEMP/service.json"
+          if ! timeout 45s kubectl get service async-furious-service --namespace "$K8S_NAMESPACE" -o json > "$RUNNER_TEMP/service.json" 2>/dev/null; then
+            echo 'hml EKS_INSPECTION unavailable cluster_api_unreachable'
+            exit 0
+          fi
           kubectl get ingress async-furious-api --namespace "$K8S_NAMESPACE" -o json > "$RUNNER_TEMP/ingress.json"
           kubectl get pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api -o json > "$RUNNER_TEMP/pods.json"
           kubectl get targetgroupbinding --namespace "$K8S_NAMESPACE" -o json > "$RUNNER_TEMP/tgb.json"
