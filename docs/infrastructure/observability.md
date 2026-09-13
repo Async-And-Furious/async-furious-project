@@ -1,15 +1,13 @@
 # Observabilidade
 
 > Decisão registrada em [ADR-0005](../adr/0005-observabilidade.md): New
-> Relic, implementado em código nas issues #163 (plataforma) e #164 (logs
-> estruturados), **pendente de validação end-to-end** — este documento
-> reflete o que existe no código das branches
-> `feat/I-163_EstruturarPlataformaObservabilidade` (`repo-k8s-infra`) e
-> `feat/I-164_ImplementarLogsEstruturados` (`async-furious-project`, a
-> partir da branch do #163), não uma confirmação de que já está rodando em
-> produção.
+> Relic, implementado em código nas issues #163 (plataforma), #164 (logs
+> estruturados) e #165 (monitoramento). Infraestrutura do cluster e logs
+> **já validados em HML com dado real** (consulta direta via API da New
+> Relic em 2026-09-13); o agente APM da aplicação ainda não — ver
+> "Pendências" abaixo.
 
-## Estado atual: implementado em código, não validado
+## Estado atual: infraestrutura e logs validados, APM com bug conhecido
 
 - **APM da aplicação** (`async-furious-project`): agente `newrelic`
   instrumentando `src/main.ts`, configurado 100% via variável de ambiente
@@ -35,16 +33,43 @@
   `NEW_RELIC_APPLICATION_LOGGING_*` habilitando a decoração automática de
   cada linha de log com `trace.id`/`span.id` da transação APM ("Logs in
   Context").
-- **Nenhuma das branches foi aplicada contra o ambiente real ainda** —
-  falta rodar o pipeline (`workflow_dispatch`, `plan` e depois `apply`) e
-  confirmar telemetria e logs chegando ao New Relic.
+- **Validado em HML em 2026-09-13**, consultando a API da New Relic
+  (NerdGraph) diretamente: infraestrutura do cluster (`K8sClusterSample`
+  para `tc3-eks-hml`, ~11 mil amostras/24h) e logs (`newrelic-logging`,
+  ~129 mil linhas/24h, incluindo os logs JSON do `nestjs-pino` do pod da
+  aplicação) chegando normalmente.
+- **APM da aplicação ainda não confirmado**: zero transações reportadas.
+  Causa raiz identificada no log do próprio pod —
+  `New Relic failed to open log file /app/newrelic_agent.log` (`EACCES`).
+  O `Dockerfile` só copia `node_modules`/`prisma`/`dist`/`dist-scripts` com
+  `--chown=nodejs:nodejs` no estágio de produção; o diretório `/app` em si
+  continua do `root`, e o container roda como `USER nodejs` — o agente não
+  consegue criar o arquivo de log e a inicialização não chega a reportar
+  dado. Fix aplicado: `NEW_RELIC_LOG: "stdout"` no ConfigMap
+  (`k8s/config/configmap.yaml`), evitando qualquer escrita em disco pelo
+  agente. Ainda pendente de validação end-to-end (o deploy de teste
+  esbarrou numa falha de infraestrutura não relacionada — ver Pendências).
 
-## O que já existia e foi reaproveitado (sem mudança)
+## O que já existia e foi reaproveitado (sem mudança) — issue #165
 
-- **Health check**: `GET /api/v1` continua sendo o sinal de saúde usado
-  pelos probes de liveness/readiness do Kubernetes
-  (`k8s/app/deployment.yaml`) — ainda não exportado como uptime check para
-  o New Relic (candidato natural para a issue #165).
+- **Health check**: os probes de liveness/readiness/startup do Kubernetes
+  (`k8s/app/deployment.yaml`) usam `GET /api/v1/health/live` e
+  `GET /api/v1/health/ready` (`HealthController`) — mantidos como estão.
+  Métricas de aplicação (latência, throughput, taxa de erro, apdex) já são
+  coletadas automaticamente pelo agente APM do #163 assim que ele estiver
+  validado; visibilidade de status/restart do pod já vem do
+  `newrelic-infrastructure` (#163), sem mudança de código necessária.
+- **Sem Synthetic monitor por enquanto (decisão do #165)**: investigado
+  expor o health check como um Synthetic/Uptime monitor externo do New
+  Relic, mas não existe hoje uma rota pública sem autenticação — o
+  roteamento do API Gateway (`repo-auth-serverless/infra/{hml,prod}/main.tf`)
+  só expõe `POST /auth` sem auth; todo o resto, incluindo `/health/live` e
+  `/health/ready`, passa pelo Lambda Authorizer, e o ALB do cluster é
+  interno. Um Synthetic ping simples bateria 401/403, não um sinal de
+  saúde real. Considerar no futuro uma rota pública dedicada (`GET
+  /health`, sem `authorizer_id`) no API Gateway, especificamente para
+  viabilizar um Synthetic monitor — decisão de segurança (abrir endpoint
+  sem autenticação) fora do escopo do #165.
 - **HPA**: continua reagindo a CPU/memória via `metrics-server`
   (`k8s/app/hpa.yaml`) — o `newrelic-infrastructure` passa a dar
   visibilidade sobre esses mesmos números fora do cluster, mas o HPA em si
@@ -91,24 +116,24 @@
 
 | Requisito | Estado |
 |---|---|
-| Logs centralizados | Implementado em código (`nestjs-pino` + forwarding via Fluent Bit), não validado |
-| Níveis de severidade | Implementado em código (`info`/`warn`/`error` por status HTTP), não validado |
-| Métricas de aplicação (latência, taxa de erro, throughput) | Implementado em código (agente APM), não validado |
-| Métricas de infraestrutura do cluster (CPU/memória por nó) | Implementado em código (`newrelic-infrastructure`), não validado |
+| Logs centralizados | **Validado em HML** (`nestjs-pino` + forwarding via Fluent Bit) |
+| Níveis de severidade | Implementado em código (`info`/`warn`/`error` por status HTTP), validação de conteúdo real ainda não revisada linha a linha |
+| Métricas de aplicação (latência, taxa de erro, throughput) | Bug de permissão identificado e corrigido (`NEW_RELIC_LOG=stdout`); validação end-to-end pendente |
+| Métricas de infraestrutura do cluster (CPU/memória por nó) | **Validado em HML** (`newrelic-infrastructure`) |
+| Health checks / monitoramento (#165) | Reaproveita probes existentes + #163; sem Synthetic monitor por falta de rota pública (decisão registrada acima) |
 | Tracing distribuído (Gateway → Lambda → EKS → RDS) | Agente cobre a aplicação a partir do EKS; correlação com a Function Serverless não avaliada |
 | Dashboards | Terraform escrito e validado localmente (issue #166), não aplicado |
 | Alertas | Não iniciado (issue #167) |
 
 ## Pendências
 
-- Rodar o pipeline de verdade (`plan` e `apply`) nos repositórios
-  envolvidos e confirmar telemetria e logs chegando ao New Relic antes de
-  fechar as issues #163 e #164 — inclusive validar que a correlação
-  `trace.id`/log ("Logs in Context") realmente funciona na UI do New
-  Relic, não só que os dados chegam.
+- Validar o agente APM depois do fix de `NEW_RELIC_LOG=stdout` — confirmar
+  a entidade `async-furious-project-hml` reportando transações reais, e
+  que a correlação `trace.id`/log ("Logs in Context") funciona na UI do
+  New Relic antes de fechar a issue #163.
 - Aplicar o Terraform do #166 em HML e confirmar visualmente que os
   widgets carregam dado real antes de fechar a issue.
-- Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o básico
+- Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o APM
   estiver validado e a capacidade dos nós do EKS for confirmada com a carga
   adicional.
 - `TODO`: os pontos `[PENDENTE]` em [overview.md](../architecture/overview.md),
