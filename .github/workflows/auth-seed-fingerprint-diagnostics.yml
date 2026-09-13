@@ -76,8 +76,16 @@ jobs:
           }
           trap restore EXIT
           runner_ip=$(curl --fail --silent --show-error --ipv4 https://checkip.amazonaws.com)
-          aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=${runner_ip}/32" >/dev/null
+          update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=${runner_ip}/32" --query 'update.id' --output text)
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == Successful ]] && break
+            [[ "$status" == Failed || "$status" == Cancelled ]] && { echo 'EKS endpoint access update failed.' >&2; exit 1; }
+            sleep 10
+          done
+          (( SECONDS < deadline )) || { echo 'Timed out waiting for EKS endpoint access.' >&2; exit 1; }
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
 
           kubernetes_secret=$(kubectl get secret async-furious-secret --namespace "$K8S_NAMESPACE" -o json)
