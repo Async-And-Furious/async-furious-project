@@ -30,6 +30,11 @@ on:
         required: false
         type: boolean
         default: false
+      seed_comprehensive:
+        description: Run the non-destructive comprehensive seed twice
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       environment:
@@ -43,6 +48,11 @@ on:
         default: false
       seed_customer:
         description: Run the controlled CPF customer seed job
+        required: false
+        type: boolean
+        default: false
+      seed_comprehensive:
+        description: Run the non-destructive comprehensive seed twice
         required: false
         type: boolean
         default: false
@@ -163,11 +173,14 @@ jobs:
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
       JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
+      JWT_PRIVATE_KEY_SECRET_ARN: ${{ secrets.JWT_PRIVATE_KEY_SECRET_ARN }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+      SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
     steps:
       - name: Checkout
@@ -191,6 +204,21 @@ jobs:
           {
             printf 'JWT_PUBLIC_KEY<<%s\n' "$delimiter"
             printf '%s\n' "$jwt_public_key"
+            printf '%s\n' "$delimiter"
+          } >> "$GITHUB_ENV"
+      - name: Fetch JWT private key from Secrets Manager
+        run: |
+          set -euo pipefail
+          test -n "$JWT_PRIVATE_KEY_SECRET_ARN" || { echo 'JWT_PRIVATE_KEY_SECRET_ARN is required.' >&2; exit 1; }
+          jwt_private_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PRIVATE_KEY_SECRET_ARN" --query 'SecretString' --output text)
+          test -n "$jwt_private_key" && [[ "$jwt_private_key" != 'None' ]] || { echo 'JWT private key secret is empty.' >&2; exit 1; }
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
+          done <<< "$jwt_private_key"
+          delimiter="JWT_PRIVATE_KEY_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          {
+            printf 'JWT_PRIVATE_KEY<<%s\n' "$delimiter"
+            printf '%s\n' "$jwt_private_key"
             printf '%s\n' "$delimiter"
           } >> "$GITHUB_ENV"
       - name: Resolve target group ARN from repo-k8s-infra state
@@ -297,7 +325,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -310,7 +338,7 @@ jobs:
           set -euo pipefail
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
-          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
@@ -328,11 +356,14 @@ jobs:
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
+             --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
+            --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
       - name: Free HML pod capacity for migration
         run: |
@@ -387,13 +418,13 @@ jobs:
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
       - name: Require controlled CPF seed input
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_customer == true }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_customer == true || inputs.seed_comprehensive == true) }}
         run: |
           set -euo pipefail
           test -n "${SEEDED_CPF:-}" || { echo 'SEEDED_CPF environment secret is required for the controlled customer seed.' >&2; exit 1; }
           printf '::add-mask::%s\n' "$SEEDED_CPF"
       - name: Run controlled HML customer seed
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_customer == true && inputs.environment == 'hml' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_customer == true || inputs.seed_comprehensive == true) && inputs.environment == 'hml' }}
         run: |
           set -euo pipefail
           seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -411,7 +442,7 @@ jobs:
               app.kubernetes.io/part-of: async-furious
               app.kubernetes.io/component: seed
           spec:
-            backoffLimit: 4
+            backoffLimit: 0
             ttlSecondsAfterFinished: 86400
             template:
               spec:
@@ -424,6 +455,8 @@ jobs:
                     env:
                       - name: DEPLOY_ENV
                         value: hml
+                      - name: SEED_MANIFEST_PATH
+                        value: /tmp/seed-manifest.json
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
@@ -439,6 +472,9 @@ jobs:
             kubectl describe pods --namespace "$K8S_NAMESPACE" --selector "job-name=$seed_job" || true
             exit 1
           }
+          kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true \
+            | awk '/SEED_MANIFEST_BEGIN/{show=1} show{print} /SEED_MANIFEST_END/{exit}' \
+            | head -c 48000 >> "$GITHUB_STEP_SUMMARY"
       - name: Roll out application
         run: |
           set -euo pipefail
@@ -518,11 +554,14 @@ jobs:
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
       JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
+      JWT_PRIVATE_KEY_SECRET_ARN: ${{ secrets.JWT_PRIVATE_KEY_SECRET_ARN }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+      SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
     steps:
       - name: Checkout
@@ -555,6 +594,21 @@ jobs:
           {
             printf 'JWT_PUBLIC_KEY<<%s\n' "$delimiter"
             printf '%s\n' "$jwt_public_key"
+            printf '%s\n' "$delimiter"
+          } >> "$GITHUB_ENV"
+      - name: Fetch JWT private key from Secrets Manager
+        run: |
+          set -euo pipefail
+          test -n "$JWT_PRIVATE_KEY_SECRET_ARN" || { echo 'JWT_PRIVATE_KEY_SECRET_ARN is required.' >&2; exit 1; }
+          jwt_private_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PRIVATE_KEY_SECRET_ARN" --query 'SecretString' --output text)
+          test -n "$jwt_private_key" && [[ "$jwt_private_key" != 'None' ]] || { echo 'JWT private key secret is empty.' >&2; exit 1; }
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
+          done <<< "$jwt_private_key"
+          delimiter="JWT_PRIVATE_KEY_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          {
+            printf 'JWT_PRIVATE_KEY<<%s\n' "$delimiter"
+            printf '%s\n' "$jwt_private_key"
             printf '%s\n' "$delimiter"
           } >> "$GITHUB_ENV"
       - name: Resolve target group ARN from repo-k8s-infra state
@@ -634,7 +688,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -647,7 +701,7 @@ jobs:
           set -euo pipefail
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
-          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
@@ -665,11 +719,14 @@ jobs:
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
+             --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
+            --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
       - name: Run controlled Prisma migration
         run: |
@@ -711,7 +768,7 @@ jobs:
             exit 1
           }
       - name: Run controlled seed
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_prod == true || inputs.seed_customer == true) }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_prod == true || inputs.seed_customer == true || inputs.seed_comprehensive == true) }}
         run: |
           set -euo pipefail
           seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -731,7 +788,7 @@ jobs:
               app.kubernetes.io/part-of: async-furious
               app.kubernetes.io/component: seed
           spec:
-            backoffLimit: 4
+            backoffLimit: 0
             ttlSecondsAfterFinished: 86400
             template:
               spec:
@@ -741,6 +798,9 @@ jobs:
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
                     command: ["sh", "-c", "DEPLOY_ENV=prod ALLOW_PRODUCTION_SEED=true node dist-scripts/seed.js"]
+                    env:
+                      - name: SEED_MANIFEST_PATH
+                        value: /tmp/seed-manifest.json
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
