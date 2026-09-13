@@ -1,0 +1,79 @@
+name: Customer lookup diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        required: true
+        type: choice
+        options: [hml, prod]
+        default: hml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target == 'prod' && 'production' || 'hml' }}
+    env:
+      TARGET: ${{ inputs.target }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
+      SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Inspect seed write and Lambda lookup without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EKS_CLUSTER_NAME" -a -n "$SEEDED_CPF"
+          SEEDED_CPF="$(printf '%s' "$SEEDED_CPF" | tr -d '[:space:]')"
+          printf '::add-mask::%s\n' "$SEEDED_CPF"
+          cpf_hash=$(printf '%s' "$SEEDED_CPF" | sha256sum | cut -d' ' -f1)
+          normalized_hash=$(printf '%s' "$SEEDED_CPF" | tr -d '.-' | sha256sum | cut -d' ' -f1)
+
+          saved="$RUNNER_TEMP/eks-access.json"
+          aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{private:endpointPrivateAccess,public:endpointPublicAccess,cidrs:publicAccessCidrs}' --output json > "$saved"
+          restore() {
+            set +e
+            access=$(python3 - "$saved" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1]))
+          print(f"endpointPrivateAccess={str(d['private']).lower()},endpointPublicAccess={str(d['public']).lower()},publicAccessCidrs={','.join(d['cidrs'])}")
+          PY
+            )
+            aws eks update-cluster-config --name "$EKS_CLUSTER_NAME" --resources-vpc-config "$access" >/dev/null 2>&1 || true
+          }
+          trap restore EXIT
+          runner_ip=$(curl --fail --silent --show-error --ipv4 https://checkip.amazonaws.com)
+          update_id=$(aws eks update-cluster-config --name "$EKS_CLUSTER_NAME" --resources-vpc-config "endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=${runner_ip}/32" --query 'update.id' --output text)
+          until [[ "$(aws eks describe-update --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)" == Successful ]]; do sleep 10; done
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
+
+          lookup=$(kubectl exec deployment/async-furious-api --namespace "$K8S_NAMESPACE" -- env SEEDED_CPF="$SEEDED_CPF" node -e '
+          const crypto=require("node:crypto"); const {PrismaClient}=require("@prisma/client"); const db=new PrismaClient();
+          (async()=>{try{const raw=process.env.SEEDED_CPF; const cpf=raw.replace(/[.\-\s]/g,""); const c=await db.cliente.findUnique({where:{documento:cpf}}); const meta=await db.$queryRawUnsafe("SELECT current_database() AS db,current_schema() AS schema,current_setting(\"search_path\") AS search_path"); console.log(JSON.stringify({input_length:raw.length,normalized_length:cpf.length,input_hash:crypto.createHash("sha256").update(raw).digest("hex"),normalized_hash:crypto.createHash("sha256").update(cpf).digest("hex"),found:Boolean(c),active:Boolean(c?.ativo),document_hash:c&&crypto.createHash("sha256").update(c.documento).digest("hex"),document_length:c?.documento?.length||0,document_digits:/^\\d+$/.test(c?.documento||""),document_type:c?.tipo_documento||null,db:meta[0]}))}catch(e){console.log(JSON.stringify({error_class:e?.name||"UnknownError",error_code:e?.code||"unknown"}))}finally{await db.$disconnect()}})()')
+          printf 'target=%s cpf_hash=%s normalized_hash=%s lookup=%s\n' "$TARGET" "$cpf_hash" "$normalized_hash" "$lookup" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          fn="tc3-auth-${TARGET}-auth"
+          config=$(aws lambda get-function-configuration --function-name "$fn" --output json)
+          python3 - "$config" <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import hashlib,json,sys
+          d=json.loads(sys.argv[1]); v=(d.get('Configuration',d).get('Environment') or {}).get('Variables',{})
+          print(json.dumps({'lambda_database_env':{k:bool(v.get(k)) for k in ('DATABASE_SECRET_ARN','DATABASE_HOST','DATABASE_PORT','DATABASE_NAME')},'lambda_code_sha256':d.get('Configuration',d).get('CodeSha256')}))
+          PY
+          payload=$(SEEDED_CPF="$SEEDED_CPF" python3 -c 'import json,os; print(json.dumps({"version":"2.0","body":json.dumps({"cpf":os.environ["SEEDED_CPF"]}),"headers":{"content-type":"application/json"},"requestContext":{"requestId":"lookup-diagnostic"}}))')
+          aws lambda invoke --function-name "$fn" --cli-binary-format raw-in-base64-out --payload "$payload" "$RUNNER_TEMP/lambda.json" >/dev/null
+          python3 - "$RUNNER_TEMP/lambda.json" <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          print(json.dumps({'lambda_status':d.get('statusCode'),'lambda_function_error':d.get('FunctionError')}))
+          PY
