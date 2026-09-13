@@ -1,0 +1,114 @@
+name: Protected API route diagnostics
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hml:
+    name: HML protected routes and EKS health
+    runs-on: ubuntu-latest
+    environment: hml
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Authenticate and inspect protected routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-hml'].ApiEndpoint | [0]" --output text)"
+          auth_payload="$(curl --silent --show-error --max-time 20 -H 'content-type: application/json' -d "$(python -c 'import json,os; print(json.dumps({"cpf":os.environ["SEEDED_CPF"]}))')" --write-out $'\n%{http_code}' "$endpoint/auth")"
+          auth_status="${auth_payload##*$'\n'}"; auth_body="${auth_payload%$'\n'*}"
+          token="$(printf '%s' "$auth_body" | python -c 'import json,sys; print(json.load(sys.stdin).get("token", ""))')"
+          printf 'hml POST /auth %s %s\n' "$auth_status" "$(case "$auth_status" in 2*) echo none;; 4*) echo http_4xx;; 5*) echo http_5xx;; *) echo http_other;; esac)"
+          test -n "$token"
+          for path in /api/v1/health/live /api/v1/clientes; do
+            status="$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -H "authorization: Bearer $token" -H "x-correlation-id: github-protected-hml-${GITHUB_RUN_ID}" "$endpoint$path")"
+            printf 'hml GET %s %s %s\n' "$path" "$status" "$(case "$status" in 2*) echo none;; 4*) echo http_4xx;; 5*) echo http_5xx;; *) echo http_other;; esac)"
+          done
+      - name: Inspect HML EKS service ingress pods and ALB targets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EKS_CLUSTER_NAME" || { echo 'hml EKS inspection skipped missing_cluster_config'; exit 0; }
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
+          if ! timeout 45s kubectl get service async-furious-service --namespace "$K8S_NAMESPACE" -o json > "$RUNNER_TEMP/service.json" 2>/dev/null; then
+            echo 'hml EKS_INSPECTION unavailable cluster_api_unreachable'
+            exit 0
+          fi
+          kubectl get ingress async-furious-api --namespace "$K8S_NAMESPACE" -o json > "$RUNNER_TEMP/ingress.json"
+          kubectl get pods --namespace "$K8S_NAMESPACE" -l app=async-furious-api -o json > "$RUNNER_TEMP/pods.json"
+          kubectl get targetgroupbinding --namespace "$K8S_NAMESPACE" -o json > "$RUNNER_TEMP/tgb.json"
+          python - "$RUNNER_TEMP/service.json" "$RUNNER_TEMP/ingress.json" "$RUNNER_TEMP/pods.json" "$RUNNER_TEMP/tgb.json" <<'PY'
+          import hashlib,json,sys
+          service=json.load(open(sys.argv[1],encoding='utf-8')); ingress=json.load(open(sys.argv[2],encoding='utf-8')); pods=json.load(open(sys.argv[3],encoding='utf-8')); tgb=json.load(open(sys.argv[4],encoding='utf-8'))
+          phases={}
+          for pod in pods.get('items',[]):
+              phase=(pod.get('status') or {}).get('phase','Unknown'); phases[phase]=phases.get(phase,0)+1
+          host=((ingress.get('status') or {}).get('loadBalancer') or {}).get('ingress') or []
+          target_groups=[]
+          for item in tgb.get('items',[]):
+              arn=(item.get('spec') or {}).get('targetGroupARN','')
+              target_groups.append({'name':item.get('metadata',{}).get('name'),'arn_sha256':hashlib.sha256(arn.encode()).hexdigest() if arn else None,'conditions':(item.get('status') or {}).get('conditions',[])})
+          print(json.dumps({'service':{'type':service.get('spec',{}).get('type'),'ports':service.get('spec',{}).get('ports',[])},'ingress_hostname_present':bool(host),'pod_phases':phases,'target_groups':target_groups},sort_keys=True))
+          open('/tmp/target-groups','w').write(' '.join((item.get('spec') or {}).get('targetGroupARN','') for item in tgb.get('items',[]) if (item.get('spec') or {}).get('targetGroupARN')))
+          PY
+          for target_group in $(cat /tmp/target-groups); do
+            aws elbv2 describe-target-health --target-group-arn "$target_group" --query 'TargetHealthDescriptions[].{state:TargetHealth.State,reason:TargetHealth.Reason}' --output json
+          done
+
+  prod:
+    name: PROD protected routes and authorizer
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+      - name: Authenticate, inspect authorizer artifact and protected routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-prod'].ApiEndpoint | [0]" --output text)"
+          auth_payload="$(curl --silent --show-error --max-time 20 -H 'content-type: application/json' -d "$(python -c 'import json,os; print(json.dumps({"cpf":os.environ["SEEDED_CPF"]}))')" --write-out $'\n%{http_code}' "$endpoint/auth")"
+          auth_status="${auth_payload##*$'\n'}"; auth_body="${auth_payload%$'\n'*}"
+          token="$(printf '%s' "$auth_body" | python -c 'import json,sys; print(json.load(sys.stdin).get("token", ""))')"
+          printf 'prod POST /auth %s %s\n' "$auth_status" "$(case "$auth_status" in 2*) echo none;; 4*) echo http_4xx;; 5*) echo http_5xx;; *) echo http_other;; esac)"
+          test -n "$token"
+          for path in /api/v1/health/live /api/v1/clientes; do
+            status="$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' -H "authorization: Bearer $token" -H "x-correlation-id: github-protected-prod-${GITHUB_RUN_ID}" "$endpoint$path")"
+            printf 'prod GET %s %s %s\n' "$path" "$status" "$(case "$status" in 2*) echo none;; 4*) echo http_4xx;; 5*) echo http_5xx;; *) echo http_other;; esac)"
+          done
+          function_name='tc3-auth-prod-authorizer'; config="$RUNNER_TEMP/authorizer.json"
+          aws lambda get-function-configuration --function-name "$function_name" --output json > "$config"
+          python - "$config" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          print(json.dumps({'version':d.get('Version'),'last_modified':d.get('LastModified'),'code_sha256':d.get('CodeSha256'),'handler':d.get('Handler'),'runtime':d.get('Runtime')},sort_keys=True))
+          PY
+          direct_payload="$(TOKEN="$token" python -c 'import json,os; print(json.dumps({"version":"2.0","type":"REQUEST","routeArn":"diagnostic","headers":{"authorization":"Bearer "+os.environ["TOKEN"],"x-correlation-id":"github-prod-direct"},"requestContext":{"requestId":"github-prod-direct"}}))')"
+          aws lambda invoke --function-name "$function_name" --cli-binary-format raw-in-base64-out --payload "$direct_payload" "$RUNNER_TEMP/authorizer-response.json" >/dev/null
+          python - "$RUNNER_TEMP/authorizer-response.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8')); print(json.dumps({'direct_authorizer_status':d.get('StatusCode'),'isAuthorized':d.get('isAuthorized'),'error_class':d.get('FunctionError')}))
+          PY
