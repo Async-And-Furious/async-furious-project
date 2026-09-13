@@ -1,0 +1,168 @@
+name: Observability Alert Scenarios
+
+# Manual, on-demand workflow to exercise the New Relic alert conditions
+# (issue #167) against HML: app availability, CPU, memory and crash loop.
+# Same EKS-endpoint-access pattern as protected-route-diagnostics.yml.
+# Each scenario waits past its alert threshold, then cleans up before
+# moving to the next one (sequential, never two stressors at once, per
+# the original issue's own capacity warning for t3.small HML nodes).
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Which scenario(s) to run
+        required: true
+        type: choice
+        options: [all, unavailable, cpu, memory, crash-loop]
+        default: all
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Run alert scenario (HML)
+    runs-on: ubuntu-latest
+    environment: hml
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
+      SCENARIO: ${{ inputs.scenario }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Save HML EKS endpoint access
+        run: |
+          set -euo pipefail
+          aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' \
+            --output json > "$RUNNER_TEMP/eks-hml-endpoint-access.json"
+
+      - name: Allow only this runner to reach HML EKS
+        run: |
+          set -euo pipefail
+          runner_ip=$(curl --fail --silent --show-error --ipv4 --proto '=https' https://checkip.amazonaws.com)
+          runner_ip=$(python3 - "$runner_ip" <<'PY'
+          import ipaddress
+          import sys
+          address = ipaddress.ip_address(sys.argv[1].strip())
+          if address.version != 4 or not address.is_global:
+              raise SystemExit(f"Runner address is not a globally routable IPv4: {address}")
+          print(address)
+          PY
+          )
+          access="endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=${runner_ip}/32"
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          deadline=$((SECONDS + 600))
+          while ! update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out allowing the HML runner.' >&2; exit 1; }
+            sleep 10
+          done
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == Successful ]] && { echo 'HML EKS access temporarily restricted to this runner /32.'; exit 0; }
+            [[ "$status" == Failed || "$status" == Cancelled ]] && { echo "HML EKS access update ended with status $status." >&2; exit 1; }
+            sleep 10
+          done
+          echo 'Timed out waiting for HML EKS access.' >&2
+          exit 1
+
+      - name: Configure kubectl for HML
+        run: |
+          set -euo pipefail
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
+          kubectl get --raw=/readyz
+
+      - name: "Scenario: App indisponível"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'unavailable' }}
+        run: |
+          set -euo pipefail
+          echo "### Escalando async-furious-api para 0 réplicas" >> "$GITHUB_STEP_SUMMARY"
+          kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=0
+          echo "Aguardando 6 minutos (limite do alerta: sinal abaixo de 1 em 5 min)..."
+          sleep 360
+          echo "### Revertendo para 2 réplicas" >> "$GITHUB_STEP_SUMMARY"
+          kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=2
+          kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=5m
+
+      - name: "Scenario: CPU excessiva"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'cpu' }}
+        run: |
+          set -euo pipefail
+          echo "### Rodando pod de stress de CPU" >> "$GITHUB_STEP_SUMMARY"
+          kubectl run stress-cpu --image=polinux/stress --restart=Never --namespace "$K8S_NAMESPACE" \
+            --requests='cpu=400m' --limits='cpu=400m' -- stress --cpu 2 --timeout 600s
+          echo "Aguardando 11 minutos (limite do alerta: acima de 80% em 10 min)..."
+          sleep 660
+          kubectl delete pod stress-cpu --namespace "$K8S_NAMESPACE" --ignore-not-found=true
+
+      - name: "Scenario: Memória excessiva"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'memory' }}
+        run: |
+          set -euo pipefail
+          echo "### Rodando pod de stress de memória" >> "$GITHUB_STEP_SUMMARY"
+          kubectl run stress-mem --image=polinux/stress --restart=Never --namespace "$K8S_NAMESPACE" \
+            --requests='memory=400Mi' --limits='memory=400Mi' -- stress --vm 1 --vm-bytes 380M --timeout 600s
+          echo "Aguardando 11 minutos (limite do alerta: acima de 80% em 10 min)..."
+          sleep 660
+          kubectl delete pod stress-mem --namespace "$K8S_NAMESPACE" --ignore-not-found=true
+
+      - name: "Scenario: Pod em crash loop"
+        if: ${{ inputs.scenario == 'all' || inputs.scenario == 'crash-loop' }}
+        run: |
+          set -euo pipefail
+          echo "### Forçando crash loop" >> "$GITHUB_STEP_SUMMARY"
+          kubectl run crash-test --image=busybox --restart=Always --namespace "$K8S_NAMESPACE" -- sh -c "exit 1"
+          echo "Aguardando restartCount > 3 (limite do alerta: acima de 3 restarts em 10 min)..."
+          deadline=$((SECONDS + 660))
+          while (( SECONDS < deadline )); do
+            restarts=$(kubectl get pod crash-test --namespace "$K8S_NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}' 2>/dev/null || echo 0)
+            echo "restartCount atual: ${restarts:-0}"
+            (( ${restarts:-0} > 3 )) && break
+            sleep 20
+          done
+          kubectl delete pod crash-test --namespace "$K8S_NAMESPACE" --ignore-not-found=true
+
+      - name: Capture HML evidence
+        if: ${{ always() }}
+        run: |
+          kubectl get pods --namespace "$K8S_NAMESPACE" -o wide || true
+          kubectl get deployment/async-furious-api --namespace "$K8S_NAMESPACE" -o wide || true
+
+      - name: Restore HML EKS endpoint to private
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          error_file=$(mktemp)
+          trap 'status=$?; rm -f "$error_file"; exit "$status"' EXIT
+          deadline=$((SECONDS + 600))
+          while ! update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --resources-vpc-config endpointPrivateAccess=true,endpointPublicAccess=false \
+            --query 'update.id' --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceNotFoundException* || "$error" == *'already at the desired configuration'* ]] && { echo 'HML EKS endpoint already has the requested cleanup configuration.'; exit 0; }
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out requesting private HML EKS cleanup.' >&2; exit 1; }
+            sleep 10
+          done
+          deadline=$((SECONDS + 600))
+          while (( SECONDS < deadline )); do
+            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$status" == Successful ]] && { echo 'HML EKS endpoint is private again.'; exit 0; }
+            [[ "$status" == Failed || "$status" == Cancelled ]] && { echo "Private HML EKS cleanup ended with status $status." >&2; exit 1; }
+            sleep 10
+          done
+          echo 'Timed out waiting for private HML EKS cleanup.' >&2
+          exit 1
