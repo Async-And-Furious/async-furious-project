@@ -9,7 +9,7 @@ export class WebhookAuthGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    const expected = this.config.get<string>('WEBHOOK_SECRET');
+    const expected = this.config.get<string>('WEBHOOK_SECRET')?.replace(/[\r\n]/g, '');
     const supplied = request.header('x-webhook-secret');
     if (!expected || !supplied) throw new UnauthorizedException('Webhook não autorizado');
     const expectedBytes = Buffer.from(expected);
