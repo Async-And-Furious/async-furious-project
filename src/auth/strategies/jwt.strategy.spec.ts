@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthService } from '../services/auth.service';
 import { Role } from '../enums/role.enum';
-import { AuthenticatedUser } from '../types/auth.types';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -30,7 +29,7 @@ describe('JwtStrategy', () => {
   });
 
   it('should return AuthenticatedUser from DB when token is valid', async () => {
-    const mockUser: AuthenticatedUser = {
+    const mockUser = {
       id: 'user-1',
       email: 'test@test.com',
       role: Role.ADMIN,
@@ -67,7 +66,7 @@ describe('JwtStrategy', () => {
   });
 
   it('should use role from DB, not from token payload', async () => {
-    const dbUser: AuthenticatedUser = {
+    const dbUser = {
       id: 'user-1',
       email: 'test@test.com',
       role: Role.RECEPCIONISTA,
@@ -97,7 +96,7 @@ describe('JwtStrategy', () => {
     };
     config.get.mockImplementation((key: string) => gatewayValues[key]);
     strategy = new JwtStrategy(config, authService);
-    const customer: AuthenticatedUser = {
+    const customer = {
       id: 'customer-id',
       email: 'customer@test.com',
       role: Role.RECEPCIONISTA,

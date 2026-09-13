@@ -1,5 +1,6 @@
 """Generate secret-free Postman and Insomnia exports from the route contract."""
 import json
+import yaml
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,24 +28,23 @@ routes += [
     ("POST", "/pagamentos/registrar", "public", {"ordemServicoId": "{{ordem_id}}", "valor": 1}),
     ("POST", "/webhooks/service-orders/status", "webhook", {"status": "RECEIVED"}),
 ]
-order_id = "{{ordem_id}}"
-routes += [
-    ("POST", "/ordens-servico", "receptionist", {"veiculoId": "{{veiculo_id}}", "clienteId": "{{cliente_id}}", "descricao": "Collection smoke order"}),
-    ("GET", "/ordens-servico", "any", None), ("GET", "/ordens-servico/tempo-medio", "admin", None),
-    ("GET", f"/ordens-servico/{order_id}", "any", None), ("GET", f"/ordens-servico/{order_id}/status", "public", None),
-    ("GET", f"/ordens-servico/{order_id}/rastreamento", "public", None),
-    ("PATCH", f"/ordens-servico/{order_id}", "admin", {"descricao": "Collection smoke update"}),
-    ("DELETE", f"/ordens-servico/{order_id}", "admin", None),
-    ("PATCH", f"/ordens-servico/{order_id}/assumir", "mechanic", None),
-    ("PATCH", f"/ordens-servico/{order_id}/analisar", "mechanic", None),
-    ("PATCH", f"/ordens-servico/{order_id}/servicos-insumos", "mechanic", {"valor_total_servicos": 1, "valor_total_pecas": 1}),
-    ("PATCH", f"/ordens-servico/{order_id}/orcamento/aprovar", "public", None),
-    ("PATCH", f"/ordens-servico/{order_id}/orcamento/recusar", "public", None),
-    ("PATCH", f"/ordens-servico/{order_id}/finalizar-execucao", "mechanic", None),
-    ("PATCH", f"/ordens-servico/{order_id}/aprovar-servico", "public", None),
-    ("POST", f"/ordens-servico/{order_id}/aprovar-servico", "public", {"decisao": "APROVADO"}),
-    ("PATCH", f"/ordens-servico/{order_id}/registrar-entrega", "receptionist", None),
-]
+
+# routes.yaml is the only source of application requests.  The generated
+# exports must never grow a second hand-maintained route list.
+manifest = yaml.safe_load((ROOT / "docs/http/routes.yaml").read_text(encoding="utf-8"))
+
+def flatten(nodes):
+    result = []
+    for node in nodes.get("routes", nodes) if isinstance(nodes, dict) else nodes:
+        result.extend(flatten(node["routes"])) if "routes" in node else None
+        if "method" in node:
+            result.append(node)
+    return result
+
+manifest_routes = flatten(manifest)
+assert len(manifest_routes) == 48 and len({r["id"] for r in manifest_routes}) == 48
+role_names = {"customer": "public", "staff": "any", "webhook": "webhook"}
+routes = [(r["method"], r["path"].removeprefix("/api/v1"), role_names[r["auth"]], r.get("mock_body")) for r in manifest_routes]
 
 tokens = {"public": "{{customer_token}}", "any": "{{admin_token}}", "admin": "{{admin_token}}", "receptionist": "{{receptionist_token}}", "mechanic": "{{mechanic_token}}", "webhook": "{{webhook_token}}"}
 variables = [
@@ -60,9 +60,9 @@ def postman_request(method, path, role, body):
         req["request"]["header"].append({"key": "Content-Type", "value": "application/json"})
         req["request"]["body"] = {"mode": "raw", "raw": json.dumps(body), "options": {"raw": {"language": "json"}}}
     token = tokens[role]
-    if token:
-        if role == "webhook":
-            req["request"]["header"].append({"key": "X-Webhook-Secret", "value": "{{webhook_token}}"})
+    if role == "webhook":
+        req["request"]["header"].append({"key": "X-Webhook-Secret", "value": "{{webhook_token}}"})
+    elif token:
         req["request"]["auth"] = {"type": "bearer", "bearer": [{"key": "token", "value": token, "type": "string"}]}
     return req
 
@@ -88,7 +88,7 @@ for i, (name, url, body, token_name, auth) in enumerate([
     insomnia["resources"].append(request)
 for i, (method, path, role, body) in enumerate(routes):
     headers = [{"name": "Content-Type", "value": "application/json"}] if body is not None else []
-    authentication = {"type": "bearer", "token": tokens[role]} if tokens[role] else {}
+    authentication = {"type": "bearer", "token": tokens[role]} if role != "webhook" and tokens[role] else {}
     if role == "webhook": headers.append({"name": "X-Webhook-Secret", "value": "{{webhook_token}}"})
     insomnia["resources"].append({"_id": f"req_{i:03d}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "url": BASE + path, "name": f"{method} {path}", "description": f"Role: {role}", "method": method, "body": {"mimeType": "application/json", "text": json.dumps(body)} if body is not None else {}, "headers": headers, "authentication": authentication, "_type": "request"})
 for name in ("HML", "PROD"):
@@ -96,9 +96,13 @@ for name in ("HML", "PROD"):
 
 out = ROOT / "docs" / "http"
 (out / "postman").mkdir(parents=True, exist_ok=True); (out / "insomnia").mkdir(parents=True, exist_ok=True)
-(out / "postman" / "async-furious.postman_collection.json").write_text(json.dumps(postman, ensure_ascii=False, indent=2) + "\n")
+def write_json(path, document):
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(document, ensure_ascii=False, indent=2) + "\n")
+
+write_json(out / "postman" / "async-furious.postman_collection.json", postman)
 for env in ("hml", "prod"):
     env_doc = {"id": f"async-furious-{env}", "name": f"Async Furious {env.upper()}", "values": [{"key": v["key"], "value": v["value"], "enabled": True} for v in variables]}
     env_doc["values"][0]["value"] = ""
-    (out / "postman" / f"async-furious.{env}.postman_environment.json").write_text(json.dumps(env_doc, indent=2) + "\n")
-(out / "insomnia" / "async-furious.insomnia.json").write_text(json.dumps(insomnia, ensure_ascii=False, indent=2) + "\n")
+    write_json(out / "postman" / f"async-furious.{env}.postman_environment.json", env_doc)
+write_json(out / "insomnia" / "async-furious.insomnia.json", insomnia)
