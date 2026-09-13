@@ -336,6 +336,7 @@ jobs:
       - name: Apply namespace and configuration
         run: |
           set -euo pipefail
+          WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
@@ -699,6 +700,7 @@ jobs:
       - name: Apply namespace and configuration
         run: |
           set -euo pipefail
+          WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
