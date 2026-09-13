@@ -39,7 +39,7 @@ jobs:
           RECEPTIONIST_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
           MECHANIC_EMAIL: mecanico@oficina.com
           MECHANIC_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
-          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
+          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_SECRET }}
           cliente_id: ${{ vars.SEEDED_CLIENTE_ID }}
           veiculo_id: ${{ vars.SEEDED_VEICULO_ID }}
           servico_id: ${{ vars.SEEDED_SERVICO_ID }}
