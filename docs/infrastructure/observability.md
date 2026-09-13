@@ -112,6 +112,39 @@
   `init`, `validate` — todos passando, incluindo o schema do provider
   `newrelic`), **ainda não aplicado** em HML/PROD.
 
+## Alertas operacionais (issue #167)
+
+- **Terraform, mesma branch base do #166** (`feat/I-167_AlertasOps`, a
+  partir de `feat/I-166_DashboardsOps`, no `repo-k8s-infra`) — reaproveita
+  o provider `newrelic` já configurado ali, sem recurso novo além dos de
+  notificação.
+- **Uma política por ambiente** (`newrelic_alert_policy`,
+  `tc3-observability-${environment}`) com 5 condições NRQL
+  (`newrelic_nrql_alert_condition`), todas usando o mesmo `appName`/
+  `clusterName` já usados no #166:
+
+  | Condição | Fonte | Limite |
+  |---|---|---|
+  | App indisponível | `count(*)` em `Transaction` | abaixo de 1 em 5 min |
+  | Taxa de erro alta | `percentage(count(*), WHERE error IS true)` em `Transaction` | acima de 5% em 5 min |
+  | CPU excessiva | `average(cpuUsedCores/cpuLimitCores)*100` em `K8sContainerSample` | acima de 80% em 10 min |
+  | Memória excessiva | `average(memoryWorkingSetBytes/memoryLimitBytes)*100` em `K8sContainerSample` | acima de 80% em 10 min |
+  | Pod em crash loop | `sum(restartCount)` em `K8sContainerSample`, facetado por `podName` | acima de 3 restarts em 10 min |
+
+- **Notificação por e-mail**: `newrelic_notification_destination` (tipo
+  `EMAIL`) + `newrelic_notification_channel` (tipo `EMAIL`, produto
+  `IINT`) + `newrelic_workflow` roteando qualquer issue da política pra
+  esse canal — endereço vem da variável `new_relic_alert_email`
+  (`NEW_RELIC_ALERT_EMAIL`, já criada no `repo-k8s-infra` em 2026-09-13),
+  não hardcoded no `.tf`.
+- **Schema do provider verificado localmente** antes de escrever o código
+  (`terraform providers schema -json`, contra o `newrelic/newrelic
+  v3.97.5` real) — evitou adivinhar nomes de atributo às cegas.
+- **Estado**: código escrito e validado (`terraform fmt`/`init`/
+  `validate`), **ainda não aplicado** — depende do #166 já estar de pé
+  (mesmo `newrelic_alert_policy`/provider), que por sua vez depende da
+  validação do #163.
+
 ## O que a Fase 3 exige e o estado de cada item
 
 | Requisito | Estado |
@@ -123,7 +156,7 @@
 | Health checks / monitoramento (#165) | Reaproveita probes existentes + #163; sem Synthetic monitor por falta de rota pública (decisão registrada acima) |
 | Tracing distribuído (Gateway → Lambda → EKS → RDS) | Agente cobre a aplicação a partir do EKS; correlação com a Function Serverless não avaliada |
 | Dashboards | Terraform escrito e validado localmente (issue #166), não aplicado |
-| Alertas | Não iniciado (issue #167) |
+| Alertas | Terraform escrito e validado localmente (issue #167), não aplicado |
 
 ## Pendências
 
@@ -133,6 +166,10 @@
   New Relic antes de fechar a issue #163.
 - Aplicar o Terraform do #166 em HML e confirmar visualmente que os
   widgets carregam dado real antes de fechar a issue.
+- Aplicar o Terraform do #167 e testar cada uma das 5 condições de verdade
+  (escalar a app pra zero, gerar taxa de erro, estressar CPU/memória de um
+  pod, forçar um crash loop) antes de fechar a issue — roteiro já
+  documentado no comentário original do #167.
 - Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o APM
   estiver validado e a capacidade dos nós do EKS for confirmada com a carga
   adicional.
