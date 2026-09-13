@@ -168,16 +168,18 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   (mesmo ajuste replicado no widget de taxa de erro do dashboard do
   #166).
 - **Testadas as outras 4 condições** (workflow manual
-  `observability-alert-scenarios.yml`): indisponibilidade (sinal real
-  confirmado, app ficou com 0 transações por 4 min) e crash loop
-  (restartCount chegou a 4) tiveram sinal real capturado; CPU e memória
-  ficaram inconclusivas (agente não capturou uso de um pod de stress
-  efêmero antes dele terminar). **Nenhuma das 5 condições enviou e-mail**
-  — confirmado via `NrAiIssue`/API de Issues (zero alertas abertos na
-  conta). Causa raiz encontrada para a de indisponibilidade:
-  `fill_option: "NONE"` faz o avaliador ignorar janelas sem nenhuma
-  transação em vez de tratar como "0" — corrigido com
-  `fill_option = "static"` / `fill_value = 0`. Reteste pendente.
+  `observability-alert-scenarios.yml`). **App indisponível: validada de
+  ponta a ponta ✅** — primeira tentativa teve sinal real (0 transações
+  por 4 min) mas sem e-mail; causa raiz era `fill_option: "NONE"` (o
+  avaliador ignora janelas sem nenhuma transação em vez de tratar como
+  "0"), corrigido com `fill_option = "static"` / `fill_value = 0"`;
+  reteste abriu issue `ACTIVATED`/`CRITICAL` de verdade e o e-mail
+  chegou (com ~4 min de atraso entre violação e notificação, normal
+  nessa conta). Crash loop (`restartCount` chegou a 4) teve sinal real
+  mas ainda sem e-mail — suspeita de `threshold_duration` (10 min) não
+  sustentado. CPU e memória ficaram inconclusivas: os pods de stress
+  terminam rápido demais pro agente capturar uso em execução, só o
+  estado final `Terminated`.
 
 ### O que ainda não foi feito
 
@@ -186,12 +188,10 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   completed" do `pino-http` não carrega `trace.id`/`span.id` — dispara
   depois que o agente já encerrou o segmento da transação (limitação de
   timing, não bug).
-- **Alertas (#167)**: aplicado em HML/PROD e as 5 condições testadas ao
-  menos uma vez, mas **nenhuma confirmou e-mail entregue** ainda. Fix do
-  `fill_option` pronto pra reteste da condição de indisponibilidade;
-  taxa de erro (já corrigida) e crash loop precisam de reteste; CPU e
-  memória precisam de um método de teste diferente (pod de stress que
-  fique vivo mais tempo).
+- **Alertas (#167)**: indisponibilidade validada de ponta a ponta
+  (e-mail confirmado). Taxa de erro (já corrigida) e crash loop
+  precisam de reteste; CPU e memória precisam de um método de teste
+  diferente (pod de stress que fique vivo mais tempo).
 
 ## Alternativas consideradas
 
