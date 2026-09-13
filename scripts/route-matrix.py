@@ -2,6 +2,7 @@
 import json, os, sys, urllib.error, urllib.request
 
 base = os.environ["BASE_URL"].rstrip("/")
+os.environ.setdefault("RUN_EMAIL", "matrix-" + os.environ.get("GITHUB_RUN_ID", "local") + "@example.invalid")
 SAFE_UUID = "00000000-0000-0000-0000-000000000000"
 def value(name): return base if name == "base_url" else os.environ.get(name, "")
 def expand(text, safe_ids=False):
