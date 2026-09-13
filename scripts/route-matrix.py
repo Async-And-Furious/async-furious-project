@@ -77,7 +77,13 @@ def collect(items_in):
         if "request" in item: items.append(item)
         collect(item.get("item", []))
 collect(collection["item"])
-app_items = [i for i in items if i["request"]["url"]["raw"].endswith(tuple(r["path"] for r in routes))]
+application_group = next((item for item in collection["item"] if item.get("name") == "Application routes"), None)
+if application_group is None:
+    raise RuntimeError("generated collection has no Application routes group")
+app_items = []
+items = []
+collect(application_group.get("item", []))
+app_items = list(items)
 assert len(app_items) == len(routes)
 items = app_items
 by_identity = {(r["method"], r["path"]): r for r in routes}
