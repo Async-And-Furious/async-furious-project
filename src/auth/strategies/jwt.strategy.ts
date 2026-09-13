@@ -39,6 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     const user =
       this.config.get<string>('AUTH_MODE') === 'gateway' &&
+      !payload.role &&
       typeof this.authService.validateCustomer === 'function'
         ? await this.authService.validateCustomer(payload.sub)
         : typeof this.authService.validateTokenSubject === 'function'

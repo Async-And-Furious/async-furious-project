@@ -1,5 +1,14 @@
 # Agent Log
 
+## 2026-09-13 — Comprehensive HML/PROD seed
+
+- Extended the deterministic, non-destructive Prisma seed with staff password
+  updates, relations, supplier data, reservations, payments, and status history.
+- Added a safe manifest and a protected manual workflow that runs the seed twice;
+  no HML/PROD execution was performed.
+- Validation: build passed; typecheck remains blocked by pre-existing JWT strategy
+  spec type errors; Jest has no discoverable tests in this checkout.
+
 ## 2026-09-10 — Python orchestrator CLI aliases
 
 - Added default-HML selection and the `--prod` alias to the Python stack
