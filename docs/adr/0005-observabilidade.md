@@ -11,17 +11,16 @@ logs estruturados da aplicação implementados em código na issue
 #163 — o agente New Relic ainda não estava em `develop` quando #164
 começou), e monitoramento (issue #165) fechado por reaproveitar #163
 sem exigir mudança de infraestrutura. Dashboards (issue #166) e alertas
-(issue #167) com Terraform escrito e validado localmente
+(issue #167) com Terraform aplicado em HML e PROD
 (`repo-k8s-infra`, branches `feat/I-166_DashboardsOps` e
-`feat/I-167_AlertasOps`, a segunda em cima da primeira), ainda não
-aplicados.
+`feat/I-167_AlertasOps`).
 
 **Validado em HML em 2026-09-13** (consulta direta à API da New Relic):
-infraestrutura do cluster e logs chegando com dado real. **Pendente**:
-o agente APM da aplicação — bug de permissão de arquivo identificado e
-corrigido (`NEW_RELIC_LOG=stdout`), validação end-to-end ainda não
-confirmada —, e aplicar o Terraform de #166/#167 em HML/PROD com teste
-real de cada condição de alerta. Ver
+infraestrutura do cluster, logs e **agente APM** chegando com dado real
+(dois bugs encontrados e corrigidos no caminho: permissão de arquivo de
+log e license key inválida). **Pendente**: testar de ponta a ponta as 5
+condições do #167 (a de taxa de erro já corrigida — o atributo `error`
+do agente não marca 4xx, trocado por checar `http.statusCode`). Ver
 [`docs/infrastructure/observability.md`](../infrastructure/observability.md)
 para o detalhe do bug e o estado atualizado de cada item.
 
@@ -140,8 +139,9 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   `NEW_RELIC_API_KEY`) — diferente da license key de ingestão já usada pelo
   `nri-bundle`. Variável nova `new_relic_account_id` (secret/variável já
   criados no `repo-k8s-infra`).
-- Código validado localmente (`terraform fmt`/`init`/`validate`, contra o
-  schema real do provider), ainda não aplicado contra HML/PROD.
+- **Aplicado em HML e PROD em 2026-09-13** — dashboards confirmados
+  existindo via API da New Relic (`tc3-observability-hml`/`-prod`, 3
+  páginas cada).
 
 ### O que foi implementado (issue #167)
 
@@ -159,24 +159,27 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   `newrelic_notification_channel`, `newrelic_workflow`) conferido via
   `terraform providers schema -json` antes de escrever o código, contra a
   versão real instalada (`newrelic/newrelic v3.97.5`).
-- Código validado localmente, ainda não aplicado contra HML/PROD — e as 5
-  condições ainda não foram exercitadas de verdade (roteiro de teste no
-  comentário original da issue: escalar a app a zero, gerar tráfego de
-  erro, `stress` de CPU/memória num pod, forçar um crash loop).
+- **Aplicado em HML e PROD em 2026-09-13**, confirmado via API da New
+  Relic. Testada de verdade a condição de taxa de erro: 200 requisições
+  autenticadas contra uma rota inexistente (todas `404`) resultaram em
+  **0%** de erro medido, porque o atributo `error` do agente Node não
+  marca 4xx como erro por padrão — condição corrigida pra usar
+  `numeric(http.statusCode) >= 400` em vez de `WHERE error IS true`
+  (mesmo ajuste replicado no widget de taxa de erro do dashboard do
+  #166). As outras 4 condições (indisponibilidade, CPU, memória, crash
+  loop) ainda não foram exercitadas de verdade (roteiro no comentário
+  original da issue).
 
 ### O que ainda não foi feito
 
-- **Validação end-to-end**: as branches de #163 e #164 existem mas ainda
-  não foram aplicadas contra o ambiente real — não há confirmação de que
-  telemetria e logs chegam no New Relic, nem de que a correlação
-  `trace.id`/log realmente funciona. Critério de aceite explícito das duas
-  issues, não deve ser considerado concluído antes de rodar o pipeline de
-  verdade.
-- **Dashboards (#166)**: código pronto, falta aplicar em HML/PROD e
-  confirmar visualmente que os widgets carregam dado real.
-- **Alertas (#167)**: código pronto, falta aplicar e testar cada uma das 5
-  condições de verdade (não só confirmar que o Terraform aplica sem
-  erro).
+- **Correlação `trace.id`/log**: confirmado que funciona para logs
+  emitidos durante a requisição (ex.: exceções), mas o log de "request
+  completed" do `pino-http` não carrega `trace.id`/`span.id` — dispara
+  depois que o agente já encerrou o segmento da transação (limitação de
+  timing, não bug).
+- **Alertas (#167)**: aplicado em HML/PROD, condição de taxa de erro
+  testada e corrigida; as outras 4 condições (indisponibilidade, CPU,
+  memória, crash loop) ainda não foram exercitadas de verdade.
 
 ## Alternativas consideradas
 
@@ -219,15 +222,11 @@ Prometheus/Grafana ou Datadog.
 
 ## Próximos passos
 
-1. Rodar o pipeline (`workflow_dispatch`, ação `plan`, depois `apply`) nos
-   repositórios envolvidos e confirmar telemetria e logs reais chegando ao
-   New Relic (inclusive a correlação `trace.id`/log) antes de considerar as
-   issues #163 e #164 encerradas.
+1. Testar de verdade as 4 condições de alerta restantes do #167
+   (indisponibilidade, CPU, memória, crash loop) — roteiro no comentário
+   original da issue.
 2. Avaliar, com dado real em mãos, se `nri-metadata-injection` e
    `nri-kube-events` valem o custo de recursos adicional.
-3. Aplicar o Terraform de #166 e #167 (ambos já escritos) em HML/PROD,
-   confirmar os dashboards com dado real e testar cada uma das 5 condições
-   de alerta de verdade (roteiro no comentário original do #167).
 
 ## Referências
 
