@@ -30,6 +30,11 @@ on:
         required: false
         type: boolean
         default: false
+      seed_comprehensive:
+        description: Run the non-destructive comprehensive seed twice
+        required: false
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       environment:
@@ -43,6 +48,11 @@ on:
         default: false
       seed_customer:
         description: Run the controlled CPF customer seed job
+        required: false
+        type: boolean
+        default: false
+      seed_comprehensive:
+        description: Run the non-destructive comprehensive seed twice
         required: false
         type: boolean
         default: false
@@ -168,6 +178,8 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+      SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
     steps:
       - name: Checkout
@@ -297,7 +309,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -333,6 +345,8 @@ jobs:
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
+            --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
       - name: Free HML pod capacity for migration
         run: |
@@ -387,13 +401,13 @@ jobs:
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
       - name: Require controlled CPF seed input
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_customer == true }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_customer == true || inputs.seed_comprehensive == true) }}
         run: |
           set -euo pipefail
           test -n "${SEEDED_CPF:-}" || { echo 'SEEDED_CPF environment secret is required for the controlled customer seed.' >&2; exit 1; }
           printf '::add-mask::%s\n' "$SEEDED_CPF"
       - name: Run controlled HML customer seed
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.seed_customer == true && inputs.environment == 'hml' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_customer == true || inputs.seed_comprehensive == true) && inputs.environment == 'hml' }}
         run: |
           set -euo pipefail
           seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -523,6 +537,8 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+      SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
     steps:
       - name: Checkout
@@ -634,7 +650,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -670,6 +686,8 @@ jobs:
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+            --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
+            --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
       - name: Run controlled Prisma migration
         run: |
@@ -711,7 +729,7 @@ jobs:
             exit 1
           }
       - name: Run controlled seed
-        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_prod == true || inputs.seed_customer == true) }}
+        if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_prod == true || inputs.seed_customer == true || inputs.seed_comprehensive == true) }}
         run: |
           set -euo pipefail
           seed_job="async-furious-seed-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

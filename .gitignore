@@ -44,6 +44,7 @@ lerna-debug.log*
 # Temporary files
 tmp/
 temp/
+seed-manifest.json
 *.tmp
 
 # Debug
