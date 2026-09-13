@@ -139,9 +139,9 @@ jobs:
           app_schema_fingerprint=$(jq -r '.schemaFingerprint // "unavailable"' <<<"$customer_result")
           query_error=$(jq -r '.queryError // "none"' <<<"$customer_result")
 
-          printf 'target=%s seed_job_complete=%s customer_exists_active=%s\n' "$TARGET_ENVIRONMENT" "$seed_complete" "$customer_active" >> "$GITHUB_STEP_SUMMARY"
-          printf 'app_query_error_class=%s\n' "$query_error" >> "$GITHUB_STEP_SUMMARY"
-          printf 'app_db_fingerprint=%s app_query_fingerprint=%s auth_db_fingerprint=%s state_db_fingerprint=%s\n' "$app_fingerprint" "$app_query_fingerprint" "$auth_fingerprint" "$state_fingerprint" >> "$GITHUB_STEP_SUMMARY"
-          printf 'app_rds_secret_fingerprint=%s auth_secret_fingerprint=%s auth_secret_mode=%s\n' "$app_secret_fingerprint" "$lambda_secret_fingerprint" "$(if [[ -n "$lambda_secret_arn" ]]; then echo arn; else echo url; fi)" >> "$GITHUB_STEP_SUMMARY"
+          printf 'target=%s seed_job_complete=%s customer_exists_active=%s\n' "$TARGET_ENVIRONMENT" "$seed_complete" "$customer_active" | tee -a "$GITHUB_STEP_SUMMARY"
+          printf 'app_query_error_class=%s\n' "$query_error" | tee -a "$GITHUB_STEP_SUMMARY"
+          printf 'app_db_fingerprint=%s app_query_fingerprint=%s auth_db_fingerprint=%s state_db_fingerprint=%s\n' "$app_fingerprint" "$app_query_fingerprint" "$auth_fingerprint" "$state_fingerprint" | tee -a "$GITHUB_STEP_SUMMARY"
+          printf 'app_rds_secret_fingerprint=%s auth_secret_fingerprint=%s auth_secret_mode=%s\n' "$app_secret_fingerprint" "$lambda_secret_fingerprint" "$(if [[ -n "$lambda_secret_arn" ]]; then echo arn; else echo url; fi)" | tee -a "$GITHUB_STEP_SUMMARY"
           printf 'database_identity_match=%s app_secret_identity_present=true seed_transaction_complete=%s schema_fingerprint=%s\n' \
-            "$(if [[ "$app_fingerprint" == "$auth_fingerprint" && "$app_fingerprint" == "$state_fingerprint" ]]; then echo true; else echo false; fi)" "$seed_complete" "$app_schema_fingerprint" >> "$GITHUB_STEP_SUMMARY"
+            "$(if [[ "$app_fingerprint" == "$auth_fingerprint" && "$app_fingerprint" == "$state_fingerprint" ]]; then echo true; else echo false; fi)" "$seed_complete" "$app_schema_fingerprint" | tee -a "$GITHUB_STEP_SUMMARY"
