@@ -80,6 +80,17 @@ jobs:
           set -euo pipefail
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null
           kubectl get --raw=/readyz
+      - name: Inspect HML API Gateway integration metadata
+        run: |
+          set -euo pipefail
+          api_id=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-hml'].ApiId | [0]" --output text)
+          test -n "$api_id" -a "$api_id" != None
+          aws apigatewayv2 get-api --api-id "$api_id" \
+            --query '{protocol:ProtocolType,endpoint:ApiEndpoint,disable_execute_api_endpoint:DisableExecuteApiEndpoint}' --output json
+          aws apigatewayv2 get-routes --api-id "$api_id" \
+            --query 'Items[].{route:RouteKey,target:Target,authorizationType:AuthorizationType,authorizerId:AuthorizerId}' --output json
+          aws apigatewayv2 get-integrations --api-id "$api_id" \
+            --query 'Items[].{integrationId:IntegrationId,type:IntegrationType,method:IntegrationMethod,uri:IntegrationUri,connectionType:ConnectionType,connectionId:ConnectionId,payloadFormatVersion:PayloadFormatVersion,timeout:TimeoutInMillis}' --output json
       - name: Authenticate and inspect protected routes
         shell: bash
         run: |
