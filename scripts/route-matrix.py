@@ -14,10 +14,13 @@ def expand(text, safe_ids=False):
         text = text.replace("{{" + key + "}}", replacement)
     return text
 
-def call(method, url, token="", body=None):
+def call(method, url, token="", body=None, webhook_secret=""):
     data = json.dumps(body).encode() if body is not None else None
     headers = {"X-Correlation-ID": "route-matrix-" + os.environ.get("GITHUB_RUN_ID", "local")}
-    if token: headers["Authorization"] = "Bearer " + token
+    if webhook_secret:
+        headers["X-Webhook-Secret"] = webhook_secret
+    elif token:
+        headers["Authorization"] = "Bearer " + token
     if body is not None: headers["Content-Type"] = "application/json"
     request = urllib.request.Request(expand(url), data=data, headers=headers, method=method)
     try:
@@ -55,7 +58,9 @@ for key, path in (("cliente_id", "clientes"), ("veiculo_id", "veiculos"), ("serv
 
 collection = json.load(open(os.path.join(os.path.dirname(__file__), "..", "docs", "http", "postman", "async-furious.postman_collection.json"), encoding="utf-8"))
 items = collection["item"][1]["item"]
-role_token = {"public": tokens["customer"], "any": tokens["admin"], "admin": tokens["admin"], "receptionist": tokens["receptionist"], "mechanic": tokens["mechanic"], "webhook": value("WEBHOOK_TOKEN") or tokens["customer"]}
+webhook_secret = value("WEBHOOK_TOKEN")
+if not webhook_secret: raise RuntimeError("WEBHOOK_TOKEN is required")
+role_token = {"public": tokens["customer"], "any": tokens["admin"], "admin": tokens["admin"], "receptionist": tokens["receptionist"], "mechanic": tokens["mechanic"]}
 failures = 0; skipped = 0
 for item in items:
     req = item["request"]; method = req["method"]; url = req["url"]["raw"]
@@ -64,7 +69,10 @@ for item in items:
     raw = req.get("body", {}).get("raw")
     safe_ids = method in {"POST", "PATCH"} and not url.endswith("/auth/login")
     body = json.loads(expand(raw, safe_ids)) if raw else None
-    status, _ = call(method, expand(url, safe_ids), role_token.get(role, tokens["customer"]), body)
+    if role == "webhook":
+        status, _ = call(method, expand(url, safe_ids), body=body, webhook_secret=webhook_secret)
+    else:
+        status, _ = call(method, expand(url, safe_ids), role_token.get(role, tokens["customer"]), body)
     print(f"{method} {url.split('/api/v1')[-1] or '/'} => {status}")
     if status in (401, 403): failures += 1
 if skipped: print(f"DELETE routes skipped (destructive-request policy): {skipped}")

@@ -12,9 +12,10 @@ routes = [
     ("POST", "/auth/register", "admin", {"email": "new-user@example.invalid", "password": "{{new_password}}", "name": "Collection User", "role": "RECEPCIONISTA"}),
 ]
 for resource, singular in (("clientes", "cliente"), ("veiculos", "veiculo"), ("servicos", "servico")):
-    routes += [("POST", f"/{resource}", "receptionist", {}), ("GET", f"/{resource}", "any", None),
+    create_role = "admin" if resource == "servicos" else "receptionist"
+    routes += [("POST", f"/{resource}", create_role, {}), ("GET", f"/{resource}", "any", None),
                ("GET", f"/{resource}/{{{{{singular}_id}}}}", "any", None),
-               ("PATCH", f"/{resource}/{{{{{singular}_id}}}}", "receptionist", {}),
+               ("PATCH", f"/{resource}/{{{{{singular}_id}}}}", "admin" if resource == "servicos" else "receptionist", {}),
                ("DELETE", f"/{resource}/{{{{{singular}_id}}}}", "admin", None)]
 routes += [
     ("POST", "/pecas", "admin", {}), ("GET", "/pecas", "any", None),
@@ -60,7 +61,10 @@ def postman_request(method, path, role, body):
         req["request"]["body"] = {"mode": "raw", "raw": json.dumps(body), "options": {"raw": {"language": "json"}}}
     token = tokens[role]
     if token:
-        req["request"]["auth"] = {"type": "bearer", "bearer": [{"key": "token", "value": token, "type": "string"}]}
+        if role == "webhook":
+            req["request"]["header"].append({"key": "X-Webhook-Secret", "value": "{{webhook_token}}"})
+        else:
+            req["request"]["auth"] = {"type": "bearer", "bearer": [{"key": "token", "value": token, "type": "string"}]}
     return req
 
 login_script = """const data = pm.response.json(); const token = data.access_token || data.token; if (token) pm.environment.set(pm.request.name.toLowerCase().includes('receptionist') ? 'receptionist_token' : pm.request.name.toLowerCase().includes('mechanic') ? 'mechanic_token' : 'admin_token', token);"""
@@ -84,7 +88,10 @@ for i, (name, url, body, token_name, auth) in enumerate([
     request = {"_id": f"auth_{i:02d}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "url": url, "name": name, "method": "POST", "body": {"mimeType": "application/json", "text": json.dumps(body)}, "headers": [{"name": "Content-Type", "value": "application/json"}], "authentication": {"type": "bearer", "token": "{{customer_token}}"} if auth else {}, "scripts": {"afterResponse": f"const token = insomnia.response.json().access_token || insomnia.response.json().token; if (token) insomnia.environment.set('{token_name}', token);"}, "_type": "request"}
     insomnia["resources"].append(request)
 for i, (method, path, role, body) in enumerate(routes):
-    insomnia["resources"].append({"_id": f"req_{i:03d}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "url": BASE + path, "name": f"{method} {path}", "description": f"Role: {role}", "method": method, "body": {"mimeType": "application/json", "text": json.dumps(body)} if body is not None else {}, "headers": [{"name": "Content-Type", "value": "application/json"}] if body is not None else [], "authentication": {"type": "bearer", "token": tokens[role]} if tokens[role] else {}, "_type": "request"})
+    headers = [{"name": "Content-Type", "value": "application/json"}] if body is not None else []
+    authentication = {"type": "bearer", "token": tokens[role]} if tokens[role] and role != "webhook" else {}
+    if role == "webhook": headers.append({"name": "X-Webhook-Secret", "value": "{{webhook_token}}"})
+    insomnia["resources"].append({"_id": f"req_{i:03d}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "url": BASE + path, "name": f"{method} {path}", "description": f"Role: {role}", "method": method, "body": {"mimeType": "application/json", "text": json.dumps(body)} if body is not None else {}, "headers": headers, "authentication": authentication, "_type": "request"})
 for name in ("HML", "PROD"):
     insomnia["resources"].append({"_id": f"env_{name.lower()}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "name": name, "data": {v["key"]: v["value"] for v in variables} | {"base_url": "", "customer_auth_url": ""}, "_type": "environment"})
 
