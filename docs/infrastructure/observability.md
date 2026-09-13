@@ -166,9 +166,30 @@
   no evento `finish` da resposta, depois que o agente já encerrou o
   segmento da transação. Não é bug, é limitação de timing conhecida dessa
   integração.
-- **Ainda não testado de verdade**: as outras 4 condições (indisponibilidade,
-  CPU, memória, crash loop) — roteiro de teste no comentário original da
-  issue.
+- **Teste das outras 4 condições** (workflow `.github/workflows/observability-alert-scenarios.yml`,
+  manual, sob demanda): escalar a app a zero, `stress` de CPU/memória num
+  pod, forçar crash loop.
+  - **App indisponível**: sinal real confirmado (tráfego caiu de ~44
+    transações/min pra **0 por 4 minutos seguidos**), mas **nenhum
+    e-mail chegou**. Causa raiz: a condição tinha `fill_option: "NONE"` —
+    numa janela sem nenhuma transação, a consulta não retorna linha
+    nenhuma, e o avaliador **ignora** a janela em vez de comparar "0 < 1".
+    Corrigido com `fill_option = "static"` / `fill_value = 0`, fazendo
+    silêncio virar um "0" explícito e comparável. Ainda não reexecutado
+    depois do fix.
+  - **Pod em crash loop**: `restartCount` chegou a 4 (limite: acima de 3),
+    mas também sem e-mail — suspeita é o `threshold_duration` de 10 min
+    não ter sido sustentado (o pod foi apagado poucos minutos depois de
+    cruzar o limite, antes da janela de avaliação completar).
+  - **CPU e memória excessiva**: os pods de stress rodaram com o limite de
+    recurso correto, mas **todas as amostras coletadas já mostravam o
+    container `Terminated`** — o agente de infraestrutura não chegou a
+    capturar `cpuUsedCores`/`memoryWorkingSetBytes` de um pod tão efêmero
+    em execução, só o estado final. Inconclusivo, não é claro se a
+    condição chegaria a avaliar dado suficiente.
+  - **Confirmado via `NrAiIssue` (NRQL) e a API de Issues da New Relic**:
+    zero alertas foram abertos até agora nessa conta, em qualquer
+    condição — bate com a ausência de e-mails.
 
 ## O que a Fase 3 exige e o estado de cada item
 
@@ -181,16 +202,19 @@
 | Health checks / monitoramento (#165) | Reaproveita probes existentes + #163; sem Synthetic monitor por falta de rota pública (decisão registrada acima) |
 | Tracing distribuído (Gateway → Lambda → EKS → RDS) | Agente cobre a aplicação a partir do EKS; correlação com a Function Serverless não avaliada |
 | Dashboards | **Aplicado em HML/PROD** (issue #166) — página "Aplicação" populando |
-| Alertas | Aplicado em HML/PROD (issue #167); condição de taxa de erro testada e corrigida, as outras 4 condições ainda não testadas |
+| Alertas | Aplicado em HML/PROD (issue #167); **nenhuma das 5 condições confirmou e-mail entregue ainda** — 1 bug de configuração achado e corrigido (`fill_option`), demais pendentes de reteste |
 
 ## Pendências
 
-- Testar de verdade as 4 condições de alerta restantes do #167
-  (indisponibilidade, CPU, memória, crash loop) — roteiro no comentário
-  original da issue.
-- Confirmar por e-mail que o alerta de "taxa de erro alta" corrigido
-  dispara de verdade (reexecutar o teste de 200 requisições autenticadas
-  contra rota inexistente e aguardar a notificação).
+- **Nenhum alerta do #167 chegou a enviar e-mail ainda** (confirmado via
+  `NrAiIssue`/API de Issues, zero eventos). Reexecutar todas as 5
+  condições depois do fix de `fill_option` na condição de
+  indisponibilidade e confirmar recebimento de verdade — incluindo a de
+  taxa de erro, já corrigida mas nunca reexecutada desde a correção.
+- Investigar se CPU/memória/crash loop precisam de ajuste semelhante
+  (`threshold_duration` mais curto, ou pod de stress sem timeout
+  automático que fique vivo tempo suficiente pro agente capturar uma
+  amostra em execução).
 - Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o APM
   estiver validado e a capacidade dos nós do EKS for confirmada com a carga
   adicional.

@@ -166,9 +166,18 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   marca 4xx como erro por padrão — condição corrigida pra usar
   `numeric(http.statusCode) >= 400` em vez de `WHERE error IS true`
   (mesmo ajuste replicado no widget de taxa de erro do dashboard do
-  #166). As outras 4 condições (indisponibilidade, CPU, memória, crash
-  loop) ainda não foram exercitadas de verdade (roteiro no comentário
-  original da issue).
+  #166).
+- **Testadas as outras 4 condições** (workflow manual
+  `observability-alert-scenarios.yml`): indisponibilidade (sinal real
+  confirmado, app ficou com 0 transações por 4 min) e crash loop
+  (restartCount chegou a 4) tiveram sinal real capturado; CPU e memória
+  ficaram inconclusivas (agente não capturou uso de um pod de stress
+  efêmero antes dele terminar). **Nenhuma das 5 condições enviou e-mail**
+  — confirmado via `NrAiIssue`/API de Issues (zero alertas abertos na
+  conta). Causa raiz encontrada para a de indisponibilidade:
+  `fill_option: "NONE"` faz o avaliador ignorar janelas sem nenhuma
+  transação em vez de tratar como "0" — corrigido com
+  `fill_option = "static"` / `fill_value = 0`. Reteste pendente.
 
 ### O que ainda não foi feito
 
@@ -177,9 +186,12 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   completed" do `pino-http` não carrega `trace.id`/`span.id` — dispara
   depois que o agente já encerrou o segmento da transação (limitação de
   timing, não bug).
-- **Alertas (#167)**: aplicado em HML/PROD, condição de taxa de erro
-  testada e corrigida; as outras 4 condições (indisponibilidade, CPU,
-  memória, crash loop) ainda não foram exercitadas de verdade.
+- **Alertas (#167)**: aplicado em HML/PROD e as 5 condições testadas ao
+  menos uma vez, mas **nenhuma confirmou e-mail entregue** ainda. Fix do
+  `fill_option` pronto pra reteste da condição de indisponibilidade;
+  taxa de erro (já corrigida) e crash loop precisam de reteste; CPU e
+  memória precisam de um método de teste diferente (pod de stress que
+  fique vivo mais tempo).
 
 ## Alternativas consideradas
 
