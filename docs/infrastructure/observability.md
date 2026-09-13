@@ -2,12 +2,12 @@
 
 > Decisão registrada em [ADR-0005](../adr/0005-observabilidade.md): New
 > Relic, implementado em código nas issues #163 (plataforma), #164 (logs
-> estruturados) e #165 (monitoramento). Infraestrutura do cluster e logs
-> **já validados em HML com dado real** (consulta direta via API da New
-> Relic em 2026-09-13); o agente APM da aplicação ainda não — ver
-> "Pendências" abaixo.
+> estruturados) e #165 (monitoramento), com dashboards (#166) e alertas
+> (#167) aplicados em cima. **Infraestrutura, logs e APM já validados em
+> HML com dado real** (consulta direta via API da New Relic em
+> 2026-09-13) — ver "Pendências" abaixo pro que ainda falta testar.
 
-## Estado atual: infraestrutura e logs validados, APM com bug conhecido
+## Estado atual: infraestrutura, logs e APM validados
 
 - **APM da aplicação** (`async-furious-project`): agente `newrelic`
   instrumentando `src/main.ts`, configurado 100% via variável de ambiente
@@ -38,17 +38,23 @@
   para `tc3-eks-hml`, ~11 mil amostras/24h) e logs (`newrelic-logging`,
   ~129 mil linhas/24h, incluindo os logs JSON do `nestjs-pino` do pod da
   aplicação) chegando normalmente.
-- **APM da aplicação ainda não confirmado**: zero transações reportadas.
-  Causa raiz identificada no log do próprio pod —
-  `New Relic failed to open log file /app/newrelic_agent.log` (`EACCES`).
-  O `Dockerfile` só copia `node_modules`/`prisma`/`dist`/`dist-scripts` com
-  `--chown=nodejs:nodejs` no estágio de produção; o diretório `/app` em si
-  continua do `root`, e o container roda como `USER nodejs` — o agente não
-  consegue criar o arquivo de log e a inicialização não chega a reportar
-  dado. Fix aplicado: `NEW_RELIC_LOG: "stdout"` no ConfigMap
-  (`k8s/config/configmap.yaml`), evitando qualquer escrita em disco pelo
-  agente. Ainda pendente de validação end-to-end (o deploy de teste
-  esbarrou numa falha de infraestrutura não relacionada — ver Pendências).
+- **APM da aplicação validado em HML** (entidade `async-furious-project-hml`,
+  transações reais chegando). Dois bugs encontrados e corrigidos no
+  caminho, ambos escondidos um atrás do outro:
+  1. `New Relic failed to open log file /app/newrelic_agent.log` (`EACCES`)
+     — o `Dockerfile` só copia `node_modules`/`prisma`/`dist`/`dist-scripts`
+     com `--chown=nodejs:nodejs`; o diretório `/app` em si continua do
+     `root`, e o container roda como `USER nodejs`. Corrigido com
+     `NEW_RELIC_LOG: "stdout"` no ConfigMap, evitando qualquer escrita em
+     disco pelo agente.
+  2. Depois do fix acima, o agente conectava mas com
+     `Your license key appears to be invalid (401)` — o secret
+     `NEW_RELIC_LICENSE_KEY` do `async-furious-project` (independente do
+     mesmo secret no `repo-k8s-infra`, GitHub não compartilha entre repos)
+     estava com um valor errado/truncado. Corrigido gerando uma nova
+     "Ingest - License" key e validando com `curl` direto na Metric API
+     da New Relic antes de salvar no secret — evita depender só do
+     deploy completo pra saber se a key está certa.
 
 ## O que já existia e foi reaproveitado (sem mudança) — issue #165
 
@@ -108,9 +114,9 @@
     `cluster_name` (snake_case), diferente de `clusterName` (camelCase)
     usado pelos samples de infraestrutura — confirmado consultando a API
     da New Relic diretamente em 2026-09-13.
-- **Estado**: código escrito e validado localmente (`terraform fmt`,
-  `init`, `validate` — todos passando, incluindo o schema do provider
-  `newrelic`), **ainda não aplicado** em HML/PROD.
+- **Estado**: aplicado em HML e PROD em 2026-09-13, dashboards confirmados
+  existindo via API da New Relic — página "Aplicação" já populando com
+  dado real do APM.
 
 ## Alertas operacionais (issue #167)
 
@@ -126,7 +132,7 @@
   | Condição | Fonte | Limite |
   |---|---|---|
   | App indisponível | `count(*)` em `Transaction` | abaixo de 1 em 5 min |
-  | Taxa de erro alta | `percentage(count(*), WHERE error IS true)` em `Transaction` | acima de 5% em 5 min |
+  | Taxa de erro alta | `percentage(count(*), WHERE numeric(http.statusCode) >= 400)` em `Transaction` | acima de 5% em 5 min |
   | CPU excessiva | `average(cpuUsedCores/cpuLimitCores)*100` em `K8sContainerSample` | acima de 80% em 10 min |
   | Memória excessiva | `average(memoryWorkingSetBytes/memoryLimitBytes)*100` em `K8sContainerSample` | acima de 80% em 10 min |
   | Pod em crash loop | `sum(restartCount)` em `K8sContainerSample`, facetado por `podName` | acima de 3 restarts em 10 min |
@@ -140,10 +146,29 @@
 - **Schema do provider verificado localmente** antes de escrever o código
   (`terraform providers schema -json`, contra o `newrelic/newrelic
   v3.97.5` real) — evitou adivinhar nomes de atributo às cegas.
-- **Estado**: código escrito e validado (`terraform fmt`/`init`/
-  `validate`), **ainda não aplicado** — depende do #166 já estar de pé
-  (mesmo `newrelic_alert_policy`/provider), que por sua vez depende da
-  validação do #163.
+- **Terraform aplicado em HML e PROD em 2026-09-13** — dashboard (#166) e
+  política de alertas (#167) confirmados existindo de verdade via API da
+  New Relic (`tc3-observability-hml`/`-prod`, 3 páginas cada).
+- **Bug real encontrado testando a condição "Taxa de erro alta"**: gerei
+  200 requisições autenticadas de verdade contra uma rota inexistente
+  (todas `404`) e a taxa de erro ficou em **0%** — o atributo `error` que
+  o agente Node da New Relic marca no evento `Transaction` **não conta
+  4xx como erro por padrão** (só 5xx/exceções não tratadas específicas).
+  A condição original (`WHERE error IS true`), copiada do roteiro da
+  issue, não dispararia nesse cenário. Corrigido trocando para
+  `WHERE numeric(http.statusCode) >= 400`, usando o atributo real
+  confirmado nos dados (`http.statusCode`, string) — tanto na condição de
+  alerta quanto no widget equivalente do dashboard do #166.
+- **Achado extra do mesmo teste**: a correlação `trace.id`/`span.id`
+  ("Logs in Context", #164) funciona para logs emitidos *durante* a
+  requisição (ex.: o log de exceção do `GlobalExceptionFilter`), mas
+  **não** para o log de "request completed" do `pino-http` — esse dispara
+  no evento `finish` da resposta, depois que o agente já encerrou o
+  segmento da transação. Não é bug, é limitação de timing conhecida dessa
+  integração.
+- **Ainda não testado de verdade**: as outras 4 condições (indisponibilidade,
+  CPU, memória, crash loop) — roteiro de teste no comentário original da
+  issue.
 
 ## O que a Fase 3 exige e o estado de cada item
 
@@ -151,25 +176,21 @@
 |---|---|
 | Logs centralizados | **Validado em HML** (`nestjs-pino` + forwarding via Fluent Bit) |
 | Níveis de severidade | Implementado em código (`info`/`warn`/`error` por status HTTP), validação de conteúdo real ainda não revisada linha a linha |
-| Métricas de aplicação (latência, taxa de erro, throughput) | Bug de permissão identificado e corrigido (`NEW_RELIC_LOG=stdout`); validação end-to-end pendente |
+| Métricas de aplicação (latência, taxa de erro, throughput) | **Validado em HML** — agente reportando transações reais (dois bugs corrigidos: permissão de log e license key) |
 | Métricas de infraestrutura do cluster (CPU/memória por nó) | **Validado em HML** (`newrelic-infrastructure`) |
 | Health checks / monitoramento (#165) | Reaproveita probes existentes + #163; sem Synthetic monitor por falta de rota pública (decisão registrada acima) |
 | Tracing distribuído (Gateway → Lambda → EKS → RDS) | Agente cobre a aplicação a partir do EKS; correlação com a Function Serverless não avaliada |
-| Dashboards | Terraform escrito e validado localmente (issue #166), não aplicado |
-| Alertas | Terraform escrito e validado localmente (issue #167), não aplicado |
+| Dashboards | **Aplicado em HML/PROD** (issue #166) — página "Aplicação" populando |
+| Alertas | Aplicado em HML/PROD (issue #167); condição de taxa de erro testada e corrigida, as outras 4 condições ainda não testadas |
 
 ## Pendências
 
-- Validar o agente APM depois do fix de `NEW_RELIC_LOG=stdout` — confirmar
-  a entidade `async-furious-project-hml` reportando transações reais, e
-  que a correlação `trace.id`/log ("Logs in Context") funciona na UI do
-  New Relic antes de fechar a issue #163.
-- Aplicar o Terraform do #166 em HML e confirmar visualmente que os
-  widgets carregam dado real antes de fechar a issue.
-- Aplicar o Terraform do #167 e testar cada uma das 5 condições de verdade
-  (escalar a app pra zero, gerar taxa de erro, estressar CPU/memória de um
-  pod, forçar um crash loop) antes de fechar a issue — roteiro já
-  documentado no comentário original do #167.
+- Testar de verdade as 4 condições de alerta restantes do #167
+  (indisponibilidade, CPU, memória, crash loop) — roteiro no comentário
+  original da issue.
+- Confirmar por e-mail que o alerta de "taxa de erro alta" corrigido
+  dispara de verdade (reexecutar o teste de 200 requisições autenticadas
+  contra rota inexistente e aguardar a notificação).
 - Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o APM
   estiver validado e a capacidade dos nós do EKS for confirmada com a carga
   adicional.
