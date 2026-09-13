@@ -56,6 +56,37 @@
   middleware manual) e sua propagação automática para qualquer log emitido
   durante a requisição.
 
+## Dashboards operacionais (issue #166)
+
+- **Terraform, não UI manual**: recurso `newrelic_one_dashboard` no
+  `repo-k8s-infra`, branch `feat/I-166_DashboardsOps` — criada a partir de
+  `main` (não `develop`), mesmo motivo do workaround do #163: o
+  `nri-bundle` (e agora também este recurso) só existe em `main` até a
+  sincronização `develop`↔`main` desse repositório acontecer.
+- **Provider novo**: `newrelic/newrelic` (`versions.tf`), com duas
+  variáveis novas — `new_relic_account_id` e `new_relic_api_key` — a
+  segunda é uma **User API key** (`NRAK-...`), diferente da
+  `new_relic_license_key` (uma ingest key) já usada pelo `nri-bundle`.
+  Segredo `NEW_RELIC_API_KEY` e variável `NEW_RELIC_ACCOUNT_ID` já criados
+  no GitHub do `repo-k8s-infra` em 2026-09-13.
+- **Um dashboard por ambiente** (`tc3-observability-${environment}`),
+  permissão `public_read_only`, três páginas, reaproveitando 100% dado que
+  já vem do #163/#164 (nenhuma instrumentação nova):
+  - **Aplicação** (fonte: entidade APM `async-furious-project-${environment}`):
+    tempo de resposta médio, throughput, taxa de erro, apdex, top
+    endpoints por tempo de resposta.
+  - **Infraestrutura** (fonte: `newrelic-infrastructure`, `K8sContainerSample`/
+    `K8sNodeSample` filtrados por `clusterName`): CPU e memória por pod,
+    contagem de pods/restarts, nós do cluster.
+  - **Logs** (fonte: `newrelic-logging`): volume de logs por nível,
+    últimos erros — atenção ao nome do atributo: eventos `Log` usam
+    `cluster_name` (snake_case), diferente de `clusterName` (camelCase)
+    usado pelos samples de infraestrutura — confirmado consultando a API
+    da New Relic diretamente em 2026-09-13.
+- **Estado**: código escrito e validado localmente (`terraform fmt`,
+  `init`, `validate` — todos passando, incluindo o schema do provider
+  `newrelic`), **ainda não aplicado** em HML/PROD.
+
 ## O que a Fase 3 exige e o estado de cada item
 
 | Requisito | Estado |
@@ -65,7 +96,7 @@
 | Métricas de aplicação (latência, taxa de erro, throughput) | Implementado em código (agente APM), não validado |
 | Métricas de infraestrutura do cluster (CPU/memória por nó) | Implementado em código (`newrelic-infrastructure`), não validado |
 | Tracing distribuído (Gateway → Lambda → EKS → RDS) | Agente cobre a aplicação a partir do EKS; correlação com a Function Serverless não avaliada |
-| Dashboards | Não iniciado (issue #166) |
+| Dashboards | Terraform escrito e validado localmente (issue #166), não aplicado |
 | Alertas | Não iniciado (issue #167) |
 
 ## Pendências
@@ -75,6 +106,8 @@
   fechar as issues #163 e #164 — inclusive validar que a correlação
   `trace.id`/log ("Logs in Context") realmente funciona na UI do New
   Relic, não só que os dados chegam.
+- Aplicar o Terraform do #166 em HML e confirmar visualmente que os
+  widgets carregam dado real antes de fechar a issue.
 - Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o básico
   estiver validado e a capacidade dos nós do EKS for confirmada com a carga
   adicional.
