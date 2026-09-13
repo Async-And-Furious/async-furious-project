@@ -910,11 +910,11 @@ async function seedRelations(
     const existingOsService = await db.osServico.findFirst({ where: { id_ordem_servico: order.id, id_servico: serviceId } });
     const osService = existingOsService
       ? await db.osServico.update({ where: { id: existingOsService.id }, data: { quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco } })
-      : await db.osServico.create({ id: osServiceId, id_ordem_servico: order.id, id_servico: serviceId, quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco });
+      : await db.osServico.create({ data: { id: osServiceId, id_ordem_servico: order.id, id_servico: serviceId, quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco } });
     const existingOsPart = await db.osPeca.findFirst({ where: { id_ordem_servico: order.id, id_peca: partId } });
     const osPart = existingOsPart
       ? await db.osPeca.update({ where: { id: existingOsPart.id }, data: { quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco } })
-      : await db.osPeca.create({ id: osPartId, id_ordem_servico: order.id, id_peca: partId, quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco });
+      : await db.osPeca.create({ data: { id: osPartId, id_ordem_servico: order.id, id_peca: partId, quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco } });
     orderServices.push(osService.id);
     orderParts.push(osPart.id);
 
@@ -944,7 +944,7 @@ async function seedRelations(
       const existingReservation = await db.reservaEstoque.findFirst({ where: { ordem_id: order.id, peca_id: partId } });
       const reservation = existingReservation
         ? await db.reservaEstoque.update({ where: { id: existingReservation.id }, data: { quantidade: 1 } })
-        : await db.reservaEstoque.create({ id: reservationId, ordem_id: order.id, peca_id: partId, quantidade: 1 });
+        : await db.reservaEstoque.create({ data: { id: reservationId, ordem_id: order.id, peca_id: partId, quantidade: 1 } });
       reservations.push(reservation.id);
     }
   }
