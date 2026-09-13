@@ -1,17 +1,24 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ArgumentsHost, HttpStatus, HttpException } from '@nestjs/common';
+import { getLoggerToken } from 'nestjs-pino';
 import { GlobalExceptionFilter } from '../../src/shared/infrastructure/filters/global-exception.filter';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
+  let mockLogger: { error: jest.Mock; warn: jest.Mock };
   let mockResponse: any;
   let mockRequest: any;
   let mockArgumentsHost: ArgumentsHost;
 
   beforeEach(async () => {
+    mockLogger = { error: jest.fn(), warn: jest.fn() };
+
     const module: TestingModule = await Test.createTestingModule({
-      providers: [GlobalExceptionFilter],
+      providers: [
+        GlobalExceptionFilter,
+        { provide: getLoggerToken(GlobalExceptionFilter.name), useValue: mockLogger },
+      ],
     }).compile();
 
     filter = module.get<GlobalExceptionFilter>(GlobalExceptionFilter);
@@ -118,6 +125,42 @@ describe('GlobalExceptionFilter', () => {
 
       const responseCall = mockResponse.json.mock.calls[0][0];
       expect(responseCall.path).toBe('/api/v1/clientes/123');
+    });
+
+    it('deve incluir o correlationId da requisição (definido pelo pino-http) na resposta', () => {
+      mockRequest.id = 'trace-123';
+      const error = new Error('Test error');
+
+      filter.catch(error, mockArgumentsHost);
+
+      const responseCall = mockResponse.json.mock.calls[0][0];
+      expect(responseCall.correlationId).toBe('trace-123');
+    });
+  });
+
+  describe('severidade do log', () => {
+    it('loga como error quando o status é 5xx', () => {
+      const error = new Error('Falha interna');
+
+      filter.catch(error, mockArgumentsHost);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        { err: error, statusCode: HttpStatus.INTERNAL_SERVER_ERROR },
+        expect.any(String)
+      );
+      expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
+
+    it('loga como warn quando o status é 4xx', () => {
+      const domainException = new DomainException('Erro de domínio');
+
+      filter.catch(domainException, mockArgumentsHost);
+
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        { err: domainException, statusCode: HttpStatus.BAD_REQUEST },
+        expect.any(String)
+      );
+      expect(mockLogger.error).not.toHaveBeenCalled();
     });
   });
 
