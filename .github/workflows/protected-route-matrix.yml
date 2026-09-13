@@ -54,3 +54,10 @@ jobs:
           fornecedor_id: ${{ vars.SEEDED_FORNECEDOR_ID }}
           pedido_fornecedor_id: ${{ vars.SEEDED_PEDIDO_FORNECEDOR_ID }}
         run: python scripts/route-matrix.py
+      - name: Run controlled read-then-PATCH validation
+        env:
+          CUSTOMER_CPF: ${{ secrets.SEEDED_CPF }}
+          ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+          RECEPTIONIST_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+        run: python scripts/controlled-patch-validation.py
