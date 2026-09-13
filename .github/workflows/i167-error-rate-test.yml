@@ -1,0 +1,67 @@
+name: I-167 alert test - error rate
+
+# Temporary, manual-only workflow to validate the "taxa de erro alta"
+# NRQL alert condition from issue #167. Authenticates with the seeded
+# customer CPF (same pattern as protected-route-diagnostics.yml) and
+# hits a route that doesn't exist in the app, generating real error
+# Transactions in APM (unlike an unauthenticated request, which the
+# Lambda Authorizer would reject before it ever reaches the pod).
+
+on:
+  workflow_dispatch:
+    inputs:
+      requests:
+        description: Number of requests to send to the nonexistent route
+        required: true
+        default: '200'
+
+permissions:
+  contents: read
+
+jobs:
+  generate-error-traffic:
+    name: Generate authenticated error traffic (HML)
+    runs-on: ubuntu-latest
+    environment: hml
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+
+      - name: Authenticate and generate error traffic
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-hml'].ApiEndpoint | [0]" --output text)"
+          test -n "$endpoint" -a "$endpoint" != None
+
+          auth_payload="$(curl --silent --show-error --max-time 20 -H 'content-type: application/json' \
+            -d "$(python -c 'import json,os; print(json.dumps({"cpf":os.environ["SEEDED_CPF"]}))')" \
+            --write-out $'\n%{http_code}' "$endpoint/auth")"
+          auth_status="${auth_payload##*$'\n'}"; auth_body="${auth_payload%$'\n'*}"
+          test "$auth_status" = "200" || { echo "POST /auth failed with $auth_status" >&2; exit 1; }
+          token="$(printf '%s' "$auth_body" | python -c 'import json,sys; print(json.load(sys.stdin).get("token", ""))')"
+          test -n "$token" || { echo "No token returned from /auth" >&2; exit 1; }
+
+          declare -A counts
+          for i in $(seq 1 "${{ inputs.requests }}"); do
+            correlation="github-i167-error-test-${GITHUB_RUN_ID}-${i}"
+            status="$(curl --silent --show-error --max-time 20 -o /dev/null -w '%{http_code}' \
+              -H "authorization: Bearer $token" \
+              -H "x-correlation-id: $correlation" \
+              "$endpoint/api/v1/rota-inexistente-i167-teste")"
+            counts[$status]=$(( ${counts[$status]:-0} + 1 ))
+          done
+
+          echo "### Status code distribution" >> "$GITHUB_STEP_SUMMARY"
+          for status in "${!counts[@]}"; do
+            echo "- $status: ${counts[$status]}" >> "$GITHUB_STEP_SUMMARY"
+          done
+          echo "Sample correlationId for log lookup: github-i167-error-test-${GITHUB_RUN_ID}-1" >> "$GITHUB_STEP_SUMMARY"
