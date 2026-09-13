@@ -455,6 +455,9 @@ jobs:
             kubectl describe pods --namespace "$K8S_NAMESPACE" --selector "job-name=$seed_job" || true
             exit 1
           }
+          kubectl logs "job/$seed_job" --namespace "$K8S_NAMESPACE" --all-containers=true \
+            | awk '/SEED_MANIFEST_BEGIN/{show=1} show{print} /SEED_MANIFEST_END/{exit}' \
+            | head -c 48000 >> "$GITHUB_STEP_SUMMARY"
       - name: Roll out application
         run: |
           set -euo pipefail
