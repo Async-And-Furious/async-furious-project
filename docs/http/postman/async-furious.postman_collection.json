@@ -1249,6 +1249,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{webhook_token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },

@@ -70,7 +70,7 @@ for item in items:
     safe_ids = method in {"POST", "PATCH"} and not url.endswith("/auth/login")
     body = json.loads(expand(raw, safe_ids)) if raw else None
     if role == "webhook":
-        status, _ = call(method, expand(url, safe_ids), body=body, webhook_secret=webhook_secret)
+        status, _ = call(method, expand(url, safe_ids), tokens["customer"], body, webhook_secret)
     else:
         status, _ = call(method, expand(url, safe_ids), role_token.get(role, tokens["customer"]), body)
     print(f"{method} {url.split('/api/v1')[-1] or '/'} => {status}")

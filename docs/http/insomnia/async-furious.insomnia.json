@@ -756,7 +756,10 @@
           "value": "{{webhook_token}}"
         }
       ],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{webhook_token}}"
+      },
       "_type": "request"
     },
     {
