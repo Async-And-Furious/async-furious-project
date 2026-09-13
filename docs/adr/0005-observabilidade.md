@@ -9,14 +9,21 @@ logs estruturados da aplicação implementados em código na issue
 [#164](https://github.com/Async-And-Furious/async-furious-project/issues/164)
 (branch `feat/I-164_ImplementarLogsEstruturados`, a partir da branch do
 #163 — o agente New Relic ainda não estava em `develop` quando #164
-começou).
-Dashboards (issue #166) e alertas (issue #167) com Terraform escrito e
-validado localmente (`repo-k8s-infra`, branches `feat/I-166_DashboardsOps`
-e `feat/I-167_AlertasOps`, a segunda em cima da primeira), ainda não
+começou), e monitoramento (issue #165) fechado por reaproveitar #163
+sem exigir mudança de infraestrutura. Dashboards (issue #166) e alertas
+(issue #167) com Terraform escrito e validado localmente
+(`repo-k8s-infra`, branches `feat/I-166_DashboardsOps` e
+`feat/I-167_AlertasOps`, a segunda em cima da primeira), ainda não
 aplicados.
-**Pendente**: validação end-to-end de #163/#164 (telemetria e logs
-chegando de fato no New Relic), e aplicar o Terraform de #166/#167 em
-HML/PROD com teste real de cada condição de alerta.
+
+**Validado em HML em 2026-09-13** (consulta direta à API da New Relic):
+infraestrutura do cluster e logs chegando com dado real. **Pendente**:
+o agente APM da aplicação — bug de permissão de arquivo identificado e
+corrigido (`NEW_RELIC_LOG=stdout`), validação end-to-end ainda não
+confirmada —, e aplicar o Terraform de #166/#167 em HML/PROD com teste
+real de cada condição de alerta. Ver
+[`docs/infrastructure/observability.md`](../infrastructure/observability.md)
+para o detalhe do bug e o estado atualizado de cada item.
 
 ## Contexto
 
