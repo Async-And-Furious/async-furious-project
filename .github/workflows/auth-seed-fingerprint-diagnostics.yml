@@ -114,14 +114,24 @@ jobs:
           app_secret_fingerprint=$(printf '%s' "$rds_secret_arn" | sha256sum | cut -d' ' -f1)
           app_secret_matches_state=true
 
-          PGPASSWORD="$db_password" psql "host=$state_host port=$state_port dbname=$state_name user=$db_user sslmode=require" \
-            -v ON_ERROR_STOP=1 -v seeded_cpf="$SEEDED_CPF" -Atqc "SELECT CASE WHEN EXISTS (SELECT 1 FROM \"Cliente\" WHERE \"documento\" = :'seeded_cpf' AND \"tipo_documento\" = 'CPF' AND \"ativo\" = true) THEN 'true' ELSE 'false' END" \
-            > "$RUNNER_TEMP/customer-active.txt"
-          customer_active=$(tr -d '\r\n' < "$RUNNER_TEMP/customer-active.txt")
-          [[ "$customer_active" == true || "$customer_active" == false ]]
+          customer_result=$(kubectl exec deployment/async-furious-api --namespace "$K8S_NAMESPACE" -- \
+            env SEEDED_CPF="$SEEDED_CPF" node -e '
+          const crypto = require("node:crypto");
+          const { PrismaClient, Prisma } = require("@prisma/client");
+          const db = new PrismaClient();
+          const url = new URL(process.env.DATABASE_URL);
+          const normalized = [url.hostname, url.port || "5432", url.pathname.slice(1), url.searchParams.get("schema") || "public"].join("|");
+          db.$queryRaw(Prisma.sql`SELECT current_database() AS db, current_schema() AS schema, EXISTS (SELECT 1 FROM "Cliente" WHERE "documento" = ${process.env.SEEDED_CPF} AND "tipo_documento" = 'CPF' AND "ativo" = true) AS active`)
+            .then((rows) => { console.log(JSON.stringify({ active: Boolean(rows[0].active), dbFingerprint: crypto.createHash("sha256").update(normalized).digest("hex"), schemaFingerprint: crypto.createHash("sha256").update(`${rows[0].db}|${rows[0].schema}`).digest("hex") })); })
+            .catch(() => process.exitCode = 1)
+            .finally(() => db.$disconnect());
+          ')
+          customer_active=$(jq -er '.active | tostring' <<<"$customer_result")
+          app_query_fingerprint=$(jq -er '.dbFingerprint' <<<"$customer_result")
+          app_schema_fingerprint=$(jq -er '.schemaFingerprint' <<<"$customer_result")
 
           printf 'target=%s seed_job_complete=%s customer_exists_active=%s\n' "$TARGET_ENVIRONMENT" "$seed_complete" "$customer_active" >> "$GITHUB_STEP_SUMMARY"
-          printf 'app_db_fingerprint=%s auth_db_fingerprint=%s state_db_fingerprint=%s\n' "$app_fingerprint" "$auth_fingerprint" "$state_fingerprint" >> "$GITHUB_STEP_SUMMARY"
+          printf 'app_db_fingerprint=%s app_query_fingerprint=%s auth_db_fingerprint=%s state_db_fingerprint=%s\n' "$app_fingerprint" "$app_query_fingerprint" "$auth_fingerprint" "$state_fingerprint" >> "$GITHUB_STEP_SUMMARY"
           printf 'app_rds_secret_fingerprint=%s auth_secret_fingerprint=%s auth_secret_mode=%s\n' "$app_secret_fingerprint" "$lambda_secret_fingerprint" "$(if [[ -n "$lambda_secret_arn" ]]; then echo arn; else echo url; fi)" >> "$GITHUB_STEP_SUMMARY"
-          printf 'database_identity_match=%s app_secret_identity_present=true seed_transaction_complete=%s\n' \
-            "$(if [[ "$app_fingerprint" == "$auth_fingerprint" && "$app_fingerprint" == "$state_fingerprint" ]]; then echo true; else echo false; fi)" "$seed_complete" >> "$GITHUB_STEP_SUMMARY"
+          printf 'database_identity_match=%s app_secret_identity_present=true seed_transaction_complete=%s schema_fingerprint=%s\n' \
+            "$(if [[ "$app_fingerprint" == "$auth_fingerprint" && "$app_fingerprint" == "$state_fingerprint" ]]; then echo true; else echo false; fi)" "$seed_complete" "$app_schema_fingerprint" >> "$GITHUB_STEP_SUMMARY"
