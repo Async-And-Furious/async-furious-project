@@ -6,7 +6,11 @@ SAFE_UUID = "00000000-0000-0000-0000-000000000000"
 def value(name): return base if name == "base_url" else os.environ.get(name, "")
 def expand(text, safe_ids=False):
     for key in ("base_url", "cliente_id", "veiculo_id", "servico_id", "peca_id", "ordem_id", "fornecedor_id", "pedido_fornecedor_id"):
-        replacement = value(key) if key == "base_url" else (SAFE_UUID if safe_ids else (os.environ.get(key.upper()) or value(key)))
+        replacement = value(key)
+        if key != "base_url" and safe_ids:
+            replacement = SAFE_UUID
+        elif key != "base_url":
+            replacement = os.environ.get(key.upper()) or value(key)
         text = text.replace("{{" + key + "}}", replacement)
     return text
 
@@ -38,8 +42,13 @@ tokens.update({"admin": login("ADMIN_EMAIL", "ADMIN_PASSWORD", customer_token), 
 
 def first_id(path, token):
     status, body = call("GET", base + "/api/v1/" + path, token)
-    rows = body.get("data", body if isinstance(body, list) else [])
-    return rows[0].get("id", "") if status == 200 and rows else ""
+    if isinstance(body, list):
+        rows = body
+    else:
+        rows = body.get("data", [])
+    if status == 200 and rows:
+        return rows[0].get("id", "")
+    return ""
 
 for key, path in (("cliente_id", "clientes"), ("veiculo_id", "veiculos"), ("servico_id", "servicos"), ("peca_id", "pecas"), ("ordem_id", "ordens-servico")):
     if not value(key): os.environ[key.upper()] = first_id(path, tokens["admin"])
