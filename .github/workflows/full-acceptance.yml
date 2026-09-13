@@ -55,8 +55,13 @@ jobs:
           test -n "$customer_token"
           printf 'target=%s customer_auth=200 token_present=true\n' "$TARGET" | tee -a "$GITHUB_STEP_SUMMARY"
 
+          admin_early_file="$RUNNER_TEMP/admin-early.json"
+          request -H "authorization: Bearer $customer_token" -d "$(EMAIL="$SEED_ADMIN_EMAIL" PASSWORD="$SEED_ADMIN_PASSWORD" python3 -c 'import json,os; print(json.dumps({"email":os.environ["EMAIL"],"password":os.environ["PASSWORD"]}))')" "$endpoint/api/v1/auth/login" > "$admin_early_file"
+          admin_early_token=$(json_status "$admin_early_file" access_token)
+          test -n "$admin_early_token"
+
           orders_file="$RUNNER_TEMP/orders.json"
-          request -H "authorization: Bearer $customer_token" "$endpoint/api/v1/ordens-servico" > "$orders_file"
+          request -H "authorization: Bearer $admin_early_token" "$endpoint/api/v1/ordens-servico" > "$orders_file"
           order_id=$(python3 - "$orders_file" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
