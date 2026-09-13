@@ -18,10 +18,10 @@ def expand(text, safe_ids=False):
 def call(method, url, token="", body=None, webhook_secret=""):
     data = json.dumps(body).encode() if body is not None else None
     headers = {"X-Correlation-ID": "route-matrix-" + os.environ.get("GITHUB_RUN_ID", "local")}
+    if token:
+        headers["Authorization"] = "Bearer " + token
     if webhook_secret:
         headers["X-Webhook-Secret"] = webhook_secret
-    elif token:
-        headers["Authorization"] = "Bearer " + token
     if body is not None: headers["Content-Type"] = "application/json"
     request = urllib.request.Request(expand(url), data=data, headers=headers, method=method)
     try:
@@ -94,7 +94,7 @@ expected_fingerprint = os.environ.get("WEBHOOK_TOKEN_FINGERPRINT", "").strip().l
 if expected_fingerprint and webhook_fingerprint != expected_fingerprint:
     raise RuntimeError("webhook secret fingerprint mismatch")
 print("manifest_routes=" + str(len(routes)) + " webhook_fingerprint=" + webhook_fingerprint[:16])
-role_token = {"public": tokens["customer"], "any": tokens["admin"], "admin": tokens["admin"], "receptionist": tokens["receptionist"], "mechanic": tokens["mechanic"]}
+role_token = {"customer": tokens["customer"], "admin": tokens["admin"], "receptionist": tokens["receptionist"], "mechanic": tokens["mechanic"], "webhook": tokens["admin"]}
 failures = 0; skipped = 0
 for item in items:
     req = item["request"]; method = req["method"]; url = req["url"]["raw"]
@@ -106,7 +106,7 @@ for item in items:
     safe_ids = method in {"POST", "PATCH"} and not url.endswith("/auth/login")
     body = json.loads(expand(raw, safe_ids)) if raw else None
     if role == "webhook":
-        status, _ = call(method, expand(url, safe_ids), "", body, webhook_secret)
+        status, _ = call(method, expand(url, safe_ids), role_token["webhook"], body, webhook_secret)
     else:
         status, _ = call(method, expand(url, safe_ids), role_token.get(role, tokens["customer"]), body)
     print(f"{method} {url.split('/api/v1')[-1] or '/'} => {status}")

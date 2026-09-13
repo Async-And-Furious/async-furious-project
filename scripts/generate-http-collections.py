@@ -43,10 +43,16 @@ def flatten(nodes):
 
 manifest_routes = flatten(manifest)
 assert len(manifest_routes) == 48 and len({r["id"] for r in manifest_routes}) == 48
-role_names = {"customer": "public", "staff": "any", "webhook": "webhook"}
-routes = [(r["method"], r["path"].removeprefix("/api/v1"), role_names[r["auth"]], r.get("mock_body")) for r in manifest_routes]
+def route_role(route):
+    if route["auth"] == "customer":
+        return "customer"
+    if route["auth"] == "webhook":
+        return "webhook"
+    return {"ADMIN": "admin", "RECEPCIONISTA": "receptionist", "MECANICO": "mechanic"}[route["role"]]
 
-tokens = {"public": "{{customer_token}}", "any": "{{admin_token}}", "admin": "{{admin_token}}", "receptionist": "{{receptionist_token}}", "mechanic": "{{mechanic_token}}", "webhook": "{{webhook_token}}"}
+routes = [(r["method"], r["path"].removeprefix("/api/v1"), route_role(r), r.get("mock_body")) for r in manifest_routes]
+
+tokens = {"customer": "{{customer_token}}", "public": "{{customer_token}}", "admin": "{{admin_token}}", "receptionist": "{{receptionist_token}}", "mechanic": "{{mechanic_token}}", "webhook": "{{admin_token}}"}
 variables = [
     {"key": "base_url", "value": "http://localhost:3000"}, {"key": "admin_email", "value": ""}, {"key": "admin_password", "value": ""},
     {"key": "receptionist_email", "value": ""}, {"key": "receptionist_password", "value": ""}, {"key": "mechanic_email", "value": ""}, {"key": "mechanic_password", "value": ""},
@@ -62,7 +68,7 @@ def postman_request(method, path, role, body):
     token = tokens[role]
     if role == "webhook":
         req["request"]["header"].append({"key": "X-Webhook-Secret", "value": "{{webhook_token}}"})
-    elif token:
+    if token:
         req["request"]["auth"] = {"type": "bearer", "bearer": [{"key": "token", "value": token, "type": "string"}]}
     return req
 
@@ -88,7 +94,7 @@ for i, (name, url, body, token_name, auth) in enumerate([
     insomnia["resources"].append(request)
 for i, (method, path, role, body) in enumerate(routes):
     headers = [{"name": "Content-Type", "value": "application/json"}] if body is not None else []
-    authentication = {"type": "bearer", "token": tokens[role]} if role != "webhook" and tokens[role] else {}
+    authentication = {"type": "bearer", "token": tokens[role]} if tokens[role] else {}
     if role == "webhook": headers.append({"name": "X-Webhook-Secret", "value": "{{webhook_token}}"})
     insomnia["resources"].append({"_id": f"req_{i:03d}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "url": BASE + path, "name": f"{method} {path}", "description": f"Role: {role}", "method": method, "body": {"mimeType": "application/json", "text": json.dumps(body)} if body is not None else {}, "headers": headers, "authentication": authentication, "_type": "request"})
 for name in ("HML", "PROD"):

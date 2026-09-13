@@ -304,7 +304,7 @@
                 "/"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -343,7 +343,7 @@
                 "/health"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -382,7 +382,7 @@
                 "/health/live"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -421,7 +421,7 @@
                 "/health/ready"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -460,7 +460,7 @@
                 "/auth/login"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"email\": \"{{email}}\", \"password\": \"{{password}}\"}",
@@ -499,7 +499,7 @@
                 "/auth/register"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"email\": \"new-user@example.invalid\", \"password\": \"{{new_password}}\", \"name\": \"Collection User\", \"role\": \"RECEPCIONISTA\"}",
@@ -538,7 +538,7 @@
                 "/clientes"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -553,7 +553,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{receptionist_token}}",
                   "type": "string"
                 }
               ]
@@ -577,7 +577,7 @@
                 "/clientes"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -616,7 +616,7 @@
                 "/clientes/{{cliente_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -655,7 +655,7 @@
                 "/clientes/{{cliente_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -670,7 +670,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{receptionist_token}}",
                   "type": "string"
                 }
               ]
@@ -694,7 +694,7 @@
                 "/clientes/{{cliente_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -733,7 +733,7 @@
                 "/veiculos"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -748,7 +748,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{receptionist_token}}",
                   "type": "string"
                 }
               ]
@@ -772,7 +772,7 @@
                 "/veiculos"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -811,7 +811,7 @@
                 "/veiculos/{{veiculo_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -850,7 +850,7 @@
                 "/veiculos/{{veiculo_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -865,7 +865,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{receptionist_token}}",
                   "type": "string"
                 }
               ]
@@ -889,7 +889,7 @@
                 "/veiculos/{{veiculo_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -928,7 +928,7 @@
                 "/servicos"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -967,7 +967,7 @@
                 "/servicos"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1006,7 +1006,7 @@
                 "/servicos/{{servico_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1045,7 +1045,7 @@
                 "/servicos/{{servico_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1084,7 +1084,7 @@
                 "/servicos/{{servico_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1123,7 +1123,7 @@
                 "/pecas"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1162,7 +1162,7 @@
                 "/pecas"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1201,7 +1201,7 @@
                 "/pecas/{{peca_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1240,7 +1240,7 @@
                 "/pecas/{{peca_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1279,7 +1279,7 @@
                 "/pecas/{{peca_id}}/estoque"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"quantidade\": 50}",
@@ -1318,7 +1318,7 @@
                 "/pecas/{{peca_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1357,7 +1357,7 @@
                 "/pecas/fornecedor/solicitar"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"fornecedorId\": \"{{fornecedor_id}}\", \"pecas\": [{\"pecaId\": \"{{peca_id}}\", \"quantidadeSolicitada\": 1}]}",
@@ -1396,7 +1396,7 @@
                 "/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1435,7 +1435,7 @@
                 "/pagamentos/registrar"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"ordemServicoId\": \"{{ordem_id}}\", \"valor\": 1}",
@@ -1487,6 +1487,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -1507,7 +1517,7 @@
                 "/ordens-servico"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"veiculoId\": \"{{veiculo_id}}\", \"clienteId\": \"{{cliente_id}}\", \"descricao\": \"Collection smoke order\"}",
@@ -1522,7 +1532,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{receptionist_token}}",
                   "type": "string"
                 }
               ]
@@ -1546,7 +1556,7 @@
                 "/ordens-servico"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1585,7 +1595,7 @@
                 "/ordens-servico/tempo-medio"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1624,7 +1634,7 @@
                 "/ordens-servico/{{ordem_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1663,7 +1673,7 @@
                 "/ordens-servico/{{ordem_id}}/status"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1702,7 +1712,7 @@
                 "/ordens-servico/{{ordem_id}}/rastreamento"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1741,7 +1751,7 @@
                 "/ordens-servico/{{ordem_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"descricao\": \"Collection smoke update\"}",
@@ -1780,7 +1790,7 @@
                 "/ordens-servico/{{ordem_id}}"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1819,7 +1829,7 @@
                 "/ordens-servico/{{ordem_id}}/assumir"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1834,7 +1844,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{mechanic_token}}",
                   "type": "string"
                 }
               ]
@@ -1858,7 +1868,7 @@
                 "/ordens-servico/{{ordem_id}}/analisar"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1873,7 +1883,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{mechanic_token}}",
                   "type": "string"
                 }
               ]
@@ -1897,7 +1907,7 @@
                 "/ordens-servico/{{ordem_id}}/servicos-insumos"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"valor_total_servicos\": 1, \"valor_total_pecas\": 1}",
@@ -1912,7 +1922,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{mechanic_token}}",
                   "type": "string"
                 }
               ]
@@ -1936,7 +1946,7 @@
                 "/ordens-servico/{{ordem_id}}/orcamento/aprovar"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -1975,7 +1985,7 @@
                 "/ordens-servico/{{ordem_id}}/orcamento/recusar"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -2014,7 +2024,7 @@
                 "/ordens-servico/{{ordem_id}}/finalizar-execucao"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -2029,7 +2039,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{mechanic_token}}",
                   "type": "string"
                 }
               ]
@@ -2053,7 +2063,7 @@
                 "/ordens-servico/{{ordem_id}}/aprovar-servico"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -2092,7 +2102,7 @@
                 "/ordens-servico/{{ordem_id}}/aprovar-servico"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{\"decisao\": \"APROVADO\"}",
@@ -2131,7 +2141,7 @@
                 "/ordens-servico/{{ordem_id}}/registrar-entrega"
               ]
             },
-            "description": "Role: any; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
             "body": {
               "mode": "raw",
               "raw": "{}",
@@ -2146,7 +2156,7 @@
               "bearer": [
                 {
                   "key": "token",
-                  "value": "{{admin_token}}",
+                  "value": "{{receptionist_token}}",
                   "type": "string"
                 }
               ]
