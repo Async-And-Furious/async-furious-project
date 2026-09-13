@@ -50,7 +50,7 @@ failures = 0; skipped = 0
 for item in items:
     req = item["request"]; method = req["method"]; url = req["url"]["raw"]
     if method == "DELETE": skipped += 1; continue
-    role = item["description"].split("Role: ", 1)[-1].split(";", 1)[0]
+    role = req.get("description", "Role: public").split("Role: ", 1)[-1].split(";", 1)[0]
     raw = req.get("body", {}).get("raw")
     safe_ids = method in {"POST", "PATCH"} and not url.endswith("/auth/login")
     body = json.loads(expand(raw, safe_ids)) if raw else None
