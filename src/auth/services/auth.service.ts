@@ -47,9 +47,6 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, correlationId = 'unknown') {
-    if (this.config.get<string>('AUTH_MODE') === 'gateway') {
-      throw new UnauthorizedException('Login local indisponível neste ambiente');
-    }
     const email = dto.email.toLowerCase().trim();
 
     const user = await this.prisma.user.findUnique({

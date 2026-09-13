@@ -3,21 +3,10 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import type { Application } from 'express';
 import { JwtService } from '@nestjs/jwt';
-import { generateKeyPairSync } from 'node:crypto';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
 import { randomInt } from 'node:crypto';
-
-const { publicKey: customerPublicKey, privateKey: customerPrivateKey } = generateKeyPairSync(
-  'rsa',
-  {
-    modulusLength: 2048,
-    publicKeyEncoding: { type: 'spki', format: 'pem' },
-    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-  }
-);
-process.env.JWT_CUSTOMER_PUBLIC_KEY = customerPublicKey;
 
 describe('OrdemServico Happy Flow (e2e)', () => {
   let app: INestApplication;
@@ -27,7 +16,6 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
   let recepcionistaToken: string;
   let mecanicoToken: string;
-  let customerToken: string;
 
   let clienteId: string;
   let veiculoId: string;
@@ -120,10 +108,6 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       .expect(201);
 
     clienteId = clienteResponse.body.id;
-    customerToken = jwtService.sign(
-      { sub: clienteId },
-      { algorithm: 'RS256', secret: customerPrivateKey, expiresIn: '30m' }
-    );
 
     const uniquePlaca = `OSF${randomInt(1000, 10000)}`;
 
@@ -187,10 +171,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       })
       .expect(200);
 
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/orcamento/aprovar`)
-      .set('Authorization', `Bearer ${customerToken}`)
-      .expect(200);
+    await server.patch(`/ordens-servico/${ordemServicoId}/orcamento/aprovar`).expect(200);
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/finalizar-execucao`)
@@ -209,7 +190,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     const statusResponse = await server
       .get(`/ordens-servico/${ordemServicoId}/status`)
-      .set('Authorization', `Bearer ${customerToken}`)
+      .set('Authorization', `Bearer ${recepcionistaToken}`)
       .expect(200);
 
     expect(statusResponse.body).toEqual({
