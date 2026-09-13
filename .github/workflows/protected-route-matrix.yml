@@ -1,0 +1,56 @@
+name: Protected HML/PROD route matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to verify
+        required: true
+        type: choice
+        options: [hml, prod]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  matrix:
+    environment: ${{ inputs.target == 'prod' && 'production' || 'hml' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate generated route contract
+        run: |
+          python scripts/generate-http-collections.py
+          git diff --exit-code -- docs/http/postman docs/http/insomnia
+      - name: Resolve protected API endpoint
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          TARGET: ${{ inputs.target }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+        run: |
+          endpoint=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-${TARGET}'].ApiEndpoint | [0]" --output text)
+          test -n "$endpoint" -a "$endpoint" != None
+          printf 'BASE_URL=%s\nCUSTOMER_AUTH_URL=%s/auth\n' "$endpoint" "$endpoint" >> "$GITHUB_ENV"
+      - name: Run non-destructive authenticated route matrix
+        env:
+          CUSTOMER_CPF: ${{ secrets.SEEDED_CPF }}
+          ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+          RECEPTIONIST_EMAIL: recepcionista@oficina.com
+          RECEPTIONIST_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+          MECHANIC_EMAIL: mecanico@oficina.com
+          MECHANIC_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
+          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_TOKEN_FINGERPRINT: ${{ vars.WEBHOOK_SECRET_FINGERPRINT }}
+          cliente_id: ${{ vars.SEEDED_CLIENTE_ID }}
+          veiculo_id: ${{ vars.SEEDED_VEICULO_ID }}
+          servico_id: ${{ vars.SEEDED_SERVICO_ID }}
+          peca_id: ${{ vars.SEEDED_PECA_ID }}
+          ordem_id: ${{ vars.SEEDED_ORDEM_ID }}
+          fornecedor_id: ${{ vars.SEEDED_FORNECEDOR_ID }}
+          pedido_fornecedor_id: ${{ vars.SEEDED_PEDIDO_FORNECEDOR_ID }}
+        run: python scripts/route-matrix.py

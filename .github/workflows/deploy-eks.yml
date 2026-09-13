@@ -179,8 +179,6 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
-      NEW_RELIC_APP_NAME: ${{ vars.NEW_RELIC_APP_NAME }}
-      NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
       SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
       SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
@@ -327,7 +325,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -338,9 +336,10 @@ jobs:
       - name: Apply namespace and configuration
         run: |
           set -euo pipefail
+          WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
-          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
@@ -364,7 +363,6 @@ jobs:
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
-            --from-literal=NEW_RELIC_LICENSE_KEY="$NEW_RELIC_LICENSE_KEY" \
             --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
             --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -481,8 +479,10 @@ jobs:
       - name: Roll out application
         run: |
           set -euo pipefail
+          webhook_secret_hash=$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n' | sha256sum | cut -d' ' -f1)
           sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
+          kubectl patch deployment/async-furious-api --namespace "$K8S_NAMESPACE" --type merge -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"webhook-secret-hash\":\"$webhook_secret_hash\"}}}}}"
           kubectl apply -f k8s/app/service.yaml
           sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
@@ -563,8 +563,6 @@ jobs:
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
       SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
       SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
-      NEW_RELIC_APP_NAME: ${{ vars.NEW_RELIC_APP_NAME }}
-      NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
       SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
       SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
@@ -693,7 +691,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -704,9 +702,10 @@ jobs:
       - name: Apply namespace and configuration
         run: |
           set -euo pipefail
+          WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
-          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
@@ -730,7 +729,6 @@ jobs:
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
             --from-literal=SEED_ADMIN_EMAIL="$SEED_ADMIN_EMAIL" \
             --from-literal=SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
-            --from-literal=NEW_RELIC_LICENSE_KEY="$NEW_RELIC_LICENSE_KEY" \
             --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
             --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -821,8 +819,10 @@ jobs:
       - name: Roll out application
         run: |
           set -euo pipefail
+          webhook_secret_hash=$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n' | sha256sum | cut -d' ' -f1)
           sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
+          kubectl patch deployment/async-furious-api --namespace "$K8S_NAMESPACE" --type merge -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"webhook-secret-hash\":\"$webhook_secret_hash\"}}}}}"
           kubectl apply -f k8s/app/service.yaml
           sed "s|\${target_group_arn}|$TARGET_GROUP_ARN|g" k8s/app/target-group-binding.yaml > "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
