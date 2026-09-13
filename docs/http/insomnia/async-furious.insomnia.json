@@ -128,8 +128,16 @@
       "name": "GET /",
       "description": "Role: public",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -145,8 +153,16 @@
       "name": "GET /health",
       "description": "Role: public",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -162,8 +178,16 @@
       "name": "GET /health/live",
       "description": "Role: public",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -179,8 +203,16 @@
       "name": "GET /health/ready",
       "description": "Role: public",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -219,7 +251,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/auth/register",
       "name": "POST /auth/register",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -244,7 +276,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes",
       "name": "POST /clientes",
-      "description": "Role: receptionist",
+      "description": "Role: any",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -258,7 +290,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -271,8 +303,16 @@
       "name": "GET /clientes",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -288,8 +328,16 @@
       "name": "GET /clientes/{{cliente_id}}",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -303,7 +351,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
       "name": "PATCH /clientes/{{cliente_id}}",
-      "description": "Role: receptionist",
+      "description": "Role: any",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -317,7 +365,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -328,10 +376,18 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
       "name": "DELETE /clientes/{{cliente_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "DELETE",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -345,7 +401,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos",
       "name": "POST /veiculos",
-      "description": "Role: receptionist",
+      "description": "Role: any",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -359,7 +415,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -372,8 +428,16 @@
       "name": "GET /veiculos",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -389,8 +453,16 @@
       "name": "GET /veiculos/{{veiculo_id}}",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -404,7 +476,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
       "name": "PATCH /veiculos/{{veiculo_id}}",
-      "description": "Role: receptionist",
+      "description": "Role: any",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -418,7 +490,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -429,10 +501,18 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
       "name": "DELETE /veiculos/{{veiculo_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "DELETE",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -446,7 +526,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos",
       "name": "POST /servicos",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -473,8 +553,16 @@
       "name": "GET /servicos",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -490,8 +578,16 @@
       "name": "GET /servicos/{{servico_id}}",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -505,7 +601,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos/{{servico_id}}",
       "name": "PATCH /servicos/{{servico_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -530,10 +626,18 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos/{{servico_id}}",
       "name": "DELETE /servicos/{{servico_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "DELETE",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -547,7 +651,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas",
       "name": "POST /pecas",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -574,8 +678,16 @@
       "name": "GET /pecas",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -591,8 +703,16 @@
       "name": "GET /pecas/{{peca_id}}",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -606,7 +726,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/{{peca_id}}",
       "name": "PATCH /pecas/{{peca_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -631,7 +751,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/{{peca_id}}/estoque",
       "name": "PATCH /pecas/{{peca_id}}/estoque",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -656,10 +776,18 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/{{peca_id}}",
       "name": "DELETE /pecas/{{peca_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "DELETE",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -673,7 +801,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/fornecedor/solicitar",
       "name": "POST /pecas/fornecedor/solicitar",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -698,10 +826,18 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber",
       "name": "PATCH /pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -756,10 +892,7 @@
           "value": "{{webhook_token}}"
         }
       ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{webhook_token}}"
-      },
+      "authentication": {},
       "_type": "request"
     },
     {
@@ -769,7 +902,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico",
       "name": "POST /ordens-servico",
-      "description": "Role: receptionist",
+      "description": "Role: any",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -783,7 +916,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -796,8 +929,16 @@
       "name": "GET /ordens-servico",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -811,10 +952,18 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/tempo-medio",
       "name": "GET /ordens-servico/tempo-medio",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -830,8 +979,16 @@
       "name": "GET /ordens-servico/{{ordem_id}}",
       "description": "Role: any",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -847,8 +1004,16 @@
       "name": "GET /ordens-servico/{{ordem_id}}/status",
       "description": "Role: public",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -864,8 +1029,16 @@
       "name": "GET /ordens-servico/{{ordem_id}}/rastreamento",
       "description": "Role: public",
       "method": "GET",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -879,7 +1052,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
       "name": "PATCH /ordens-servico/{{ordem_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -904,10 +1077,18 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
       "name": "DELETE /ordens-servico/{{ordem_id}}",
-      "description": "Role: admin",
+      "description": "Role: any",
       "method": "DELETE",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{admin_token}}"
@@ -921,13 +1102,21 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/assumir",
       "name": "PATCH /ordens-servico/{{ordem_id}}/assumir",
-      "description": "Role: mechanic",
+      "description": "Role: any",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
-        "token": "{{mechanic_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -938,13 +1127,21 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/analisar",
       "name": "PATCH /ordens-servico/{{ordem_id}}/analisar",
-      "description": "Role: mechanic",
+      "description": "Role: any",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
-        "token": "{{mechanic_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -955,7 +1152,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/servicos-insumos",
       "name": "PATCH /ordens-servico/{{ordem_id}}/servicos-insumos",
-      "description": "Role: mechanic",
+      "description": "Role: any",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -969,7 +1166,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{mechanic_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -982,8 +1179,16 @@
       "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/aprovar",
       "description": "Role: public",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -999,8 +1204,16 @@
       "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/recusar",
       "description": "Role: public",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -1014,13 +1227,21 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao",
       "name": "PATCH /ordens-servico/{{ordem_id}}/finalizar-execucao",
-      "description": "Role: mechanic",
+      "description": "Role: any",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
-        "token": "{{mechanic_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },
@@ -1033,8 +1254,16 @@
       "name": "PATCH /ordens-servico/{{ordem_id}}/aprovar-servico",
       "description": "Role: public",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
         "token": "{{customer_token}}"
@@ -1073,13 +1302,21 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/registrar-entrega",
       "name": "PATCH /ordens-servico/{{ordem_id}}/registrar-entrega",
-      "description": "Role: receptionist",
+      "description": "Role: any",
       "method": "PATCH",
-      "body": {},
-      "headers": [],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
       "authentication": {
         "type": "bearer",
-        "token": "{{receptionist_token}}"
+        "token": "{{admin_token}}"
       },
       "_type": "request"
     },

@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   matrix:
@@ -19,6 +20,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Validate generated route contract
+        run: |
+          python scripts/generate-http-collections.py
+          git diff --exit-code -- docs/http/postman docs/http/insomnia
       - name: Resolve protected API endpoint
         env:
           AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
@@ -40,6 +45,7 @@ jobs:
           MECHANIC_EMAIL: mecanico@oficina.com
           MECHANIC_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
           WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_SECRET }}
+          WEBHOOK_TOKEN_FINGERPRINT: ${{ vars.WEBHOOK_SECRET_FINGERPRINT }}
           cliente_id: ${{ vars.SEEDED_CLIENTE_ID }}
           veiculo_id: ${{ vars.SEEDED_VEICULO_ID }}
           servico_id: ${{ vars.SEEDED_SERVICO_ID }}
