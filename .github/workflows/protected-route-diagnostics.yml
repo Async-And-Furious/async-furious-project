@@ -128,13 +128,13 @@ jobs:
           const token=process.env.TOKEN;
           const publicPem=fs.readFileSync(process.env.PUBLIC_FILE,'utf8');
           const secretText=fs.readFileSync(process.env.PRIVATE_FILE,'utf8').trim();
-          const b64=(value)=>Buffer.from(value.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-value.length%4)%4),'base64').toString('utf8');
+          const decode=(value)=>Buffer.from(value.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-value.length%4)%4),'base64');
           const fingerprint=(pem)=>crypto.createHash('sha256').update(crypto.createPublicKey(pem).export({type:'spki',format:'der'})).digest('hex');
-          const parts=token.split('.'); const header=JSON.parse(b64(parts[0])); const claims=JSON.parse(b64(parts[1]));
+          const parts=token.split('.'); const header=JSON.parse(decode(parts[0]).toString('utf8')); const claims=JSON.parse(decode(parts[1]).toString('utf8'));
           const publicFingerprint=fingerprint(publicPem); let signerFingerprint=null; let secretJsonKeys=[]; let candidateCount=0;
           try { const parsed=JSON.parse(secretText); secretJsonKeys=Object.keys(parsed||{}); for (const candidate of Object.values(parsed||{})) { if (typeof candidate==='string') { candidateCount++; try { signerFingerprint=fingerprint(candidate); break; } catch {} } } } catch { candidateCount=1; try { signerFingerprint=fingerprint(secretText); } catch {} }
           const now=Math.floor(Date.now()/1000);
-          const signatureValid=crypto.verify('RSA-SHA256',Buffer.from(`${parts[0]}.${parts[1]}`),crypto.createPublicKey(publicPem),Buffer.from(b64(parts[2]),'base64'));
+          const signatureValid=crypto.verify('RSA-SHA256',Buffer.from(`${parts[0]}.${parts[1]}`),crypto.createPublicKey(publicPem),decode(parts[2]));
           console.log(JSON.stringify({key_pair_match:signerFingerprint===publicFingerprint,public_key_fingerprint:publicFingerprint,signer_public_key_fingerprint:signerFingerprint,private_secret_json_keys:secretJsonKeys,private_secret_candidate_count:candidateCount,jwt:{alg:header.alg,typ:header.typ,claim_names:Object.keys(claims).sort(),issuer_match:claims.iss===process.env.JWT_ISSUER,audience_match:claims.aud===process.env.JWT_AUDIENCE,signature_valid:signatureValid,not_expired:typeof claims.exp==='number'&&claims.exp>now}}));
           JS
           account_id="$(aws sts get-caller-identity --query Account --output text)"; api_host="${endpoint#https://}"; direct_correlation="github-prod-direct-${GITHUB_RUN_ID}"
