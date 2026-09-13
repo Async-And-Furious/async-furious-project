@@ -6,7 +6,8 @@ SAFE_UUID = "00000000-0000-0000-0000-000000000000"
 def value(name): return base if name == "base_url" else os.environ.get(name, "")
 def expand(text, safe_ids=False):
     for key in ("base_url", "cliente_id", "veiculo_id", "servico_id", "peca_id", "ordem_id", "fornecedor_id", "pedido_fornecedor_id"):
-        text = text.replace("{{" + key + "}}", SAFE_UUID if safe_ids else value(key))
+        replacement = value(key) if key == "base_url" else (SAFE_UUID if safe_ids else (os.environ.get(key.upper()) or value(key)))
+        text = text.replace("{{" + key + "}}", replacement)
     return text
 
 def call(method, url, token="", body=None):
@@ -34,6 +35,14 @@ customer_token = body.get("access_token") or body.get("token")
 if status != 200 or not isinstance(customer_token, str): raise RuntimeError("customer login failed")
 tokens = {"customer": customer_token}
 tokens.update({"admin": login("ADMIN_EMAIL", "ADMIN_PASSWORD", customer_token), "receptionist": login("RECEPTIONIST_EMAIL", "RECEPTIONIST_PASSWORD", customer_token), "mechanic": login("MECHANIC_EMAIL", "MECHANIC_PASSWORD", customer_token)})
+
+def first_id(path, token):
+    status, body = call("GET", base + "/api/v1/" + path, token)
+    rows = body.get("data", body if isinstance(body, list) else [])
+    return rows[0].get("id", "") if status == 200 and rows else ""
+
+for key, path in (("cliente_id", "clientes"), ("veiculo_id", "veiculos"), ("servico_id", "servicos"), ("peca_id", "pecas"), ("ordem_id", "ordens-servico")):
+    if not value(key): os.environ[key.upper()] = first_id(path, tokens["admin"])
 
 collection = json.load(open(os.path.join(os.path.dirname(__file__), "..", "docs", "http", "postman", "async-furious.postman_collection.json"), encoding="utf-8"))
 items = collection["item"][1]["item"]
