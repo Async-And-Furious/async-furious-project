@@ -45,7 +45,7 @@ routes += [
     ("PATCH", f"/ordens-servico/{order_id}/registrar-entrega", "receptionist", None),
 ]
 
-tokens = {"public": "", "any": "{{admin_token}}", "admin": "{{admin_token}}", "receptionist": "{{receptionist_token}}", "mechanic": "{{mechanic_token}}", "webhook": "{{webhook_token}}"}
+tokens = {"public": "{{customer_token}}", "any": "{{admin_token}}", "admin": "{{admin_token}}", "receptionist": "{{receptionist_token}}", "mechanic": "{{mechanic_token}}", "webhook": "{{webhook_token}}"}
 variables = [
     {"key": "base_url", "value": "http://localhost:3000"}, {"key": "admin_email", "value": ""}, {"key": "admin_password", "value": ""},
     {"key": "receptionist_email", "value": ""}, {"key": "receptionist_password", "value": ""}, {"key": "mechanic_email", "value": ""}, {"key": "mechanic_password", "value": ""},
@@ -69,11 +69,20 @@ for item, name in zip(login, ("Login admin", "Login receptionist", "Login mechan
     item["name"] = name; item["event"] = [{"listen": "test", "script": {"type": "text/javascript", "exec": login_script.splitlines()}}]
 customer = postman_request("POST", "", "public", {"cpf": "{{customer_cpf}}"})
 customer["request"]["url"] = "{{customer_auth_url}}"
+customer["request"].pop("auth", None)
 customer["name"] = "Customer CPF login (gateway/auth Lambda)"
 customer["event"] = [{"listen": "test", "script": {"type": "text", "exec": ["const data = pm.response.json(); pm.environment.set('customer_token', data.access_token || data.token);"]}}]
-postman = {"info": {"name": "Async Furious API - HML/PROD", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json", "description": "Import this collection and select either generated HML or PROD environment. Credentials, CPF, tokens and IDs are variables only."}, "variable": variables, "item": [{"name": "Authentication", "item": login + [customer]}, {"name": "Application routes", "item": [postman_request(*r) for r in routes]}]}
+postman = {"info": {"name": "Async Furious API - HML/PROD", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json", "description": "Import this collection and select either generated HML or PROD environment. Credentials, CPF, tokens and IDs are variables only."}, "variable": variables, "item": [{"name": "Authentication", "item": [customer] + login}, {"name": "Application routes", "item": [postman_request(*r) for r in routes]}]}
 
 insomnia = {"_type": "export", "__export_format": 4, "__export_date": "2026-09-13T00:00:00.000Z", "__export_source": "async-furious.collection-generator", "resources": [{"_id": "wrk_async_furious", "parentId": None, "modified": 0, "created": 0, "name": "Async Furious API - HML/PROD", "description": "Secret-free route collection", "scope": "collection", "_type": "workspace"}]}
+for i, (name, url, body, token_name, auth) in enumerate([
+    ("Customer CPF login", "{{customer_auth_url}}", {"cpf": "{{customer_cpf}}"}, "customer_token", False),
+    ("Login admin", BASE + "/auth/login", {"email": "{{admin_email}}", "password": "{{admin_password}}"}, "admin_token", True),
+    ("Login receptionist", BASE + "/auth/login", {"email": "{{receptionist_email}}", "password": "{{receptionist_password}}"}, "receptionist_token", True),
+    ("Login mechanic", BASE + "/auth/login", {"email": "{{mechanic_email}}", "password": "{{mechanic_password}}"}, "mechanic_token", True),
+]):
+    request = {"_id": f"auth_{i:02d}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "url": url, "name": name, "method": "POST", "body": {"mimeType": "application/json", "text": json.dumps(body)}, "headers": [{"name": "Content-Type", "value": "application/json"}], "authentication": {"type": "bearer", "token": "{{customer_token}}"} if auth else {}, "scripts": {"afterResponse": f"const token = insomnia.response.json().access_token || insomnia.response.json().token; if (token) insomnia.environment.set('{token_name}', token);"}, "_type": "request"}
+    insomnia["resources"].append(request)
 for i, (method, path, role, body) in enumerate(routes):
     insomnia["resources"].append({"_id": f"req_{i:03d}", "parentId": "wrk_async_furious", "modified": 0, "created": 0, "url": BASE + path, "name": f"{method} {path}", "description": f"Role: {role}", "method": method, "body": {"mimeType": "application/json", "text": json.dumps(body)} if body is not None else {}, "headers": [{"name": "Content-Type", "value": "application/json"}] if body is not None else [], "authentication": {"type": "bearer", "token": tokens[role]} if tokens[role] else {}, "_type": "request"})
 for name in ("HML", "PROD"):

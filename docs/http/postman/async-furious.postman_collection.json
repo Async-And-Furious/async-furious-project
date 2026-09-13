@@ -99,6 +99,40 @@
       "name": "Authentication",
       "item": [
         {
+          "name": "Customer CPF login (gateway/auth Lambda)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{customer_auth_url}}",
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cpf\": \"{{customer_cpf}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "const data = pm.response.json(); pm.environment.set('customer_token', data.access_token || data.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Login admin",
           "request": {
             "method": "POST",
@@ -124,6 +158,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "event": [
@@ -164,6 +208,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "event": [
@@ -204,6 +258,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "event": [
@@ -213,40 +277,6 @@
                 "type": "text/javascript",
                 "exec": [
                   "const data = pm.response.json(); const token = data.access_token || data.token; if (token) pm.environment.set(pm.request.name.toLowerCase().includes('receptionist') ? 'receptionist_token' : pm.request.name.toLowerCase().includes('mechanic') ? 'mechanic_token' : 'admin_token', token);"
-                ]
-              }
-            }
-          ]
-        },
-        {
-          "name": "Customer CPF login (gateway/auth Lambda)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": "{{customer_auth_url}}",
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\"cpf\": \"{{customer_cpf}}\"}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text",
-                "exec": [
-                  "const data = pm.response.json(); pm.environment.set('customer_token', data.access_token || data.token);"
                 ]
               }
             }
@@ -269,7 +299,17 @@
                 "/"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -284,7 +324,17 @@
                 "/health"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -299,7 +349,17 @@
                 "/health/live"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -314,7 +374,17 @@
                 "/health/ready"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -343,6 +413,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -1126,6 +1206,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },
@@ -1294,7 +1384,17 @@
                 "/ordens-servico/{{ordem_id}}/status"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1309,7 +1409,17 @@
                 "/ordens-servico/{{ordem_id}}/rastreamento"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1477,7 +1587,17 @@
                 "/ordens-servico/{{ordem_id}}/orcamento/aprovar"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1492,7 +1612,17 @@
                 "/ordens-servico/{{ordem_id}}/orcamento/recusar"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1532,7 +1662,17 @@
                 "/ordens-servico/{{ordem_id}}/aprovar-servico"
               ]
             },
-            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock."
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
           }
         },
         {
@@ -1561,6 +1701,16 @@
                   "language": "json"
                 }
               }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
             }
           }
         },

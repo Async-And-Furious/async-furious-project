@@ -15,6 +15,111 @@
       "_type": "workspace"
     },
     {
+      "_id": "auth_00",
+      "parentId": "wrk_async_furious",
+      "modified": 0,
+      "created": 0,
+      "url": "{{customer_auth_url}}",
+      "name": "Customer CPF login",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"cpf\": \"{{customer_cpf}}\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {},
+      "scripts": {
+        "afterResponse": "const token = insomnia.response.json().access_token || insomnia.response.json().token; if (token) insomnia.environment.set('customer_token', token);"
+      },
+      "_type": "request"
+    },
+    {
+      "_id": "auth_01",
+      "parentId": "wrk_async_furious",
+      "modified": 0,
+      "created": 0,
+      "url": "{{base_url}}/api/v1/auth/login",
+      "name": "Login admin",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"email\": \"{{admin_email}}\", \"password\": \"{{admin_password}}\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
+      "scripts": {
+        "afterResponse": "const token = insomnia.response.json().access_token || insomnia.response.json().token; if (token) insomnia.environment.set('admin_token', token);"
+      },
+      "_type": "request"
+    },
+    {
+      "_id": "auth_02",
+      "parentId": "wrk_async_furious",
+      "modified": 0,
+      "created": 0,
+      "url": "{{base_url}}/api/v1/auth/login",
+      "name": "Login receptionist",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"email\": \"{{receptionist_email}}\", \"password\": \"{{receptionist_password}}\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
+      "scripts": {
+        "afterResponse": "const token = insomnia.response.json().access_token || insomnia.response.json().token; if (token) insomnia.environment.set('receptionist_token', token);"
+      },
+      "_type": "request"
+    },
+    {
+      "_id": "auth_03",
+      "parentId": "wrk_async_furious",
+      "modified": 0,
+      "created": 0,
+      "url": "{{base_url}}/api/v1/auth/login",
+      "name": "Login mechanic",
+      "method": "POST",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"email\": \"{{mechanic_email}}\", \"password\": \"{{mechanic_password}}\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ],
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
+      "scripts": {
+        "afterResponse": "const token = insomnia.response.json().access_token || insomnia.response.json().token; if (token) insomnia.environment.set('mechanic_token', token);"
+      },
+      "_type": "request"
+    },
+    {
       "_id": "req_000",
       "parentId": "wrk_async_furious",
       "modified": 0,
@@ -25,7 +130,10 @@
       "method": "GET",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -39,7 +147,10 @@
       "method": "GET",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -53,7 +164,10 @@
       "method": "GET",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -67,7 +181,10 @@
       "method": "GET",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -89,7 +206,10 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -607,7 +727,10 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -722,7 +845,10 @@
       "method": "GET",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -736,7 +862,10 @@
       "method": "GET",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -851,7 +980,10 @@
       "method": "PATCH",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -865,7 +997,10 @@
       "method": "PATCH",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -896,7 +1031,10 @@
       "method": "PATCH",
       "body": {},
       "headers": [],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
@@ -918,7 +1056,10 @@
           "value": "application/json"
         }
       ],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{customer_token}}"
+      },
       "_type": "request"
     },
     {
