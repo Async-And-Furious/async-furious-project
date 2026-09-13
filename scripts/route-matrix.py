@@ -94,7 +94,7 @@ expected_fingerprint = os.environ.get("WEBHOOK_TOKEN_FINGERPRINT", "").strip().l
 if expected_fingerprint and webhook_fingerprint != expected_fingerprint:
     raise RuntimeError("webhook secret fingerprint mismatch")
 print("manifest_routes=" + str(len(routes)) + " webhook_fingerprint=" + webhook_fingerprint[:16])
-role_token = {"customer": tokens["customer"], "admin": tokens["admin"], "receptionist": tokens["receptionist"], "mechanic": tokens["mechanic"], "webhook": tokens["customer"]}
+role_token = {"customer": tokens["customer"], "admin": tokens["admin"], "receptionist": tokens["receptionist"], "mechanic": tokens["mechanic"], "webhook": tokens["admin"]}
 failures = 0; skipped = 0
 for item in items:
     req = item["request"]; method = req["method"]; url = req["url"]["raw"]

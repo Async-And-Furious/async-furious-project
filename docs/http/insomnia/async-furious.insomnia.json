@@ -126,7 +126,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/",
       "name": "GET /",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -151,7 +151,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/health",
       "name": "GET /health",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -176,7 +176,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/health/live",
       "name": "GET /health/live",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -201,7 +201,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/health/ready",
       "name": "GET /health/ready",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -226,7 +226,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/auth/login",
       "name": "POST /auth/login",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -251,7 +251,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/auth/register",
       "name": "POST /auth/register",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -276,7 +276,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes",
       "name": "POST /clientes",
-      "description": "Role: any",
+      "description": "Role: receptionist",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -290,7 +290,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{receptionist_token}}"
       },
       "_type": "request"
     },
@@ -301,7 +301,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes",
       "name": "GET /clientes",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -326,7 +326,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
       "name": "GET /clientes/{{cliente_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -351,7 +351,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
       "name": "PATCH /clientes/{{cliente_id}}",
-      "description": "Role: any",
+      "description": "Role: receptionist",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -365,7 +365,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{receptionist_token}}"
       },
       "_type": "request"
     },
@@ -376,7 +376,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
       "name": "DELETE /clientes/{{cliente_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "DELETE",
       "body": {
         "mimeType": "application/json",
@@ -401,7 +401,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos",
       "name": "POST /veiculos",
-      "description": "Role: any",
+      "description": "Role: receptionist",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -415,7 +415,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{receptionist_token}}"
       },
       "_type": "request"
     },
@@ -426,7 +426,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos",
       "name": "GET /veiculos",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -451,7 +451,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
       "name": "GET /veiculos/{{veiculo_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -476,7 +476,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
       "name": "PATCH /veiculos/{{veiculo_id}}",
-      "description": "Role: any",
+      "description": "Role: receptionist",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -490,7 +490,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{receptionist_token}}"
       },
       "_type": "request"
     },
@@ -501,7 +501,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
       "name": "DELETE /veiculos/{{veiculo_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "DELETE",
       "body": {
         "mimeType": "application/json",
@@ -526,7 +526,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos",
       "name": "POST /servicos",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -551,7 +551,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos",
       "name": "GET /servicos",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -576,7 +576,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos/{{servico_id}}",
       "name": "GET /servicos/{{servico_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -601,7 +601,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos/{{servico_id}}",
       "name": "PATCH /servicos/{{servico_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -626,7 +626,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/servicos/{{servico_id}}",
       "name": "DELETE /servicos/{{servico_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "DELETE",
       "body": {
         "mimeType": "application/json",
@@ -651,7 +651,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas",
       "name": "POST /pecas",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -676,7 +676,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas",
       "name": "GET /pecas",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -701,7 +701,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/{{peca_id}}",
       "name": "GET /pecas/{{peca_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -726,7 +726,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/{{peca_id}}",
       "name": "PATCH /pecas/{{peca_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -751,7 +751,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/{{peca_id}}/estoque",
       "name": "PATCH /pecas/{{peca_id}}/estoque",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -776,7 +776,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/{{peca_id}}",
       "name": "DELETE /pecas/{{peca_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "DELETE",
       "body": {
         "mimeType": "application/json",
@@ -801,7 +801,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/fornecedor/solicitar",
       "name": "POST /pecas/fornecedor/solicitar",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -826,7 +826,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber",
       "name": "PATCH /pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -851,7 +851,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/pagamentos/registrar",
       "name": "POST /pagamentos/registrar",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -892,7 +892,10 @@
           "value": "{{webhook_token}}"
         }
       ],
-      "authentication": {},
+      "authentication": {
+        "type": "bearer",
+        "token": "{{admin_token}}"
+      },
       "_type": "request"
     },
     {
@@ -902,7 +905,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico",
       "name": "POST /ordens-servico",
-      "description": "Role: any",
+      "description": "Role: receptionist",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -916,7 +919,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{receptionist_token}}"
       },
       "_type": "request"
     },
@@ -927,7 +930,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico",
       "name": "GET /ordens-servico",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -952,7 +955,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/tempo-medio",
       "name": "GET /ordens-servico/tempo-medio",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -977,7 +980,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
       "name": "GET /ordens-servico/{{ordem_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -1002,7 +1005,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/status",
       "name": "GET /ordens-servico/{{ordem_id}}/status",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -1027,7 +1030,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/rastreamento",
       "name": "GET /ordens-servico/{{ordem_id}}/rastreamento",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "GET",
       "body": {
         "mimeType": "application/json",
@@ -1052,7 +1055,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
       "name": "PATCH /ordens-servico/{{ordem_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1077,7 +1080,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
       "name": "DELETE /ordens-servico/{{ordem_id}}",
-      "description": "Role: any",
+      "description": "Role: admin",
       "method": "DELETE",
       "body": {
         "mimeType": "application/json",
@@ -1102,7 +1105,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/assumir",
       "name": "PATCH /ordens-servico/{{ordem_id}}/assumir",
-      "description": "Role: any",
+      "description": "Role: mechanic",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1116,7 +1119,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{mechanic_token}}"
       },
       "_type": "request"
     },
@@ -1127,7 +1130,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/analisar",
       "name": "PATCH /ordens-servico/{{ordem_id}}/analisar",
-      "description": "Role: any",
+      "description": "Role: mechanic",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1141,7 +1144,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{mechanic_token}}"
       },
       "_type": "request"
     },
@@ -1152,7 +1155,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/servicos-insumos",
       "name": "PATCH /ordens-servico/{{ordem_id}}/servicos-insumos",
-      "description": "Role: any",
+      "description": "Role: mechanic",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1166,7 +1169,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{mechanic_token}}"
       },
       "_type": "request"
     },
@@ -1177,7 +1180,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/aprovar",
       "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/aprovar",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1202,7 +1205,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/recusar",
       "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/recusar",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1227,7 +1230,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao",
       "name": "PATCH /ordens-servico/{{ordem_id}}/finalizar-execucao",
-      "description": "Role: any",
+      "description": "Role: mechanic",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1241,7 +1244,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{mechanic_token}}"
       },
       "_type": "request"
     },
@@ -1252,7 +1255,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
       "name": "PATCH /ordens-servico/{{ordem_id}}/aprovar-servico",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1277,7 +1280,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
       "name": "POST /ordens-servico/{{ordem_id}}/aprovar-servico",
-      "description": "Role: public",
+      "description": "Role: customer",
       "method": "POST",
       "body": {
         "mimeType": "application/json",
@@ -1302,7 +1305,7 @@
       "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/registrar-entrega",
       "name": "PATCH /ordens-servico/{{ordem_id}}/registrar-entrega",
-      "description": "Role: any",
+      "description": "Role: receptionist",
       "method": "PATCH",
       "body": {
         "mimeType": "application/json",
@@ -1316,7 +1319,7 @@
       ],
       "authentication": {
         "type": "bearer",
-        "token": "{{admin_token}}"
+        "token": "{{receptionist_token}}"
       },
       "_type": "request"
     },

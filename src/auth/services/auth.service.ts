@@ -114,7 +114,6 @@ export class AuthService {
 
     return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
   }
-
   async findById(id: string) {
     return this.validateUser(id);
   }

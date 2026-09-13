@@ -52,7 +52,7 @@ def route_role(route):
 
 routes = [(r["method"], r["path"].removeprefix("/api/v1"), route_role(r), r.get("mock_body")) for r in manifest_routes]
 
-tokens = {"customer": "{{customer_token}}", "public": "{{customer_token}}", "admin": "{{admin_token}}", "receptionist": "{{receptionist_token}}", "mechanic": "{{mechanic_token}}", "webhook": "{{customer_token}}"}
+tokens = {"customer": "{{customer_token}}", "public": "{{customer_token}}", "admin": "{{admin_token}}", "receptionist": "{{receptionist_token}}", "mechanic": "{{mechanic_token}}", "webhook": "{{admin_token}}"}
 variables = [
     {"key": "base_url", "value": "http://localhost:3000"}, {"key": "admin_email", "value": ""}, {"key": "admin_password", "value": ""},
     {"key": "receptionist_email", "value": ""}, {"key": "receptionist_password", "value": ""}, {"key": "mechanic_email", "value": ""}, {"key": "mechanic_password", "value": ""},

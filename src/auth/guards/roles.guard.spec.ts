@@ -41,6 +41,14 @@ describe('RolesGuard', () => {
     expect(guard.canActivate(mockContext)).toBe(true);
   });
 
+  it('should accept legacy lowercase role claims', () => {
+    setMetadata([Role.ADMIN]);
+    const request = { user: { id: '1', email: 'admin@test.com', role: 'admin' } };
+    (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue(request);
+
+    expect(guard.canActivate(mockContext)).toBe(true);
+  });
+
   it('should throw ForbiddenException when user role does not match', () => {
     setMetadata([Role.ADMIN]);
     const request = { user: { id: '1', email: 'user@test.com', role: Role.RECEPCIONISTA } };
