@@ -166,7 +166,7 @@ jobs:
 
   prod:
     name: PROD protected routes and authorizer
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'prod' }}
+    if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.target == 'prod') }}
     runs-on: ubuntu-latest
     environment: production
     env:
