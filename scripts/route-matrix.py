@@ -58,7 +58,7 @@ for key, path in (("cliente_id", "clientes"), ("veiculo_id", "veiculos"), ("serv
 
 collection = json.load(open(os.path.join(os.path.dirname(__file__), "..", "docs", "http", "postman", "async-furious.postman_collection.json"), encoding="utf-8"))
 items = collection["item"][1]["item"]
-webhook_secret = value("WEBHOOK_TOKEN")
+webhook_secret = value("WEBHOOK_TOKEN").strip("\r\n")
 if not webhook_secret: raise RuntimeError("WEBHOOK_TOKEN is required")
 role_token = {"public": tokens["customer"], "any": tokens["admin"], "admin": tokens["admin"], "receptionist": tokens["receptionist"], "mechanic": tokens["mechanic"]}
 failures = 0; skipped = 0
