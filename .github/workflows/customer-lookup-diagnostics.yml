@@ -22,6 +22,10 @@ jobs:
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
       K8S_NAMESPACE: ${{ vars.K8S_NAMESPACE || 'async-furious' }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+      SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+      SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+      SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
@@ -62,6 +66,11 @@ jobs:
           const crypto=require("node:crypto"); const {PrismaClient}=require("@prisma/client"); const db=new PrismaClient();
           (async()=>{try{const raw=process.env.SEEDED_CPF; const cpf=raw.replace(/[.\-\s]/g,""); const c=await db.cliente.findUnique({where:{documento:cpf}}); const meta=await db.$queryRawUnsafe("SELECT current_database() AS db,current_schema() AS schema,current_setting($$search_path$$) AS search_path"); console.log(JSON.stringify({input_length:raw.length,normalized_length:cpf.length,input_hash:crypto.createHash("sha256").update(raw).digest("hex"),normalized_hash:crypto.createHash("sha256").update(cpf).digest("hex"),found:Boolean(c),active:Boolean(c?.ativo),document_hash:c&&crypto.createHash("sha256").update(c.documento).digest("hex"),document_length:c?.documento?.length||0,document_digits:/^\\d+$/.test(c?.documento||""),document_type:c?.tipo_documento||null,db:meta[0]}))}catch(e){console.log(JSON.stringify({error_class:e?.name||"UnknownError",error_code:e?.code||"unknown"}))}finally{await db.$disconnect()}})()')
           printf 'target=%s cpf_hash=%s normalized_hash=%s lookup=%s\n' "$TARGET" "$cpf_hash" "$normalized_hash" "$lookup" | tee -a "$GITHUB_STEP_SUMMARY"
+          staff=$(kubectl exec deployment/async-furious-api --namespace "$K8S_NAMESPACE" -- \
+            env ADMIN_EMAIL="$SEED_ADMIN_EMAIL" ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" RECEP_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" MEC_PASSWORD="$SEED_MECANICO_PASSWORD" node -e '
+          const bcrypt=require("bcrypt"); const {PrismaClient}=require("@prisma/client"); const db=new PrismaClient();
+          (async()=>{try{const specs=[ [process.env.ADMIN_EMAIL,process.env.ADMIN_PASSWORD,"ADMIN"], ["recepcionista@oficina.com",process.env.RECEP_PASSWORD,"RECEPCIONISTA"], ["mecanico@oficina.com",process.env.MEC_PASSWORD,"MECANICO"] ]; const result=[]; for(const [email,password,role] of specs){const user=await db.user.findUnique({where:{email}}); result.push({role,exists:Boolean(user),stored_role:user?.role||null,password_match:Boolean(user&&await bcrypt.compare(password,user.password))})} console.log(JSON.stringify(result))}catch(e){console.log(JSON.stringify({error_class:e?.name||"UnknownError",error_code:e?.code||"unknown"}))}finally{await db.$disconnect()}})()')
+          printf 'staff_seed_check=%s\n' "$staff" | tee -a "$GITHUB_STEP_SUMMARY"
 
           fn="tc3-auth-${TARGET}-auth"
           config=$(aws lambda get-function-configuration --function-name "$fn" --output json)
