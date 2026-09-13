@@ -40,7 +40,7 @@ jobs:
           set -euo pipefail
           test -n "$EKS_CLUSTER_NAME" || { echo 'EKS_CLUSTER_NAME is required.' >&2; exit 1; }
           SEEDED_CPF="$(printf '%s' "$SEEDED_CPF" | tr -d '[:space:]')"
-          test "${#SEEDED_CPF}" -eq 11 && [[ "$SEEDED_CPF" != *[!0-9]* ]] || { echo 'SEEDED_CPF must be an 11-digit value.' >&2; exit 1; }
+          test -n "$SEEDED_CPF" || { echo 'SEEDED_CPF is required.' >&2; exit 1; }
           printf '::add-mask::%s\n' "$SEEDED_CPF"
 
           account_id=$(aws sts get-caller-identity --query Account --output text)
