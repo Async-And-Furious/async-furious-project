@@ -103,7 +103,8 @@ jobs:
           set -euo pipefail
           echo "### Rodando pod de stress de CPU" >> "$GITHUB_STEP_SUMMARY"
           kubectl run stress-cpu --image=polinux/stress --restart=Never --namespace "$K8S_NAMESPACE" \
-            --requests='cpu=400m' --limits='cpu=400m' -- stress --cpu 2 --timeout 600s
+            --overrides='{"spec":{"containers":[{"name":"stress-cpu","image":"polinux/stress","resources":{"requests":{"cpu":"400m"},"limits":{"cpu":"400m"}}}]}}' \
+            -- stress --cpu 2 --timeout 600s
           echo "Aguardando 11 minutos (limite do alerta: acima de 80% em 10 min)..."
           sleep 660
           kubectl delete pod stress-cpu --namespace "$K8S_NAMESPACE" --ignore-not-found=true
@@ -114,7 +115,8 @@ jobs:
           set -euo pipefail
           echo "### Rodando pod de stress de memória" >> "$GITHUB_STEP_SUMMARY"
           kubectl run stress-mem --image=polinux/stress --restart=Never --namespace "$K8S_NAMESPACE" \
-            --requests='memory=400Mi' --limits='memory=400Mi' -- stress --vm 1 --vm-bytes 380M --timeout 600s
+            --overrides='{"spec":{"containers":[{"name":"stress-mem","image":"polinux/stress","resources":{"requests":{"memory":"400Mi"},"limits":{"memory":"400Mi"}}}]}}' \
+            -- stress --vm 1 --vm-bytes 380M --timeout 600s
           echo "Aguardando 11 minutos (limite do alerta: acima de 80% em 10 min)..."
           sleep 660
           kubectl delete pod stress-mem --namespace "$K8S_NAMESPACE" --ignore-not-found=true
