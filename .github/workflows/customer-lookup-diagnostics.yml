@@ -38,7 +38,7 @@ jobs:
           SEEDED_CPF="$(printf '%s' "$SEEDED_CPF" | tr -d '[:space:]')"
           printf '::add-mask::%s\n' "$SEEDED_CPF"
           cpf_hash=$(printf '%s' "$SEEDED_CPF" | sha256sum | cut -d' ' -f1)
-          normalized_hash=$(printf '%s' "$SEEDED_CPF" | tr -d '.-' | sha256sum | cut -d' ' -f1)
+          normalized_hash=$(SEEDED_CPF="$SEEDED_CPF" python3 -c 'import hashlib,os,re; print(hashlib.sha256(re.sub(r"[.\\-\\s]", "", os.environ["SEEDED_CPF"]).encode()).hexdigest())')
 
           saved="$RUNNER_TEMP/eks-access.json"
           aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{private:endpointPrivateAccess,public:endpointPublicAccess,cidrs:publicAccessCidrs}' --output json > "$saved"
@@ -60,7 +60,7 @@ jobs:
 
           lookup=$(kubectl exec deployment/async-furious-api --namespace "$K8S_NAMESPACE" -- env SEEDED_CPF="$SEEDED_CPF" node -e '
           const crypto=require("node:crypto"); const {PrismaClient}=require("@prisma/client"); const db=new PrismaClient();
-          (async()=>{try{const raw=process.env.SEEDED_CPF; const cpf=raw.replace(/[.\-\s]/g,""); const c=await db.cliente.findUnique({where:{documento:cpf}}); const meta=await db.$queryRawUnsafe("SELECT current_database() AS db,current_schema() AS schema,current_setting(\"search_path\") AS search_path"); console.log(JSON.stringify({input_length:raw.length,normalized_length:cpf.length,input_hash:crypto.createHash("sha256").update(raw).digest("hex"),normalized_hash:crypto.createHash("sha256").update(cpf).digest("hex"),found:Boolean(c),active:Boolean(c?.ativo),document_hash:c&&crypto.createHash("sha256").update(c.documento).digest("hex"),document_length:c?.documento?.length||0,document_digits:/^\\d+$/.test(c?.documento||""),document_type:c?.tipo_documento||null,db:meta[0]}))}catch(e){console.log(JSON.stringify({error_class:e?.name||"UnknownError",error_code:e?.code||"unknown"}))}finally{await db.$disconnect()}})()')
+          (async()=>{try{const raw=process.env.SEEDED_CPF; const cpf=raw.replace(/[.\-\s]/g,""); const c=await db.cliente.findUnique({where:{documento:cpf}}); const meta=await db.$queryRawUnsafe("SELECT current_database() AS db,current_schema() AS schema,current_setting('search_path') AS search_path"); console.log(JSON.stringify({input_length:raw.length,normalized_length:cpf.length,input_hash:crypto.createHash("sha256").update(raw).digest("hex"),normalized_hash:crypto.createHash("sha256").update(cpf).digest("hex"),found:Boolean(c),active:Boolean(c?.ativo),document_hash:c&&crypto.createHash("sha256").update(c.documento).digest("hex"),document_length:c?.documento?.length||0,document_digits:/^\\d+$/.test(c?.documento||""),document_type:c?.tipo_documento||null,db:meta[0]}))}catch(e){console.log(JSON.stringify({error_class:e?.name||"UnknownError",error_code:e?.code||"unknown"}))}finally{await db.$disconnect()}})()')
           printf 'target=%s cpf_hash=%s normalized_hash=%s lookup=%s\n' "$TARGET" "$cpf_hash" "$normalized_hash" "$lookup" | tee -a "$GITHUB_STEP_SUMMARY"
 
           fn="tc3-auth-${TARGET}-auth"
