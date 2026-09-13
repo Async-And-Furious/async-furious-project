@@ -173,6 +173,7 @@ jobs:
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
       JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
+      JWT_PRIVATE_KEY_SECRET_ARN: ${{ secrets.JWT_PRIVATE_KEY_SECRET_ARN }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
@@ -203,6 +204,21 @@ jobs:
           {
             printf 'JWT_PUBLIC_KEY<<%s\n' "$delimiter"
             printf '%s\n' "$jwt_public_key"
+            printf '%s\n' "$delimiter"
+          } >> "$GITHUB_ENV"
+      - name: Fetch JWT private key from Secrets Manager
+        run: |
+          set -euo pipefail
+          test -n "$JWT_PRIVATE_KEY_SECRET_ARN" || { echo 'JWT_PRIVATE_KEY_SECRET_ARN is required.' >&2; exit 1; }
+          jwt_private_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PRIVATE_KEY_SECRET_ARN" --query 'SecretString' --output text)
+          test -n "$jwt_private_key" && [[ "$jwt_private_key" != 'None' ]] || { echo 'JWT private key secret is empty.' >&2; exit 1; }
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
+          done <<< "$jwt_private_key"
+          delimiter="JWT_PRIVATE_KEY_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          {
+            printf 'JWT_PRIVATE_KEY<<%s\n' "$delimiter"
+            printf '%s\n' "$jwt_private_key"
             printf '%s\n' "$delimiter"
           } >> "$GITHUB_ENV"
       - name: Resolve target group ARN from repo-k8s-infra state
@@ -309,7 +325,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -340,6 +356,7 @@ jobs:
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
+             --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
@@ -537,6 +554,7 @@ jobs:
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
       JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
+      JWT_PRIVATE_KEY_SECRET_ARN: ${{ secrets.JWT_PRIVATE_KEY_SECRET_ARN }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
@@ -576,6 +594,21 @@ jobs:
           {
             printf 'JWT_PUBLIC_KEY<<%s\n' "$delimiter"
             printf '%s\n' "$jwt_public_key"
+            printf '%s\n' "$delimiter"
+          } >> "$GITHUB_ENV"
+      - name: Fetch JWT private key from Secrets Manager
+        run: |
+          set -euo pipefail
+          test -n "$JWT_PRIVATE_KEY_SECRET_ARN" || { echo 'JWT_PRIVATE_KEY_SECRET_ARN is required.' >&2; exit 1; }
+          jwt_private_key=$(aws secretsmanager get-secret-value --secret-id "$JWT_PRIVATE_KEY_SECRET_ARN" --query 'SecretString' --output text)
+          test -n "$jwt_private_key" && [[ "$jwt_private_key" != 'None' ]] || { echo 'JWT private key secret is empty.' >&2; exit 1; }
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && printf '::add-mask::%s\n' "$line"
+          done <<< "$jwt_private_key"
+          delimiter="JWT_PRIVATE_KEY_${GITHUB_RUN_ID}_${GITHUB_RUN_ATTEMPT}"
+          {
+            printf 'JWT_PRIVATE_KEY<<%s\n' "$delimiter"
+            printf '%s\n' "$jwt_private_key"
             printf '%s\n' "$delimiter"
           } >> "$GITHUB_ENV"
       - name: Resolve target group ARN from repo-k8s-infra state
@@ -655,7 +688,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -686,6 +719,7 @@ jobs:
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
+             --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=JWT_CUSTOMER_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
             --from-literal=WEBHOOK_SECRET="$WEBHOOK_SECRET" \
