@@ -160,7 +160,7 @@ jobs:
             --resources-vpc-config endpointPrivateAccess=true,endpointPublicAccess=false \
             --query 'update.id' --output text 2>"$error_file"); do
             error=$(<"$error_file")
-            [[ "$error" == *ResourceNotFoundException* ]] && { echo 'HML EKS cluster not found during cleanup.'; exit 0; }
+            [[ "$error" == *ResourceNotFoundException* || "$error" == *'already at the desired configuration'* ]] && { echo 'HML EKS endpoint already has the requested cleanup configuration.'; exit 0; }
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
             (( SECONDS < deadline )) || { echo 'Timed out requesting private HML EKS cleanup.' >&2; exit 1; }
             sleep 10
