@@ -69,12 +69,13 @@ def validate_resource(tokens, resource, collection_path, patch_path, role, field
     path = patch_path.replace("{id}", str(item_id))
     original = item.get(field)
     changed = changed_value(resource, item, field)
+    display_path = patch_path.replace("{id}", "<id>")
     print(f"{resource} GET {collection_path} {status} {sanitized_id(item_id)}")
     patch_status, _ = request("PATCH", path, tokens[role], {field: changed})
-    print(f"{resource} PATCH {path} {patch_status} {sanitized_id(item_id)}")
+    print(f"{resource} PATCH {display_path} {patch_status} {sanitized_id(item_id)}")
     if patch_status in (200, 201):
         restore_status, _ = request("PATCH", path, tokens[role], {field: original})
-        print(f"{resource} PATCH {path} {restore_status} {sanitized_id(item_id)}")
+        print(f"{resource} PATCH {display_path} {restore_status} {sanitized_id(item_id)}")
     return [status, patch_status]
 
 
@@ -86,12 +87,13 @@ def validate_stock(tokens):
         raise RuntimeError("estoque collection did not return a seeded item with quantity")
     item_id = item["id"]
     path = f"/api/v1/pecas/{item_id}/estoque"
+    display_path = "/api/v1/pecas/<id>/estoque"
     print(f"estoque GET /api/v1/pecas {status} {sanitized_id(item_id)}")
     patch_status, _ = request("PATCH", path, tokens["admin"], {"quantidade": quantity + 1})
-    print(f"estoque PATCH {path} {patch_status} {sanitized_id(item_id)}")
+    print(f"estoque PATCH {display_path} {patch_status} {sanitized_id(item_id)}")
     if patch_status in (200, 201):
         restore_status, _ = request("PATCH", path, tokens["admin"], {"quantidade": quantity})
-        print(f"estoque PATCH {path} {restore_status} {sanitized_id(item_id)}")
+        print(f"estoque PATCH {display_path} {restore_status} {sanitized_id(item_id)}")
     return [status, patch_status]
 
 
