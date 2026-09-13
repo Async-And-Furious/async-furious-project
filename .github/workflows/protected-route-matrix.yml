@@ -1,0 +1,41 @@
+name: Protected HML/PROD route matrix
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Environment to verify
+        required: true
+        type: choice
+        options: [hml, prod]
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    environment: ${{ inputs.target == 'prod' && 'production' || 'hml' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run non-destructive authenticated route matrix
+        env:
+          BASE_URL: ${{ vars.BASE_URL }}
+          CUSTOMER_AUTH_URL: ${{ vars.CUSTOMER_AUTH_URL }}
+          CUSTOMER_CPF: ${{ secrets.SEEDED_CPF }}
+          ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+          RECEPTIONIST_EMAIL: ${{ vars.SEED_RECEPCIONISTA_EMAIL }}
+          RECEPTIONIST_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
+          MECHANIC_EMAIL: ${{ vars.SEED_MECANICO_EMAIL }}
+          MECHANIC_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
+          WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
+          cliente_id: ${{ vars.SEEDED_CLIENTE_ID }}
+          veiculo_id: ${{ vars.SEEDED_VEICULO_ID }}
+          servico_id: ${{ vars.SEEDED_SERVICO_ID }}
+          peca_id: ${{ vars.SEEDED_PECA_ID }}
+          ordem_id: ${{ vars.SEEDED_ORDEM_ID }}
+          fornecedor_id: ${{ vars.SEEDED_FORNECEDOR_ID }}
+          pedido_fornecedor_id: ${{ vars.SEEDED_PEDIDO_FORNECEDOR_ID }}
+        run: python scripts/route-matrix.py
