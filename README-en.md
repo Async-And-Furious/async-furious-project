@@ -67,15 +67,21 @@ GitHub CLI (`gh auth login`). It never receives secrets or calls AWS directly, a
 stops at the first failed workflow:
 
 ```bash
-npm run aws:apply
-npm run aws:apply -- --prod
-npm run aws:destroy -- --confirmation "DESTROY HML"
-npm run aws:destroy -- --prod --confirmation "DESTROY PROD"
-npm run aws:destroy -- --what-if --confirmation "DESTROY HML"
+pnpm aws:apply
+pnpm aws:apply --environment prod
+pnpm aws:destroy --confirmation "DESTROY HML"
+pnpm aws:destroy --environment prod --confirmation "DESTROY PROD"
+pnpm aws:destroy --what-if --confirmation "DESTROY HML"
 ```
 
-Without `--prod`, the environment defaults to HML. The script also accepts
-`--environment hml|prod`; combining `--prod` with `--environment hml` is rejected.
+This repository uses pnpm, which forwards arguments straight to the script: do not add
+`--` before them, or the `--` itself reaches `argparse` and the command fails with
+`unrecognized arguments`. Prefer `--environment prod` over `--prod`: both select the same
+environment in the script, but `--prod` is also a pnpm flag and may be consumed before it
+gets there.
+
+Without `--environment prod`, the environment defaults to HML. Combining `--prod` with
+`--environment hml` is rejected.
 Application refs default to `develop` for HML and `main` for production. Use
 `--poll-seconds` to change the workflow polling interval. Destroy requires the exact
 confirmation shown above.

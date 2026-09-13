@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import { Prisma, PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
+import { cpf } from 'cpf-cnpj-validator';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 
@@ -26,8 +27,10 @@ function stableSeedId(value: string): string {
 
 const email = requiredEnv('SEED_ADMIN_EMAIL');
 const password = requiredEnv('SEED_ADMIN_PASSWORD');
-const recepcionistaPassword = requiredEnv('SEED_RECEPCIONISTA_PASSWORD');
-const mecanicoPassword = requiredEnv('SEED_MECANICO_PASSWORD');
+const recepcionistaPassword = process.env.SEED_RECEPCIONISTA_PASSWORD;
+const mecanicoPassword = process.env.SEED_MECANICO_PASSWORD;
+const seededCpf = process.env.SEEDED_CPF?.replace(/[.\-\s]/g, '');
+if (seededCpf && !cpf.isValid(seededCpf)) throw new Error('SEEDED_CPF must be a valid CPF');
 
 const CLIENTES = [
   {
@@ -114,7 +117,25 @@ const CLIENTES = [
     documento: '89012345642',
     tipoDocumento: TaxIdType.CPF,
   },
-];
+] as Array<{
+  nome: string;
+  email: string;
+  telefone: string;
+  documento: string;
+  tipoDocumento: TaxIdType;
+  ativo?: boolean;
+}>;
+
+if (seededCpf) {
+  CLIENTES.push({
+    nome: 'Cliente de smoke test',
+    email: 'auth-smoke@async-furious.invalid',
+    telefone: '',
+    documento: seededCpf,
+    tipoDocumento: TaxIdType.CPF,
+    ativo: true,
+  });
+}
 
 const VEICULOS_TEMPLATE = [
   { placa: 'ABC1D23', marca: 'Toyota', modelo: 'Corolla', ano: 2022, cor: 'Prata' },
@@ -470,6 +491,7 @@ async function seedAdmin(db: SeedClient): Promise<void> {
 }
 
 async function seedRecepcionista(db: SeedClient): Promise<void> {
+  if (!recepcionistaPassword) return;
   const recepEmail = 'recepcionista@oficina.com';
   const existing = await db.user.findUnique({ where: { email: recepEmail } });
   if (!existing) {
@@ -494,6 +516,7 @@ async function seedRecepcionista(db: SeedClient): Promise<void> {
 }
 
 async function seedMecanico(db: SeedClient): Promise<void> {
+  if (!mecanicoPassword) return;
   const mecEmail = 'mecanico@oficina.com';
   const existing = await db.user.findUnique({ where: { email: mecEmail } });
   if (!existing) {
@@ -525,7 +548,7 @@ async function seedClientes(db: SeedClient): Promise<string[]> {
     const existing = await db.cliente.findUnique({ where: { documento: c.documento } });
     const cliente = await db.cliente.upsert({
       where: { documento: c.documento },
-      update: {},
+      update: c.ativo === undefined ? {} : { ativo: c.ativo },
       create: {
         id: stableSeedId(`cliente:${c.documento}`),
         nome: c.nome,
@@ -817,6 +840,88 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
   console.log(`  ✅ Ordens de Serviço: ${criadas} criadas, ${puladas} já existiam`);
 }
 
+const CLIENTE_TESTE_ORCAMENTOS_DOCUMENTO = '51259628809';
+const CLIENTE_TESTE_ORCAMENTOS_PLACA = 'TST9Z99';
+
+async function seedClienteTesteOrcamentos(db: SeedClient): Promise<void> {
+  const cliente = await db.cliente.upsert({
+    where: { documento: CLIENTE_TESTE_ORCAMENTOS_DOCUMENTO },
+    update: {},
+    create: {
+      id: stableSeedId(`cliente:${CLIENTE_TESTE_ORCAMENTOS_DOCUMENTO}`),
+      nome: 'Cliente Teste Orçamentos',
+      email: 'cliente.teste.orcamentos@async-furious.invalid',
+      telefone: '(11) 90000-0000',
+      documento: CLIENTE_TESTE_ORCAMENTOS_DOCUMENTO,
+      tipo_documento: TaxIdType.CPF,
+    },
+  });
+
+  const veiculo = await db.veiculo.upsert({
+    where: { placa: CLIENTE_TESTE_ORCAMENTOS_PLACA },
+    update: {},
+    create: {
+      id: stableSeedId(`veiculo:${CLIENTE_TESTE_ORCAMENTOS_PLACA}`),
+      placa: CLIENTE_TESTE_ORCAMENTOS_PLACA,
+      marca: 'Fiat',
+      modelo: 'Uno',
+      ano: 2018,
+      cor: 'Branco',
+      id_cliente: cliente.id,
+    },
+  });
+
+  const OS_TEMPLATES: OrderTemplate[] = [
+    {
+      descricao: '[Teste] Orçamento pendente #1',
+      status: SOStatus.AWAITING_APPROVAL,
+      orcamento: { valor_total_servicos: 200.0, valor_total_pecas: 50.0, status: EstimateStatus.PENDING },
+    },
+    {
+      descricao: '[Teste] Orçamento pendente #2',
+      status: SOStatus.AWAITING_APPROVAL,
+      orcamento: { valor_total_servicos: 320.0, valor_total_pecas: 0.0, status: EstimateStatus.PENDING },
+    },
+    {
+      descricao: '[Teste] Orçamento aprovado #1',
+      status: SOStatus.IN_PROGRESS,
+      orcamento: { valor_total_servicos: 400.0, valor_total_pecas: 120.0, status: EstimateStatus.APPROVED },
+    },
+    {
+      descricao: '[Teste] Orçamento aprovado #2',
+      status: SOStatus.DELIVERED,
+      orcamento: { valor_total_servicos: 600.0, valor_total_pecas: 90.0, status: EstimateStatus.APPROVED },
+    },
+    {
+      descricao: '[Teste] Orçamento recusado #1',
+      status: SOStatus.CLOSED_WITHOUT_EXECUTION,
+      orcamento: { valor_total_servicos: 150.0, valor_total_pecas: 30.0, status: EstimateStatus.REJECTED },
+    },
+    {
+      descricao: '[Teste] Orçamento recusado #2',
+      status: SOStatus.CLOSED_WITHOUT_EXECUTION,
+      orcamento: { valor_total_servicos: 275.0, valor_total_pecas: 60.0, status: EstimateStatus.REJECTED },
+    },
+  ];
+
+  let criadas = 0;
+  let puladas = 0;
+
+  for (const template of OS_TEMPLATES) {
+    const result = await findOrCreateOrdem(db, veiculo.id, cliente.id, template);
+    if (result.existing) puladas++;
+    else criadas++;
+
+    if (template.orcamento) {
+      await upsertOrcamento(db, result.os.id, template.orcamento);
+    }
+  }
+
+  console.log(
+    `  ✅ Cliente teste (${CLIENTE_TESTE_ORCAMENTOS_DOCUMENTO}) — Orçamentos: ${criadas} criados, ${puladas} já existiam`
+  );
+}
+
 async function seed(): Promise<void> {
   console.log('🌱 Seedando banco de dados...\n');
 
@@ -830,6 +935,7 @@ async function seed(): Promise<void> {
       await seedServicos(db);
       await seedPecasInsumos(db);
       await seedOrdensServico(db, clienteIds);
+      await seedClienteTesteOrcamentos(db);
     },
     // Keep the complete seed atomic while allowing its many writes to finish.
     { maxWait: 10_000, timeout: 120_000 }

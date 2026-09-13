@@ -28,6 +28,7 @@ import {
   NotificacaoAprovacaoOrcamentoDto,
 } from '../dto/ordem-servico.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
+import { JwtCustomerAuthGuard } from '../../../../auth/guards/jwt-customer-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
 import { Roles } from '../../../../auth/decorators/roles.decorator';
 import { Public } from '../../../../auth/decorators/public.decorator';
@@ -175,10 +176,17 @@ export class OrdemServicoController {
 
   @Get(':id/status')
   @Public()
-  @ApiOperation({ summary: 'Consultar status da OS (para o cliente)' })
+  @UseGuards(JwtCustomerAuthGuard)
+  @ApiOperation({
+    summary: 'Consultar status da OS (cliente)',
+    description: 'Requer token JWT de cliente emitido pela Function de autenticação (API Gateway).',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autorizado - token de cliente inválido ou ausente',
+  })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   consultarStatus(@Param('id', ParseUUIDPipe) id: string) {
     return this.consultarStatusUseCase.execute(id);
@@ -276,13 +284,19 @@ export class OrdemServicoController {
 
   @Patch(':id/orcamento/aprovar')
   @Public()
+  @UseGuards(JwtCustomerAuthGuard)
   @ApiOperation({
     summary: 'Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)',
-    description: 'Aprova o orçamento da ordem de serviço. Público.',
+    description:
+      'Aprova o orçamento da ordem de serviço. Requer token JWT de cliente emitido pela Function de autenticação (API Gateway).',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Orçamento aprovado. OS → Em Execução' })
   @ApiResponse({ status: 400, description: 'Orçamento não está pendente ou sem valores' })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autorizado - token de cliente inválido ou ausente',
+  })
   @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
   aprovarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
     return this.aprovarOrcamentoUseCase.execute(id);
@@ -290,14 +304,20 @@ export class OrdemServicoController {
 
   @Patch(':id/orcamento/recusar')
   @Public()
+  @UseGuards(JwtCustomerAuthGuard)
   @ApiOperation({
     summary:
       'Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)',
-    description: 'Recusa o orçamento da ordem de serviço. Público.',
+    description:
+      'Recusa o orçamento da ordem de serviço. Requer token JWT de cliente emitido pela Function de autenticação (API Gateway).',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Orçamento recusado. OS → Encerrada Sem Execução' })
   @ApiResponse({ status: 400, description: 'Orçamento não está pendente' })
+  @ApiResponse({
+    status: 401,
+    description: 'Não autorizado - token de cliente inválido ou ausente',
+  })
   @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
   recusarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
     return this.recusarOrcamentoUseCase.execute(id);
