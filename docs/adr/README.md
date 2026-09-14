@@ -6,7 +6,7 @@ ainda passíveis de evolução, ver [RFCs](../rfcs/README.md).
 
 Nenhum padrão de ADR numerado existia neste repositório antes desta
 auditoria (confirmado: nenhuma pasta `docs/adr/` em nenhuma branch
-pesquisada). O template abaixo foi definido para esta tarefa e deve ser
+pesquisada). Definimos o template abaixo para esta tarefa, que deve ser
 seguido pelas próximas ADRs.
 
 ## Índice

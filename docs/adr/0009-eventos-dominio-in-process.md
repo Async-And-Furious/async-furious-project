@@ -8,7 +8,7 @@ Aceita
 
 O modelo de domínio (`docs/ddd.md` §5) define 29 eventos de domínio
 distribuídos pelos 4 Bounded Contexts de código (`ordem-servico`,
-`cadastro`, `pecas-insumos`, `financeiro`). A equipe precisava de um
+`cadastro`, `pecas-insumos`, `financeiro`). Precisávamos de um
 mecanismo para emitir e reagir a esses eventos sem acoplar módulos
 diretamente entre si, dentro do escopo acadêmico do projeto (sem
 infraestrutura de mensageria externa).

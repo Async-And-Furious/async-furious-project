@@ -34,8 +34,8 @@ comportamentos por gatilho:
 ## Alternativas consideradas
 
 - **Nunca aplicar em CI** (decisão original do spec): descartada
-  implicitamente — a equipe evoluiu para exercitar a infraestrutura de
-  ponta a ponta a cada push, sem essa nota ter sido atualizada no spec
+  implicitamente — evoluímos para exercitar a infraestrutura de
+  ponta a ponta a cada push, sem atualizar essa nota no spec
   original (divergência documental que este ADR resolve).
 - **Aplicar contra infraestrutura de nuvem persistente em CI**: não
   adotada — o `apply` acontece só contra um cluster `kind` efêmero e local

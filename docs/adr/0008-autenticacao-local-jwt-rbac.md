@@ -55,14 +55,14 @@ dentro dessa exigência.
 - Duas implementações de autenticação hoje convivem na base de código
   (esta local, para os três papéis administrativos, + o fluxo de cliente/CPF
   via `repo-auth-serverless`, implementado no PR #182) — por decisão, não
-  por pendência: ver a seção "Decision on staff roles" no ADR-0002.
+  por pendência: ver a seção "Decisão sobre os papéis de staff" no ADR-0002.
 
 ## Riscos
 
 - Nenhum risco em aberto: `JwtModule.registerAsync()` resolve o contrato via
   `createJwtModuleOptions`/`resolveJwtContract` (`src/auth/jwt.config.ts`),
-  que usa HS256 + `JWT_SECRET` para o fluxo de staff fora de produção com
-  RS256, e exige RS256 explicitamente em produção.
+  que usa HS256 + `JWT_SECRET` para o fluxo de staff fora de produção, e
+  exige RS256 explicitamente em produção.
 
 ## Referências
 
