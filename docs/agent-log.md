@@ -1,5 +1,12 @@
 # Log de agentes
 
+## 2026-09-14 — Fortalecimento da atualização de capacidade do node group em HML
+
+- Fortalecido o passo de capacidade em HML para esperar um nodegroup ACTIVE,
+  repetir apenas em `ResourceInUseException`, e sondar a atualização
+  capturada até a conclusão, sem mascarar falhas de migração ou rollout.
+- Nenhum apply ou deploy na AWS foi executado.
+
 ## 2026-09-13 — Seed abrangente de HML/PROD
 
 - Estendido o seed determinístico e não destrutivo do Prisma com atualizações
