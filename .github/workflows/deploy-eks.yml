@@ -373,7 +373,7 @@ jobs:
         run: |
           set -euo pipefail
           nodegroup=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --query 'nodegroups[0]' --output text)
-          update_id=$(aws eks update-nodegroup-config --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --scaling-config minSize=2,maxSize=3,desiredSize=3 --query 'update.id' --output text)
+          update_id=$(aws eks update-nodegroup-config --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --scaling-config minSize=2,maxSize=3,desiredSize=2 --query 'update.id' --output text)
           aws eks wait nodegroup-active --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup"
           if kubectl get deployment/async-furious-api --namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
             kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=0
@@ -404,7 +404,7 @@ jobs:
                   - name: migrate
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
-                    command: ["sh", "-c", "node_modules/.bin/prisma migrate resolve --applied 20260831000000_add_cliente_ativo; node_modules/.bin/prisma migrate deploy || { sleep 600; exit 1; }"]
+                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
                     envFrom:
                       - configMapRef:
                           name: async-furious-config
