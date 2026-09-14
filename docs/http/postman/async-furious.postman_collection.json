@@ -1,0 +1,2169 @@
+{
+  "info": {
+    "name": "Async Furious API - HML/PROD",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Import this collection and select either generated HML or PROD environment. Credentials, CPF, tokens and IDs are variables only."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000"
+    },
+    {
+      "key": "admin_email",
+      "value": ""
+    },
+    {
+      "key": "admin_password",
+      "value": ""
+    },
+    {
+      "key": "receptionist_email",
+      "value": ""
+    },
+    {
+      "key": "receptionist_password",
+      "value": ""
+    },
+    {
+      "key": "mechanic_email",
+      "value": ""
+    },
+    {
+      "key": "mechanic_password",
+      "value": ""
+    },
+    {
+      "key": "customer_auth_url",
+      "value": ""
+    },
+    {
+      "key": "customer_cpf",
+      "value": ""
+    },
+    {
+      "key": "new_password",
+      "value": ""
+    },
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "receptionist_token",
+      "value": ""
+    },
+    {
+      "key": "mechanic_token",
+      "value": ""
+    },
+    {
+      "key": "customer_token",
+      "value": ""
+    },
+    {
+      "key": "webhook_token",
+      "value": ""
+    },
+    {
+      "key": "cliente_id",
+      "value": ""
+    },
+    {
+      "key": "veiculo_id",
+      "value": ""
+    },
+    {
+      "key": "servico_id",
+      "value": ""
+    },
+    {
+      "key": "peca_id",
+      "value": ""
+    },
+    {
+      "key": "ordem_id",
+      "value": ""
+    },
+    {
+      "key": "fornecedor_id",
+      "value": ""
+    },
+    {
+      "key": "pedido_fornecedor_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Customer CPF login (gateway/auth Lambda)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{customer_auth_url}}",
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"cpf\": \"{{customer_cpf}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text",
+                "exec": [
+                  "const data = pm.response.json(); pm.environment.set('customer_token', data.access_token || data.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/auth/login"
+              ]
+            },
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{admin_email}}\", \"password\": \"{{admin_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json(); const token = data.access_token || data.token; if (token) pm.environment.set(pm.request.name.toLowerCase().includes('receptionist') ? 'receptionist_token' : pm.request.name.toLowerCase().includes('mechanic') ? 'mechanic_token' : 'admin_token', token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login receptionist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/auth/login"
+              ]
+            },
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{receptionist_email}}\", \"password\": \"{{receptionist_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json(); const token = data.access_token || data.token; if (token) pm.environment.set(pm.request.name.toLowerCase().includes('receptionist') ? 'receptionist_token' : pm.request.name.toLowerCase().includes('mechanic') ? 'mechanic_token' : 'admin_token', token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login mechanic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/auth/login"
+              ]
+            },
+            "description": "Role: public; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{mechanic_email}}\", \"password\": \"{{mechanic_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const data = pm.response.json(); const token = data.access_token || data.token; if (token) pm.environment.set(pm.request.name.toLowerCase().includes('receptionist') ? 'receptionist_token' : pm.request.name.toLowerCase().includes('mechanic') ? 'mechanic_token' : 'admin_token', token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Application routes",
+      "item": [
+        {
+          "name": "GET /",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/health",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/health"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /health/live",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/health/live",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/health/live"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /health/ready",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/health/ready",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/health/ready"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/auth/login"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{email}}\", \"password\": \"{{password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/auth/register"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"new-user@example.invalid\", \"password\": \"{{new_password}}\", \"name\": \"Collection User\", \"role\": \"RECEPCIONISTA\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /clientes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clientes",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/clientes"
+              ]
+            },
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{receptionist_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /clientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clientes",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/clientes"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /clientes/{{cliente_id}}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/clientes/{{cliente_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /clientes/{{cliente_id}}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/clientes/{{cliente_id}}"
+              ]
+            },
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{receptionist_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /clientes/{{cliente_id}}",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/clientes/{{cliente_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/clientes/{{cliente_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /veiculos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/veiculos",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/veiculos"
+              ]
+            },
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{receptionist_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /veiculos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/veiculos",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/veiculos"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /veiculos/{{veiculo_id}}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/veiculos/{{veiculo_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /veiculos/{{veiculo_id}}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/veiculos/{{veiculo_id}}"
+              ]
+            },
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{receptionist_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /veiculos/{{veiculo_id}}",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/veiculos/{{veiculo_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/veiculos/{{veiculo_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /servicos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/servicos",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/servicos"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /servicos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/servicos",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/servicos"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /servicos/{{servico_id}}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/servicos/{{servico_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/servicos/{{servico_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /servicos/{{servico_id}}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/servicos/{{servico_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/servicos/{{servico_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /servicos/{{servico_id}}",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/servicos/{{servico_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/servicos/{{servico_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /pecas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /pecas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /pecas/{{peca_id}}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas/{{peca_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas/{{peca_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /pecas/{{peca_id}}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas/{{peca_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas/{{peca_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /pecas/{{peca_id}}/estoque",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas/{{peca_id}}/estoque",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas/{{peca_id}}/estoque"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"quantidade\": 50}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /pecas/{{peca_id}}",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas/{{peca_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas/{{peca_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /pecas/fornecedor/solicitar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas/fornecedor/solicitar",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas/fornecedor/solicitar"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"fornecedorId\": \"{{fornecedor_id}}\", \"pecas\": [{\"pecaId\": \"{{peca_id}}\", \"quantidadeSolicitada\": 1}]}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /pagamentos/registrar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/pagamentos/registrar",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/pagamentos/registrar"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ordemServicoId\": \"{{ordem_id}}\", \"valor\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /webhooks/service-orders/status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Webhook-Secret",
+                "value": "{{webhook_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/webhooks/service-orders/status",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/webhooks/service-orders/status"
+              ]
+            },
+            "description": "Role: webhook; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"status\": \"RECEIVED\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /ordens-servico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico"
+              ]
+            },
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"veiculoId\": \"{{veiculo_id}}\", \"clienteId\": \"{{cliente_id}}\", \"descricao\": \"Collection smoke order\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{receptionist_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /ordens-servico",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /ordens-servico/tempo-medio",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/tempo-medio",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/tempo-medio"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /ordens-servico/{{ordem_id}}",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /ordens-servico/{{ordem_id}}/status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/status",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/status"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /ordens-servico/{{ordem_id}}/rastreamento",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/rastreamento",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/rastreamento"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"descricao\": \"Collection smoke update\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /ordens-servico/{{ordem_id}}",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}"
+              ]
+            },
+            "description": "Role: admin; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/assumir",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/assumir",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/assumir"
+              ]
+            },
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mechanic_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/analisar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/analisar",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/analisar"
+              ]
+            },
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mechanic_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/servicos-insumos",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/servicos-insumos",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/servicos-insumos"
+              ]
+            },
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"valor_total_servicos\": 1, \"valor_total_pecas\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mechanic_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/aprovar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/aprovar",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/orcamento/aprovar"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/recusar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/recusar",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/orcamento/recusar"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/finalizar-execucao",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/finalizar-execucao"
+              ]
+            },
+            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{mechanic_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/aprovar-servico",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/aprovar-servico"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /ordens-servico/{{ordem_id}}/aprovar-servico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/aprovar-servico"
+              ]
+            },
+            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"decisao\": \"APROVADO\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{customer_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PATCH /ordens-servico/{{ordem_id}}/registrar-entrega",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/registrar-entrega",
+              "host": [
+                "{{base_url}}/api/v1",
+                "/ordens-servico/{{ordem_id}}/registrar-entrega"
+              ]
+            },
+            "description": "Role: receptionist; 400 is allowed for an intentionally invalid/state-incompatible mock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{receptionist_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

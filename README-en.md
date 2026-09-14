@@ -51,11 +51,40 @@ We use Node.js with NestJS for modular architecture and native dependency inject
 
 ## Prerequisites
 
+- Python 3 (for the stack orchestrator)
+- GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker and Docker Compose
 - Terraform 1.6+
 - kind (`go install sigs.k8s.io/kind@latest` or install through your package manager)
+
+### AWS stack orchestration
+
+The cross-repository AWS stack is dispatched and monitored by the standard-library
+Python script `scripts/orchestrate-stack.py`. It requires Python 3 and an authenticated
+GitHub CLI (`gh auth login`). It never receives secrets or calls AWS directly, and
+stops at the first failed workflow:
+
+```bash
+pnpm aws:apply
+pnpm aws:apply --environment prod
+pnpm aws:destroy --confirmation "DESTROY HML"
+pnpm aws:destroy --environment prod --confirmation "DESTROY PROD"
+pnpm aws:destroy --what-if --confirmation "DESTROY HML"
+```
+
+This repository uses pnpm, which forwards arguments straight to the script: do not add
+`--` before them, or the `--` itself reaches `argparse` and the command fails with
+`unrecognized arguments`. Prefer `--environment prod` over `--prod`: both select the same
+environment in the script, but `--prod` is also a pnpm flag and may be consumed before it
+gets there.
+
+Without `--environment prod`, the environment defaults to HML. Combining `--prod` with
+`--environment hml` is rejected.
+Application refs default to `develop` for HML and `main` for production. Use
+`--poll-seconds` to change the workflow polling interval. Destroy requires the exact
+confirmation shown above.
 
 ---
 

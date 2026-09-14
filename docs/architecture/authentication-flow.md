@@ -1,148 +1,147 @@
-# Sequência de Autenticação
+# Authentication Sequence
 
-> Notação UML de sequência (Mermaid `sequenceDiagram`). Existem dois fluxos, e
-> qual deles vale depende da variável `AUTH_MODE`: `local` no ambiente `kind`,
-> `gateway` em `hml` e `prod`.
->
-> Detalhamento da borda em
-> [api-gateway-lambda.md](../infrastructure/api-gateway-lambda.md); decisão em
-> [ADR-0002](../adr/0002-autenticacao-centralizada-api-gateway-serverless.md).
+> UML sequence notation (Mermaid `sequenceDiagram`). Updated to reflect the
+> state after PR #182 (`feat/customer-jwt-rs256-auth`), which added consumption
+> of externally-issued customer JWTs, and after `repo-auth-serverless` shipped
+> its Lambda handlers (no longer skeletons).
 
-## 1. `AUTH_MODE=local` (ambiente `kind`)
+## 1. Staff authentication — local, unchanged
 
-Usuário administrativo autentica com e-mail e senha dentro do próprio NestJS.
-
-Evidência: `src/auth/guards/jwt-auth.guard.ts`, `src/auth/guards/roles.guard.ts`,
-`src/auth/strategies/jwt.strategy.ts`, `src/auth/decorators/public.decorator.ts`.
+Evidence: `src/auth/guards/jwt-auth.guard.ts`, `src/auth/guards/roles.guard.ts`,
+`src/auth/strategies/jwt.strategy.ts`, `src/auth/decorators/public.decorator.ts`,
+README.md (1h expiry, `ADMIN`/`RECEPCIONISTA`/`MECANICO` roles).
 
 ```mermaid
 sequenceDiagram
-    actor U as Usuário (Admin/Recepcionista/Mecânico)
-    participant API as Aplicação NestJS
+    actor U as Staff user (Admin/Recepcionista/Mecânico)
+    participant API as NestJS application (async-furious-project)
     participant Guard as JwtAuthGuard / RolesGuard
     participant DB as PostgreSQL
 
-    U->>API: POST /api/v1/auth/login (email, senha)
-    API->>DB: busca usuário por email
-    DB-->>API: usuário (hash bcrypt)
-    alt credenciais inválidas
+    U->>API: POST /api/v1/auth/login (email, password)
+    API->>DB: look up user by email
+    DB-->>API: user (bcrypt hash)
+    alt invalid credentials
         API-->>U: 401 Unauthorized
-    else credenciais válidas
-        API-->>U: 200 { access_token JWT }
+    else valid credentials
+        API-->>U: 200 { access_token JWT, 1h expiry }
     end
 
-    U->>API: rota protegida, Authorization Bearer
+    U->>API: request to protected route<br/>Authorization: Bearer <token>
     API->>Guard: JwtAuthGuard.canActivate()
-    Guard->>Guard: verifica @Public() via Reflector
-    alt rota marcada @Public()
-        Guard-->>API: libera sem checar token
-    else token ausente
+    Guard->>Guard: checks @Public() via Reflector
+    alt route marked @Public()
+        Guard-->>API: allows through without checking the token
+    else token missing
         Guard-->>U: 401 Unauthorized
-    else token presente
-        Guard->>Guard: valida assinatura e expiração (passport-jwt)
-        alt token expirado ou inválido
+    else token present
+        Guard->>Guard: validates signature + expiration (passport-jwt)
+        alt token expired or invalid
             Guard-->>U: 401 Unauthorized
-        else token válido
-            Guard->>Guard: RolesGuard compara @Roles(...) com user.role
-            alt papel sem permissão
+        else token valid
+            Guard->>Guard: RolesGuard checks @Roles(...) vs user.role
+            alt role lacks permission
                 Guard-->>U: 403 Forbidden
-            else papel autorizado
-                Guard-->>API: prossegue para o controller
-                API-->>U: 200 (resposta do caso de uso)
+            else role authorized
+                Guard-->>API: proceeds to the controller
+                API-->>U: 200 (use case response)
             end
         end
     end
 ```
 
-Neste modo o algoritmo é HS256 por padrão, com `JWT_SECRET` compartilhado.
-`resolveJwtContract` recusa HS256 quando `NODE_ENV=production`
-(`src/auth/jwt.config.ts:38`), então esse caminho é restrito a
-desenvolvimento e teste.
+**Note**: this flow does not emit any log/metric/trace to an observability
+tool today — only the HTTP response (see
+[`docs/infrastructure/observability.md`](../infrastructure/observability.md)).
 
-## 2. `AUTH_MODE=gateway` (ambientes AWS)
+## 2. Customer authentication — API Gateway + Function Serverless (implemented)
 
-Cliente autentica por CPF na borda. O monólito deixa de emitir token: `login`
-e `register` respondem `401` neste modo
-(`src/auth/services/auth.service.ts:19,50`).
+Evidence: RFC-003, RFC-006 (accepted), `repo-auth-serverless` README/CI
+(handlers implemented and deployed, no longer skeletons), and
+`src/auth/strategies/jwt-customer.strategy.ts` /
+`src/auth/guards/jwt-customer-auth.guard.ts` in this repo (PR #182).
 
 ```mermaid
 sequenceDiagram
-    actor C as Cliente
-    participant GW as API Gateway (tc3-auth-env)
-    participant AuthFn as Lambda authenticate-customer
-    participant AuthzFn as Lambda authorize-request
-    participant SM as Secrets Manager
+    actor C as Customer (Cliente)
+    participant GW as API Gateway (repo-auth-serverless)
+    participant AuthFn as Lambda: authenticate-customer
+    participant AuthzFn as Lambda: authorize-request (Authorizer)
+    participant Secrets as Secrets Manager
     participant SSM as SSM Parameter Store
-    participant RDS as RDS PostgreSQL
-    participant App as Aplicação no EKS (via ALB)
+    participant App as Application (JwtCustomerStrategy, RS256)
+    participant Obs as Observability [PENDING]
 
-    C->>GW: POST /auth { cpf }
-    GW->>AuthFn: integração AWS_PROXY
-    AuthFn->>AuthFn: normaliza CPF e valida dígitos verificadores
-    alt corpo inválido ou cpf ausente
-        AuthFn-->>C: 400 invalid_request
-    else CPF com dígito inválido
-        AuthFn-->>C: 401 unauthorized
-    else CPF bem formado
-        AuthFn->>RDS: SELECT id, ativo FROM Cliente WHERE documento e tipo CPF
-        alt cliente inexistente ou inativo
-            AuthFn-->>C: 401 unauthorized (mesma mensagem genérica)
-        else cliente ativo
-            AuthFn->>SM: GetSecretValue (chave privada RS256)
-            AuthFn->>AuthFn: assina JWT sub=Cliente.id, exp 1800s
-            AuthFn-->>C: 200 { token, contrato }
+    C->>GW: POST /auth (CPF)
+    GW->>AuthFn: invokes authenticate-customer
+    AuthFn->>Secrets: reads RS256 private key
+    alt invalid CPF / customer not found
+        AuthFn-->>GW: validation error
+        GW-->>C: 401/400
+    else valid CPF
+        AuthFn->>AuthFn: signs RS256 JWT (sub=Cliente.id, iat, exp 30min, iss=repo-auth-serverless, aud=async-furious-project)
+        AuthFn-->>GW: JWT
+        GW-->>C: 200 { token }
+    end
+
+    C->>GW: request to protected route<br/>Authorization: Bearer <token>
+    GW->>AuthzFn: invokes authorize-request (Lambda Authorizer)
+    AuthzFn->>SSM: reads RS256 public key
+    alt token missing
+        AuthzFn-->>GW: isAuthorized=false
+        GW-->>C: 401 Unauthorized
+    else token expired
+        AuthzFn-->>GW: isAuthorized=false
+        GW-->>C: 401 Unauthorized (expired token)
+    else token with invalid signature
+        AuthzFn-->>GW: isAuthorized=false
+        GW-->>C: 401 Unauthorized (invalid signature)
+    else Function unavailable (timeout/Lambda error)
+        AuthzFn-->>GW: error/timeout
+        GW-->>C: 5xx
+    else valid token
+        AuthzFn-->>GW: isAuthorized=true, context (claims)
+        GW->>App: forwards via VPC Link → ALB (when full integration is deployed)
+        App->>App: JwtCustomerStrategy verifies RS256 signature, issuer, audience again; maps sub to AuthenticatedUser{role: CLIENTE}
+        alt inactive/unknown customer
+            App-->>C: 401 Unauthorized
+        else claim lacks permission for the resource
+            App-->>C: 403 Forbidden
+        else authorized
+            App-->>C: 200 (use case response)
         end
     end
 
-    C->>GW: ANY /{proxy+} com Authorization Bearer
-    GW->>AuthzFn: authorizer REQUEST (identity source: header Authorization)
-    AuthzFn->>SSM: GetParameter (chave pública RS256)
-    alt token ausente, malformado, expirado ou assinatura inválida
-        AuthzFn-->>GW: isAuthorized=false
-        GW-->>C: 401 Unauthorized
-    else token válido
-        AuthzFn-->>GW: isAuthorized=true, context.correlation_id
-        GW->>App: HTTP_PROXY via VPC Link, header x-correlation-id reescrito
-        App->>App: JwtStrategy revalida RS256, issuer, audience e exp
-        App->>RDS: validateCustomer(sub) exige ativo=true
-        alt cliente desativado após a emissão do token
-            App-->>C: 401 Unauthorized
-        else autorizado
-            App-->>C: 200 (resposta do caso de uso)
-        end
+    par Observability [PENDING — no tool decided]
+        GW-->>Obs: [PENDING]
+        AuthFn-->>Obs: [PENDING]
+        AuthzFn-->>Obs: [PENDING]
+        App-->>Obs: [PENDING]
     end
 ```
 
-### Por que a validação acontece duas vezes
+**Application-side status**: `JwtCustomerStrategy` + `JwtCustomerAuthGuard`
+are implemented and tested in this repo, and `Role.CLIENTE` was added to the
+role enum so the existing `RolesGuard` works unchanged for customer tokens.
+No business route is protected by `Role.CLIENTE` yet — this PR only delivered
+the consumer-side infrastructure so a future route can opt in via
+`@UseGuards(JwtCustomerAuthGuard, RolesGuard)` + `@Roles(Role.CLIENTE)`.
 
-O authorizer prova que o token é autêntico e não expirou. Ele não prova que o
-cliente ainda está ativo, porque o token carrega identidade, não estado. Um
-cliente desativado logo depois da emissão continuaria passando pela borda por
-até 30 minutos. Por isso a aplicação revalida a assinatura e reconsulta o
-banco a cada requisição.
+### Key differences between the two flows
 
-O smoke test do deploy verifica exatamente a primeira camada: chama
-`/api/v1/health/live` pelo gateway sem token e falha o pipeline se a resposta
-não for `401` ou `403`.
-
-## 3. Contraste entre os dois modos
-
-| Aspecto | `AUTH_MODE=local` | `AUTH_MODE=gateway` |
+| Aspect | Staff (local) | Customer (external) |
 |---|---|---|
-| Onde autentica | dentro do processo NestJS | Lambda em `repo-auth-serverless` |
-| Identificação | e-mail e senha (usuário administrativo) | CPF (cliente) |
-| Algoritmo | HS256 (proibido em produção) | RS256, chave privada nunca sai da Lambda |
-| `sub` | `User.id` | `Cliente.id` |
-| Expiração | `JWT_EXPIRES_IN`, 1800s por padrão | 1800s, travado por validação no Terraform |
-| Primeira barreira | `JwtAuthGuard` | Lambda Authorizer, antes de a requisição entrar na VPC |
-| `login` e `register` | disponíveis | respondem 401 |
+| Where authentication happens | Inside the NestJS process (`src/auth/`) | In `repo-auth-serverless`, outside the application process |
+| Identification | Email + password (staff user) | CPF (`Cliente.documento`) |
+| Signing algorithm | `@nestjs/jwt`, HS256 (`JWT_SECRET`) | RS256; private key never leaves `repo-auth-serverless` |
+| Route validation | `JwtAuthGuard` + `passport-jwt` inside NestJS | Lambda Authorizer at the edge, then `JwtCustomerAuthGuard` re-verifies in-app |
+| Expiration | 1 hour | 30 minutes |
+| Token subject | `User.id` (+ `email`, `role` claims) | `Cliente.id` only (no `email`/`role` claims) |
 
-## 4. Pendências
-
-- Não há fluxo de autenticação para os papéis administrativos (`ADMIN`,
-  `RECEPCIONISTA`, `MECANICO`) nos ambientes AWS. A borda só autentica cliente
-  por CPF e o login local está desligado. Nenhuma RFC resolve isso.
-- `validateCustomer` atribui `Role.RECEPCIONISTA` a um cliente autenticado por
-  CPF, enquanto `JwtCustomerStrategy` atribui `Role.CLIENTE` ao mesmo tipo de
-  token. Qual estratégia atende cada rota protegida não está documentado.
-- A rota `POST /auth` não tem throttling nem WAF.
+**Recorded decision**: migrating the three staff roles (`ADMIN`,
+`RECEPCIONISTA`, `MECANICO`) to the external gateway flow is explicitly out of
+scope for now (see PR #182's description) — `repo-auth-serverless` only
+authenticates customers by CPF, and no staff-facing Lambda exists. Staff
+login/registration (`AuthService`, `JwtStrategy`, HS256) remains local until a
+follow-up decides how staff authenticate. See
+[ADR-0002](../adr/0002-autenticacao-centralizada-api-gateway-serverless.md).

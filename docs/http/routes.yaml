@@ -1,0 +1,581 @@
+- id: route-000
+  method: GET
+  path: /api/v1/
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-001
+  method: GET
+  path: /api/v1/health
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-002
+  method: GET
+  path: /api/v1/health/live
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-003
+  method: GET
+  path: /api/v1/health/ready
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-004
+  method: POST
+  path: /api/v1/auth/login
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    email: '{{email}}'
+    password: '{{password}}'
+- id: route-005
+  method: POST
+  path: /api/v1/auth/register
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  idempotent: true
+  mock_body:
+    email: new-user@example.invalid
+    password: '{{new_password}}'
+    name: Collection User
+    role: RECEPCIONISTA
+- id: route-006
+  method: POST
+  path: /api/v1/clientes
+  auth: staff
+  role: RECEPCIONISTA
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-007
+  method: GET
+  path: /api/v1/clientes
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-008
+  method: GET
+  path: /api/v1/clientes/{{cliente_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-009
+  method: PATCH
+  path: /api/v1/clientes/{{cliente_id}}
+  auth: staff
+  role: RECEPCIONISTA
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-010
+  method: DELETE
+  path: /api/v1/clientes/{{cliente_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: true
+  mock_body: {}
+- id: route-011
+  method: POST
+  path: /api/v1/veiculos
+  auth: staff
+  role: RECEPCIONISTA
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-012
+  method: GET
+  path: /api/v1/veiculos
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-013
+  method: GET
+  path: /api/v1/veiculos/{{veiculo_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-014
+  method: PATCH
+  path: /api/v1/veiculos/{{veiculo_id}}
+  auth: staff
+  role: RECEPCIONISTA
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-015
+  method: DELETE
+  path: /api/v1/veiculos/{{veiculo_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: true
+  mock_body: {}
+- id: route-016
+  method: POST
+  path: /api/v1/servicos
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-017
+  method: GET
+  path: /api/v1/servicos
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-018
+  method: GET
+  path: /api/v1/servicos/{{servico_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-019
+  method: PATCH
+  path: /api/v1/servicos/{{servico_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-020
+  method: DELETE
+  path: /api/v1/servicos/{{servico_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: true
+  mock_body: {}
+- id: route-021
+  method: POST
+  path: /api/v1/pecas
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-022
+  method: GET
+  path: /api/v1/pecas
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-023
+  method: GET
+  path: /api/v1/pecas/{{peca_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-024
+  method: PATCH
+  path: /api/v1/pecas/{{peca_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-025
+  method: PATCH
+  path: /api/v1/pecas/{{peca_id}}/estoque
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    quantidade: 50
+- id: route-026
+  method: DELETE
+  path: /api/v1/pecas/{{peca_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: true
+  mock_body: {}
+- id: route-027
+  method: POST
+  path: /api/v1/pecas/fornecedor/solicitar
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    fornecedorId: '{{fornecedor_id}}'
+    pecas:
+    - pecaId: '{{peca_id}}'
+      quantidadeSolicitada: 1
+- id: route-028
+  method: PATCH
+  path: /api/v1/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-029
+  method: POST
+  path: /api/v1/pagamentos/registrar
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    ordemServicoId: '{{ordem_id}}'
+    valor: 1
+- id: route-030
+  method: POST
+  path: /api/v1/webhooks/service-orders/status
+  auth: webhook
+  role: null
+  allowed_status:
+  - 200
+  - 201
+  - 204
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    status: RECEIVED
+- id: route-031
+  method: POST
+  path: /api/v1/ordens-servico
+  auth: staff
+  role: RECEPCIONISTA
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    veiculoId: '{{veiculo_id}}'
+    clienteId: '{{cliente_id}}'
+    descricao: Collection smoke order
+- id: route-032
+  method: GET
+  path: /api/v1/ordens-servico
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-033
+  method: GET
+  path: /api/v1/ordens-servico/tempo-medio
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-034
+  method: GET
+  path: /api/v1/ordens-servico/{{ordem_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-035
+  method: GET
+  path: /api/v1/ordens-servico/{{ordem_id}}/status
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-036
+  method: GET
+  path: /api/v1/ordens-servico/{{ordem_id}}/rastreamento
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 404
+  mutating: false
+  mock_body: {}
+- id: route-037
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    descricao: Collection smoke update
+- id: route-038
+  method: DELETE
+  path: /api/v1/ordens-servico/{{ordem_id}}
+  auth: staff
+  role: ADMIN
+  allowed_status:
+  - 200
+  - 404
+  mutating: true
+  mock_body: {}
+- id: route-039
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/assumir
+  auth: staff
+  role: MECANICO
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-040
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/analisar
+  auth: staff
+  role: MECANICO
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-041
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/servicos-insumos
+  auth: staff
+  role: MECANICO
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    valor_total_servicos: 1
+    valor_total_pecas: 1
+- id: route-042
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/orcamento/aprovar
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-043
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/orcamento/recusar
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-044
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao
+  auth: staff
+  role: MECANICO
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-045
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/aprovar-servico
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}
+- id: route-046
+  method: POST
+  path: /api/v1/ordens-servico/{{ordem_id}}/aprovar-servico
+  auth: customer
+  role: null
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body:
+    decisao: APROVADO
+- id: route-047
+  method: PATCH
+  path: /api/v1/ordens-servico/{{ordem_id}}/registrar-entrega
+  auth: staff
+  role: RECEPCIONISTA
+  allowed_status:
+  - 200
+  - 201
+  - 400
+  - 404
+  - 409
+  mutating: true
+  mock_body: {}

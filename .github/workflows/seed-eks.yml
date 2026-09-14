@@ -1,0 +1,35 @@
+name: Comprehensive seed on EKS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Protected target environment
+        required: true
+        type: choice
+        options: [hml, prod]
+        default: hml
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  first-run:
+    name: Seed ${{ inputs.environment }} (first run)
+    uses: ./.github/workflows/deploy-eks.yml
+    with:
+      environment: ${{ inputs.environment }}
+      seed_prod: ${{ inputs.environment == 'prod' }}
+      seed_comprehensive: true
+    secrets: inherit
+
+  second-run:
+    name: Seed ${{ inputs.environment }} (idempotency run)
+    needs: first-run
+    uses: ./.github/workflows/deploy-eks.yml
+    with:
+      environment: ${{ inputs.environment }}
+      seed_prod: ${{ inputs.environment == 'prod' }}
+      seed_comprehensive: true
+    secrets: inherit

@@ -1,7 +1,9 @@
 import dotenv from 'dotenv';
 import { Prisma, PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
+import { cpf } from 'cpf-cnpj-validator';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
+import { writeFile } from 'fs/promises';
 
 dotenv.config();
 
@@ -28,6 +30,8 @@ const email = requiredEnv('SEED_ADMIN_EMAIL');
 const password = requiredEnv('SEED_ADMIN_PASSWORD');
 const recepcionistaPassword = requiredEnv('SEED_RECEPCIONISTA_PASSWORD');
 const mecanicoPassword = requiredEnv('SEED_MECANICO_PASSWORD');
+const seededCpf = process.env.SEEDED_CPF?.replace(/[.\-\s]/g, '');
+if (seededCpf && !cpf.isValid(seededCpf)) throw new Error('SEEDED_CPF must be a valid CPF');
 
 const CLIENTES = [
   {
@@ -114,7 +118,25 @@ const CLIENTES = [
     documento: '89012345642',
     tipoDocumento: TaxIdType.CPF,
   },
-];
+] as Array<{
+  nome: string;
+  email: string;
+  telefone: string;
+  documento: string;
+  tipoDocumento: TaxIdType;
+  ativo?: boolean;
+}>;
+
+if (seededCpf) {
+  CLIENTES.push({
+    nome: 'Cliente de smoke test',
+    email: 'auth-smoke@async-furious.invalid',
+    telefone: '',
+    documento: seededCpf,
+    tipoDocumento: TaxIdType.CPF,
+    ativo: true,
+  });
+}
 
 const VEICULOS_TEMPLATE = [
   { placa: 'ABC1D23', marca: 'Toyota', modelo: 'Corolla', ano: 2022, cor: 'Prata' },
@@ -445,7 +467,7 @@ const PECAS_INSUMOS = [
   },
 ];
 
-async function seedAdmin(db: SeedClient): Promise<void> {
+async function oldSeedAdmin(db: SeedClient): Promise<void> {
   const normalizedEmail = email?.toLowerCase()?.trim() ?? '';
   const existing = await db.user.findUnique({ where: { email: normalizedEmail } });
   if (!existing) {
@@ -469,7 +491,8 @@ async function seedAdmin(db: SeedClient): Promise<void> {
   console.log(`  ✅ Admin criado/atualizado: ${email}`);
 }
 
-async function seedRecepcionista(db: SeedClient): Promise<void> {
+async function oldSeedRecepcionista(db: SeedClient): Promise<void> {
+  if (!recepcionistaPassword) return;
   const recepEmail = 'recepcionista@oficina.com';
   const existing = await db.user.findUnique({ where: { email: recepEmail } });
   if (!existing) {
@@ -493,7 +516,8 @@ async function seedRecepcionista(db: SeedClient): Promise<void> {
   console.log(`  ✅ Recepcionista criada: ${recepEmail}`);
 }
 
-async function seedMecanico(db: SeedClient): Promise<void> {
+async function oldSeedMecanico(db: SeedClient): Promise<void> {
+  if (!mecanicoPassword) return;
   const mecEmail = 'mecanico@oficina.com';
   const existing = await db.user.findUnique({ where: { email: mecEmail } });
   if (!existing) {
@@ -517,6 +541,27 @@ async function seedMecanico(db: SeedClient): Promise<void> {
   console.log(`  ✅ Mecânico criado: ${mecEmail}`);
 }
 
+async function seedUser(db: SeedClient, user: { email: string; password: string; name: string; role: string }): Promise<void> {
+  const normalizedEmail = user.email.toLowerCase().trim();
+  await db.user.upsert({
+    where: { email: normalizedEmail },
+    update: { password: await bcrypt.hash(user.password, 10), name: user.name, role: user.role },
+    create: { id: stableSeedId(`user:${normalizedEmail}`), email: normalizedEmail, password: await bcrypt.hash(user.password, 10), name: user.name, role: user.role },
+  });
+}
+
+async function seedAdmin(db: SeedClient): Promise<void> {
+  await seedUser(db, { email, password, name: 'Admin User', role: 'ADMIN' });
+}
+
+async function seedRecepcionista(db: SeedClient): Promise<void> {
+  await seedUser(db, { email: 'recepcionista@oficina.com', password: recepcionistaPassword, name: 'Recepcionista Padrão', role: 'RECEPCIONISTA' });
+}
+
+async function seedMecanico(db: SeedClient): Promise<void> {
+  await seedUser(db, { email: 'mecanico@oficina.com', password: mecanicoPassword, name: 'Mecânico Padrão', role: 'MECANICO' });
+}
+
 async function seedClientes(db: SeedClient): Promise<string[]> {
   const ids: string[] = [];
   let criados = 0;
@@ -525,7 +570,7 @@ async function seedClientes(db: SeedClient): Promise<string[]> {
     const existing = await db.cliente.findUnique({ where: { documento: c.documento } });
     const cliente = await db.cliente.upsert({
       where: { documento: c.documento },
-      update: {},
+      update: c.ativo === undefined ? {} : { ativo: c.ativo },
       create: {
         id: stableSeedId(`cliente:${c.documento}`),
         nome: c.nome,
@@ -644,6 +689,24 @@ type OrderTemplate = {
 };
 
 type SeedOrder = Awaited<ReturnType<SeedClient['ordemServico']['create']>>;
+type SeedManifest = {
+  schema: 1;
+  environment: string;
+  users: Array<{ email: string; role: string; id: string }>;
+  customers: string[];
+  vehicles: string[];
+  services: string[];
+  parts: string[];
+  orders: Array<{ id: string; status: SOStatus }>;
+  estimates: string[];
+  orderServices: string[];
+  orderParts: string[];
+  supplierOrders: string[];
+  supplierItems: string[];
+  reservations: string[];
+  payments: string[];
+  statusHistory: string[];
+};
 
 async function findOrCreateOrdem(
   db: SeedClient,
@@ -653,7 +716,10 @@ async function findOrCreateOrdem(
 ): Promise<{ os: SeedOrder; existing: boolean }> {
   const where = { id_veiculo: veiculoId, descricao: template.descricao };
   const existing = await db.ordemServico.findFirst({ where });
-  if (existing) return { os: existing, existing: true };
+  if (existing) {
+    const os = await db.ordemServico.update({ where: { id: existing.id }, data: { status: template.status, id_cliente: clienteId } });
+    return { os, existing: true };
+  }
 
   try {
     const os = await db.ordemServico.create({
@@ -700,14 +766,14 @@ async function upsertOrcamento(
   });
 }
 
-async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<void> {
+async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<SeedOrder[]> {
   const seededVehicleIds = VEICULOS_TEMPLATE.map(({ placa }) => stableSeedId(`veiculo:${placa}`));
   const veiculos = await db.veiculo.findMany({
     where: { id: { in: seededVehicleIds } },
     orderBy: { id: 'asc' },
     take: 10,
   });
-  if (veiculos.length === 0) return;
+  if (veiculos.length === 0) return [];
 
   const OS_TEMPLATES: OrderTemplate[] = [
     {
@@ -796,6 +862,7 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
 
   let criadas = 0;
   let puladas = 0;
+  const orders: SeedOrder[] = [];
 
   for (let i = 0; i < OS_TEMPLATES.length; i++) {
     const template = OS_TEMPLATES[i];
@@ -803,6 +870,7 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
     const clienteId = clienteIds[i % clienteIds.length];
 
     const result = await findOrCreateOrdem(db, veiculo.id, clienteId, template);
+    orders.push(result.os);
     if (result.existing) {
       puladas++;
     } else {
@@ -815,11 +883,86 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
   }
 
   console.log(`  ✅ Ordens de Serviço: ${criadas} criadas, ${puladas} já existiam`);
+  return orders;
+}
+
+async function seedRelations(
+  db: SeedClient,
+  orders: SeedOrder[]
+): Promise<Omit<SeedManifest, 'schema' | 'environment' | 'users' | 'customers' | 'vehicles' | 'services' | 'parts'>> {
+  const serviceIds = SERVICOS.map((service) => stableSeedId(`servico:${service.nome}`));
+  const partIds = PECAS_INSUMOS.map((part) => stableSeedId(`peca:${part.codigo}`));
+  const orderServices: string[] = [];
+  const orderParts: string[] = [];
+  const estimates: string[] = [];
+  const supplierOrders: string[] = [];
+  const supplierItems: string[] = [];
+  const reservations: string[] = [];
+  const payments: string[] = [];
+  const statusHistory: string[] = [];
+
+  for (let index = 0; index < orders.length; index++) {
+    const order = orders[index];
+    const serviceId = serviceIds[index % serviceIds.length];
+    const partId = partIds[index % partIds.length];
+    const osServiceId = stableSeedId(`os-servico:${order.id}:${serviceId}`);
+    const osPartId = stableSeedId(`os-peca:${order.id}:${partId}`);
+    const existingOsService = await db.osServico.findFirst({ where: { id_ordem_servico: order.id, id_servico: serviceId } });
+    const osService = existingOsService
+      ? await db.osServico.update({ where: { id: existingOsService.id }, data: { quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco } })
+      : await db.osServico.create({ data: { id: osServiceId, id_ordem_servico: order.id, id_servico: serviceId, quantidade: 1, preco_unitario: SERVICOS[index % SERVICOS.length].preco, valor_total: SERVICOS[index % SERVICOS.length].preco } });
+    const existingOsPart = await db.osPeca.findFirst({ where: { id_ordem_servico: order.id, id_peca: partId } });
+    const osPart = existingOsPart
+      ? await db.osPeca.update({ where: { id: existingOsPart.id }, data: { quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco } })
+      : await db.osPeca.create({ data: { id: osPartId, id_ordem_servico: order.id, id_peca: partId, quantidade: 1, preco_unitario: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco, valor_total: PECAS_INSUMOS[index % PECAS_INSUMOS.length].preco } });
+    orderServices.push(osService.id);
+    orderParts.push(osPart.id);
+
+    if (order.status !== SOStatus.RECEIVED && order.status !== SOStatus.UNDER_DIAGNOSIS) {
+      const estimateId = stableSeedId(`orcamento:${order.id}`);
+      estimates.push(estimateId);
+    }
+    const historyId = stableSeedId(`historico:${order.id}:${order.status}`);
+    await db.historicoStatusOS.upsert({
+      where: { id: historyId },
+      update: { status_novo: order.status, motivo: 'Seed determinístico de teste' },
+      create: { id: historyId, ordem_servico_id: order.id, status_novo: order.status, motivo: 'Seed determinístico de teste' },
+    });
+    statusHistory.push(historyId);
+
+    if (index % 3 === 0) {
+      const paymentId = stableSeedId(`pagamento:${order.id}`);
+      await db.pagamento.upsert({
+        where: { id: paymentId },
+        update: { valor: 100 + index * 10, status: index % 2 === 0 ? 'PAGO' : 'AGUARDANDO_PAGAMENTO' },
+        create: { id: paymentId, ordemServicoId: order.id, valor: 100 + index * 10, status: index % 2 === 0 ? 'PAGO' : 'AGUARDANDO_PAGAMENTO' },
+      });
+      payments.push(paymentId);
+    }
+    if (index % 2 === 0) {
+      const reservationId = stableSeedId(`reserva:${order.id}:${partId}`);
+      const existingReservation = await db.reservaEstoque.findFirst({ where: { ordem_id: order.id, peca_id: partId } });
+      const reservation = existingReservation
+        ? await db.reservaEstoque.update({ where: { id: existingReservation.id }, data: { quantidade: 1 } })
+        : await db.reservaEstoque.create({ data: { id: reservationId, ordem_id: order.id, peca_id: partId, quantidade: 1 } });
+      reservations.push(reservation.id);
+    }
+  }
+
+  const supplierOrderId = stableSeedId('pedido-fornecedor:seed-comprehensive');
+  await db.pedidoFornecedor.upsert({ where: { id: supplierOrderId }, update: { status: 'RECEBIDO' }, create: { id: supplierOrderId, fornecedor_id: stableSeedId('fornecedor:seed'), status: 'RECEBIDO' } });
+  supplierOrders.push(supplierOrderId);
+  const supplierItemId = stableSeedId(`pedido-item:${supplierOrderId}:${partIds[0]}`);
+  await db.pedidoFornecedorItem.upsert({ where: { id: supplierItemId }, update: { quantidade_solicitada: 5, quantidade_recebida: 5 }, create: { id: supplierItemId, id_pedido_fornecedor: supplierOrderId, id_peca: partIds[0], quantidade_solicitada: 5, quantidade_recebida: 5 } });
+  supplierItems.push(supplierItemId);
+
+  return { orders: orders.map((order) => ({ id: order.id, status: order.status })), estimates, orderServices, orderParts, supplierOrders, supplierItems, reservations, payments, statusHistory };
 }
 
 async function seed(): Promise<void> {
   console.log('🌱 Seedando banco de dados...\n');
 
+  let manifest!: SeedManifest;
   await prisma.$transaction(
     async (db) => {
       await seedAdmin(db);
@@ -829,12 +972,31 @@ async function seed(): Promise<void> {
       await seedVeiculos(db, clienteIds);
       await seedServicos(db);
       await seedPecasInsumos(db);
-      await seedOrdensServico(db, clienteIds);
+      const orders = await seedOrdensServico(db, clienteIds);
+      const relations = await seedRelations(db, orders);
+      manifest = {
+        schema: 1,
+        environment: process.env.DEPLOY_ENV ?? 'local',
+        users: [
+          { email: email.toLowerCase().trim(), role: 'ADMIN', id: stableSeedId(`user:${email.toLowerCase().trim()}`) },
+          { email: 'recepcionista@oficina.com', role: 'RECEPCIONISTA', id: stableSeedId('user:recepcionista@oficina.com') },
+          { email: 'mecanico@oficina.com', role: 'MECANICO', id: stableSeedId('user:mecanico@oficina.com') },
+        ],
+        customers: clienteIds,
+        vehicles: VEICULOS_TEMPLATE.map(({ placa }) => stableSeedId(`veiculo:${placa}`)),
+        services: SERVICOS.map(({ nome }) => stableSeedId(`servico:${nome}`)),
+        parts: PECAS_INSUMOS.map(({ codigo }) => stableSeedId(`peca:${codigo}`)),
+        ...relations,
+      };
     },
     // Keep the complete seed atomic while allowing its many writes to finish.
     { maxWait: 10_000, timeout: 120_000 }
   );
 
+  const manifestPath = process.env.SEED_MANIFEST_PATH ?? 'seed-manifest.json';
+  await writeFile(manifestPath, `${JSON.stringify(manifest!, null, 2)}\n`, { mode: 0o600 });
+  console.log(`SEED_MANIFEST_BEGIN\n${JSON.stringify(manifest)}\nSEED_MANIFEST_END`);
+  console.log(`Manifesto seguro gravado em ${manifestPath}`);
   console.log('\n🎉 Seed concluído com sucesso!');
 }
 

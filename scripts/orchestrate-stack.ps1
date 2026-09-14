@@ -7,6 +7,8 @@ param(
     [ValidateSet('apply', 'destroy')]
     [string] $Action,
     [string] $Confirmation,
+    [ValidateSet('develop', 'main')]
+    [string] $AppRef,
     [ValidateRange(5, 300)]
     [int] $PollSeconds = 10
 )
@@ -40,10 +42,11 @@ function Invoke-Workflow {
     )
     $repo = "$owner/$Repository"
     $dispatchAt = [DateTime]::UtcNow
-    $arguments = @('workflow', 'run', $Workflow, '--repo', $repo, '--ref', $ref)
+    $workflowRef = if ($Repository -eq 'async-furious-project') { $appWorkflowRef } else { $ref }
+    $arguments = @('workflow', 'run', $Workflow, '--repo', $repo, '--ref', $workflowRef)
     foreach ($entry in $Inputs.GetEnumerator()) { $arguments += @('--field', "$($entry.Key)=$($entry.Value)") }
 
-    Write-Host "Dispatching ${repo}:$Workflow ($Environment, $Action) on $ref"
+    Write-Host "Dispatching ${repo}:$Workflow ($Environment, $Action) on $workflowRef"
     & gh @arguments
     if ($LASTEXITCODE -ne 0) { throw "Unable to dispatch ${repo}:$Workflow." }
 
@@ -52,7 +55,7 @@ function Invoke-Workflow {
         Start-Sleep -Seconds $PollSeconds
         $runs = Invoke-GhJson @('run', 'list', '--repo', $repo, '--workflow', $Workflow, '--event', 'workflow_dispatch', '--limit', '20', '--json', 'databaseId,url,status,conclusion,createdAt,headBranch')
         $run = @($runs | Where-Object {
-            $_.headBranch -eq $ref -and ([DateTime]$_.createdAt).ToUniversalTime() -ge $dispatchAt.AddSeconds(-5)
+            $_.headBranch -eq $workflowRef -and ([DateTime]$_.createdAt).ToUniversalTime() -ge $dispatchAt.AddSeconds(-5)
         } | Sort-Object createdAt -Descending)[0]
     }
 
@@ -73,8 +76,8 @@ $steps = if ($Action -eq 'apply') {
     @(
         @{ Repository = 'repo-k8s-infra'; Workflow = 'ci.yml'; Inputs = @{ environment = $Environment; action = 'apply'; academy_mode = 'false'; confirm = $applyConfirmation } },
         @{ Repository = 'repo-db-infra'; Workflow = 'ci.yml'; Inputs = @{ environment = $Environment; action = 'apply'; academy_mode = 'false'; confirm = $applyConfirmation } },
-        @{ Repository = 'async-furious-project'; Workflow = 'deploy-eks.yml'; Inputs = @{ environment = $Environment; seed_prod = 'false' } },
-        @{ Repository = 'repo-auth-serverless'; Workflow = 'ci.yml'; Inputs = @{ environment = $Environment; operation = 'apply'; deploy_auth_only = 'false'; confirm = $applyConfirmation } }
+        @{ Repository = 'repo-auth-serverless'; Workflow = 'ci.yml'; Inputs = @{ environment = $Environment; operation = 'apply'; deploy_auth_only = 'false'; confirm = $applyConfirmation } },
+        @{ Repository = 'async-furious-project'; Workflow = 'deploy-eks.yml'; Inputs = @{ environment = $Environment; seed_prod = 'false' } }
     )
 } else {
     @(
@@ -91,6 +94,7 @@ foreach ($step in $steps) {
         Invoke-Workflow -Repository $step.Repository -Workflow $step.Workflow -Inputs $step.Inputs
     } else {
         $inputText = ($step.Inputs.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', '
-        Write-Host "WhatIf: would dispatch $description on $ref with inputs: $inputText"
+        $whatIfRef = if ($step.Repository -eq 'async-furious-project') { $appWorkflowRef } else { $ref }
+        Write-Host "WhatIf: would dispatch $description on $whatIfRef with inputs: $inputText"
     }
 }
