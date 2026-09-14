@@ -48,7 +48,7 @@ file. In PowerShell, enter each value when prompted and send it directly to
 `gh`:
 
 ```powershell
-$environmentName = "homolog"
+$environmentName = "hml"
 $env:AWS_ACCESS_KEY_ID = Read-Host "AWS access key ID"
 $env:AWS_SECRET_ACCESS_KEY = Read-Host "AWS secret access key"
 $env:AWS_SESSION_TOKEN = Read-Host "AWS session token"
@@ -58,7 +58,7 @@ gh secret set AWS_SESSION_TOKEN --env $environmentName --body $env:AWS_SESSION_T
 Remove-Item Env:AWS_ACCESS_KEY_ID,Env:AWS_SECRET_ACCESS_KEY,Env:AWS_SESSION_TOKEN
 ```
 
-Run the same commands once per GitHub Environment (for example, `homolog` and
+Run the same commands once per GitHub Environment (for example, `hml` and
 `production`). To use repository-level secrets instead, omit `--env
 $environmentName` from each `gh secret set` command. Rotate all three values
 together when AWS Academy issues a new session; expired sessions must be
