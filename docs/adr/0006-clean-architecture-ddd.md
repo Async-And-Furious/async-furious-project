@@ -8,7 +8,7 @@ Aceita
 
 O enunciado da Fase 1 permitia arquitetura livre (citando "arquitetura em
 camadas" como piso aceitável); o enunciado da Fase 2 restringiu para
-"Clean Architecture **ou** Arquitetura Hexagonal". A equipe precisava de um
+"Clean Architecture **ou** Arquitetura Hexagonal". Precisávamos de um
 estilo que separasse regras de negócio de frameworks/infraestrutura desde o
 início, para suportar mudanças de banco/framework sem reescrever o domínio,
 e para tornar os casos de uso testáveis por mock de repositório.
@@ -36,7 +36,7 @@ presentation → application → domain ← infrastructure
 
 Nenhuma alternativa (ex.: arquitetura em camadas simples, MVC tradicional)
 está documentada com comparativo formal — o enunciado da Fase 2 já restringe
-a escolha a Clean Architecture ou Hexagonal, e a equipe optou pela primeira,
+a escolha a Clean Architecture ou Hexagonal, e optamos pela primeira,
 sem registro de por que não Hexagonal especificamente.
 
 ## Consequências positivas

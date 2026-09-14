@@ -7,8 +7,8 @@ Aceita
 ## Contexto
 
 O enunciado da Fase 2 sugeria "atualização de status da OS via alguma
-ferramenta como e-mail" para notificar o cliente sobre o orçamento. A
-equipe implementou algo diferente: rotas HTTP públicas que o próprio
+ferramenta como e-mail" para notificar o cliente sobre o orçamento.
+Implementamos algo diferente: rotas HTTP públicas que o próprio
 cliente final aciona diretamente, sem nenhuma integração de e-mail. Isto é
 um desvio do enunciado, não documentado explicitamente em nenhum lugar
 antes deste ADR — vale registrar o porquê.

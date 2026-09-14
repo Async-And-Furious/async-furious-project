@@ -9,16 +9,15 @@
 
 | Ambiente | Onde roda | Versão | Evidência |
 | --- | --- | --- | --- |
-| Dev local (`docker compose`) | `docker-compose.dependencies.yml` | `postgres:15-alpine` | `docker-compose.dependencies.yml:3` |
+| Dev local (`docker compose`) | `docker-compose.dependencies.yml` | `postgres:16-alpine` | `docker-compose.dependencies.yml:3` |
 | CI (`tests.yml`) | Serviço containerizado no runner | `postgres:16` | `.github/workflows/tests.yml:18` |
 | Kubernetes local (`kind`) | `StatefulSet` | `postgres:15-alpine` | `k8s/database/statefulset.yaml:20` |
 | Nuvem (`hml` e `prod`) | RDS `tc3-db-<env>`, provisionado por `repo-db-infra` (`modules/rds`) | PostgreSQL `16.4` | [ADR-0004](../adr/0004-banco-dados-gerenciado.md), [RFC-007](../rfcs/RFC-007-rds-public-access.md) e [database-justification.md](../rfcs/database-justification.md); provisionado e em uso pelo `deploy-eks.yml` |
 
-Persiste uma divergência de versão: o `docker compose` de desenvolvimento e o
-`StatefulSet` do cluster `kind` seguem em Postgres 15, enquanto o CI e o RDS
-usam 16. Como o schema é aplicado por `prisma migrate deploy` nos dois casos,
-a divergência não bloqueia o desenvolvimento, mas mantém local e produção em
-engines diferentes.
+Ainda existe uma divergência: o `StatefulSet` do Kubernetes local continua
+em Postgres 15, enquanto dev local, CI e a decisão definitiva para produção
+(RDS) já são 16. A correção do dev local foi feita e mesclada (PR #172), mas
+o `StatefulSet` do Kubernetes local ainda não foi atualizado.
 
 ## Diagrama ER
 

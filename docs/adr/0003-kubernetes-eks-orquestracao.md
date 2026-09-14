@@ -67,7 +67,7 @@ Registradas em `docs/superpowers/specs/2026-06-22-terraform-kubernetes-design.md
   `repo-k8s-infra` — há dois lugares descrevendo a mesma migração futura
   (este repositório e o novo repositório dedicado); `TODO` confirmar qual é
   a fonte de verdade daqui para frente.
-- **Baixo**: nenhuma politica de rede (NetworkPolicy) ou hardening adicional
+- **Baixo**: nenhuma política de rede (NetworkPolicy) ou hardening adicional
   de cluster foi encontrada em nenhum dos dois caminhos.
 
 ## Referências

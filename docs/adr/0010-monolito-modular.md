@@ -6,8 +6,8 @@ Aceita
 
 ## Contexto
 
-O enunciado da Fase 1 exigia explicitamente "back-end monolítico". A
-equipe precisava, dentro dessa restrição, de uma forma de manter os
+O enunciado da Fase 1 exigia explicitamente "back-end monolítico".
+Precisávamos, dentro dessa restrição, de uma forma de manter os
 Bounded Contexts de negócio isolados no código para não degenerar num
 monólito "big ball of mud".
 
@@ -23,8 +23,8 @@ internamente a mesma separação em camadas de
 ## Alternativas consideradas
 
 Nenhuma alternativa é aplicável — "back-end monolítico" era exigência
-obrigatória do enunciado da Fase 1, não uma escolha da equipe. A decisão
-real da equipe foi *como* organizar esse monólito internamente (módulos
+obrigatória do enunciado da Fase 1, não algo que escolhemos. O que de fato
+decidimos foi *como* organizar esse monólito internamente (módulos
 por contexto), não *se* seria monólito.
 
 ## Consequências positivas

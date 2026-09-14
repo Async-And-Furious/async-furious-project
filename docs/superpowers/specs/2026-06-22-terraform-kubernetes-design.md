@@ -1,30 +1,30 @@
-# Terraform + Kubernetes Infrastructure Design
+# Design de Infraestrutura Terraform + Kubernetes
 
-**Date:** 2026-06-22  
-**Status:** Approved  
-**Scope:** IaC provisioning via Terraform (local kind cluster) + Kubernetes manifests for async-furious-project
-
----
-
-## Context
-
-NestJS API + PostgreSQL already containerized via Docker/docker-compose. Goal: provision a reproducible Kubernetes environment locally (kind) via Terraform, with a clear migration path to EKS.
+**Data:** 2026-06-22  
+**Status:** Aprovado  
+**Escopo:** Provisionamento de IaC via Terraform (cluster kind local) + manifests Kubernetes para o async-furious-project
 
 ---
 
-## Decisions
+## Contexto
 
-| Decision | Choice | Reason |
+API NestJS + PostgreSQL já containerizados via Docker/docker-compose. Objetivo: provisionar um ambiente Kubernetes reproduzível localmente (kind) via Terraform, com um caminho de migração claro para o EKS.
+
+---
+
+## Decisões
+
+| Decisão | Escolha | Motivo |
 |---|---|---|
-| Local K8s | kind | Runs in Docker, zero extra prereqs, CI-compatible |
-| Terraform state | Local `.tfstate` | Academic project, no remote backend needed now |
-| CI/CD Terraform | validate + plan only | No auto-apply; humans run `terraform apply` |
-| Terraform structure | Modular (B) | K8s YAML reusable outside Terraform; EKS migration = new env dir |
-| K8s manifest format | Raw YAML in `/k8s` | Readable, kubectl-compatible for debugging |
+| K8s local | kind | Roda em Docker, zero pré-requisitos extras, compatível com CI |
+| Estado do Terraform | `.tfstate` local | Projeto acadêmico, sem necessidade de backend remoto por enquanto |
+| CI/CD Terraform | apenas validate + plan | Sem auto-apply; humanos executam `terraform apply` |
+| Estrutura do Terraform | Modular (B) | YAML do K8s reutilizável fora do Terraform; migração para EKS = novo diretório de ambiente |
+| Formato dos manifests K8s | YAML puro em `/k8s` | Legível, compatível com kubectl para debug |
 
 ---
 
-## Directory Structure
+## Estrutura de Diretórios
 
 ```
 /k8s
@@ -59,57 +59,57 @@ NestJS API + PostgreSQL already containerized via Docker/docker-compose. Goal: p
       outputs.tf
       terraform.tfvars
     /aws
-      README.md   (stub — not implemented)
+      README.md   (stub — não implementado)
 ```
 
 ---
 
-## Terraform Providers
+## Providers do Terraform
 
-| Provider | Version | Purpose |
+| Provider | Versão | Finalidade |
 |---|---|---|
-| `tehcyx/kind` | ~> 0.4 | Provision kind cluster |
-| `gavinbunney/kubectl` | ~> 1.14 | Apply raw YAML manifests |
-| `hashicorp/kubernetes` | ~> 2.0 | Read kubeconfig from kind output |
+| `tehcyx/kind` | ~> 0.4 | Provisionar cluster kind |
+| `gavinbunney/kubectl` | ~> 1.14 | Aplicar manifests YAML puros |
+| `hashicorp/kubernetes` | ~> 2.0 | Ler kubeconfig a partir do output do kind |
 
 ---
 
-## Module: `kind-cluster`
+## Módulo: `kind-cluster`
 
-**Inputs:**
-- `cluster_name` (string) — default `"async-furious"`
-- `kubernetes_version` (string) — default `"v1.29.0"`
-- `node_port` (number) — default `30000` (maps host:30000 → container:30000)
+**Entradas:**
+- `cluster_name` (string) — padrão `"async-furious"`
+- `kubernetes_version` (string) — padrão `"v1.29.0"`
+- `node_port` (number) — padrão `30000` (mapeia host:30000 → container:30000)
 
-**Outputs:**
-- `kubeconfig` (sensitive string) — passed to `kubernetes-apps` module
+**Saídas:**
+- `kubeconfig` (string sensível) — repassado ao módulo `kubernetes-apps`
 
-**Behavior:** Creates 1 control-plane + 1 worker node. Configures extraPortMappings for NodePort access.
+**Comportamento:** Cria 1 control-plane + 1 worker node. Configura extraPortMappings para acesso via NodePort.
 
 ---
 
-## Module: `kubernetes-apps`
+## Módulo: `kubernetes-apps`
 
-**Inputs:**
-- `kubeconfig` (sensitive string)
+**Entradas:**
+- `kubeconfig` (string sensível)
 - `app_image` (string)
 - `app_replicas` (number)
 - `db_name` (string)
-- `db_password` (sensitive string)
-- `jwt_secret` (sensitive string)
+- `db_password` (string sensível)
+- `jwt_secret` (string sensível)
 
-**Behavior:**
-- Connects to cluster via kubeconfig
-- Applies YAML resources in order via `kubectl_manifest`:
+**Comportamento:**
+- Conecta ao cluster via kubeconfig
+- Aplica os recursos YAML em ordem via `kubectl_manifest`:
   1. `namespace.yaml`
   2. `config/configmap.yaml`, `config/secret.yaml`
   3. `database/statefulset.yaml`, `database/service.yaml`, `database/pvc.yaml`
   4. `app/deployment.yaml`, `app/service.yaml`, `app/hpa.yaml`
-- Secret values injected via `templatefile()` — not hardcoded in YAML
+- Valores sensíveis injetados via `templatefile()` — não hardcoded no YAML
 
 ---
 
-## Kubernetes Resources
+## Recursos Kubernetes
 
 ### Namespace
 ```
@@ -133,38 +133,38 @@ POSTGRES_PASSWORD: <from TF_VAR_db_password>
 ```
 
 ### App Deployment (`/k8s/app/deployment.yaml`)
-- Image: `async-furious-api:latest` (loaded into kind via `kind load docker-image`)
-- Replicas: 2
-- Resources: requests `cpu:100m mem:128Mi` / limits `cpu:500m mem:512Mi`
-- Readiness probe: HTTP GET `/health` port 3000, initial delay 10s
-- Liveness probe: HTTP GET `/health` port 3000, initial delay 30s
-- Env from ConfigMap + Secret refs
+- Imagem: `async-furious-api:latest` (carregada no kind via `kind load docker-image`)
+- Réplicas: 2
+- Recursos: requests `cpu:100m mem:128Mi` / limits `cpu:500m mem:512Mi`
+- Readiness probe: HTTP GET `/health` porta 3000, delay inicial de 10s
+- Liveness probe: HTTP GET `/health` porta 3000, delay inicial de 30s
+- Variáveis de ambiente vindas de referências ao ConfigMap + Secret
 
 ### App Service (`/k8s/app/service.yaml`)
-- Type: `NodePort`
-- Port 3000 → nodePort 30000 (local access at `localhost:30000`)
-- Note: for EKS, change to `LoadBalancer` or use Ingress
+- Tipo: `NodePort`
+- Porta 3000 → nodePort 30000 (acesso local em `localhost:30000`)
+- Observação: para o EKS, alterar para `LoadBalancer` ou usar Ingress
 
 ### HPA (`/k8s/app/hpa.yaml`)
-- Min replicas: 2 / Max: 5
-- Scale up at CPU > 70% or Memory > 80%
+- Réplicas mínimas: 2 / Máximas: 5
+- Scale up quando CPU > 70% ou Memória > 80%
 
 ### Database StatefulSet (`/k8s/database/statefulset.yaml`)
-- Image: `postgres:15-alpine`
-- Mounts PVC at `/var/lib/postgresql/data`
-- Env from ConfigMap + Secret refs
+- Imagem: `postgres:15-alpine`
+- Monta o PVC em `/var/lib/postgresql/data`
+- Variáveis de ambiente vindas de referências ao ConfigMap + Secret
 
 ### Database Service (`/k8s/database/service.yaml`)
-- Type: `ClusterIP` (internal only)
-- Port 5432
+- Tipo: `ClusterIP` (apenas interno)
+- Porta 5432
 
 ### PVC (`/k8s/database/pvc.yaml`)
-- Storage: 1Gi
+- Armazenamento: 1Gi
 - AccessMode: ReadWriteOnce
 
 ---
 
-## `terraform.tfvars` (committed, non-sensitive)
+## `terraform.tfvars` (versionado, não sensível)
 
 ```hcl
 cluster_name  = "async-furious"
@@ -174,7 +174,7 @@ db_name       = "workshop"
 db_user       = "postgres"
 ```
 
-## Sensitive vars (NOT committed, passed via env)
+## Variáveis sensíveis (NÃO versionadas, passadas via env)
 
 ```bash
 export TF_VAR_jwt_secret="..."
@@ -185,65 +185,65 @@ export TF_VAR_db_password="..."
 
 ## CI/CD: `.github/workflows/terraform.yml`
 
-**Trigger:** PR touching `infra/**` or `k8s/**`
+**Gatilho:** PR que altere `infra/**` ou `k8s/**`
 
-**Steps:**
+**Etapas:**
 1. `terraform init` (environments/local)
 2. `terraform validate`
 3. `terraform plan -out=tfplan`
-4. Upload plan as PR artifact
+4. Upload do plan como artefato do PR
 
-No `terraform apply` in CI. No cloud secrets needed for validate+plan.
+Sem `terraform apply` no CI. Nenhum secret de nuvem é necessário para validate+plan.
 
 ---
 
-## Local Developer Workflow
+## Fluxo de Trabalho do Desenvolvedor Local
 
 ```bash
-# 1. Build and load image into kind
+# 1. Build e carregamento da imagem no kind
 docker build -t async-furious-api:latest .
 kind load docker-image async-furious-api:latest --name async-furious
 
-# 2. Provision
+# 2. Provisionamento
 cd infra/environments/local
 export TF_VAR_jwt_secret="dev-secret"
 export TF_VAR_db_password="postgres"
 terraform init
 terraform apply
 
-# 3. Access
+# 3. Acesso
 curl http://localhost:30000/health
 
-# 4. Teardown
+# 4. Desprovisionamento
 terraform destroy
 ```
 
 ---
 
-## EKS Migration Path
+## Caminho de Migração para o EKS
 
-1. Add `infra/environments/aws/main.tf` using `aws` provider + `terraform-aws-modules/eks`
-2. Push image to ECR, update `app_image` variable
-3. Change App Service type to `LoadBalancer` (or add Ingress + ALB controller)
-4. Add S3 backend for remote state
-5. K8s manifests in `/k8s` unchanged
+1. Adicionar `infra/environments/aws/main.tf` usando o provider `aws` + `terraform-aws-modules/eks`
+2. Enviar a imagem para o ECR, atualizar a variável `app_image`
+3. Alterar o tipo do App Service para `LoadBalancer` (ou adicionar Ingress + controller ALB)
+4. Adicionar backend S3 para estado remoto
+5. Manifests do K8s em `/k8s` permanecem inalterados
 
 ---
 
-## Acceptance Criteria Mapping
+## Mapeamento dos Critérios de Aceite
 
-| Criterion | Implementation |
+| Critério | Implementação |
 |---|---|
-| `/infra` structure | `infra/environments/local/` + modules |
-| Provider config | `infra/versions.tf` + module providers |
-| K8s cluster via Terraform | `modules/kind-cluster` |
-| PostgreSQL via Terraform | `modules/kubernetes-apps` → DB StatefulSet |
-| K8s resources via Terraform | `modules/kubernetes-apps` → all manifests |
+| Estrutura `/infra` | `infra/environments/local/` + módulos |
+| Configuração de provider | `infra/versions.tf` + providers dos módulos |
+| Cluster K8s via Terraform | `modules/kind-cluster` |
+| PostgreSQL via Terraform | `modules/kubernetes-apps` → StatefulSet do DB |
+| Recursos K8s via Terraform | `modules/kubernetes-apps` → todos os manifests |
 | ConfigMaps | `/k8s/config/configmap.yaml` |
-| Secrets | `/k8s/config/secret.yaml` (values from TF vars) |
+| Secrets | `/k8s/config/secret.yaml` (valores vindos de variáveis do TF) |
 | HPA | `/k8s/app/hpa.yaml` |
-| Reusable variables | `terraform.tfvars` + `variables.tf` |
-| Outputs | `outputs.tf` (kubeconfig, cluster endpoint, app URL) |
-| CI/CD compatible | `.github/workflows/terraform.yml` |
-| Local + cloud | kind local now, EKS env stub |
-| Documentation | This spec + README updates |
+| Variáveis reutilizáveis | `terraform.tfvars` + `variables.tf` |
+| Outputs | `outputs.tf` (kubeconfig, endpoint do cluster, URL da app) |
+| Compatível com CI/CD | `.github/workflows/terraform.yml` |
+| Local + nuvem | kind local agora, stub de ambiente EKS |
+| Documentação | Esta spec + atualizações do README |

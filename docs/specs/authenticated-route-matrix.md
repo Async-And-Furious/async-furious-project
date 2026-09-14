@@ -1,25 +1,27 @@
-# Authenticated route matrix
+# Matriz de rotas autenticadas
 
-## Contract
+## Contrato
 
-`docs/http/routes.yaml` is the canonical manifest. It contains one entry per
-`METHOD + path`, with explicit `auth`, `role`, `allowed_status`, `mutating`,
-and `mock_body` policy. The matrix and both generated HTTP collections consume
-this file recursively, including future nested `routes` groups. The current
-contract has 48 unique routes.
+`docs/http/routes.yaml` é o manifesto canônico. Ele contém uma entrada por
+`METHOD + path`, com política explícita de `auth`, `role`, `allowed_status`,
+`mutating` e `mock_body`. A matriz e as duas coleções HTTP geradas consomem
+este arquivo recursivamente, incluindo futuros grupos `routes` aninhados. O
+contrato atual tem 48 rotas únicas.
 
-Authentication policies are separate:
+As políticas de autenticação são separadas:
 
-- `customer` and `staff` use JWT `Authorization: Bearer ...` headers.
-- `webhook` uses only `X-Webhook-Secret`; it must never receive a JWT header.
-- The webhook secret is printed only as a truncated SHA-256 fingerprint.
+- `customer` e `staff` usam headers JWT `Authorization: Bearer ...`.
+- `webhook` usa apenas `X-Webhook-Secret`; nunca deve receber um header JWT.
+- O segredo do webhook é exibido apenas como um fingerprint SHA-256
+  truncado.
 
-Mocks use the all-zero UUID for resource references and do not delete data.
-DELETE entries are reported as skipped. Registration uses the stable invalid
-domain address in the manifest and accepts `201` on first use or `409` when it
-already exists, making reruns idempotent without creating unbounded users.
+Os mocks usam o UUID all-zero para referências de recursos e não excluem
+dados. As entradas DELETE são reportadas como puladas (skipped). O cadastro
+usa o endereço de domínio inválido estável definido no manifesto e aceita
+`201` no primeiro uso ou `409` quando já existe, tornando as reexecuções
+idempotentes sem criar usuários ilimitados.
 
-## Validation
+## Validação
 
 ```sh
 python scripts/generate-http-collections.py
@@ -28,6 +30,6 @@ pnpm run type:check
 pnpm run test -- --runInBand
 ```
 
-The protected `protected-route-matrix.yml` workflow runs the same checks for a
-selected HML or PROD GitHub Environment. It does not deploy or apply
-infrastructure.
+O workflow protegido `protected-route-matrix.yml` executa as mesmas
+verificações para um GitHub Environment de HML ou PROD selecionado. Ele não
+faz deploy nem aplica infraestrutura.

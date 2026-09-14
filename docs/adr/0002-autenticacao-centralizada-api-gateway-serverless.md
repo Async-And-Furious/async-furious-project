@@ -1,103 +1,105 @@
-# ADR-0002: Centralized authentication via API Gateway + Function Serverless
+# ADR-0002: Autenticação centralizada via API Gateway + Function Serverless
 
 ## Status
 
-**Accepted and partially implemented.** RFC-003 and RFC-006 are accepted.
-`repo-auth-serverless` ships both Lambda handlers (`authenticate-customer`,
-`authorize-request`) with CI/CD, Terraform, and CloudWatch alarms — no longer
-skeletons. On the application side, PR #182
-(`feat/customer-jwt-rs256-auth`) added the consumer: `JwtCustomerStrategy`
-(RS256) and `JwtCustomerAuthGuard`, plus `Role.CLIENTE`. Staff authentication
-(`ADMIN`/`RECEPCIONISTA`/`MECANICO`) intentionally remains local — see
-"Decision on staff roles" below.
+**Aceito e parcialmente implementado.** A RFC-003 e a RFC-006 estão aceitas.
+O `repo-auth-serverless` entrega os dois handlers Lambda (`authenticate-customer`,
+`authorize-request`) com CI/CD, Terraform e alarmes do CloudWatch — não são
+mais esqueletos. Do lado da aplicação, o PR #182
+(`feat/customer-jwt-rs256-auth`) adicionou o consumidor: `JwtCustomerStrategy`
+(RS256) e `JwtCustomerAuthGuard`, além de `Role.CLIENTE`. A autenticação de
+staff (`ADMIN`/`RECEPCIONISTA`/`MECANICO`) permanece local intencionalmente —
+veja "Decisão sobre os papéis de staff" abaixo.
 
-## Context
+## Contexto
 
-Before this change, authentication and authorization (JWT + bcrypt, roles
-`ADMIN`/`RECEPCIONISTA`/`MECANICO`) ran entirely inside the NestJS process
-(`src/auth/`). Phase 3 requires a single entry point (API Gateway) with
-centralized authentication before a request reaches any application in the
-Kubernetes cluster — including support for more than one service behind the
-same Gateway in the future.
+Antes desta mudança, a autenticação e a autorização (JWT + bcrypt, papéis
+`ADMIN`/`RECEPCIONISTA`/`MECANICO`) rodavam inteiramente dentro do processo
+NestJS (`src/auth/`). A Fase 3 exige um único ponto de entrada (API Gateway)
+com autenticação centralizada antes de a requisição chegar a qualquer
+aplicação no cluster Kubernetes — incluindo suporte a mais de um serviço por
+trás do mesmo Gateway no futuro.
 
-## Decision
+## Decisão
 
-Extract customer authentication to its own repository and process
-(`repo-auth-serverless`), fronted by an API Gateway (HTTP API):
+Extrair a autenticação de clientes para seu próprio repositório e processo
+(`repo-auth-serverless`), exposto por um API Gateway (HTTP API):
 
-- **Token issuance**: the `authenticate-customer` Function Serverless
-  validates the CPF and issues a JWT signed with **RS256**.
-- **Token validation**: the `authorize-request` Function Serverless, acting
-  as a **custom Lambda Authorizer** (not the API Gateway's native JWT
-  authorizer), validates the signature and claims on every protected route.
-- **Secrets**: the private key lives in AWS Secrets Manager (only the two
-  `repo-auth-serverless` Lambdas can access it); the public key lives in SSM
-  Parameter Store (non-sensitive, any future verifier can read it without
-  access to the private key).
-- **Application integration**: API Gateway → VPC Link → internal ALB
-  (managed by `repo-k8s-infra` via Kubernetes Ingress) → application pods on
-  EKS. The application additionally re-verifies the RS256 signature,
-  issuer, and audience in-process via `JwtCustomerStrategy`, rather than
-  trusting the Lambda Authorizer's decision alone.
+- **Emissão de token**: a Function Serverless `authenticate-customer` valida
+  o CPF e emite um JWT assinado com **RS256**.
+- **Validação de token**: a Function Serverless `authorize-request`, atuando
+  como um **Lambda Authorizer customizado** (não o autorizador JWT nativo do
+  API Gateway), valida a assinatura e as claims em toda rota protegida.
+- **Segredos**: a chave privada fica no AWS Secrets Manager (apenas as duas
+  Lambdas do `repo-auth-serverless` podem acessá-la); a chave pública fica no
+  SSM Parameter Store (não sensível, qualquer verificador futuro pode lê-la
+  sem acesso à chave privada).
+- **Integração com a aplicação**: API Gateway → VPC Link → ALB interno
+  (gerenciado pelo `repo-k8s-infra` via Kubernetes Ingress) → pods da
+  aplicação no EKS. A aplicação também reverifica a assinatura RS256, o
+  issuer e o audience em processo, via `JwtCustomerStrategy`, em vez de
+  confiar apenas na decisão do Lambda Authorizer.
 
-## Decision on staff roles
+## Decisão sobre os papéis de staff
 
-`repo-auth-serverless` only authenticates customers by CPF; there is no
-Lambda or Gateway route for staff (`ADMIN`/`RECEPCIONISTA`/`MECANICO`).
-PR #182 explicitly scoped the migration to the customer/CPF flow only:
-staff login and registration (`AuthService`, `JwtStrategy`, HS256,
-`JWT_SECRET`) remain local for now. This is a recorded decision, not an
-oversight — migrating staff auth to an external service is a separate,
-not-yet-scoped follow-up (it would require either a staff-facing Lambda or a
-different centralization strategy).
+O `repo-auth-serverless` autentica apenas clientes por CPF; não existe Lambda
+ou rota no Gateway para staff (`ADMIN`/`RECEPCIONISTA`/`MECANICO`). O PR #182
+delimitou explicitamente o escopo da migração apenas ao fluxo de
+cliente/CPF: o login e o cadastro de staff (`AuthService`, `JwtStrategy`,
+HS256, `JWT_SECRET`) permanecem locais por enquanto. Esta é uma decisão
+registrada, não um esquecimento — migrar a autenticação de staff para um
+serviço externo é um desdobramento futuro, ainda sem escopo definido (exigiria
+uma Lambda voltada a staff ou uma estratégia de centralização diferente).
 
-## Alternatives considered
+## Alternativas consideradas
 
-(Recorded in RFC-006)
+(Registradas na RFC-006)
 
-- **API Gateway's native JWT authorizer**: rejected — it would require
-  exposing a public JWKS endpoint, permanent infrastructure with no other use
-  in the project.
-- **HS256 (symmetric signing)**: rejected — every future verifier would need
-  the same shared secret, a worse fit for a microservices direction.
-- **REST API + NLB** (instead of HTTP API + VPC Link + ALB, recorded in
-  RFC-003): rejected — more expensive, and NLB is L4-only, requiring new
-  target-group wiring per future microservice.
+- **Autorizador JWT nativo do API Gateway**: rejeitado — exigiria expor um
+  endpoint JWKS público, uma infraestrutura permanente sem outro uso no
+  projeto.
+- **HS256 (assinatura simétrica)**: rejeitado — todo verificador futuro
+  precisaria do mesmo segredo compartilhado, o que se encaixa pior em uma
+  direção de microsserviços.
+- **REST API + NLB** (em vez de HTTP API + VPC Link + ALB, registrado na
+  RFC-003): rejeitado — mais caro, e o NLB opera apenas em L4, exigindo nova
+  configuração de target group a cada futuro microsserviço.
 
-## Positive consequences
+## Consequências positivas
 
-- Customer authentication is isolated from business code — the NestJS
-  application no longer implements token issuance logic for the end
-  customer.
-- The private key never leaves `repo-auth-serverless`; any future verifier
-  (the application itself, or a future microservice) only needs the
-  non-sensitive public key.
-- ALB/Ingress (instead of NLB) allows adding path/host routing for future
-  microservices without touching the Gateway or the VPC Link.
+- A autenticação de clientes fica isolada do código de negócio — a aplicação
+  NestJS não implementa mais a lógica de emissão de token para o cliente
+  final.
+- A chave privada nunca sai do `repo-auth-serverless`; qualquer verificador
+  futuro (a própria aplicação, ou um futuro microsserviço) precisa apenas da
+  chave pública, não sensível.
+- O ALB/Ingress (em vez do NLB) permite adicionar roteamento por
+  path/host para futuros microsserviços sem tocar no Gateway ou no VPC Link.
 
-## Negative consequences
+## Consequências negativas
 
-- New distributed failure point: unavailability of the Function Serverless
-  blocks all customer authentication (see the alternate flow in
+- Novo ponto de falha distribuído: a indisponibilidade da Function Serverless
+  bloqueia toda a autenticação de clientes (veja o fluxo alternativo em
   [authentication-flow.md](../architecture/authentication-flow.md)).
-- Two authentication implementations coexist today: `src/auth/` (local,
-  JWT+bcrypt, staff users) and `repo-auth-serverless` (RS256, end customer by
-  CPF) — by decision (see above), not by omission.
+- Duas implementações de autenticação coexistem hoje: `src/auth/` (local,
+  JWT+bcrypt, usuários de staff) e `repo-auth-serverless` (RS256, cliente
+  final por CPF) — por decisão (veja acima), não por omissão.
 
-## Risks
+## Riscos
 
-- **Medium**: `authenticate-customer` decided to query the RDS instance
-  directly rather than via RDS Proxy (see RFC-006).
-- **Low**: no route in the application is protected by `Role.CLIENTE` yet;
-  the consumer-side infrastructure (strategy + guard + role) is ready, but no
-  business use case currently requires customer self-service, so this is
-  expected rather than a gap.
+- **Médio**: a `authenticate-customer` optou por consultar a instância RDS
+  diretamente em vez de via RDS Proxy (veja RFC-006).
+- **Baixo**: nenhuma rota da aplicação está protegida por `Role.CLIENTE`
+  ainda; a infraestrutura do lado do consumidor (strategy + guard + role)
+  está pronta, mas nenhum caso de uso de negócio hoje exige self-service do
+  cliente, então isso é esperado, não uma lacuna.
 
-## References
+## Referências
 
-- RFC-003 (API Gateway/EKS) and RFC-006 (secrets/JWT) — see
+- RFC-003 (API Gateway/EKS) e RFC-006 (segredos/JWT) — veja
   [`docs/rfcs/README.md`](../rfcs/README.md)
-- [Authentication sequence](../architecture/authentication-flow.md)
-- `src/auth/` (current local staff implementation, `async-furious-project`)
-- PR #182 (`feat/customer-jwt-rs256-auth`) — consumer-side implementation
-- `repo-auth-serverless` — issuer-side implementation
+- [Sequência de autenticação](../architecture/authentication-flow.md)
+- `src/auth/` (implementação local atual de staff, `async-furious-project`)
+- PR #182 (`feat/customer-jwt-rs256-auth`) — implementação do lado do
+  consumidor
+- `repo-auth-serverless` — implementação do lado do emissor
