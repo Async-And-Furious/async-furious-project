@@ -373,8 +373,32 @@ jobs:
         run: |
           set -euo pipefail
           nodegroup=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --query 'nodegroups[0]' --output text)
-          update_id=$(aws eks update-nodegroup-config --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --scaling-config minSize=2,maxSize=3,desiredSize=3 --query 'update.id' --output text)
-          aws eks wait nodegroup-active --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup"
+          deadline=$((SECONDS + 600))
+          while true; do
+            nodegroup_status=$(aws eks describe-nodegroup --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --query 'nodegroup.status' --output text)
+            [[ "$nodegroup_status" == 'ACTIVE' ]] && break
+            [[ "$nodegroup_status" == 'CREATE_FAILED' || "$nodegroup_status" == 'DEGRADED' ]] && { echo "HML nodegroup is not usable: $nodegroup_status" >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out waiting for HML nodegroup to become ACTIVE.' >&2; exit 1; }
+            sleep 10
+          done
+
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          while ! update_id=$(aws eks update-nodegroup-config \
+            --region "$AWS_REGION" --cluster-name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" \
+            --scaling-config minSize=2,maxSize=3,desiredSize=2 --query 'update.id' --output text 2>"$error_file"); do
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out requesting HML nodegroup capacity update.' >&2; exit 1; }
+            sleep 10
+          done
+          while (( SECONDS < deadline )); do
+            update_status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --nodegroup-name "$nodegroup" --update-id "$update_id" --query 'update.status' --output text)
+            [[ "$update_status" == 'Successful' ]] && break
+            [[ "$update_status" == 'Failed' || "$update_status" == 'Cancelled' ]] && { echo "HML nodegroup capacity update ended with status $update_status." >&2; exit 1; }
+            sleep 10
+          done
+          [[ "$update_status" == 'Successful' ]] || { echo 'Timed out waiting for HML nodegroup capacity update.' >&2; exit 1; }
           if kubectl get deployment/async-furious-api --namespace "$K8S_NAMESPACE" >/dev/null 2>&1; then
             kubectl scale deployment/async-furious-api --namespace "$K8S_NAMESPACE" --replicas=0
             kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=5m
@@ -404,7 +428,7 @@ jobs:
                   - name: migrate
                     image: $IMAGE
                     imagePullPolicy: IfNotPresent
-                    command: ["sh", "-c", "node_modules/.bin/prisma migrate resolve --applied 20260831000000_add_cliente_ativo; node_modules/.bin/prisma migrate deploy || { sleep 600; exit 1; }"]
+                    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
                     envFrom:
                       - configMapRef:
                           name: async-furious-config

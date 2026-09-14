@@ -166,9 +166,36 @@
   no evento `finish` da resposta, depois que o agente já encerrou o
   segmento da transação. Não é bug, é limitação de timing conhecida dessa
   integração.
-- **Ainda não testado de verdade**: as outras 4 condições (indisponibilidade,
-  CPU, memória, crash loop) — roteiro de teste no comentário original da
-  issue.
+- **Teste das outras 4 condições** (workflow `.github/workflows/observability-alert-scenarios.yml`,
+  manual, sob demanda): escalar a app a zero, `stress` de CPU/memória num
+  pod, forçar crash loop.
+  - **App indisponível — validado de ponta a ponta ✅**: primeira
+    tentativa teve sinal real (tráfego caiu a 0 por 4 min) mas sem
+    e-mail. Causa raiz: a condição tinha `fill_option: "NONE"` — numa
+    janela sem nenhuma transação, a consulta não retorna linha nenhuma,
+    e o avaliador **ignora** a janela em vez de comparar "0 < 1".
+    Corrigido com `fill_option = "static"` / `fill_value = 0`. Reteste
+    confirmou: issue `ACTIVATED`/`CRITICAL` aberta de verdade
+    (`tc3-observability-hml`) e **e-mail recebido** — com um atraso de
+    uns 4 minutos entre o fim da janela de violação e a issue abrir
+    (normal em conta de avaliação/plano gratuito da New Relic, não é bug).
+  - **Pod em crash loop**: `restartCount` chegou a 4 (limite: acima de 3),
+    mas sem e-mail — suspeita é o `threshold_duration` de 10 min não ter
+    sido sustentado (o pod foi apagado poucos minutos depois de cruzar o
+    limite, antes da janela de avaliação completar). Ainda não
+    reexecutado com mais tempo de espera.
+  - **CPU e memória excessiva**: os pods de stress rodaram com o limite de
+    recurso correto, mas **todas as amostras coletadas já mostravam o
+    container `Terminated`** — o agente de infraestrutura não chegou a
+    capturar `cpuUsedCores`/`memoryWorkingSetBytes` de um pod tão efêmero
+    em execução, só o estado final. Inconclusivo, precisa de um pod de
+    stress que fique vivo mais tempo (sem timeout automático) pra testar
+    de novo.
+  - **Ferramenta de diagnóstico útil**: pra depurar por que uma condição
+    não dispara, os eventos `NrAiSignal` (cada avaliação da condição) e
+    `NrAiIssue`/API `aiIssues` (issues abertas) são mais confiáveis do que
+    só olhar a UI — foi assim que confirmamos o disparo real da condição
+    de indisponibilidade.
 
 ## O que a Fase 3 exige e o estado de cada item
 
@@ -181,16 +208,20 @@
 | Health checks / monitoramento (#165) | Reaproveita probes existentes + #163; sem Synthetic monitor por falta de rota pública (decisão registrada acima) |
 | Tracing distribuído (Gateway → Lambda → EKS → RDS) | Agente cobre a aplicação a partir do EKS; correlação com a Function Serverless não avaliada |
 | Dashboards | **Aplicado em HML/PROD** (issue #166) — página "Aplicação" populando |
-| Alertas | Aplicado em HML/PROD (issue #167); condição de taxa de erro testada e corrigida, as outras 4 condições ainda não testadas |
+| Alertas | Aplicado em HML/PROD (issue #167); **"App indisponível" validada de ponta a ponta (e-mail recebido)**; taxa de erro corrigida mas não reexecutada; CPU/memória/crash loop pendentes |
 
 ## Pendências
 
-- Testar de verdade as 4 condições de alerta restantes do #167
-  (indisponibilidade, CPU, memória, crash loop) — roteiro no comentário
-  original da issue.
-- Confirmar por e-mail que o alerta de "taxa de erro alta" corrigido
-  dispara de verdade (reexecutar o teste de 200 requisições autenticadas
-  contra rota inexistente e aguardar a notificação).
+- Reexecutar a condição de **taxa de erro** (já corrigida pro
+  `http.statusCode`, mas nunca retestada desde a correção) e confirmar
+  e-mail — mesmo padrão que validou a de indisponibilidade.
+- Reexecutar **crash loop** com mais tempo de espera antes de apagar o
+  pod (o `threshold_duration` é 10 min; nosso teste apagou o pod cedo
+  demais).
+- Investigar um método de teste diferente pra **CPU/memória** — pod de
+  stress sem timeout automático, que fique vivo tempo suficiente pro
+  agente capturar uma amostra em execução (não só o estado final
+  `Terminated`).
 - Reavaliar `nri-metadata-injection`/`nri-kube-events` depois que o APM
   estiver validado e a capacidade dos nós do EKS for confirmada com a carga
   adicional.

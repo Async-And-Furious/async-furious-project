@@ -50,7 +50,7 @@ jobs:
           print(value or '')
           PY
           }
-          request() { curl --silent --show-error --max-time 20 -H 'content-type: application/json' -H "x-correlation-id: acceptance-${TARGET}-${GITHUB_RUN_ID}" "$@"; }
+          request() { curl --silent --show-error --retry 3 --retry-delay 2 --retry-max-time 30 --max-time 20 -H 'content-type: application/json' -H "x-correlation-id: acceptance-${TARGET}-${GITHUB_RUN_ID}" "$@"; }
 
           auth_file="$RUNNER_TEMP/customer.json"
           request -H 'authorization: Bearer acceptance-gateway-token' -d "$(python3 -c 'import json,os; print(json.dumps({"cpf":os.environ["SEEDED_CPF"]}))')" "$endpoint/auth" > "$auth_file"
@@ -60,12 +60,16 @@ jobs:
 
           admin_early_file="$RUNNER_TEMP/admin-early.json"
           admin_early_status=$(request -o "$admin_early_file" -w '%{http_code}' -H "authorization: Bearer $customer_token" -d "$(EMAIL="$SEED_ADMIN_EMAIL" PASSWORD="$SEED_ADMIN_PASSWORD" python3 -c 'import json,os; print(json.dumps({"email":os.environ["EMAIL"],"password":os.environ["PASSWORD"]}))')" "$endpoint/api/v1/auth/login")
-          admin_early_token=$(json_status "$admin_early_file" access_token)
-          if [ -z "$admin_early_token" ]; then
+          if [[ "$admin_early_status" != 2* || ! -s "$admin_early_file" ]]; then
             printf 'admin_login_status=%s response_keys=' "$admin_early_status"
-            python3 -c 'import json,sys; print(",".join(sorted(json.load(open(sys.argv[1],encoding="utf-8")).keys())))' "$admin_early_file"
+            python3 -c 'import json,sys
+try:
+ d=json.load(open(sys.argv[1],encoding="utf-8")); print(",".join(sorted(d)) if isinstance(d,dict) else "array")
+except (OSError,ValueError): print("invalid-or-empty-json")' "$admin_early_file"
             exit 1
           fi
+          admin_early_token=$(json_status "$admin_early_file" access_token)
+          test -n "$admin_early_token"
 
           orders_file="$RUNNER_TEMP/orders.json"
           export ORDERS_STATUS=$(request -o "$orders_file" -w '%{http_code}' -H "authorization: Bearer $admin_early_token" "$endpoint/api/v1/ordens-servico")
