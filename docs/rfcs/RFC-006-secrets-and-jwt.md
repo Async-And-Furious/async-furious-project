@@ -36,7 +36,7 @@ independente os JWTs emitidos pelo `repo-auth-serverless`.
 JWT do API Gateway. O authorizer nativo de JWT exige um endpoint HTTPS
 público de JWKS para o issuer — infraestrutura permanente extra sem
 nenhum outro uso neste projeto. Um Lambda Authorizer também combina com o
-desenho de dois handlers que o HANDOFF §4.3 já sugere
+desenho de dois handlers já adotado no projeto
 (`authenticate-customer` / `authorize-request`) e mantém controle total
 sobre a validação de claims customizadas.
 
@@ -81,9 +81,10 @@ payload.
   RS256.
 - A parte de validação de CPF contra o registro do cliente na
   `authenticate-customer` está explicitamente fora do escopo desta RFC —
-  depende da decisão #11 do HANDOFF.md (Lambda direto ao RDS vs. RDS
-  Proxy) e do contrato de dados do cliente, ambos ainda em aberto.
-- Resolve as decisões #2, #7 e #8 do HANDOFF.md.
+  depende de uma decisão futura sobre Lambda direto ao RDS vs. RDS
+  Proxy e do contrato de dados do cliente, ambos ainda em aberto.
+- Resolve os três itens em aberto listados no Contexto (authorizer,
+  assinatura do JWT e duração/claims do token).
 
 ## Alternativas consideradas
 

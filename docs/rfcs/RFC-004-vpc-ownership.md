@@ -38,10 +38,10 @@ dos outputs do `repo-k8s-infra`.
 ## Consequências
 
 - O `repo-k8s-infra` expõe `vpc_id`, `private_subnet_ids`,
-  `public_subnet_ids`, `cluster_name`, `ecr_repository_url` (conforme
-  HANDOFF.md §5.2) para os repositórios consumidores.
+  `public_subnet_ids`, `cluster_name`, `ecr_repository_url` para os
+  repositórios consumidores.
 - O `repo-db-infra` precisa ser aplicado depois do `repo-k8s-infra` (ordem
-  de provisionamento conforme HANDOFF.md §6.4: rede antes do banco).
+  de provisionamento definida por esta decisão: rede antes do banco).
 - Os valores de output são passados via um data source
   `terraform_remote_state` no `repo-db-infra`, apontando para a state key
   S3 do `repo-k8s-infra`
