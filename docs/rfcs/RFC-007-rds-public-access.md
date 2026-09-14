@@ -59,9 +59,9 @@ Isso **substitui** a parte da RFC-004 que amarrava o RDS à VPC do EKS via
 ## Consequências
 
 - O PR [#3](https://github.com/Async-And-Furious/repo-db-infra/pull/3)
-  (`feat/rds-module-postgres16`), que implementa o módulo RDS seguindo a
-  RFC-004 (RDS dentro da VPC), fica superado por esta decisão e deve ser
-  fechado ou reescrito.
+  (`feat/rds-module-postgres16`), que implementava o módulo RDS seguindo a
+  RFC-004 (RDS dentro da VPC), ficou superado por esta decisão e foi fechado
+  sem merge em 23/08/2026.
 - Um novo PR no `repo-db-infra` implementa o módulo RDS com
   `publicly_accessible = true` e `allowed_cidr_blocks` como variável,
   referenciando esta RFC.

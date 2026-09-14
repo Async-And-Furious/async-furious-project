@@ -130,8 +130,8 @@ Detalhes de execucao (scripts, comandos manuais, troubleshooting) estao na secao
 
 ## Pre-requisitos
 
-- Python 3 (for the stack orchestrator)
-- GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
+- Python 3 (para o orquestrador de stack)
+- GitHub CLI (`gh`), autenticado com `gh auth login` (para o orquestrador de stack)
 - Node.js 20+
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
@@ -340,8 +340,8 @@ pnpm test -- --testNamePattern="CreateClienteUseCase"
 
 | Metrica | Minimo |
 | ------- | ------ |
-| Statements | 85% |
-| Lines | 85% |
+| Statements | 80% |
+| Lines | 80% |
 | Functions | 80% |
 | Branches | 80% |
 

@@ -55,7 +55,7 @@ dentro dessa exigência.
 - Duas implementações de autenticação hoje convivem na base de código
   (esta local, para os três papéis administrativos, + o fluxo de cliente/CPF
   via `repo-auth-serverless`, implementado no PR #182) — por decisão, não
-  por pendência: ver a seção "Decision on staff roles" no ADR-0002.
+  por pendência: ver a seção "Decisão sobre os papéis de staff" no ADR-0002.
 
 ## Riscos
 

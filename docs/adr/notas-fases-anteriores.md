@@ -34,7 +34,7 @@ já existe um ADR**.
 | 10 | Manifests Kubernetes em YAML puro (não Helm/Kustomize) | 2 | "Manifestos YAML" (obrigatório) | YAML puro em `/k8s`, legibilidade/debug direto | mesmo spec acima | **Parcial** — mesmo caso do #9 |
 | 11 | CI/CD via GitHub Actions, `apply` só contra cluster efêmero no runner | 2 | "Pipeline CI/CD... deploy no cluster... aplicação dos manifestos" | GitHub Actions; `validate`+`plan` em PR, `apply` real só em push, contra kind efêmero no próprio runner (nunca nuvem persistente) | README, consolidado §8 (conflito com o spec original documentado na seção 8) | **Não** |
 | 12 | Segurança DAST: OWASP ZAP | 1 | "Relatório de análise de vulnerabilidades" (obrigatório) | OWASP ZAP no pipeline | consolidado §8 | **Não** |
-| 13 | Testes automatizados, cobertura mínima | 1 (80%) / 2 (mantida) | F1: 80% em domínios críticos | Convenção em `AGENTS.md`, cobertura mínima 85% (Fase 3 já subiu a régua) | `AGENTS.md` | **Não** — decisão de regra de cobertura nunca formalizada |
+| 13 | Testes automatizados, cobertura mínima | 1 (80%) / 2 (mantida) | F1: 80% em domínios críticos | Cobertura mínima de 80% uniforme, enforçada em `jest.config.js` (`coverageThreshold.global`) | [ADR-0014](./0014-cobertura-minima-testes.md) | **Sim** — formalizada na ADR-0014 |
 
 ## Itens só de contexto (provavelmente não geram ADR)
 

@@ -1,50 +1,53 @@
 # RFC-004 — Ownership da VPC e outputs
 
-- **Status**: Accepted
-- **Date**: 2026-07-29
-- **Source of truth**: this file, in `async-furious-project`. Copies exist in
-  `repo-k8s-infra` and `repo-db-infra` for local visibility — update here
-  first, then sync.
+- **Status**: Aceita
+- **Data**: 2026-07-29
+- **Fonte da verdade**: este arquivo, em `async-furious-project`. Cópias
+  existem em `repo-k8s-infra` e `repo-db-infra` para visibilidade local —
+  atualizar aqui primeiro, depois sincronizar.
 
-## Context
+## Contexto
 
-HANDOFF.md §6.1 suggested `repo-k8s-infra` as VPC owner but left it
-unconfirmed. The Tech Challenge Fase 3 requires two separate Terraform
-repos — one for Kubernetes infra, one for the managed database — and a
-database has to sit inside some VPC/subnet, so exactly one of the two must
-own the network.
+O HANDOFF.md §6.1 sugeriu o `repo-k8s-infra` como dono da VPC, mas deixou
+isso sem confirmação. O Tech Challenge Fase 3 exige dois repositórios
+Terraform separados — um para a infra de Kubernetes, outro para o banco
+gerenciado — e um banco de dados precisa estar dentro de alguma VPC/subnet,
+então exatamente um dos dois precisa ser dono da rede.
 
-## Decision
+## Decisão
 
-`repo-k8s-infra` owns the VPC, public/private subnets, and route
-tables/NAT. `repo-db-infra` does not create a VPC; it consumes `vpc_id` and
-`private_subnet_ids` as Terraform input variables from `repo-k8s-infra`'s
-outputs.
+O `repo-k8s-infra` é dono da VPC, das subnets públicas/privadas e das
+tabelas de rota/NAT. O `repo-db-infra` não cria uma VPC; ele consome
+`vpc_id` e `private_subnet_ids` como variáveis de input Terraform, vindas
+dos outputs do `repo-k8s-infra`.
 
-## Rationale
+## Justificativa
 
-- The challenge's own repo split (§3.2) requires two independent infra
-  repos; one owning network is the only way to avoid two competing VPCs.
-- `repo-db-infra`'s `variables.tf` was already scaffolded to take
-  `vpc_id`/`private_subnet_ids` as inputs — this decision formalizes the
-  existing shape rather than changing it.
-- No requirement in the challenge restricts cross-repo Terraform output
-  consumption; each repo still owns its own Terraform state, CI/CD, and
-  apply pipeline independently (§3.7).
+- A própria divisão de repositórios do desafio (§3.2) exige dois repos de
+  infra independentes; um ser dono da rede é a única forma de evitar duas
+  VPCs concorrentes.
+- O `variables.tf` do `repo-db-infra` já estava estruturado para receber
+  `vpc_id`/`private_subnet_ids` como inputs — esta decisão apenas
+  formaliza o desenho existente em vez de mudá-lo.
+- Nenhum requisito do desafio restringe o consumo de outputs Terraform
+  entre repositórios; cada repo continua sendo dono do seu próprio state
+  Terraform, CI/CD e pipeline de apply de forma independente (§3.7).
 
-## Consequences
+## Consequências
 
-- `repo-k8s-infra` outputs `vpc_id`, `private_subnet_ids`,
-  `public_subnet_ids`, `cluster_name`, `ecr_repository_url` (per HANDOFF.md
-  §5.2) for downstream repos to consume.
-- `repo-db-infra` must be applied after `repo-k8s-infra` (provisioning
-  order per HANDOFF.md §6.4: network before database).
-- Output values are passed via a `terraform_remote_state` data source in
-  `repo-db-infra` pointed at `repo-k8s-infra`'s S3 state key
-  (`repo-k8s-infra/${environment}/terraform.tfstate`, same bucket both
-  repos use for their own state). `vpc_id`/`private_subnet_ids` still
-  accept manual overrides; `allowed_security_group_ids` always includes
-  the EKS node group SG plus any extras. This only resolves once
-  `repo-k8s-infra`'s state has actually been applied for that environment
-  — the provisioning-order requirement above is load-bearing, not just
-  a suggestion.
+- O `repo-k8s-infra` expõe `vpc_id`, `private_subnet_ids`,
+  `public_subnet_ids`, `cluster_name`, `ecr_repository_url` (conforme
+  HANDOFF.md §5.2) para os repositórios consumidores.
+- O `repo-db-infra` precisa ser aplicado depois do `repo-k8s-infra` (ordem
+  de provisionamento conforme HANDOFF.md §6.4: rede antes do banco).
+- Os valores de output são passados via um data source
+  `terraform_remote_state` no `repo-db-infra`, apontando para a state key
+  S3 do `repo-k8s-infra`
+  (`repo-k8s-infra/${environment}/terraform.tfstate`, o mesmo bucket que
+  ambos os repositórios usam para seus próprios states). `vpc_id`/
+  `private_subnet_ids` ainda aceitam overrides manuais;
+  `allowed_security_group_ids` sempre inclui o security group do node
+  group do EKS mais quaisquer extras. Isso só se resolve depois que o
+  state do `repo-k8s-infra` tiver sido de fato aplicado para aquele
+  ambiente — o requisito de ordem de provisionamento acima é estrutural,
+  não apenas uma sugestão.
