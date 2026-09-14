@@ -1,5 +1,12 @@
 # Agent Log
 
+## 2026-09-14 — HML nodegroup capacity update hardening
+
+- Hardened the HML capacity step to wait for an ACTIVE nodegroup, retry only
+  ResourceInUseException, and poll the captured update until completion without
+  masking migration or rollout failures.
+- No AWS apply or deployment was run.
+
 ## 2026-09-13 — Comprehensive HML/PROD seed
 
 - Extended the deterministic, non-destructive Prisma seed with staff password
