@@ -8,7 +8,9 @@
 
 ## Contexto
 
-O HANDOFF.md §6.1 sugeriu o `repo-k8s-infra` como dono da VPC, mas deixou
+O HANDOFF.md §6.1 (referência histórica a um documento de planejamento —
+HANDOFF.md — não encontrado nos repositórios; ver
+[`docs/rfcs/README.md`](./README.md)) sugeriu o `repo-k8s-infra` como dono da VPC, mas deixou
 isso sem confirmação. O Tech Challenge Fase 3 exige dois repositórios
 Terraform separados — um para a infra de Kubernetes, outro para o banco
 gerenciado — e um banco de dados precisa estar dentro de alguma VPC/subnet,

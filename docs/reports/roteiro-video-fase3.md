@@ -9,7 +9,7 @@ Esta parte (intro + repositórios + pipeline) deve ficar entre 5 e 6 minutos, pa
 Preparação antes de gravar:
 - Abas abertas: repositório principal no GitHub, `repo-auth-serverless`, `repo-k8s-infra`, `repo-db-infra`, aba de Actions do repositório principal.
 - Ter uma alteração pequena e inofensiva pronta em uma branch a partir de `develop` (ex.: ajuste de comentário ou log), para abrir o PR e mergear ao vivo e disparar o deploy de homologação.
-- Confirmar de antemão qual workflow builda/depoia: `deploy-eks.yml` ("Deploy monolith to Academy EKS"), que tem dois jobs, `deploy-hml` (dispara em push para `develop`) e `deploy-prod` (dispara em push para `main`). Vale já deixar uma execução recente de cada um localizada no histórico do Actions, caso não dê tempo de esperar a nova rodar por completo.
+- Confirmar de antemão qual workflow builda/deploia: `deploy-eks.yml` ("Deploy monolith to Academy EKS"), que tem dois jobs, `deploy-hml` (dispara em push para `develop`) e `deploy-prod` (dispara em push para `main`). Vale já deixar uma execução recente de cada um localizada no histórico do Actions, caso não dê tempo de esperar a nova rodar por completo.
 
 ---
 

@@ -3,6 +3,8 @@
 - **Status**: Aceita
 - **Data**: 2026-07-29
 - **Resolve**: HANDOFF.md §20, decisão #6 ("Banco definitivo e versão")
+  (referência histórica a um documento de planejamento — HANDOFF.md — não
+  encontrado nos repositórios; ver [`docs/rfcs/README.md`](./README.md))
 - **Fonte da verdade**: este arquivo, em `async-furious-project`. Cópia
   existe em `repo-db-infra` para visibilidade local — atualizar aqui
   primeiro, depois sincronizar.

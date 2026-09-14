@@ -6,8 +6,8 @@ Aceita
 
 ## Contexto
 
-O enunciado da Fase 1 exigia "relatório de análise de vulnerabilidades". A
-equipe precisava cobrir dois tipos distintos de risco: vulnerabilidades na
+O enunciado da Fase 1 exigia "relatório de análise de vulnerabilidades".
+Precisávamos cobrir dois tipos distintos de risco: vulnerabilidades na
 **aplicação em execução** (API HTTP) e vulnerabilidades na **imagem de
 container** (SO + dependências empacotadas).
 

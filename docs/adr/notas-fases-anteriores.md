@@ -13,14 +13,14 @@ Os dois PDFs são os **enunciados do desafio**, não registros de decisão —
 eles impõem requisitos/restrições (ex.: "back-end monolítico", "Clean
 Architecture ou Hexagonal", "banco livre mas justifique"). A decisão em si
 (qual banco, qual estilo dentro do permitido, como implementar o requisito)
-foi tomada pela equipe e está espalhada em `docs/ddd.md`, `AGENTS.md`,
+tomamos nós e está espalhada em `docs/ddd.md`, `AGENTS.md`,
 README e no `contexto-tecnico-consolidado.md`. Este documento separa: **o
-que o enunciado exigiu** vs. **o que a equipe decidiu dentro disso** vs. **se
+que o enunciado exigiu** vs. **o que decidimos dentro disso** vs. **se
 já existe um ADR**.
 
 ## Tabela ponto a ponto
 
-| # | Decisão | Fase | Exigência do enunciado | O que a equipe escolheu | Já documentado em | ADR existe? |
+| # | Decisão | Fase | Exigência do enunciado | O que escolhemos | Já documentado em | ADR existe? |
 |---|---|---|---|---|---|---|
 | 1 | Estilo arquitetural: Clean Architecture + DDD | 1 (reforçado na 2) | F1: livre, "arquitetura em camadas" citada como piso aceitável. F2: "Clean Architecture **ou** Arquitetura Hexagonal" | Clean Architecture + DDD, regra de dependência estrita (`presentation → application → domain ← infrastructure`) | `AGENTS.md`, `docs/ddd.md`, consolidado §2 | **Não** |
 | 2 | Framework de aplicação: NestJS | 1 | Livre | NestJS (DI nativa, modular) | consolidado §8 | **Não** |

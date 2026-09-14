@@ -5,7 +5,7 @@
 - Estendido o seed determinístico e não destrutivo do Prisma com atualizações
   de senha de funcionários, relacionamentos, dados de fornecedores, reservas,
   pagamentos e histórico de status.
-- Adicionado um manifesto seguro e um workflow manual protegido que executa o
+- Adicionados um manifesto seguro e um workflow manual protegido que executa o
   seed duas vezes; nenhuma execução em HML/PROD foi realizada.
 - Validação: build passou; typecheck permanece bloqueado por erros de tipo
   preexistentes na spec da estratégia JWT; o Jest não encontra testes
@@ -13,7 +13,7 @@
 
 ## 2026-09-10 — Aliases do CLI do orquestrador Python
 
-- Adicionada a seleção padrão de HML e o alias `--prod` ao orquestrador de
+- Adicionados a seleção padrão de HML e o alias `--prod` ao orquestrador de
   stack em Python, com validação explícita de conflitos; adicionados scripts
   de encaminhamento multiplataforma `aws:apply` e `aws:destroy` no npm e
   atualizados ambos os READMEs.

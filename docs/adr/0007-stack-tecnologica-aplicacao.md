@@ -7,7 +7,7 @@ Aceita
 ## Contexto
 
 O enunciado da Fase 1 deixava framework, banco e ORM livres (exigindo apenas
-justificativa para o banco). A equipe precisava de um framework Node.js com
+justificativa para o banco). Precisávamos de um framework Node.js com
 suporte nativo a injeção de dependência (para viabilizar Clean Architecture,
 ver [ADR-0006](./0006-clean-architecture-ddd.md)), um banco com consistência
 transacional forte (o domínio tem fluxos financeiros — orçamento, pagamento
@@ -28,8 +28,8 @@ integrada ao TypeScript.
 
 Nenhuma alternativa concorrente (ex.: Express/Fastify puro, TypeORM,
 Sequelize, MySQL/MongoDB) está documentada com comparativo — as escolhas
-aparecem já tomadas no README, com justificativa de motivo mas sem registro
-de descarte de outras opções.
+aparecem já tomadas no README, com justificativa apresentada, mas sem
+registro de descarte de outras opções.
 
 ## Consequências positivas
 

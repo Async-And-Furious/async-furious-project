@@ -1,31 +1,31 @@
-# Sistema de Gestao para Oficina Mecanica
+# Sistema de Gestão para Oficina Mecânica
 
-> API RESTful para gerenciamento de ordens de servico, clientes, veiculos e estoque de pecas.
+> API RESTful para gerenciamento de ordens de serviço, clientes, veículos e estoque de peças.
 
 English version: [README-en.md](./README-en.md)
 
 ## Objetivo do Projeto
 
-Backend para **gestao integrada de oficina mecanica**, desenvolvido como Tech Challenge da pos-graduacao em Arquitetura de Software (15SOAT - FIAP). A arquitetura combina Clean Architecture e DDD.
+Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech Challenge da pós-graduação em Arquitetura de Software (15SOAT - FIAP). A arquitetura combina Clean Architecture e DDD.
 
 ### Problema que Resolve
 
-- **Centralizacao**: substitui planilhas e processos manuais por um sistema unico.
-- **Rastreamento**: permite acompanhar o status da ordem de servico em tempo real.
-- **Controle de estoque**: gerencia pecas, estoque minimo e pedidos a fornecedores.
-- **Validacao**: aplica regras para CPF/CNPJ e placas veiculares brasileiras.
+- **Centralização**: substitui planilhas e processos manuais por um sistema único.
+- **Rastreamento**: permite acompanhar o status da ordem de serviço em tempo real.
+- **Controle de estoque**: gerencia peças, estoque mínimo e pedidos a fornecedores.
+- **Validação**: aplica regras para CPF/CNPJ e placas veiculares brasileiras.
 
 ### Funcionalidades Principais
 
-| Modulo | Descricao |
+| Módulo | Descrição |
 | ------ | --------- |
-| **Ordens de Servico** | Ciclo completo da OS, do recebimento ate a entrega. |
-| **Clientes** | CRUD com validacao de CPF/CNPJ. |
-| **Veiculos** | CRUD com validacao de placa brasileira. |
-| **Servicos** | Catalogo de servicos oferecidos pela oficina. |
-| **Pecas e Insumos** | CRUD com controle de estoque e pedidos a fornecedores. |
-| **Pagamentos** | Registro de pagamentos com disparo automatico da entrega. |
-| **Autenticacao** | JWT com papeis `ADMIN`, `RECEPCIONISTA` e `MECANICO`. |
+| **Ordens de Serviço** | Ciclo completo da OS, do recebimento até a entrega. |
+| **Clientes** | CRUD com validação de CPF/CNPJ. |
+| **Veículos** | CRUD com validação de placa brasileira. |
+| **Serviços** | Catálogo de serviços oferecidos pela oficina. |
+| **Peças e Insumos** | CRUD com controle de estoque e pedidos a fornecedores. |
+| **Pagamentos** | Registro de pagamentos com disparo automático da entrega. |
+| **Autenticação** | JWT com papéis `ADMIN`, `RECEPCIONISTA` e `MECANICO`. |
 
 ---
 
@@ -37,23 +37,23 @@ Backend para **gestao integrada de oficina mecanica**, desenvolvido como Tech Ch
 | Linguagem | TypeScript 5.x |
 | Banco de dados | PostgreSQL local; RDS na AWS |
 | ORM | Prisma |
-| Autenticacao | JWT + bcrypt |
-| Documentacao | Swagger / OpenAPI |
+| Autenticação | JWT + bcrypt |
+| Documentação | Swagger / OpenAPI |
 | Container | Docker Compose |
 | Testes | Jest |
-| Seguranca DAST | OWASP ZAP |
+| Segurança DAST | OWASP ZAP |
 | IaC | Terraform 1.6+ |
-| Orquestracao | Kubernetes com kind |
+| Orquestração | Kubernetes com kind |
 
-Usamos Node.js com NestJS pela arquitetura modular e pela injecao de dependencia nativa, PostgreSQL pela consistencia transacional, e Prisma pela tipagem forte integrada ao TypeScript.
+Usamos Node.js com NestJS pela arquitetura modular e pela injeção de dependência nativa, PostgreSQL pela consistência transacional, e Prisma pela tipagem forte integrada ao TypeScript.
 
 ---
 
-## Escalabilidade e Automacao de Infraestrutura
+## Escalabilidade e Automação de Infraestrutura
 
-### Orquestracao AWS entre repositorios
+### Orquestração AWS entre repositórios
 
-Este repositorio contem a aplicacao, mas a stack AWS e distribuida em quatro repositorios: `repo-k8s-infra` (EKS/VPC), `repo-db-infra` (RDS), `async-furious-project` (imagem e workloads Kubernetes) e `repo-auth-serverless` (Lambda, API Gateway e authorizer). Para evitar dependencias quebradas, a subida segue `K8s -> DB -> Auth -> App`; a destruicao segue a ordem inversa: `App -> Auth -> DB -> K8s`.
+Este repositório contém a aplicação, mas a stack AWS é distribuída em quatro repositórios: `repo-k8s-infra` (EKS/VPC), `repo-db-infra` (RDS), `async-furious-project` (imagem e workloads Kubernetes) e `repo-auth-serverless` (Lambda, API Gateway e authorizer). Para evitar dependências quebradas, a subida segue `K8s -> DB -> Auth -> App`; a destruição segue a ordem inversa: `App -> Auth -> DB -> K8s`.
 
 O script `scripts/orchestrate-stack.py` usa Python 3 e somente o `gh`, para no primeiro erro e aguarda cada workflow. Requer Python 3 e o GitHub CLI (`gh`) instalado e autenticado (`gh auth login`):
 
@@ -65,18 +65,18 @@ pnpm aws:destroy --environment prod --confirmation "DESTROY PROD"
 pnpm aws:destroy --what-if --confirmation "DESTROY HML"
 ```
 
-O repositorio usa pnpm, que repassa os argumentos direto para o script: nao use `--` antes deles, ou o proprio `--` chega ao `argparse` e o comando falha com `unrecognized arguments`. Prefira `--environment prod` a `--prod`: os dois sao equivalentes no script, mas `--prod` tambem e flag do pnpm e pode ser consumida antes de chegar la.
+O repositório usa pnpm, que repassa os argumentos direto para o script: não use `--` antes deles, ou o próprio `--` chega ao `argparse` e o comando falha com `unrecognized arguments`. Prefira `--environment prod` a `--prod`: os dois são equivalentes no script, mas `--prod` também é flag do pnpm e pode ser consumida antes de chegar lá.
 
-Sem `--environment prod`, o ambiente padrao e HML. Combinar `--prod` com `--environment hml` e rejeitado. `apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositorios. O script nunca recebe secrets, nao chama AWS diretamente e exige `gh auth login`.
+Sem `--environment prod`, o ambiente padrão é HML. Combinar `--prod` com `--environment hml` é rejeitado. `apply` executa k8s `ci.yml`/`apply`, banco `ci.yml`/`apply`, app `deploy-eks.yml` e auth `ci.yml`/`apply`. `destroy` executa app `cleanup-eks.yml`, auth `down.yml`, banco `down.yml` e k8s `down.yml`. Todos usam a ref `main`, `academy_mode/aws_academy=false` e as credenciais AWS normais configuradas como secrets nos repositórios. O script nunca recebe secrets, não chama AWS diretamente e exige `gh auth login`.
 
-Use `--what-if` antes de uma operacao destrutiva para conferir a sequencia. O `destroy` exige a confirmacao exata do ambiente (`DESTROY HML` ou `DESTROY PROD`). O script dispara e monitora as GitHub Actions; ele nao substitui os workflows nem executa `terraform` localmente.
+Use `--what-if` antes de uma operação destrutiva para conferir a sequência. O `destroy` exige a confirmação exata do ambiente (`DESTROY HML` ou `DESTROY PROD`). O script dispara e monitora as GitHub Actions; ele não substitui os workflows nem executa `terraform` localmente.
 
-Com o aumento da demanda e a expansao para novas unidades, a oficina precisa garantir alta disponibilidade do sistema mesmo em picos de atendimento. Para isso, a infraestrutura evoluiu com:
+Com o aumento da demanda e a expansão para novas unidades, a oficina precisa garantir alta disponibilidade do sistema mesmo em picos de atendimento. Para isso, a infraestrutura evoluiu com:
 
-- **Infraestrutura escalavel**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 replicas, escalando por CPU > 70% ou memoria > 80%).
-- **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migracao documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
+- **Infraestrutura escalável**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 réplicas, escalando por CPU > 70% ou memória > 80%).
+- **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migração documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
 - **Pipeline de CI/CD**: GitHub Actions valida build, testes automatizados e infraestrutura (`terraform validate` + `plan`) a cada Pull Request.
-- **Qualidade e organizacao do codigo**: Clean Architecture + DDD, com cobertura minima de testes de 85%.
+- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 85%.
 
 ### Diagrama de Arquitetura
 
@@ -118,17 +118,17 @@ flowchart TB
 
 ### Fluxo de Deploy
 
-1. A imagem Docker da API e construida localmente e carregada no cluster kind (`kind load docker-image`).
-2. O PostgreSQL local e usado apenas no Docker Compose. HML/PROD recebem o ARN de um secret RDS com `host`, `port`, `dbname`, `username` e `password`; a aplicacao consome esse contrato explicito.
-3. A pipeline executa um Job controlado com `prisma migrate deploy`; migrations nao rodam no startup dos pods.
-4. O HPA escala os pods da API de 2 a 5 replicas conforme o consumo de CPU/memoria.
-5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisao humana antes de qualquer `apply` real.
+1. A imagem Docker da API é construída localmente e carregada no cluster kind (`kind load docker-image`).
+2. O PostgreSQL local é usado apenas no Docker Compose. HML/PROD recebem o ARN de um secret RDS com `host`, `port`, `dbname`, `username` e `password`; a aplicação consome esse contrato explícito.
+3. A pipeline executa um Job controlado com `prisma migrate deploy`; migrations não rodam no startup dos pods.
+4. O HPA escala os pods da API de 2 a 5 réplicas conforme o consumo de CPU/memória.
+5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisão humana antes de qualquer `apply` real.
 
-Detalhes de execucao (scripts, comandos manuais, troubleshooting) estao na secao [Infraestrutura como Codigo](#infraestrutura-como-codigo-terraform--kubernetes).
+Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na seção [Infraestrutura como Código](#infraestrutura-como-codigo-terraform--kubernetes).
 
 ---
 
-## Pre-requisitos
+## Pré-requisitos
 
 - Python 3 (para o orquestrador de stack)
 - GitHub CLI (`gh`), autenticado com `gh auth login` (para o orquestrador de stack)
@@ -136,20 +136,20 @@ Detalhes de execucao (scripts, comandos manuais, troubleshooting) estao na secao
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
 - Terraform 1.6+
-- kind (`go install sigs.k8s.io/kind@latest` ou instalacao via gerenciador de pacotes)
+- kind (`go install sigs.k8s.io/kind@latest` ou instalação via gerenciador de pacotes)
 
 ---
 
 ## Como Executar Localmente
 
-### 1. Clonar o repositorio
+### 1. Clonar o repositório
 
 ```bash
 git clone <repo-url>
 cd async-furious-project
 ```
 
-### 2. Configurar variaveis de ambiente
+### 2. Configurar variáveis de ambiente
 
 ```bash
 cp .env.example .env
@@ -184,13 +184,13 @@ pnpm run dev
 docker compose up -d
 ```
 
-A aplicacao fica disponivel em `http://localhost:3000`.
+A aplicação fica disponível em `http://localhost:3000`.
 
-Em HML/PROD, o fluxo e `API Gateway -> CPF Auth Lambda (RS256) -> Authorizer -> monolito privado`. O monolito nao e exposto diretamente; seus pods usam o `DATABASE_URL` do RDS. `GET /api/v1/health/live` verifica o processo e `GET /api/v1/health/ready` verifica o banco.
+Em HML/PROD, o fluxo é `API Gateway -> CPF Auth Lambda (RS256) -> Authorizer -> monolito privado`. O monolito não é exposto diretamente; seus pods usam o `DATABASE_URL` do RDS. `GET /api/v1/health/live` verifica o processo e `GET /api/v1/health/ready` verifica o banco.
 
 ---
 
-## Documentacao da API
+## Documentação da API
 
 Depois de iniciar o projeto, acesse o Swagger em:
 
@@ -198,24 +198,24 @@ Depois de iniciar o projeto, acesse o Swagger em:
 http://localhost:3000/api/docs
 ```
 
-A colecao completa das APIs (formato Insomnia v5) fica versionada no repositorio e pode ser importada diretamente pelo link:
+A coleção completa das APIs (formato Insomnia v5) fica versionada no repositório e pode ser importada diretamente pelo link:
 
 [docs/http/insomnia.yaml](https://github.com/Async-And-Furious/async-furious-project/blob/develop/docs/http/insomnia.yaml)
 
-Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`, escolhendo `From File` (apos baixar o arquivo) ou `From URL` (colando o link acima).
+Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`, escolhendo `From File` (após baixar o arquivo) ou `From URL` (colando o link acima).
 
 ### Rotas
 
-#### Autenticacao (`/api/v1/auth`)
+#### Autenticação (`/api/v1/auth`)
 
-| Metodo | Endpoint | Acesso | Descricao |
+| Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/auth/register` | ADMIN | Registrar novo usuario. |
-| POST | `/auth/login` | Publico | Fazer login e retornar JWT. |
+| POST | `/auth/register` | ADMIN | Registrar novo usuário. |
+| POST | `/auth/login` | Público | Fazer login e retornar JWT. |
 
 #### Clientes (`/api/v1/clientes`)
 
-| Metodo | Endpoint | Acesso | Descricao |
+| Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
 | POST | `/clientes` | RECEPCIONISTA | Criar cliente. |
 | GET | `/clientes` | Autenticado | Listar clientes. |
@@ -223,29 +223,29 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | PATCH | `/clientes/:id` | RECEPCIONISTA | Atualizar cliente. |
 | DELETE | `/clientes/:id` | ADMIN | Deletar cliente. |
 
-#### Veiculos (`/api/v1/veiculos`)
+#### Veículos (`/api/v1/veiculos`)
 
-| Metodo | Endpoint | Acesso | Descricao |
+| Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/veiculos` | RECEPCIONISTA | Criar veiculo. |
-| GET | `/veiculos` | Autenticado | Listar veiculos. |
-| GET | `/veiculos/:id` | Autenticado | Detalhar veiculo. |
-| PATCH | `/veiculos/:id` | RECEPCIONISTA | Atualizar veiculo. |
-| DELETE | `/veiculos/:id` | ADMIN | Deletar veiculo. |
+| POST | `/veiculos` | RECEPCIONISTA | Criar veículo. |
+| GET | `/veiculos` | Autenticado | Listar veículos. |
+| GET | `/veiculos/:id` | Autenticado | Detalhar veículo. |
+| PATCH | `/veiculos/:id` | RECEPCIONISTA | Atualizar veículo. |
+| DELETE | `/veiculos/:id` | ADMIN | Deletar veículo. |
 
-#### Servicos (`/api/v1/servicos`)
+#### Serviços (`/api/v1/servicos`)
 
-| Metodo | Endpoint | Acesso | Descricao |
+| Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/servicos` | ADMIN | Criar servico. |
-| GET | `/servicos` | Autenticado | Listar servicos. |
-| GET | `/servicos/:id` | Autenticado | Detalhar servico. |
-| PATCH | `/servicos/:id` | ADMIN | Atualizar servico. |
-| DELETE | `/servicos/:id` | ADMIN | Deletar servico. |
+| POST | `/servicos` | ADMIN | Criar serviço. |
+| GET | `/servicos` | Autenticado | Listar serviços. |
+| GET | `/servicos/:id` | Autenticado | Detalhar serviço. |
+| PATCH | `/servicos/:id` | ADMIN | Atualizar serviço. |
+| DELETE | `/servicos/:id` | ADMIN | Deletar serviço. |
 
-#### Ordens de Servico (`/api/v1/ordens-servico`)
+#### Ordens de Serviço (`/api/v1/ordens-servico`)
 
-| Metodo | Endpoint | Acesso | Descricao |
+| Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
 | POST | `/ordens-servico` | RECEPCIONISTA | Criar OS. |
 | GET | `/ordens-servico` | Autenticado | Listar OSs. |
@@ -253,38 +253,38 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecanico assume a OS. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar analise diagnostica. |
-| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orcamento. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Publico | Cliente aprova orcamento. |
-| PATCH | `/ordens-servico/:id/orcamento/recusar` | Publico | Cliente recusa orcamento. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Publico | Cliente aprova servico prestado. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecanico finaliza execucao. |
+| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. |
+| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. |
+| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orçamento. |
+| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento. |
+| PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
+| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
-| GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo medio de execucao. |
+| GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
-#### Pecas e Insumos (`/api/v1/pecas`)
+#### Peças e Insumos (`/api/v1/pecas`)
 
-| Metodo | Endpoint | Acesso | Descricao |
+| Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/pecas` | ADMIN | Criar peca ou insumo. |
-| GET | `/pecas` | Autenticado | Listar pecas e insumos. |
-| GET | `/pecas/:id` | Autenticado | Detalhar peca ou insumo. |
-| PATCH | `/pecas/:id` | ADMIN | Atualizar peca ou insumo. |
+| POST | `/pecas` | ADMIN | Criar peça ou insumo. |
+| GET | `/pecas` | Autenticado | Listar peças e insumos. |
+| GET | `/pecas/:id` | Autenticado | Detalhar peça ou insumo. |
+| PATCH | `/pecas/:id` | ADMIN | Atualizar peça ou insumo. |
 | PATCH | `/pecas/:id/estoque` | ADMIN | Atualizar estoque. |
-| DELETE | `/pecas/:id` | ADMIN | Deletar peca ou insumo. |
-| POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar pecas a fornecedor. |
-| PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de pecas. |
+| DELETE | `/pecas/:id` | ADMIN | Deletar peça ou insumo. |
+| POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar peças a fornecedor. |
+| PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de peças. |
 
 #### Pagamentos (`/api/v1/pagamentos`)
 
-| Metodo | Endpoint | Acesso | Descricao |
+| Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
 | POST | `/pagamentos/registrar` | Autenticado | Registrar pagamento e disparar entrega da OS. |
 
 ---
 
-## Ciclo de Vida da Ordem de Servico
+## Ciclo de Vida da Ordem de Serviço
 
 ```text
 RECEIVED
@@ -300,15 +300,15 @@ RECEIVED
 
 ---
 
-## Autenticacao e Papeis
+## Autenticação e Papéis
 
 Todos os endpoints, exceto os marcados com `@Public()`, exigem o header `Authorization: Bearer <token>`.
 
-| Papel | Permissoes principais |
+| Papel | Permissões principais |
 | ----- | --------------------- |
-| `ADMIN` | Acesso total: CRUD de servicos, pecas e gestao administrativa. |
-| `RECEPCIONISTA` | Cria e atualiza clientes/veiculos, cria OS e registra entrega. |
-| `MECANICO` | Assume OS, diagnostica, gera orcamento e finaliza execucao. |
+| `ADMIN` | Acesso total: CRUD de serviços, peças e gestão administrativa. |
+| `RECEPCIONISTA` | Cria e atualiza clientes/veículos, cria OS e registra entrega. |
+| `MECANICO` | Assume OS, diagnostica, gera orçamento e finaliza execução. |
 
 O token JWT expira em **1 hora**.
 
@@ -338,7 +338,7 @@ pnpm test -- --testNamePattern="CreateClienteUseCase"
 
 ### Thresholds de Cobertura
 
-| Metrica | Minimo |
+| Métrica | Mínimo |
 | ------- | ------ |
 | Statements | 80% |
 | Lines | 80% |
@@ -366,11 +366,11 @@ src/
     └── infrastructure/      # PrismaService, EmissorEventos, filtros
 ```
 
-Cada modulo segue a regra de dependencia: `presentation -> application -> domain <- infrastructure`.
+Cada módulo segue a regra de dependência: `presentation -> application -> domain <- infrastructure`.
 
 ---
 
-## Comandos Uteis
+## Comandos Úteis
 
 ```bash
 # Desenvolvimento com PostgreSQL, migrations, seed e app
@@ -391,11 +391,11 @@ pnpm run format
 
 ---
 
-## Infraestrutura como Codigo (Terraform + Kubernetes)
+## Infraestrutura como Código (Terraform + Kubernetes)
 
-A infraestrutura local e provisionada com Terraform em um cluster Kubernetes local criado pelo kind.
+A infraestrutura local é provisionada com Terraform em um cluster Kubernetes local criado pelo kind.
 
-### Pre-requisitos
+### Pré-requisitos
 
 - Docker rodando
 - `terraform` 1.6+
@@ -435,22 +435,22 @@ Use o script `scripts/local-up.sh` — ele executa todos os passos na ordem corr
 ./scripts/local-up.sh down
 ```
 
-As variaveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email`
+As variáveis `TF_VAR_db_password`, `TF_VAR_jwt_secret`, `TF_VAR_seed_admin_email`
 e `TF_VAR_seed_admin_password` podem ser exportadas antes ou definidas em
-`.env.local` — o script solicita interativamente se nao encontrar.
+`.env.local` — o script solicita interativamente se não encontrar.
 
-No deploy EKS, as variaveis `JWT_ISSUER` e `JWT_AUDIENCE` sao obrigatorias no
-Environment. O `TARGET_GROUP_ARN` e resolvido, sem fallback, do output
+No deploy EKS, as variáveis `JWT_ISSUER` e `JWT_AUDIENCE` são obrigatórias no
+Environment. O `TARGET_GROUP_ARN` é resolvido, sem fallback, do output
 `application_target_group_arn` (ou `internal_alb_target_group_arn`) do state
 remoto atual de `repo-k8s-infra` para o ambiente correspondente; o deploy e os
-smokes falham se o state nao puder ser lido ou o ARN for invalido. Os outputs atuais de `repo-db-infra` sao lidos
+smokes falham se o state não puder ser lido ou o ARN for inválido. Os outputs atuais de `repo-db-infra` são lidos
 do state remoto por ambiente (`db_connection_secret_arn`, `db_host`, `db_port`,
-`db_name` e `db_ssl_mode`); portanto, nao configure um ARN RDS estatico no
-GitHub. O secret RDS e lido em runtime e seus valores nao sao impressos.
+`db_name` e `db_ssl_mode`); portanto, não configure um ARN RDS estático no
+GitHub. O secret RDS é lido em runtime e seus valores não são impressos.
 
 ### Subir o ambiente local (manual)
 
-Execute os comandos a partir da raiz do repositorio, exceto quando indicado.
+Execute os comandos a partir da raiz do repositório, exceto quando indicado.
 
 ```bash
 # 1. Build da imagem local da API
@@ -517,38 +517,38 @@ kubectl rollout status deployment/async-furious-api -n async-furious --timeout=2
 curl http://localhost:30000/api/v1
 ```
 
-### Observacoes importantes
+### Observações importantes
 
-- Os probes do Kubernetes devem apontar para `/api/v1`, nao para `/health`.
+- Os probes do Kubernetes devem apontar para `/api/v1`, não para `/health`.
 - Se aparecer `ErrImageNeverPull`, carregue a imagem com `kind load docker-image` ou use `./scripts/local-up.sh reload`.
 - O init container `migrate` roda `prisma migrate deploy` antes de cada pod da API iniciar.
-- O HPA requer o metrics-server, que e instalado automaticamente pelo modulo `kubernetes-apps`.
-- Se aparecer erro de autenticacao do Prisma contra `postgres-service`, confira se `TF_VAR_db_password` e o password do PostgreSQL local existente sao iguais. Em ambiente local descartavel, destruir e recriar o cluster/volume tambem resolve.
+- O HPA requer o metrics-server, que é instalado automaticamente pelo módulo `kubernetes-apps`.
+- Se aparecer erro de autenticação do Prisma contra `postgres-service`, confira se `TF_VAR_db_password` e o password do PostgreSQL local existente são iguais. Em ambiente local descartável, destruir e recriar o cluster/volume também resolve.
 
 ### CI/CD
 
-Pull requests que alterem `infra/**` ou `k8s/**` executam automaticamente `terraform validate` e `terraform plan` via `.github/workflows/terraform.yml` (rapido, nenhum cluster e criado).
+Pull requests que alterem `infra/**` ou `k8s/**` executam automaticamente `terraform validate` e `terraform plan` via `.github/workflows/terraform.yml` (rápido, nenhum cluster é criado).
 
-Em push para `main`/`develop` (ou via `workflow_dispatch` manual), o mesmo workflow roda um segundo job que aplica a infraestrutura de verdade: builda a imagem Docker, provisiona um cluster `kind` efemero com `terraform apply`, implanta a aplicacao e roda um smoke test em `/api/v1`. A limpeza permanece manual e somente para HML. Isso roda inteiramente dentro do runner do GitHub usando Docker — nenhuma conta de nuvem e envolvida. O job reutiliza o `scripts/local-up.sh`, o mesmo script usado no provisionamento local.
+Em push para `main`/`develop` (ou via `workflow_dispatch` manual), o mesmo workflow roda um segundo job que aplica a infraestrutura de verdade: builda a imagem Docker, provisiona um cluster `kind` efêmero com `terraform apply`, implanta a aplicação e roda um smoke test em `/api/v1`. A limpeza permanece manual e somente para HML. Isso roda inteiramente dentro do runner do GitHub usando Docker — nenhuma conta de nuvem é envolvida. O job reutiliza o `scripts/local-up.sh`, o mesmo script usado no provisionamento local.
 
-### Migracao para EKS
+### Migração para EKS
 
 Consulte `infra/environments/aws/README.md`.
 
 ---
 
-## Persistencia e Modelo de Dados
+## Persistência e Modelo de Dados
 
-A documentacao completa da camada de persistencia (diagrama ER, modelo relacional tabela a tabela, mapeamento entre entidades de dominio e tabelas, justificativas do PostgreSQL e do Prisma, estrategia de persistencia e o historico de decisoes de evolucao do schema) esta em [docs/infrastructure/database.md](./docs/infrastructure/database.md).
-
----
-
-## Convencoes de Codigo
-
-Consulte [AGENTS.md](./AGENTS.md) para convencoes de nomenclatura, padroes TypeScript/NestJS e politicas de imports.
+A documentação completa da camada de persistência (diagrama ER, modelo relacional tabela a tabela, mapeamento entre entidades de domínio e tabelas, justificativas do PostgreSQL e do Prisma, estratégia de persistência e o histórico de decisões de evolução do schema) está em [docs/infrastructure/database.md](./docs/infrastructure/database.md).
 
 ---
 
-## Licenca
+## Convenções de Código
+
+Consulte [AGENTS.md](./AGENTS.md) para convenções de nomenclatura, padrões TypeScript/NestJS e políticas de imports.
+
+---
+
+## Licença
 
 Privado - Todos os direitos reservados.

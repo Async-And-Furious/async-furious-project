@@ -18,8 +18,8 @@ vigor:
 
 Como o `jest.config.js` é o que o Jest de fato executa e falha o build se
 violado, ele é a fonte de verdade sobre o que está *em vigor* — o
-`README.md` está desatualizado neste ponto específico (não foi corrigido
-por esta tarefa, que é sobre ADRs, não sobre o README).
+`README.md` está desatualizado neste ponto específico (não o corrigimos
+nesta tarefa, que trata de ADRs, não do README).
 
 ## Decisão
 
@@ -32,7 +32,7 @@ métrica cair abaixo de 80%.
 
 - **85% em statements/lines** (o que o `README.md` afirma): não é o que
   está de fato configurado — não há evidência de que isso tenha sido
-  aplicado e depois revertido, mais provável que o README nunca tenha
+  aplicado e depois revertido; é mais provável que o README nunca tenha
   refletido o `jest.config.js` real, ou que uma mudança em um dos dois não
   tenha sido replicada no outro.
 - **Cobertura por módulo/pasta** (thresholds diferentes por criticidade):

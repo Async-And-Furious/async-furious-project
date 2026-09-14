@@ -61,8 +61,8 @@ dentro dessa exigência.
 
 - Nenhum risco em aberto: `JwtModule.registerAsync()` resolve o contrato via
   `createJwtModuleOptions`/`resolveJwtContract` (`src/auth/jwt.config.ts`),
-  que usa HS256 + `JWT_SECRET` para o fluxo de staff fora de produção com
-  RS256, e exige RS256 explicitamente em produção.
+  que usa HS256 + `JWT_SECRET` para o fluxo de staff fora de produção, e
+  exige RS256 explicitamente em produção.
 
 ## Referências
 

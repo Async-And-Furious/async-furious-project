@@ -10,7 +10,9 @@ RFC — atualizar aqui primeiro, depois sincronizar.
 
 ## Contexto
 
-A lista de decisões do HANDOFF.md (§20) deixa três itens relacionados em
+A lista de decisões do HANDOFF.md (§20) (referência histórica a um
+documento de planejamento — HANDOFF.md — não encontrado nos repositórios;
+ver [`docs/rfcs/README.md`](./README.md)) deixa três itens relacionados em
 aberto:
 
 - #2 — Lambda Authorizer vs. authorizer nativo de JWT.

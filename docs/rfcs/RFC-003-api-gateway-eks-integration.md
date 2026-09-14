@@ -8,7 +8,9 @@
 
 ## Contexto
 
-O HANDOFF.md §6.2 deixou a ownership do API Gateway em aberto, e o §4.2
+O HANDOFF.md §6.2 (referência histórica a um documento de planejamento —
+HANDOFF.md — não encontrado nos repositórios; ver
+[`docs/rfcs/README.md`](./README.md)) deixou a ownership do API Gateway em aberto, e o §4.2
 sugeriu (sem decidir) uma integração via VPC Link + load balancer interno
 entre o Gateway e a aplicação hospedada no EKS. Ambos precisavam de uma
 decisão antes que a pipeline de apply do `repo-k8s-infra` ou os recursos de
