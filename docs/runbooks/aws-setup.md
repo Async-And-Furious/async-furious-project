@@ -41,9 +41,9 @@ Environment só resolve nos jobs daquele Environment.
 
 | Nome | Usado por | Origem |
 |---|---|---|
-| `AWS_ACCESS_KEY_ID` | todos os workflows de nuvem | sessão AWS Academy |
-| `AWS_SECRET_ACCESS_KEY` | todos os workflows de nuvem | sessão AWS Academy |
-| `AWS_SESSION_TOKEN` | todos os workflows de nuvem, apenas no modo Academy | sessão AWS Academy |
+| `AWS_ACCESS_KEY_ID` | todos os workflows de nuvem | usuário IAM da conta AWS pessoal |
+| `AWS_SECRET_ACCESS_KEY` | todos os workflows de nuvem | usuário IAM da conta AWS pessoal |
+| `AWS_SESSION_TOKEN` | opcional; só é usado quando preenchido | credenciais temporárias, se for o caso; com chave de usuário IAM, deixe vazio |
 | `JWT_PRIVATE_KEY_SECRET_ARN` | `deploy-eks.yml` | ARN do secret com a chave privada RS256 no Secrets Manager; a aplicação a usa para assinar tokens de staff |
 | `NEW_RELIC_LICENSE_KEY` | `deploy-eks.yml` | conta New Relic |
 | `JWT_SECRET` | `deploy-eks.yml` | operador |
@@ -53,8 +53,10 @@ Environment só resolve nos jobs daquele Environment.
 | `SEED_RECEPCIONISTA_PASSWORD`, `SEED_MECANICO_PASSWORD` | `deploy-eks.yml`, workflows de aceitação | operador |
 | `SEEDED_CPF` | seed controlado do `deploy-eks.yml`, `full-acceptance.yml`, `protected-route-matrix.yml`, diagnósticos | CPF semeado; nunca impresso |
 
-As credenciais Academy expiram junto com a sessão do laboratório e precisam ser
-renovadas antes de cada execução.
+Os ambientes rodam em uma conta AWS pessoal, no free tier; não em AWS Academy
+nem AWS Lab. Chaves de usuário IAM não expiram sozinhas, então a rotação é
+responsabilidade de quem administra a conta. Os workflows ainda têm um modo
+Academy (`academy_mode`), que deve ficar desligado.
 
 ### Variáveis
 

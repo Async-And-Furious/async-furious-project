@@ -126,7 +126,7 @@ O endpoint privado tem uma consequência direta no pipeline: o runner do GitHub
 Actions não alcança a API do cluster. O `deploy-eks.yml` resolve isso abrindo o
 endpoint temporariamente apenas para o IP do runner, com `/32`, e restaurando a
 configuração original em um passo `if: always()`
-(passos "Allow HML runner to reach Academy EKS" e "Restore original HML EKS endpoint access" do `.github/workflows/deploy-eks.yml`). O mesmo padrão existe no
+(passos "Allow HML runner to reach Academy EKS", nome legado, e "Restore original HML EKS endpoint access" do `.github/workflows/deploy-eks.yml`). O mesmo padrão existe no
 `cleanup-eks.yml`.
 
 ## 6. Registry: ECR
@@ -207,21 +207,34 @@ Ver [ADR-0015](../adr/0015-segredos-kubernetes-templatefile.md) para o
 tratamento equivalente no ambiente local e
 [RFC-006](../rfcs/RFC-006-secrets-and-jwt.md) para a estratégia de chaves.
 
-## 10. Modo AWS Academy
+## 10. Conta AWS
 
-O projeto roda em conta AWS Academy, que não permite criar roles IAM
-arbitrárias. Os três repositórios de infraestrutura têm uma variável
-`aws_academy` (e `manage_iam`, `lab_role_arn`) que, quando ativada, faz os
-módulos reusarem a `LabRole` existente em vez de criar IRSA ou roles próprias
-(`repo-k8s-infra/variables.tf`, `repo-auth-serverless/infra/hml/variables.tf`).
+Os ambientes rodam em uma **conta AWS pessoal, no free tier**. Não é conta AWS
+Academy nem AWS Lab.
 
-A autenticação dos workflows acompanha essa restrição: em vez de OIDC, os
-pipelines usam `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e
-`AWS_SESSION_TOKEN` da sessão Academy, que expiram e precisam ser renovados a
-cada sessão. Ver [aws-setup.md](../runbooks/aws-setup.md).
+Os pipelines autenticam com credenciais de usuário IAM, `AWS_ACCESS_KEY_ID` e
+`AWS_SECRET_ACCESS_KEY` (passos "Configure AWS IAM user credentials" no
+`deploy-eks.yml`). O `AWS_SESSION_TOKEN` só é usado quando o secret está
+preenchido, caso de credenciais temporárias. Não há OIDC. Ver
+[aws-setup.md](../runbooks/aws-setup.md).
 
-Em HML, o ECR é criado com `force_delete = true` para permitir destruir o
-ambiente sem esvaziar o registry manualmente.
+Nessa configuração os módulos criam as próprias roles IAM: o cluster e os nós
+do EKS, o IRSA do AWS Load Balancer Controller (`enable_irsa = manage_iam &&
+!aws_academy`) e as roles de execução das duas Lambdas.
+
+### Resquícios do modo Academy no código
+
+Os três repositórios de infraestrutura ainda carregam um caminho alternativo
+para contas AWS Academy, que não é o caminho em uso: as variáveis
+`aws_academy`, `manage_iam` e `lab_role_arn` em `repo-k8s-infra`, o
+`academy_mode` em `repo-auth-serverless` e nos workflows, e nomes de passo como
+"Configure AWS Academy credentials for production" (usado no build de
+produção, com o `AWS_SESSION_TOKEN` vazio) e "Allow HML runner to reach
+Academy EKS" no `deploy-eks.yml`. Com
+`aws_academy`/`academy_mode` em `false` (como o `README.md` da raiz orienta),
+esses ramos ficam inativos. Uma consequência prática: o ECR de HML só é criado
+com `force_delete = true` quando `aws_academy` é verdadeiro, então na conta
+pessoal destruir HML exige esvaziar o repositório de imagens antes.
 
 ## 11. Ordem de provisionamento
 
@@ -241,6 +254,11 @@ flowchart LR
 
 ## 12. Pendências
 
+- **Custo fora do free tier.** Parte do que o Terraform cria não é gratuita no
+  free tier: o control plane do EKS é cobrado por hora, a VPC usa um NAT
+  Gateway (`single_nat_gateway = true`) e o RDS de PROD é Multi-AZ. Não
+  verifiquei o billing da conta nem se ela está no plano de créditos ou no de
+  12 meses; vale acompanhar o custo e destruir HML quando não estiver em uso.
 - Não há Terraform de bootstrap para o bucket `tc3-tfstate-<account_id>`. Ele é
   criado por scripts nos próprios repositórios
   (`.github/scripts/bootstrap-backend.sh` em `repo-k8s-infra`, `repo-db-infra`

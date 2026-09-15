@@ -155,7 +155,7 @@ flowchart TB
 | ALB → Pods | HTTP na porta 3000, alvos registrados por IP |
 | Aplicação e Lambda → RDS | PostgreSQL, TLS obrigatório (`rds.force_ssl=1`) |
 | Lambdas → Secrets Manager e SSM | HTTPS, escopo IAM |
-| Runner → ECR e EKS | HTTPS, credenciais de sessão Academy |
+| Runner → ECR e EKS | HTTPS, credenciais de usuário IAM da conta pessoal |
 
 ### Diferenças entre hml e prod
 

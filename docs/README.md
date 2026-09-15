@@ -22,7 +22,7 @@ de cada documento.
 
 | Documento | Conteúdo |
 |---|---|
-| [infrastructure/aws.md](./infrastructure/aws.md) | Visão geral da nuvem: ownership por repositório, ambientes, estado Terraform compartilhado, VPC, EKS, ECR, ALB, RDS e modo AWS Academy |
+| [infrastructure/aws.md](./infrastructure/aws.md) | Visão geral da nuvem: ownership por repositório, ambientes, estado Terraform compartilhado, VPC, EKS, ECR, ALB, RDS e conta AWS usada |
 | [infrastructure/api-gateway-lambda.md](./infrastructure/api-gateway-lambda.md) | Borda serverless: HTTP API, Lambdas, authorizer, VPC Link, contrato JWT e consumo pelo monólito |
 | [infrastructure/kubernetes.md](./infrastructure/kubernetes.md) | Manifests compartilhados, cluster `kind` local, EKS, TargetGroupBinding e a sequência de deploy |
 | [infrastructure/database.md](./infrastructure/database.md) | Modelo de dados, versões de Postgres por ambiente e RDS |

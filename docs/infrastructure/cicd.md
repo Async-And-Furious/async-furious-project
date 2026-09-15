@@ -86,8 +86,8 @@ infraestrutura usam `scan-type: config` (IaC); `repo-auth-serverless` usa
 
 Os três também têm atalhos `up.yml` (apply de HML) e `down.yml` (destroy de
 HML ou PROD, com confirmação digitada). `repo-k8s-infra` tem ainda
-`diagnose-ec2-capacity.yml`, somente leitura, e usa runner `eks-private` fora do
-modo Academy; `repo-auth-serverless` tem `auth-smoke.yml`, que chama `POST
+`diagnose-ec2-capacity.yml`, somente leitura, e usa runner `eks-private` quando
+`academy_mode` não é ativado; `repo-auth-serverless` tem `auth-smoke.yml`, que chama `POST
 /auth` com o CPF do secret `SEEDED_CPF` e confere a emissão do token.
 
 ### Mapeamento de branch para ambiente
@@ -103,11 +103,12 @@ fazem hoje.
 
 ## 3. Credenciais
 
-Não há OIDC. A conta é AWS Academy, cujas credenciais são temporárias, então os
-workflows usam `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e, no modo Academy,
-`AWS_SESSION_TOKEN`, configurados por GitHub Environment
-(`hml` e `production`). Eles expiram junto com a sessão do laboratório e
-precisam ser renovados antes de qualquer execução.
+Não há OIDC. Os ambientes rodam em uma conta AWS pessoal, no free tier, e os
+workflows autenticam com credenciais de usuário IAM (`AWS_ACCESS_KEY_ID` e
+`AWS_SECRET_ACCESS_KEY`), configuradas por GitHub Environment (`hml` e
+`production`). `AWS_SESSION_TOKEN` só é usado se preenchido, para credenciais
+temporárias. Os workflows ainda aceitam um modo Academy (`academy_mode`), que
+não é o usado; ver [aws.md](./aws.md#10-conta-aws).
 
 A fixação de actions por SHA é parcial neste repositório. Os workflows que
 tocam a AWS (`deploy-eks.yml`, `cleanup-eks.yml`) fixam tudo por SHA completo,
