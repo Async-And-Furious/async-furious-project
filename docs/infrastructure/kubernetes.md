@@ -82,7 +82,7 @@ Não há Ingress em uso. O ALB e o target group são criados por
 `TargetGroupBinding`, do AWS Load Balancer Controller, com `targetType: ip`. O
 pipeline substitui `${target_group_arn}` pelo ARN lido do estado Terraform de
 `repo-k8s-infra`, deleta o binding anterior e aplica o novo
-(`.github/workflows/deploy-eks.yml:378-389`).
+(passo "Roll out application" do `.github/workflows/deploy-eks.yml`).
 
 A escolha evita que a aplicação crie um balanceador próprio: o ciclo de vida do
 ALB pertence a quem é dono da rede.
@@ -95,7 +95,8 @@ ALB pertence a quem é dono da rede.
    `kubectl patch` com `AUTH_MODE=gateway`, `DEPLOY_ENV` e o contrato JWT.
 3. O Secret é montado em tempo de execução a partir do Secrets Manager e
    aplicado por `kubectl create ... --dry-run=client | kubectl apply -f -`.
-4. Em HML, o node group é escalado para 3 nós e o Deployment é zerado para
+4. Em HML, o pipeline espera o node group ficar `ACTIVE`, ajusta a escala para
+   min 2, desired 2, max 3 e zera o Deployment para
    liberar capacidade para o Job de migração.
 5. O Job de migração roda e é aguardado.
 6. Deployment, Service, TargetGroupBinding e HPA são aplicados; o pipeline
@@ -103,8 +104,10 @@ ALB pertence a quem é dono da rede.
 7. O endpoint do cluster volta à configuração original, em passo
    `if: always()`.
 
-Em PROD há ainda um Job de seed, condicionado à entrada explícita
-`seed_prod: true`.
+O seed não roda em deploy automático. Em disparo manual, `seed_customer` ou
+`seed_comprehensive` criam um Job de seed controlado (exigem o secret
+`SEEDED_CPF`); em PROD, `seed_prod` também habilita o Job. O seed completo
+também tem workflow próprio, `seed-eks.yml`.
 
 Em caso de falha, um passo de diagnóstico coleta `get pods -o wide`,
 `describe deployment`, `describe pods` e as últimas 200 linhas de log de todos

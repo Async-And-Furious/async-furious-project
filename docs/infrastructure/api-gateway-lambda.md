@@ -4,7 +4,7 @@
 > documento descreve os recursos reais, o contrato do token e como a aplicação
 > no EKS consome esse contrato.
 >
-> Fontes: `repo-auth-serverless@release/v0.1.0` (`infra/hml`, `infra/prod`,
+> Fontes: `repo-auth-serverless` na branch `main` (`infra/hml`, `infra/prod`,
 > `src/`) e `src/auth/` deste repositório.
 > Decisão em [ADR-0002](../adr/0002-autenticacao-centralizada-api-gateway-serverless.md);
 > detalhes em [RFC-003](../rfcs/RFC-003-api-gateway-eks-integration.md) e
@@ -134,44 +134,60 @@ Os logs das duas funções são JSON de uma linha com `level`, `event`,
 ## 6. Como o monólito consome
 
 A variável `AUTH_MODE` decide o comportamento. O `deploy-eks.yml` aplica
-`AUTH_MODE=gateway` no ConfigMap em HML e PROD
-(`.github/workflows/deploy-eks.yml:302,585`).
+`AUTH_MODE=gateway` e `JWT_ALGORITHM=RS256` no ConfigMap em HML e PROD (passo
+"Apply namespace and configuration") e injeta no Secret Kubernetes tanto a
+chave pública (lida do SSM) quanto a **chave privada** RS256, buscada no
+Secrets Manager pelo ARN do secret `JWT_PRIVATE_KEY_SECRET_ARN` (passo "Fetch
+JWT private key from Secrets Manager").
 
-Com `AUTH_MODE=gateway`:
+Com `AUTH_MODE=gateway`, a aplicação aceita dois tipos de token, ambos RS256
+com o mesmo emissor, audiência e expiração de 1800 segundos:
 
-- `POST /auth/login` e `POST /auth/register` do NestJS passam a responder
-  `401`, com a mensagem de que o fluxo local está indisponível
-  (`src/auth/services/auth.service.ts:19,50`). A emissão de token deixa de
-  existir dentro da aplicação.
-- `resolveJwtContract` força `RS256` e valida o token contra `JWT_ISSUER`,
-  `JWT_AUDIENCE` e `maxAge` equivalente ao `exp` de 1800 segundos.
-- `JwtStrategy.validate` resolve o `sub` como `Cliente.id` via
-  `validateCustomer`, que exige `ativo = true` no banco.
+| Token | Quem emite | Claims | Como a aplicação resolve |
+|---|---|---|---|
+| Cliente | Lambda `authenticate-customer` (`POST /auth`) | só `sub` = `Cliente.id` | sem `role`: `JwtStrategy` chama `validateCustomer`, que exige `ativo = true` |
+| Staff | a própria aplicação (`POST /api/v1/auth/login`), assinando com a mesma chave privada | `sub` = `User.id`, `email`, `role` | com `role`: `validateTokenSubject` busca o `User` e, se não achar, um `Cliente` ativo |
 
-Ou seja, a validação acontece duas vezes por requisição protegida: uma na
-borda, feita pelo authorizer, e outra dentro da aplicação, que revalida a
-assinatura e reconfirma que o cliente continua ativo. A segunda camada existe
-porque o token carrega identidade, não estado: um cliente desativado depois da
-emissão continuaria passando pelo authorizer.
+Como as duas origens usam o mesmo par de chaves, o authorizer da borda aceita
+os dois tokens sem distinção. `resolveJwtContract` recusa HS256 quando
+`NODE_ENV=production` e exige `JWT_PRIVATE_KEY` para assinar em produção
+(`src/auth/jwt.config.ts`).
 
-O smoke test do deploy confirma justamente essa proteção: chama
+A validação acontece duas vezes por requisição protegida: na borda, pelo
+authorizer, e na aplicação, que revalida a assinatura e reconsulta o banco. A
+segunda camada existe porque o token carrega identidade, não estado: um
+usuário desativado depois da emissão continuaria passando pelo authorizer.
+
+### Login de staff atrás do gateway
+
+`POST /api/v1/auth/login` não tem rota pública própria no API Gateway: ele cai
+em `ANY /{proxy+}`, que exige authorizer. Na prática, o staff precisa primeiro
+de um token válido para alcançar o login. O `full-acceptance.yml` faz
+exatamente isso: obtém um token de cliente em `POST /auth` com o CPF semeado e
+o usa como `Bearer` na chamada de login do administrador, do recepcionista e do
+mecânico. Não encontrei documento que registre esse encadeamento como decisão.
+
+O smoke test do deploy (`smoke-hml` e `smoke-prod`) chama
 `/api/v1/health/live` pelo endpoint do gateway sem token e falha o pipeline se
-a resposta não for `401` ou `403`
-(`.github/workflows/deploy-eks.yml:753-761` para HML, `789-797` para PROD).
+a resposta não for `401` ou `403`, além de exigir alvo saudável no target
+group.
 
 ## 7. Pendências
 
-- Papéis administrativos (`ADMIN`, `RECEPCIONISTA`, `MECANICO`) não têm fluxo
-  na borda. `repo-auth-serverless` autentica apenas cliente por CPF, e com
-  `AUTH_MODE=gateway` o login local está desligado. Não há RFC que resolva como
-  um administrador se autentica em HML ou PROD.
+- O login de staff depende de um token prévio para atravessar o authorizer
+  (seção 6). Funciona, mas não há rota pública de login de staff nem decisão
+  registrada sobre esse desenho.
+- A chave privada RS256 deixou de ficar restrita à Lambda: a aplicação também a
+  recebe para assinar tokens de staff. Isso contradiz a premissa da RFC-006 de
+  que a chave privada nunca sai de `repo-auth-serverless`.
 - `validateCustomer` devolve `role: Role.RECEPCIONISTA` para um cliente
-  autenticado por CPF (`src/auth/services/auth.service.ts`), enquanto
-  `JwtCustomerStrategy` devolve `Role.CLIENTE` para o mesmo tipo de token.
-  As duas estratégias atribuem papéis diferentes ao mesmo sujeito; qual delas
-  atende cada rota protegida não está documentado em nenhuma RFC.
+  autenticado por CPF, enquanto `validateTokenSubject` e `JwtCustomerStrategy`
+  devolvem `Role.CLIENTE` para o mesmo sujeito
+  (`src/auth/services/auth.service.ts`).
 - Não há throttling nem WAF configurado no HTTP API. A rota `POST /auth` aceita
-  tentativas sem limite de taxa, o que permite varredura de CPFs apesar da
-  resposta genérica.
-- Os alarmes CloudWatch existem, mas sem `alarm_actions`. Ninguém é notificado
-  quando disparam. Ver [observability.md](./observability.md).
+  tentativas sem limite de taxa.
+- Os quatro alarmes CloudWatch desta borda são criados com
+  `alarm_actions = []`. Os alertas com notificação do projeto estão na New
+  Relic e consultam apenas `Transaction` da aplicação e `K8sContainerSample` do
+  cluster, sem métricas das Lambdas. Ver
+  [observability.md](./observability.md).

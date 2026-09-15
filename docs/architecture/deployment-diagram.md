@@ -60,8 +60,8 @@ flowchart TB
 
 ## 2. Ambiente AWS (hml e prod)
 
-Evidência: `repo-k8s-infra@release/v0.1.0`, `repo-db-infra@release/v0.1.0`,
-`repo-auth-serverless@release/v0.1.0`, `.github/workflows/deploy-eks.yml`,
+Evidência: branch `main` de `repo-k8s-infra`, `repo-db-infra` e
+`repo-auth-serverless`, `.github/workflows/deploy-eks.yml`,
 `k8s/app/target-group-binding.yaml`.
 
 ```mermaid
@@ -83,12 +83,13 @@ flowchart TB
                 alb["ALB interno<br/>tc3-&lt;env&gt;-internal :80"]
                 tg["Target group<br/>tc3-&lt;env&gt;-app, targetType ip"]
                 subgraph EKS["EKS tc3-eks-&lt;env&gt;, endpoint privado"]
-                    pods["Pods async-furious-api<br/>HPA 2 a 5"]
+                    pods["Pods async-furious-api<br/>HPA 2 a 5, agente New Relic"]
+                    nrb["New Relic bundle<br/>infra, logs, kube-state-metrics"]
                     tgb["TargetGroupBinding"]
                     job["Job de migração<br/>prisma migrate deploy"]
                 end
             end
-            subgraph DbSubnet["Subnets do banco: públicas em hml, privadas em prod"]
+            subgraph DbSubnet["Subnets privadas do banco (as mesmas do cluster)"]
                 rds[("RDS PostgreSQL 16.4<br/>tc3-db-&lt;env&gt;<br/>Multi-AZ apenas em prod")]
             end
         end
@@ -97,6 +98,8 @@ flowchart TB
         s3[("S3 tc3-tfstate-&lt;account&gt;<br/>estado Terraform")]
         cw["CloudWatch<br/>logs das Lambdas + 7 alarmes"]
     end
+
+    nr["New Relic<br/>APM, dashboard, alertas por e-mail"]
 
     client -->|"HTTPS POST /auth"| apigw
     client -->|"HTTPS + Bearer, ANY /{proxy+}"| apigw
@@ -119,6 +122,8 @@ flowchart TB
     lambdaAuth -.-> cw
     lambdaAuthz -.-> cw
     rds -.-> cw
+    pods -.APM.-> nr
+    nrb -.métricas e logs.-> nr
 ```
 
 ### Limites de rede
@@ -130,11 +135,12 @@ flowchart TB
 - **Endpoint da API do Kubernetes é privado** por padrão. O pipeline abre uma
   janela temporária apenas para o IP do runner, com máscara `/32`, e restaura a
   configuração original em passo `if: always()`.
-- **RDS diverge por ambiente por decisão explícita**: público em `hml`, com
-  CIDRs estreitos, e privado em `prod`, com ingresso apenas por security group.
-  A regra é imposta por `precondition` no Terraform, que falha o plano se o
-  ambiente e a exposição não combinarem
-  ([RFC-007](../rfcs/RFC-007-rds-public-access.md)).
+- **RDS é privado nos dois ambientes**: fica nas subnets privadas publicadas
+  por `repo-k8s-infra`, com `publicly_accessible = false` e um `precondition`
+  que falha o plano se alguma subnet tiver rota para Internet Gateway. O
+  ingresso difere: CIDRs explícitos em `hml`, apenas security groups em
+  `prod`. A [RFC-007](../rfcs/RFC-007-rds-public-access.md), que propunha
+  RDS público em HML, está superada.
 - **Ordem de provisionamento é obrigatória**: `repo-db-infra` lê o estado de
   `repo-k8s-infra` para descobrir VPC, subnets e security group dos nós
   ([RFC-004](../rfcs/RFC-004-vpc-ownership.md)).
@@ -155,11 +161,12 @@ flowchart TB
 
 | Aspecto | hml | prod |
 |---|---|---|
-| RDS | público, CIDRs estreitos | privado, só security group |
+| Ingresso no RDS (privado nos dois) | CIDRs explícitos | só security group |
 | Multi-AZ | não | sim |
-| Retenção de backup | 1 dia | 7 dias |
+| Retenção de backup | 1 dia | 1 dia |
 | Proteção de deleção | não | sim |
-| Seed | roda no deploy | só com `seed_prod: true` |
+| Nós do EKS | SPOT | ON_DEMAND |
+| Seed | só em disparo manual, com `seed_customer` ou `seed_comprehensive` | só em disparo manual, com `seed_prod`, `seed_customer` ou `seed_comprehensive` |
 | Gatilho de deploy | push em `develop` | push em `main`, ou manual a partir de `main` |
 | Remoção | apaga o namespace | apaga apenas os recursos criados pelo deploy |
 
@@ -168,11 +175,7 @@ flowchart TB
 - **TLS interno**: o ALB serve HTTP na porta 80, sem certificado. O TLS termina
   no API Gateway. Exceção registrada com `#trivy:ignore:AWS-0054` no código de
   `repo-k8s-infra`, por não haver ACM nem domínio contratado.
-- **Coleta de logs da aplicação**: os pods escrevem em stdout e nada os
-  recolhe. Ver [observability.md](../infrastructure/observability.md).
-- **Destino dos alarmes**: os sete alarmes CloudWatch existem sem
-  `alarm_actions`.
-- **Ambiente `prod` dos satélites**: `repo-k8s-infra` e `repo-db-infra` mantêm
-  `environments/prod/backend.tf`, mas o conteúdo real vive em
-  `release/v0.1.0`, ainda não promovida para `main` em nenhum dos três
-  repositórios.
+- **Alarmes CloudWatch sem destino na borda**: os quatro alarmes de
+  `repo-auth-serverless` usam `alarm_actions = []`; os três do RDS dependem dos
+  secrets `*_ALARM_ACTIONS` do pipeline. A notificação por e-mail existe apenas
+  nos alertas da New Relic, que cobrem aplicação e cluster.

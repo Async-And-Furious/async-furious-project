@@ -15,12 +15,11 @@ A solução é dividida em quatro repositórios sob a organização
 |---|---|---|
 | **`async-furious-project`** (este; `repo-application` nas RFCs) | Monólito NestJS com os quatro Bounded Contexts de negócio (`cadastro`, `ordem-servico`, `pecas-insumos`, `financeiro`) | **[ATUAL]** Implementado, testado, com deploy automatizado para EKS |
 | **`repo-auth-serverless`** | Autenticação centralizada: valida CPF e emite JWT RS256 (`authenticate-customer`); autoriza na borda (`authorize-request`) | **[ATUAL]** Handlers implementados e testados; API Gateway, Lambdas, authorizer e VPC Link provisionados por Terraform em `infra/hml` e `infra/prod` |
-| **`repo-k8s-infra`** | VPC, EKS, ECR e ALB interno via Terraform | **[ATUAL]** Módulos completos, incluindo AWS Load Balancer Controller e Metrics Server por Helm |
-| **`repo-db-infra`** | RDS PostgreSQL 16 via Terraform | **[ATUAL]** Módulo completo, com política de exposição distinta por ambiente e três alarmes |
+| **`repo-k8s-infra`** | VPC, EKS, ECR e ALB interno via Terraform | **[ATUAL]** Módulos completos, incluindo AWS Load Balancer Controller, Metrics Server e New Relic (bundle, dashboard e alertas) |
+| **`repo-db-infra`** | RDS PostgreSQL 16 via Terraform | **[ATUAL]** Módulo completo, privado nos dois ambientes, com três alarmes |
 
-O conteúdo dos três satélites está na branch `release/v0.1.0` de cada um. O
-`main` deles ainda é o esqueleto inicial, e promover as branches de release é
-uma pendência aberta.
+As referências a código dos satélites apontam para a branch `main` de cada um,
+que já contém o que antes estava em `release/v0.1.0`.
 
 Existe ainda um quinto repositório, `async-furious-front` (privado), que é o
 frontend. Ele não faz parte da separação em quatro repositórios de backend e
@@ -62,23 +61,19 @@ flowchart TB
         rds[("RDS PostgreSQL 16.4")]
     end
 
-    obs["Observabilidade parcial<br/>logs e alarmes CloudWatch, sem stack decidida"]
+    obs["New Relic<br/>APM, infra do cluster, logs, dashboard e alertas"]
 
     customer -->|"HTTPS: autenticação por CPF"| apigw
-    actor -->|"[PENDENTE] sem fluxo na borda"| apigw
+    actor -->|"HTTPS: login por e-mail e senha no app, atrás do authorizer"| apigw
     apigw -->|"HTTP_PROXY via VPC Link"| alb
     app -->|Prisma| rds
     authFn -->|"consulta Cliente"| rds
     authFn -.->|"chave privada RS256"| secretsMgr[("Secrets Manager")]
     authzFn -.->|"chave pública RS256"| ssm[("SSM Parameter Store")]
 
-    authFn -.-> obs
-    authzFn -.-> obs
-    rds -.-> obs
-    app -.->|"[PENDENTE] sem coleta de logs"| obs
+    authFn -.->|"logs e alarmes CloudWatch, fora da New Relic"| cwLogs[("CloudWatch")]
+    app -.->|"APM e logs"| obs
 
-    classDef pendente stroke-dasharray: 4 4
-    class obs pendente
 ```
 
 ### O mesmo sistema no ambiente local
@@ -117,10 +112,12 @@ gerenciado. É a mesma base de código: o que muda é `AUTH_MODE` e o destino do
 4. **API Gateway → Aplicação**: requisição autorizada segue por VPC Link até o
    ALB interno, que a entrega aos pods registrados via `TargetGroupBinding`.
 5. **Aplicação → Banco**: acesso ao RDS por Prisma, com TLS obrigatório. A
-   aplicação revalida o token e reconfirma que o cliente continua ativo.
-6. **Observabilidade**: parcial. Logs estruturados com correlation ID nas três
-   camadas e sete alarmes CloudWatch, nenhum com destino de notificação, e sem
-   coleta dos logs da aplicação. Ver
+   aplicação revalida o token e reconfirma no banco que o usuário ou cliente
+   continua válido.
+6. **Observabilidade**: New Relic para a aplicação (APM e logs) e para o
+   cluster (bundle com métricas de infraestrutura e `kube-state-metrics`), com
+   dashboard e alertas por e-mail provisionados em `repo-k8s-infra`. Lambdas e
+   RDS ficam em CloudWatch, com alarmes próprios. Ver
    [`docs/infrastructure/observability.md`](../infrastructure/observability.md).
 
 ## 4. Comunicação entre Bounded Contexts
@@ -141,8 +138,11 @@ acoplamento de código. Ver a revisão do Context Map em
 [`docs/domain/revisao-fase3.md`](../domain/revisao-fase3.md).
 
 Vale a ressalva de que `src/auth/` não desapareceu: ele continua validando o
-token e resolvendo identidade a cada requisição, e ainda atende o modo local.
-A extração foi da emissão do token, não da verificação.
+token e resolvendo identidade a cada requisição. Para o cliente, a extração
+foi da emissão do token: quem emite é a Lambda. Para o staff, não: nos
+ambientes AWS a própria aplicação continua emitindo o token de login, agora
+em RS256 com a mesma chave privada da Lambda. Ver
+[`authentication-flow.md`](./authentication-flow.md).
 
 ## 5. Documentos relacionados
 

@@ -41,13 +41,17 @@ Environment só resolve nos jobs daquele Environment.
 
 | Nome | Usado por | Origem |
 |---|---|---|
-| `AWS_ACCESS_KEY_ID` | `deploy-eks.yml`, `cleanup-eks.yml` | sessão AWS Academy |
-| `AWS_SECRET_ACCESS_KEY` | `deploy-eks.yml`, `cleanup-eks.yml` | sessão AWS Academy |
-| `AWS_SESSION_TOKEN` | ambos, apenas no modo Academy | sessão AWS Academy |
+| `AWS_ACCESS_KEY_ID` | todos os workflows de nuvem | sessão AWS Academy |
+| `AWS_SECRET_ACCESS_KEY` | todos os workflows de nuvem | sessão AWS Academy |
+| `AWS_SESSION_TOKEN` | todos os workflows de nuvem, apenas no modo Academy | sessão AWS Academy |
+| `JWT_PRIVATE_KEY_SECRET_ARN` | `deploy-eks.yml` | ARN do secret com a chave privada RS256 no Secrets Manager; a aplicação a usa para assinar tokens de staff |
+| `NEW_RELIC_LICENSE_KEY` | `deploy-eks.yml` | conta New Relic |
 | `JWT_SECRET` | `deploy-eks.yml` | operador |
 | `WEBHOOK_SECRET` | `deploy-eks.yml` | operador |
-| `SEED_ADMIN_EMAIL` | `deploy-eks.yml` | operador |
-| `SEED_ADMIN_PASSWORD` | `deploy-eks.yml` | operador |
+| `SEED_ADMIN_EMAIL` | `deploy-eks.yml`, workflows de aceitação | operador |
+| `SEED_ADMIN_PASSWORD` | `deploy-eks.yml`, workflows de aceitação | operador |
+| `SEED_RECEPCIONISTA_PASSWORD`, `SEED_MECANICO_PASSWORD` | `deploy-eks.yml`, workflows de aceitação | operador |
+| `SEEDED_CPF` | seed controlado do `deploy-eks.yml`, `full-acceptance.yml`, `protected-route-matrix.yml`, diagnósticos | CPF semeado; nunca impresso |
 
 As credenciais Academy expiram junto com a sessão do laboratório e precisam ser
 renovadas antes de cada execução.
@@ -65,6 +69,8 @@ renovadas antes de cada execução.
 | `JWT_PUBLIC_KEY_PARAMETER_NAME` | nenhum | nome do parâmetro SSM publicado por `repo-auth-serverless` |
 | `ECR_REPOSITORY_OVERRIDE` | `tc3-app-<env>` | apenas `cleanup-eks.yml` |
 | `ECR_CLEANUP_OWNED` | nenhum | apenas `cleanup-eks.yml`; a limpeza de imagens em produção é recusada se não for `true` |
+| `NEW_RELIC_APP_NAME` | nenhum | nome da aplicação no APM, por ambiente |
+| `SEEDED_*_ID`, `WEBHOOK_SECRET_FINGERPRINT` | nenhum | apenas `protected-route-matrix.yml` |
 
 ### Segredos do workflow local
 
@@ -86,6 +92,7 @@ execução:
 | ARN do segredo do banco | estado de `repo-db-infra`, campo `db_connection_secret_arn` |
 | Usuário e senha do banco | `aws secretsmanager get-secret-value` sobre o ARN acima |
 | Chave pública RS256 | `aws ssm get-parameter --with-decryption` |
+| Chave privada RS256 | `aws secretsmanager get-secret-value` sobre `JWT_PRIVATE_KEY_SECRET_ARN` |
 | Registry do ECR | `aws sts get-caller-identity` |
 
 Nenhuma credencial de banco é variável do GitHub. O arquivo de estado e os

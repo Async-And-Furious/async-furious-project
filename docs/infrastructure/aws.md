@@ -4,14 +4,15 @@
 > provisionada por Terraform, não uma proposta. As evidências citadas apontam
 > para arquivos reais nos quatro repositórios do projeto.
 >
-> Fontes: `repo-k8s-infra@release/v0.1.0`, `repo-db-infra@release/v0.1.0`,
-> `repo-auth-serverless@release/v0.1.0` e este repositório em `develop`.
+> Fontes: branch `main` de `repo-k8s-infra`, `repo-db-infra` e
+> `repo-auth-serverless`, e este repositório em `develop`.
 > Decisões em [ADR-0001](../adr/0001-separacao-quatro-repositorios.md),
 > [ADR-0003](../adr/0003-kubernetes-eks-orquestracao.md),
 > [ADR-0004](../adr/0004-banco-dados-gerenciado.md),
-> [RFC-003](../rfcs/RFC-003-api-gateway-eks-integration.md),
-> [RFC-004](../rfcs/RFC-004-vpc-ownership.md) e
-> [RFC-007](../rfcs/RFC-007-rds-public-access.md).
+> [RFC-003](../rfcs/RFC-003-api-gateway-eks-integration.md) e
+> [RFC-004](../rfcs/RFC-004-vpc-ownership.md). A
+> [RFC-007](../rfcs/RFC-007-rds-public-access.md), que propunha RDS público,
+> está superada.
 
 ## 1. Divisão de responsabilidades
 
@@ -20,7 +21,7 @@ recurso que pertence a outro.
 
 | Repositório | Provisiona | Não provisiona |
 |---|---|---|
-| `repo-k8s-infra` | VPC, subnets, EKS, node group, ECR, ALB interno, target group, AWS Load Balancer Controller, Metrics Server | Banco, Lambda, workloads da aplicação |
+| `repo-k8s-infra` | VPC, subnets, EKS, node group, ECR, ALB interno, target group, AWS Load Balancer Controller, Metrics Server, New Relic (bundle no cluster, dashboard, alertas) | Banco, Lambda, workloads da aplicação |
 | `repo-db-infra` | RDS PostgreSQL, subnet group, parameter group, security group do banco, alarmes | VPC (consome de `repo-k8s-infra`) |
 | `repo-auth-serverless` | Lambdas de autenticação, API Gateway HTTP, authorizer, VPC Link, alarmes | Cluster, banco, rede |
 | `async-furious-project` (este) | Nenhum recurso AWS via Terraform. Publica imagem no ECR e aplica manifests Kubernetes no cluster alheio | Toda a infraestrutura acima |
@@ -42,7 +43,7 @@ chave de estado Terraform e por nome de recurso.
 | ALB interno | `tc3-<env>-internal` | `repo-k8s-infra/modules/alb/main.tf:28` |
 | Target group | `tc3-<env>-app` | `repo-k8s-infra/modules/alb/main.tf:37` |
 | Instância RDS | `tc3-db-<env>` | `repo-db-infra/modules/rds/main.tf:65` |
-| HTTP API | `tc3-auth-<env>` | `.github/workflows/deploy-eks.yml:758,794` (o smoke test localiza a API por esse nome) |
+| HTTP API | `tc3-auth-<env>` | `.github/workflows/deploy-eks.yml`, jobs `smoke-hml` e `smoke-prod` (localizam a API por esse nome) |
 
 Região padrão `us-east-1`, sobrescrevível pela variável de repositório
 `AWS_REGION`. Todos os recursos de `repo-k8s-infra` recebem as tags padrão
@@ -64,13 +65,16 @@ formas de consumo em uso:
 
 **Remote state nativo.** `repo-db-infra` lê os outputs de `repo-k8s-infra`
 via `data "terraform_remote_state"`, sem cópia manual de IDs para `tfvars`
-(`repo-db-infra/main.tf:18-27`). É assim que ele descobre `vpc_id`,
-`public_subnet_ids` e `node_security_group_id`.
+(`repo-db-infra/main.tf`). É assim que ele descobre `vpc_id`,
+`private_subnet_ids` e `node_security_group_id`. `repo-auth-serverless` faz o
+mesmo com os estados de `repo-k8s-infra` (subnets privadas, security group e
+listener do ALB) e de `repo-db-infra` (security group do banco e ARN do
+segredo de conexão).
 
 **Leitura do arquivo de estado no pipeline.** Este repositório não roda
 Terraform contra a AWS, então o `deploy-eks.yml` baixa o `terraform.tfstate`
 dos outros dois com `aws s3 cp` e extrai os outputs com `jq`
-(`.github/workflows/deploy-eks.yml:185-225`). Os valores lidos são:
+(passos "Resolve target group ARN from repo-k8s-infra state" e "Resolve database outputs from repo-db-infra state" do `.github/workflows/deploy-eks.yml`). Os valores lidos são:
 
 | Origem | Output | Uso |
 |---|---|---|
@@ -102,23 +106,27 @@ do sistema é o API Gateway.
 
 | Item | Valor | Evidência |
 |---|---|---|
-| Versão do Kubernetes | `1.30` | `modules/eks/variables.tf` |
-| Tipo de instância dos nós | `t3.medium` | `modules/eks/variables.tf` |
-| Node group | desired 2, min 1, max 3 | `modules/eks/variables.tf` |
+| Versão do Kubernetes | `1.30` no módulo; o root usa `cluster_version = null` e preserva a versão de um cluster existente | `modules/eks/variables.tf`, `variables.tf` |
+| Tipo de instância dos nós | `t3.small` | `main.tf` (`coalesce(var.node_instance_types, ["t3.small"])`) |
+| Capacidade | SPOT em HML, ON_DEMAND em PROD | `modules/eks/main.tf` (`capacity_type`) |
+| Node group | desired 3, min 2, max 3 | `variables.tf` |
 | Endpoint da API | privado por padrão (`cluster_endpoint_public_access = false`) | `modules/eks/variables.tf` |
 
-Dois add-ons são instalados por Helm com versão fixada, direto do Terraform
-(`repo-k8s-infra/main.tf:64,99`):
+Três add-ons são instalados por Helm, direto do Terraform
+(`repo-k8s-infra/main.tf`):
 
 - **AWS Load Balancer Controller** `1.8.2`, que traz o CRD
   `TargetGroupBinding` usado pela aplicação para se registrar no ALB.
 - **Metrics Server** `3.12.2`, pré-requisito do HPA.
+- **New Relic bundle**, agente de infraestrutura e coleta do cluster. O mesmo
+  root cria dashboard, política de alertas e notificação por e-mail na New
+  Relic. Ver [observability.md](./observability.md).
 
 O endpoint privado tem uma consequência direta no pipeline: o runner do GitHub
 Actions não alcança a API do cluster. O `deploy-eks.yml` resolve isso abrindo o
 endpoint temporariamente apenas para o IP do runner, com `/32`, e restaurando a
 configuração original em um passo `if: always()`
-(`.github/workflows/deploy-eks.yml:226-285,397`). O mesmo padrão existe no
+(passos "Allow HML runner to reach Academy EKS" e "Restore original HML EKS endpoint access" do `.github/workflows/deploy-eks.yml`). O mesmo padrão existe no
 `cleanup-eks.yml`.
 
 ## 6. Registry: ECR
@@ -133,7 +141,7 @@ tag é o SHA do commit, e o job de build primeiro verifica se a imagem já exist
 imutável já publicada, trata como corrida vencida por outro job e segue com o
 digest existente. O que é passado adiante para o deploy não é a tag, é o
 digest (`registry/repo@sha256:...`), o que garante que HML e PROD rodam
-exatamente o mesmo binário (`.github/workflows/deploy-eks.yml:99-139`).
+exatamente o mesmo binário (passo "Build and push commit-SHA image" do `.github/workflows/deploy-eks.yml`).
 
 ## 7. Banco de dados gerenciado: RDS
 
@@ -144,27 +152,29 @@ exatamente o mesmo binário (`.github/workflows/deploy-eks.yml:99-139`).
 | Armazenamento | 20 GB, criptografado (`storage_encrypted = true`) |
 | Database | `workshop`, usuário `postgres` |
 | Senha | gerenciada pelo RDS via Secrets Manager (`manage_master_user_password = true`), nunca no estado Terraform |
-| Backup | 7 dias em PROD, 1 dia em HML |
+| Backup | 1 dia nos dois ambientes |
 | Multi-AZ | somente PROD |
-| Proteção de deleção e snapshot final | somente PROD |
+| Proteção de deleção e snapshot final | somente PROD (a proteção é desligada em `destroy_mode`) |
 | SSL | obrigatório, `rds.force_ssl = 1` no parameter group |
 
-A diferença de exposição entre ambientes é imposta por `precondition` e
-`postcondition` no próprio recurso: HML **precisa** ser público, PROD
-**precisa** ser privado, e o plano falha se a variável divergir
-(`repo-db-infra/modules/rds/main.tf:93-100`). HML em subnet pública é a
-exceção aprovada na [RFC-007](../rfcs/RFC-007-rds-public-access.md), com CIDRs
-explícitos e estreitos; `0.0.0.0/0` é rejeitado. PROD só aceita ingresso por
-security group, incluindo o SG dos nós do EKS lido do estado de
-`repo-k8s-infra`.
+O RDS é privado nos dois ambientes. `publicly_accessible = false` é fixo no
+root e reforçado por `precondition` e `postcondition` no módulo. As subnets do
+banco são as subnets privadas publicadas por `repo-k8s-infra`, e um
+`precondition` falha o plano se qualquer uma delas tiver rota para Internet
+Gateway (`repo-db-infra/main.tf`).
 
-Há ainda uma validação que confere se as subnets informadas têm (HML) ou não
-têm (PROD) rota para Internet Gateway, falhando o plano se a topologia não
-corresponder à política do ambiente (`repo-db-infra/main.tf:67-85`).
+O ingresso difere por ambiente: HML aceita apenas os CIDRs explícitos de
+`hml_allowed_cidr_blocks` (obrigatórios, nunca `0.0.0.0/0`), PROD aceita apenas
+security groups, incluindo o dos nós do EKS lido do estado de `repo-k8s-infra`.
+A Lambda de autenticação roda dentro da VPC e alcança o banco por security
+group. A [RFC-007](../rfcs/RFC-007-rds-public-access.md), que chegou a
+propor RDS público em HML, está superada.
 
 Três alarmes CloudWatch acompanham a instância: CPU acima de 80%, armazenamento
-livre abaixo de 2 GiB e conexões acima de 80. Os alarmes são criados sem ação
-de notificação, para que a conta anexe seus próprios destinos depois.
+livre abaixo de 2 GiB e conexões acima de 80. Os destinos vêm das variáveis
+`alarm_actions` e `alarm_ok_actions`, alimentadas pelos secrets
+`HML_ALARM_ACTIONS`/`PROD_ALARM_ACTIONS` do pipeline; se estão preenchidos em
+cada Environment não é visível pelo repositório.
 
 Ver [database.md](./database.md) para o modelo de dados e o histórico da
 decisão de versão.
@@ -182,15 +192,15 @@ encaminha as rotas protegidas para o ALB interno.
 | Onde | O que | Quem escreve | Quem lê |
 |---|---|---|---|
 | Secrets Manager | Credenciais master do RDS (JSON com `username`/`password`) | RDS | `deploy-eks.yml`, Lambda de autenticação |
-| Secrets Manager | Chave privada RS256 | Operador | Lambda `authenticate-customer` |
+| Secrets Manager | Chave privada RS256 | Operador | Lambda `authenticate-customer` e `deploy-eks.yml`, que a entrega à aplicação para assinar tokens de staff |
 | SSM Parameter Store | Chave pública RS256 | Operador | Lambda `authorize-request` e `deploy-eks.yml` |
-| Secret Kubernetes `async-furious-secret` | `DATABASE_URL`, credenciais, `JWT_PUBLIC_KEY`, `WEBHOOK_SECRET`, seeds | `deploy-eks.yml`, em tempo de deploy | Pods da aplicação |
+| Secret Kubernetes `async-furious-secret` | `DATABASE_URL`, credenciais, `JWT_PUBLIC_KEY`, `JWT_PRIVATE_KEY`, `WEBHOOK_SECRET`, `NEW_RELIC_LICENSE_KEY`, seeds | `deploy-eks.yml`, em tempo de deploy | Pods da aplicação |
 
 Nenhuma credencial de banco é output Terraform nem variável do GitHub. O
 pipeline resolve o ARN do segredo pelo estado remoto, busca o JSON no Secrets
 Manager, faz percent-encoding de usuário e senha em Python antes de montar a
 `DATABASE_URL`, e aplica o Secret por `kubectl create ... --dry-run=client -o
-yaml | kubectl apply -f -` (`.github/workflows/deploy-eks.yml:297-325`). Os
+yaml | kubectl apply -f -` (passo "Apply namespace and configuration" do `.github/workflows/deploy-eks.yml`). Os
 valores são mascarados com `::add-mask::`.
 
 Ver [ADR-0015](../adr/0015-segredos-kubernetes-templatefile.md) para o
@@ -248,5 +258,3 @@ flowchart LR
   mas não é referenciado por nenhum workflow ou script. O deploy real aplica os
   manifests base com substituição via `sed`. Ver
   [kubernetes.md](./kubernetes.md).
-- `infra/environments/aws/README.md` ainda descreve a migração para EKS como
-  não implementada e cita autenticação por OIDC, que não é o caminho em uso.

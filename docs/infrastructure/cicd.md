@@ -16,6 +16,11 @@
 | `down.yml` | `workflow_dispatch` | Atalho: chama `cleanup-eks.yml` com `operation: destroy` |
 | `trivy.yml` | push em `main`/`develop`, pull request, semanal (segunda 04:00), manual | Constrói a imagem, publica relatório em tabela e SARIF, e roda um gate final com `exit-code: 1` para HIGH e CRITICAL |
 | `zap.yml` | pull request para `main`/`develop`, semanal (segunda 03:00), manual | DAST: baseline em PR, full API scan agendado ou manual, contra a aplicação subida no runner com credenciais descartáveis |
+| `seed-eks.yml` | manual (`hml`/`prod`) | Seed abrangente, reaproveitando os jobs protegidos do `deploy-eks.yml`. Ver [comprehensive-seed.md](../runbooks/comprehensive-seed.md) |
+| `full-acceptance.yml` | manual (`hml`/`prod`) | Aceitação ponta a ponta pelo gateway: token de cliente, rastreamento de OS, login dos três papéis de staff e checagem de permissões |
+| `protected-route-matrix.yml` | manual (`hml`/`prod`) | Executa a matriz não destrutiva de rotas autenticadas definida em `docs/http/routes.yaml` |
+| `observability-alert-scenarios.yml` | manual, só HML | Provoca cenários (indisponibilidade, CPU, memória, crash loop) para validar os alertas da New Relic |
+| `protected-route-diagnostics.yml`, `auth-seed-fingerprint-diagnostics.yml`, `customer-lookup-diagnostics.yml` | manual (o primeiro também em pull request) | Diagnóstico somente leitura de rotas protegidas, fingerprint do seed e consulta de cliente pela Lambda |
 
 A cobertura mínima exigida é 80% em todas as métricas (`jest.config.js`). O
 `README.md` afirma 85% em statements e lines; a divergência está registrada em
@@ -37,7 +42,8 @@ O `concurrency` é por ambiente, com `cancel-in-progress: false`, então dois
 deploys no mesmo alvo enfileiram em vez de se atropelar.
 
 Produção só é alcançada por push em `main`, ou por `workflow_dispatch` a partir
-de `main`, e o job de seed exige a entrada explícita `seed_prod: true`.
+de `main`. Seed só roda em disparo manual, pelas entradas `seed_customer`,
+`seed_comprehensive` ou, em produção, `seed_prod`.
 
 O job de build reusa uma imagem já publicada com a mesma tag de SHA em vez de
 falhar, o que torna o workflow idempotente e permite reexecutar um deploy sem
@@ -77,6 +83,12 @@ passos: um scan informativo que publica SARIF (`exit-code: 0`) e um gate que
 falha o job em HIGH ou CRITICAL (`exit-code: 1`). Os repositórios de
 infraestrutura usam `scan-type: config` (IaC); `repo-auth-serverless` usa
 `scan-type: fs` (dependências e código).
+
+Os três também têm atalhos `up.yml` (apply de HML) e `down.yml` (destroy de
+HML ou PROD, com confirmação digitada). `repo-k8s-infra` tem ainda
+`diagnose-ec2-capacity.yml`, somente leitura, e usa runner `eks-private` fora do
+modo Academy; `repo-auth-serverless` tem `auth-smoke.yml`, que chama `POST
+/auth` com o CPF do secret `SEEDED_CPF` e confere a emissão do token.
 
 ### Mapeamento de branch para ambiente
 
