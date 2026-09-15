@@ -16,7 +16,9 @@ mesclados e os arquivos existem de verdade em `docs/rfcs/` nesta pasta:
 
 ## Nossas RFCs
 
-- [RFC-007 — Acesso público do RDS](./RFC-007-rds-public-access.md): substitui parcialmente a RFC-004 (#171) — o RDS passa a ser acessível publicamente (security group restrito por CIDR), em vez de isolado na VPC do `repo-k8s-infra`, para viabilizar o acesso direto da Lambda de autenticação ao banco (ADR-0005 do `repo-auth-serverless`), já que a `LabRole` da conta AWS Academy não permite permissões de VPC/ENI. Supera o PR [#3](https://github.com/Async-And-Furious/repo-db-infra/pull/3) do `repo-db-infra` (fechado sem merge em 23/08/2026).
+- [RFC-007 — Acesso público do RDS](./RFC-007-rds-public-access.md): substitui parcialmente a RFC-004 (#171), o RDS passa a ser acessível publicamente (security group restrito por CIDR), em vez de isolado na VPC do `repo-k8s-infra`, para viabilizar o acesso direto da Lambda de autenticação ao banco (ADR-0005 do `repo-auth-serverless`), já que a `LabRole` da conta AWS Academy não permite permissões de VPC/ENI. Supera o PR [#3](https://github.com/Async-And-Furious/repo-db-infra/pull/3) do `repo-db-infra` (fechado sem merge em 23/08/2026).
+- [RFC-008 — Escolha do cloud provider (AWS)](./RFC-008-cloud-provider.md): justificativa retroativa para AWS/AWS Academy como provedor único, escrita para a issue [#180](https://github.com/Async-And-Furious/async-furious-project/issues/180). Não houve comparação técnica formal contra GCP/Azure, a conta acadêmica pronta e sem custo foi o fator decisivo.
+- [RFC-009 — Escolha da ferramenta de observabilidade (New Relic)](./RFC-009-observability.md): fecha a lacuna que a própria ADR-0005 registra (nenhuma comparação formal contra CloudWatch/Prometheus-Grafana/Datadog). Com dado real de free tier, mostra por que Datadog (sem log/APM grátis) e CloudWatch (múltiplas peças + permissões de IAM sob a `LabRole`) não avançaram.
 
 ## Lacuna identificada: `HANDOFF.md`
 
