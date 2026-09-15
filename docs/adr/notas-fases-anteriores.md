@@ -13,14 +13,14 @@ Os dois PDFs são os **enunciados do desafio**, não registros de decisão —
 eles impõem requisitos/restrições (ex.: "back-end monolítico", "Clean
 Architecture ou Hexagonal", "banco livre mas justifique"). A decisão em si
 (qual banco, qual estilo dentro do permitido, como implementar o requisito)
-foi tomada pela equipe e está espalhada em `docs/ddd.md`, `AGENTS.md`,
+tomamos nós e está espalhada em `docs/ddd.md`, `AGENTS.md`,
 README e no `contexto-tecnico-consolidado.md`. Este documento separa: **o
-que o enunciado exigiu** vs. **o que a equipe decidiu dentro disso** vs. **se
+que o enunciado exigiu** vs. **o que decidimos dentro disso** vs. **se
 já existe um ADR**.
 
 ## Tabela ponto a ponto
 
-| # | Decisão | Fase | Exigência do enunciado | O que a equipe escolheu | Já documentado em | ADR existe? |
+| # | Decisão | Fase | Exigência do enunciado | O que escolhemos | Já documentado em | ADR existe? |
 |---|---|---|---|---|---|---|
 | 1 | Estilo arquitetural: Clean Architecture + DDD | 1 (reforçado na 2) | F1: livre, "arquitetura em camadas" citada como piso aceitável. F2: "Clean Architecture **ou** Arquitetura Hexagonal" | Clean Architecture + DDD, regra de dependência estrita (`presentation → application → domain ← infrastructure`) | `AGENTS.md`, `docs/ddd.md`, consolidado §2 | **Não** |
 | 2 | Framework de aplicação: NestJS | 1 | Livre | NestJS (DI nativa, modular) | consolidado §8 | **Não** |
@@ -34,7 +34,7 @@ já existe um ADR**.
 | 10 | Manifests Kubernetes em YAML puro (não Helm/Kustomize) | 2 | "Manifestos YAML" (obrigatório) | YAML puro em `/k8s`, legibilidade/debug direto | mesmo spec acima | **Parcial** — mesmo caso do #9 |
 | 11 | CI/CD via GitHub Actions, `apply` só contra cluster efêmero no runner | 2 | "Pipeline CI/CD... deploy no cluster... aplicação dos manifestos" | GitHub Actions; `validate`+`plan` em PR, `apply` real só em push, contra kind efêmero no próprio runner (nunca nuvem persistente) | README, consolidado §8 (conflito com o spec original documentado na seção 8) | **Não** |
 | 12 | Segurança DAST: OWASP ZAP | 1 | "Relatório de análise de vulnerabilidades" (obrigatório) | OWASP ZAP no pipeline | consolidado §8 | **Não** |
-| 13 | Testes automatizados, cobertura mínima | 1 (80%) / 2 (mantida) | F1: 80% em domínios críticos | Convenção em `AGENTS.md`, cobertura mínima 85% (Fase 3 já subiu a régua) | `AGENTS.md` | **Não** — decisão de regra de cobertura nunca formalizada |
+| 13 | Testes automatizados, cobertura mínima | 1 (80%) / 2 (mantida) | F1: 80% em domínios críticos | Cobertura mínima de 80% uniforme, enforçada em `jest.config.js` (`coverageThreshold.global`) | [ADR-0014](./0014-cobertura-minima-testes.md) | **Sim** — formalizada na ADR-0014 |
 
 ## Itens só de contexto (provavelmente não geram ADR)
 

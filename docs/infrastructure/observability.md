@@ -149,7 +149,7 @@
 - **Terraform aplicado em HML e PROD em 2026-09-13** — dashboard (#166) e
   política de alertas (#167) confirmados existindo de verdade via API da
   New Relic (`tc3-observability-hml`/`-prod`, 3 páginas cada).
-- **Bug real encontrado testando a condição "Taxa de erro alta"**: gerei
+- **Bug real encontrado testando a condição "Taxa de erro alta"**: geramos
   200 requisições autenticadas de verdade contra uma rota inexistente
   (todas `404`) e a taxa de erro ficou em **0%** — o atributo `error` que
   o agente Node da New Relic marca no evento `Transaction` **não conta

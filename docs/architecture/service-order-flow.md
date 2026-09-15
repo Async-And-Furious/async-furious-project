@@ -101,10 +101,10 @@ com o time se um endpoint torna o outro redundante ou se são independentes.
 ADMIN) são consultas, não alteram o fluxo principal — incluídas para
 completude do mapeamento endpoint↔estado.
 
-## Relação com a proposta Fase 3
+## Relação com a arquitetura da Fase 3
 
 Este fluxo roda **inteiramente dentro do Bounded Context `ordem-servico`, no
-mesmo monólito**, hoje e na proposta Fase 3 — a separação em quatro
+mesmo monólito**, hoje e na arquitetura da Fase 3 — a separação em quatro
 repositórios não o altera. A única mudança é *como* a requisição chega até a
 aplicação (via API Gateway + Lambda Authorizer, em vez de acesso direto) —
 ver [authentication-flow.md](./authentication-flow.md) e

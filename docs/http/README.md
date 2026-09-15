@@ -1,14 +1,15 @@
-# HTTP collections
+# Coleções HTTP
 
-Import `postman/async-furious.postman_collection.json` plus either the HML or
-PROD environment, or import `insomnia/async-furious.insomnia.json` and select
-the matching environment. All credentials, CPF, tokens, endpoint URLs and seed
-IDs are variables; populate them from the protected GitHub Environment secrets
-and variables. The login requests extract the three staff JWTs, and the
-customer request extracts the CPF-auth Lambda JWT.
+Importe `postman/async-furious.postman_collection.json` mais o ambiente de HML
+ou de PROD, ou importe `insomnia/async-furious.insomnia.json` e selecione o
+ambiente correspondente. Todas as credenciais, CPF, tokens, URLs de endpoint e
+IDs de seed são variáveis; preencha-as a partir dos secrets e variables
+protegidos do GitHub Environment. As requisições de login extraem os três JWTs
+de funcionários, e a requisição de cliente extrai o JWT da Lambda de
+autenticação por CPF.
 
-The protected workflow `protected-route-matrix.yml` runs the same collection's
-route contract against the selected environment. It fails on unexpected 401 or
-403 and accepts 400 for invalid/state-incompatible mock bodies. DELETE routes
-are deliberately reported as skipped because this verification is
-non-destructive.
+O workflow protegido `protected-route-matrix.yml` executa o mesmo contrato de
+rotas da coleção contra o ambiente selecionado. Ele falha em caso de 401 ou
+403 inesperados e aceita 400 para corpos de mock inválidos ou incompatíveis
+com o estado. As rotas DELETE são deliberadamente reportadas como puladas
+(skipped) porque essa verificação é não destrutiva.

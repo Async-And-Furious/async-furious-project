@@ -2,9 +2,11 @@
 
 ## Status
 
-Proposta — decisão detalhada na RFC de banco do trigo, ainda em PR aberto,
-não mesclado (ver [`docs/rfcs/README.md`](../rfcs/README.md)). **Não
-aplicada em infraestrutura real** (skeleton apenas em `repo-db-infra`).
+Aceita — decisão detalhada na RFC de banco do trigo
+([justificativa](../rfcs/database-justification.md), mesclada via PR
+[#172](https://github.com/Async-And-Furious/async-furious-project/pull/172)).
+**Não aplicada em infraestrutura real** (skeleton apenas em
+`repo-db-infra`).
 
 > **Nota (2026-08-21):** a topologia de rede aqui descrita (RDS dentro da
 > VPC do EKS, ver RFC-004) foi superada pela
@@ -13,6 +15,12 @@ aplicada em infraestrutura real** (skeleton apenas em `repo-db-infra`).
 > o acesso direto da Lambda de autenticação via CPF, dado que a `LabRole` da
 > conta AWS Academy não permite permissões de VPC/ENI. Engine/versão
 > (PostgreSQL 16) não são afetados por essa mudança.
+>
+> **Nota (2026-09-15):** a RFC-007 foi superada e o RDS voltou a ser privado
+> nos dois ambientes, com a Lambda de autenticação dentro da VPC. A
+> justificativa acima cita a `LabRole` de uma conta AWS Academy, mas os
+> ambientes rodam em uma conta AWS pessoal, no free tier. Ver
+> [aws.md](../infrastructure/aws.md#10-conta-aws).
 
 
 ## Contexto
@@ -65,9 +73,10 @@ indefinido.
 ## Consequências negativas
 
 - `docker-compose.dependencies.yml` (ambiente de desenvolvimento local deste
-  repositório) ainda está em `postgres:15-alpine` — a atualização para 16
-  está decidida mas **não aplicada nesta branch** (existe apenas na branch
-  não mesclada `docs/database-justification-pg16`).
+  repositório) já foi atualizado para `postgres:16-alpine` (PR #172,
+  mesclado). O `StatefulSet` do Kubernetes local
+  (`k8s/database/statefulset.yaml`) ainda está em `postgres:15-alpine` —
+  divergência residual não coberta por aquele PR.
 - Como a senha é gerenciada inteiramente pela RDS, o mecanismo exato pelo
   qual a Lambda `authenticate-customer` a lê em runtime (IAM role vs.
   referência estática de ARN) foi propositalmente deixado para a RFC-006 do
@@ -80,8 +89,9 @@ indefinido.
   o momento desta auditoria — a decisão de engine/versão está tomada, mas o
   banco gerenciado real ainda não existe.
 - **Médio**: a atualização de `docker-compose.dependencies.yml` para
-  `postgres:16-alpine` está numa branch não mesclada — risco de a
-  divergência dev/CI/prod persistir até o merge acontecer.
+  `postgres:16-alpine` já foi mesclada (PR #172), mas o `StatefulSet` do
+  Kubernetes local continua em `postgres:15-alpine` — a divergência
+  dev/CI/prod persiste parcialmente até esse ponto ser corrigido.
 
 ## Referências
 

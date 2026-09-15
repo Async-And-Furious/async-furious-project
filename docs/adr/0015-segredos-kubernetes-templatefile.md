@@ -61,10 +61,10 @@ não sensíveis como `cluster_name`, `app_replicas`).
 ## Riscos
 
 - **Médio**: nenhuma verificação automatizada (ex.: `gitleaks`,
-  `trufflehog`) foi encontrada no pipeline de CI para detectar segredo
-  commitado por engano — o único scanner de segurança em CI hoje é
-  aplicação (ZAP) e imagem (Trivy), nenhum cobre segredo em código-fonte
-  ou state do Terraform (ver [ADR-0013](./0013-seguranca-pipeline-zap-trivy.md)).
+  `trufflehog`) foi encontrada no pipeline de CI para detectar segredos
+  commitados por engano — os únicos scanners de segurança em CI hoje são
+  de aplicação (ZAP) e de imagem (Trivy), nenhum cobre segredo em
+  código-fonte ou state do Terraform (ver [ADR-0013](./0013-seguranca-pipeline-zap-trivy.md)).
 
 ## Referências
 

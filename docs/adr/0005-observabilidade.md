@@ -33,9 +33,9 @@ todo o repositório e nos três repositórios satélite e encontrou zero
 resultados — nenhuma ferramenta, nenhuma dependência de logging/métricas/APM,
 nenhuma RFC ou ADR mencionando o tema. Essa ausência ficou registrada de
 propósito, em vez de omitida, com a recomendação explícita de abrir uma RFC
-dedicada quando o grupo decidisse uma ferramenta.
+dedicada quando decidíssemos uma ferramenta.
 
-O grupo decidiu **New Relic** (epic
+Decidimos pelo **New Relic** (epic
 [#162](https://github.com/Async-And-Furious/async-furious-project/issues/162)),
 sem uma comparação formal documentada contra alternativas (CloudWatch,
 Prometheus/Grafana, Datadog) — a escolha já veio definida no planejamento do
@@ -61,8 +61,8 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   branch): Helm chart oficial `nri-bundle` (versão `8.0.24`), aplicado via
   `helm_release` no Terraform — mesmo mecanismo já usado para o AWS Load
   Balancer Controller e o Metrics Server. Componentes habilitados,
-  deliberadamente mínimos por causa da capacidade limitada dos nós EKS em
-  conta AWS Academy:
+  deliberadamente mínimos por causa da capacidade limitada dos nós EKS na
+  conta AWS pessoal (free tier):
   - `newrelic-infrastructure` — agente de infraestrutura (DaemonSet, métricas
     de CPU/memória/disco por nó).
   - `newrelic-logging` — Fluent Bit, encaminha o stdout dos pods para o New
@@ -152,7 +152,7 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   `clusterName` já usados no #163/#166, sem instrumentação nova.
 - **Notificação por e-mail**: `newrelic_notification_destination` +
   `newrelic_notification_channel` (tipo `EMAIL`, produto `IINT`) +
-  `newrelic_workflow` roteando a política inteira pra esse canal. Endereço
+  `newrelic_workflow` roteando a política inteira para esse canal. Endereço
   vem de uma variável (`new_relic_alert_email`), não hardcoded.
 - Schema do provider (`newrelic_alert_policy`,
   `newrelic_nrql_alert_condition`, `newrelic_notification_destination`,
@@ -163,7 +163,7 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   Relic. Testada de verdade a condição de taxa de erro: 200 requisições
   autenticadas contra uma rota inexistente (todas `404`) resultaram em
   **0%** de erro medido, porque o atributo `error` do agente Node não
-  marca 4xx como erro por padrão — condição corrigida pra usar
+  marca 4xx como erro por padrão — condição corrigida para usar
   `numeric(http.statusCode) >= 400` em vez de `WHERE error IS true`
   (mesmo ajuste replicado no widget de taxa de erro do dashboard do
   #166).
@@ -178,7 +178,7 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   nessa conta). Crash loop (`restartCount` chegou a 4) teve sinal real
   mas ainda sem e-mail — suspeita de `threshold_duration` (10 min) não
   sustentado. CPU e memória ficaram inconclusivas: os pods de stress
-  terminam rápido demais pro agente capturar uso em execução, só o
+  terminam rápido demais para o agente capturar uso em execução, só o
   estado final `Terminated`.
 
 ### O que ainda não foi feito
@@ -227,7 +227,7 @@ Prometheus/Grafana ou Datadog.
 
 - **Médio**: os componentes do `nri-bundle` (DaemonSets/Deployments) somam
   overhead de CPU/memória aos nós do cluster, que já têm histórico de
-  ajustes de capacidade por causa da quota de vCPU da conta AWS Academy —
+  ajustes de capacidade por causa da quota de vCPU da conta AWS pessoal —
   precisa ser observado após a primeira aplicação real.
 - **Baixo**: dependência de uma única conta/license key da New Relic criada
   por uma pessoa do grupo — sem redundância caso o acesso seja perdido.
