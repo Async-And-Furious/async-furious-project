@@ -15,6 +15,12 @@ Aceita — decisão detalhada na RFC de banco do trigo
 > o acesso direto da Lambda de autenticação via CPF, dado que a `LabRole` da
 > conta AWS Academy não permite permissões de VPC/ENI. Engine/versão
 > (PostgreSQL 16) não são afetados por essa mudança.
+>
+> **Nota (2026-09-15):** a RFC-007 foi superada e o RDS voltou a ser privado
+> nos dois ambientes, com a Lambda de autenticação dentro da VPC. A
+> justificativa acima cita a `LabRole` de uma conta AWS Academy, mas os
+> ambientes rodam em uma conta AWS pessoal, no free tier. Ver
+> [aws.md](../infrastructure/aws.md#10-conta-aws).
 
 
 ## Contexto

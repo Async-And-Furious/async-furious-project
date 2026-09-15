@@ -61,8 +61,8 @@ aplicação, infraestrutura do cluster Kubernetes e logs.
   branch): Helm chart oficial `nri-bundle` (versão `8.0.24`), aplicado via
   `helm_release` no Terraform — mesmo mecanismo já usado para o AWS Load
   Balancer Controller e o Metrics Server. Componentes habilitados,
-  deliberadamente mínimos por causa da capacidade limitada dos nós EKS em
-  conta AWS Academy:
+  deliberadamente mínimos por causa da capacidade limitada dos nós EKS na
+  conta AWS pessoal (free tier):
   - `newrelic-infrastructure` — agente de infraestrutura (DaemonSet, métricas
     de CPU/memória/disco por nó).
   - `newrelic-logging` — Fluent Bit, encaminha o stdout dos pods para o New
@@ -227,7 +227,7 @@ Prometheus/Grafana ou Datadog.
 
 - **Médio**: os componentes do `nri-bundle` (DaemonSets/Deployments) somam
   overhead de CPU/memória aos nós do cluster, que já têm histórico de
-  ajustes de capacidade por causa da quota de vCPU da conta AWS Academy —
+  ajustes de capacidade por causa da quota de vCPU da conta AWS pessoal —
   precisa ser observado após a primeira aplicação real.
 - **Baixo**: dependência de uma única conta/license key da New Relic criada
   por uma pessoa do grupo — sem redundância caso o acesso seja perdido.

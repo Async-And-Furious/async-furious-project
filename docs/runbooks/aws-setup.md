@@ -1,55 +1,121 @@
-# Pré-requisitos de setup da AWS
+# Pré-requisitos de configuração AWS
 
-Este runbook anteriormente carregava uma cópia por repositório do handoff de
-setup de conta. As quatro cópias divergiram entre si e todas descreviam uma
-infraestrutura que não existe mais (um provedor OIDC do GitHub e uma role IAM
-criada manualmente, um bucket `tc3-terraform-state` provisionado manualmente
-com uma tabela DynamoDB `tc3-terraform-locks`, workspaces do HCP Terraform e
-`TF_API_TOKEN`, e um gate de aprovação `hml-apply`).
+Este runbook lista o que precisa estar configurado para os workflows de nuvem
+deste repositório rodarem. Versões anteriores dele apontavam para
+`HANDOFF-AWS-SETUP.md`, `AWS_HML_RUNBOOK.md` e `scripts/aws_lab.py` como
+documentos canônicos: nenhum desses três arquivos existe em qualquer branch
+deste repositório, e as referências foram removidas.
 
-Os documentos canônicos e atuais deveriam viver na raiz do workspace:
+Para a descrição dos recursos AWS em si, ver
+[aws.md](../infrastructure/aws.md).
 
-- `HANDOFF-AWS-SETUP.md` — o que uma pessoa configura, por caminho (AWS
-  Academy ou uma conta real com OIDC), e o que o pipeline provisiona para si
-  mesmo.
-- `AWS_HML_RUNBOOK.md` — o procedimento do operador, os gates e o uso do
-  `scripts/aws_lab.py`.
+## 1. O que este repositório possui
 
-**Nenhum dos dois arquivos (`HANDOFF-AWS-SETUP.md` e `AWS_HML_RUNBOOK.md`) foi
-localizado neste repositório**, nem na raiz, nem em nenhuma branch, nem no
-histórico do git, nem em outro repositório da organização pesquisado via
-GitHub. `TODO`: localizar ou reconstruir esses documentos; é possível que se
-tratem de referências órfãs ou que pertençam a outro repositório do workspace
-multi-repo do projeto que não foi identificado até o momento.
+Nenhum estado Terraform na AWS. `.github/workflows/terraform.yml` valida e
+aplica apenas o ambiente local `kind`, em `infra/environments/local`.
 
-Versão resumida para este repositório: ele não possui state Terraform próprio
-da AWS. `.github/workflows/terraform.yml` valida apenas o ambiente
-local/kind em `infra/environments/local`. O caminho da AWS é
-`.github/workflows/deploy-eks.yml`, que constrói uma imagem marcada pelo
-commit SHA, envia (push) para o ECR, executa o job de migração uma vez, e
-aplica a kustomization `k8s/overlays/aws` contra o cluster criado pelo
-`repo-k8s-infra`.
+O caminho de nuvem é `.github/workflows/deploy-eks.yml`, que publica a imagem
+no ECR e aplica manifests Kubernetes em um cluster criado por
+`repo-k8s-infra`. Ele falha antes de tocar o cluster se qualquer pré-requisito
+abaixo faltar.
 
-Ele falha de forma segura (fail closed) sem estes valores no escopo do
-repositório, que o `scripts/aws_lab.py` define antes de disparar o workflow:
+## 2. Ordem de provisionamento
 
-| Nome                                                                | Tipo                              | Origem                                                                                                       |
-| ------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | secret                            | sessão da AWS Academy                                                                                        |
-| `AWS_DEPLOY_ROLE_ARN`                                               | secret                            | `LabRole` no modo Academy                                                                                    |
-| `JWT_PRIVATE_KEY_SECRET_ARN`                                        | secret                            | registro do operador                                                                                         |
-| `JWT_PUBLIC_KEY_PARAMETER_NAME`                                     | variable (repositório/ambiente)   | parâmetro SSM publicado pelo `repo-auth-serverless` (`/tc3/hml/jwt/public-key` ou `/tc3/prod/jwt/public-key`) |
-| `AWS_REGION`, `ECR_REPOSITORY`, `EKS_CLUSTER_NAME`                  | variable                          | `scripts/aws_lab.py`                                                                                          |
+Antes do primeiro deploy da aplicação, aplicar nesta ordem:
 
-O workflow de deploy usa os GitHub Environments `hml` e `production`, então
-defina `JWT_PUBLIC_KEY_PARAMETER_NAME` na configuração correspondente de
-repositório/ambiente. O workflow lê o valor do SSM Parameter Store com
-descriptografia e mascara a chave pública antes de exportá-la para o deploy.
+1. `repo-k8s-infra` (VPC, EKS, ECR, ALB e target group)
+2. `repo-db-infra` (RDS; lê o estado do anterior)
+3. `repo-auth-serverless` (Lambdas, API Gateway, VPC Link)
 
-Antes de aplicar a configuração do Kubernetes, o workflow lê o
-`repo-db-infra/<hml|prod>/terraform.tfstate` selecionado a partir do bucket
-`tc3-tfstate-<account-id>` qualificado pela conta. Ele obtém
-`db_connection_secret_arn`, `db_host`, `db_port`, `db_name` e `db_ssl_mode`
-a partir dos outputs canônicos; os valores de conexão com o banco de dados,
-portanto, não são variáveis do GitHub. O arquivo de state e as credenciais
-obtidas nunca são exibidos.
+O deploy da aplicação lê os estados de `repo-k8s-infra` e `repo-db-infra`
+diretamente do bucket `tc3-tfstate-<account-id>`, então precisa que os dois já
+tenham sido aplicados no ambiente alvo.
+
+## 3. GitHub Environments
+
+Os workflows usam os Environments `hml` e `production`. Um valor definido
+apenas no escopo do repositório funciona para ambos; um valor definido em um
+Environment só resolve nos jobs daquele Environment.
+
+### Segredos
+
+| Nome | Usado por | Origem |
+|---|---|---|
+| `AWS_ACCESS_KEY_ID` | todos os workflows de nuvem | usuário IAM da conta AWS pessoal |
+| `AWS_SECRET_ACCESS_KEY` | todos os workflows de nuvem | usuário IAM da conta AWS pessoal |
+| `AWS_SESSION_TOKEN` | opcional; só é usado quando preenchido | credenciais temporárias, se for o caso; com chave de usuário IAM, deixe vazio |
+| `JWT_PRIVATE_KEY_SECRET_ARN` | `deploy-eks.yml` | ARN do secret com a chave privada RS256 no Secrets Manager; a aplicação a usa para assinar tokens de staff |
+| `NEW_RELIC_LICENSE_KEY` | `deploy-eks.yml` | conta New Relic |
+| `JWT_SECRET` | `deploy-eks.yml` | operador |
+| `WEBHOOK_SECRET` | `deploy-eks.yml` | operador |
+| `SEED_ADMIN_EMAIL` | `deploy-eks.yml`, workflows de aceitação | operador |
+| `SEED_ADMIN_PASSWORD` | `deploy-eks.yml`, workflows de aceitação | operador |
+| `SEED_RECEPCIONISTA_PASSWORD`, `SEED_MECANICO_PASSWORD` | `deploy-eks.yml`, workflows de aceitação | operador |
+| `SEEDED_CPF` | seed controlado do `deploy-eks.yml`, `full-acceptance.yml`, `protected-route-matrix.yml`, diagnósticos | CPF semeado; nunca impresso |
+
+Os ambientes rodam em uma conta AWS pessoal, no free tier; não em AWS Academy
+nem AWS Lab. Chaves de usuário IAM não expiram sozinhas, então a rotação é
+responsabilidade de quem administra a conta. Os workflows ainda têm um modo
+Academy (`academy_mode`), que deve ficar desligado.
+
+### Variáveis
+
+| Nome | Padrão | Observação |
+|---|---|---|
+| `AWS_REGION` | `us-east-1` | |
+| `ECR_REPOSITORY` | nenhum | obrigatória; o preflight falha sem ela |
+| `EKS_CLUSTER_NAME` | nenhum | `tc3-eks-hml` ou `tc3-eks-prod` |
+| `K8S_NAMESPACE` | `async-furious` | |
+| `JWT_ISSUER` | nenhum | `repo-auth-serverless`, travado por validação no Terraform da borda |
+| `JWT_AUDIENCE` | nenhum | `async-furious-project`, idem |
+| `JWT_PUBLIC_KEY_PARAMETER_NAME` | nenhum | nome do parâmetro SSM publicado por `repo-auth-serverless` |
+| `ECR_REPOSITORY_OVERRIDE` | `tc3-app-<env>` | apenas `cleanup-eks.yml` |
+| `ECR_CLEANUP_OWNED` | nenhum | apenas `cleanup-eks.yml`; a limpeza de imagens em produção é recusada se não for `true` |
+| `NEW_RELIC_APP_NAME` | nenhum | nome da aplicação no APM, por ambiente |
+| `SEEDED_*_ID`, `WEBHOOK_SECRET_FINGERPRINT` | nenhum | apenas `protected-route-matrix.yml` |
+
+### Segredos do workflow local
+
+`terraform.yml` usa segredos próprios, com prefixo `TF_VAR_`, para o cluster
+`kind` efêmero: `TF_VAR_DB_PASSWORD`, `TF_VAR_JWT_SECRET`,
+`TF_VAR_SEED_ADMIN_EMAIL`, `TF_VAR_SEED_ADMIN_PASSWORD`,
+`TF_VAR_SEED_RECEPCIONISTA_PASSWORD` e `TF_VAR_SEED_MECANICO_PASSWORD`. Eles
+não têm relação com a AWS.
+
+## 4. O que o pipeline resolve sozinho
+
+Nem toda configuração é variável do GitHub. O deploy descobre em tempo de
+execução:
+
+| Valor | Como |
+|---|---|
+| ARN do target group | `aws s3 cp` do estado de `repo-k8s-infra`, campo `application_target_group_arn` |
+| Host, porta, nome e modo SSL do banco | estado de `repo-db-infra` |
+| ARN do segredo do banco | estado de `repo-db-infra`, campo `db_connection_secret_arn` |
+| Usuário e senha do banco | `aws secretsmanager get-secret-value` sobre o ARN acima |
+| Chave pública RS256 | `aws ssm get-parameter --with-decryption` |
+| Chave privada RS256 | `aws secretsmanager get-secret-value` sobre `JWT_PRIVATE_KEY_SECRET_ARN` |
+| Registry do ECR | `aws sts get-caller-identity` |
+
+Nenhuma credencial de banco é variável do GitHub. O arquivo de estado e os
+valores buscados são mascarados e nunca impressos.
+
+## 5. Acesso ao cluster pelo runner
+
+O endpoint da API do EKS é privado. O deploy salva a configuração de acesso
+original, abre o endpoint apenas para o IP público do runner com máscara `/32`,
+aplica, e restaura a configuração anterior em um passo `if: always()`. Se o
+workflow for cancelado à força durante a janela, a restauração pode não rodar,
+e o endpoint fica aberto para um IP que não é mais o do runner. Conferir com:
+
+```bash
+aws eks describe-cluster --name tc3-eks-hml --query 'cluster.resourcesVpcConfig'
+```
+
+## 6. Destruição
+
+`down.yml` chama `cleanup-eks.yml` e exige a confirmação exata `DESTROY HML` ou
+`DESTROY PROD`. Em HML o namespace inteiro é removido; em produção só os
+recursos que o deploy criou. Destruir a infraestrutura em si (cluster, banco,
+borda) é feito nos respectivos repositórios, pela ação `destroy` dos seus
+pipelines, com a mesma exigência de confirmação digitada.
