@@ -11,7 +11,7 @@ type: Feature
 # 🚀 Feature Request
 
 ## 📌 Descrição
-
+Indique se é um card somente de documenção primeiramente, se não,
 Descreva objetivamente a funcionalidade que deverá ser implementada.
 
 ---
@@ -24,11 +24,14 @@ Explique qual problema a feature resolve ou qual valor entrega ao sistema.
 
 ## 🧠 Regras de Negócio
 
-Liste as regras importantes da funcionalidade.
+Liste as regras importantes da funcionalidade. Se o assunto também
+aparecer em outra Feature ou Epic, adicione uma linha dizendo o que
+fica de fora daqui.
 
 - Regra 1
 - Regra 2
 - Regra 3
+- Fora do escopo: ...
 
 ---
 
@@ -44,7 +47,8 @@ Liste os endpoints criados ou alterados.
 
 ## 🏗️ Impacto na Arquitetura
 
-Descreva os módulos, camadas ou componentes afetados.
+Descreva os módulos, camadas ou componentes afetados. Se a entrega for
+só documentação/ADR, informe em qual pasta e arquivo ela deve ficar.
 
 - Módulo X
 - Use case Y
@@ -80,8 +84,11 @@ Adicione links ou documentos relacionados.
 
 - Swagger
 - Issue relacionada
-- Documento DDD
+- Documento DDD (`docs/ddd.md`)
+- ADRs relevantes (`docs/adr/`)
+- Schema do banco (`prisma/schema.prisma`)
 - Tech Challenge
+- Documentação oficial da ferramenta/lib usada (evitar só blog/tutorial de terceiro)
 
 ---
 
