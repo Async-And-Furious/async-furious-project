@@ -21,7 +21,7 @@ seguido pelas próximas ADRs.
 | [ADR-0006](./0006-clean-architecture-ddd.md) | Clean Architecture + DDD como estilo arquitetural | Aceita |
 | [ADR-0007](./0007-stack-tecnologica-aplicacao.md) | Stack tecnológica da aplicação: NestJS + PostgreSQL + Prisma | Aceita |
 | [ADR-0008](./0008-autenticacao-local-jwt-rbac.md) | Autenticação e autorização locais: JWT + bcrypt + RBAC via guards | Aceita |
-| [ADR-0009](./0009-eventos-dominio-in-process.md) | Comunicação entre Bounded Contexts via eventos de domínio in-process | Aceita (parcialmente substituída pela ADR-0016 para eventos entre serviços da Fase 4) |
+| [ADR-0009](./0009-eventos-dominio-in-process.md) | Comunicação entre Bounded Contexts via eventos de domínio in-process | Aceita (parcialmente substituída pelas ADR-0016 e ADR-0018 para eventos entre serviços da Fase 4) |
 | [ADR-0010](./0010-monolito-modular.md) | Monólito modular como topologia de implantação | Substituída (ver ADR-0017) |
 | [ADR-0011](./0011-aprovacao-orcamento-api-publica.md) | Aprovação de orçamento via API pública síncrona | Aceita (revisada na Fase 4 — migração do `Orcamento`) |
 | [ADR-0012](./0012-cicd-github-actions-apply-efemero.md) | CI/CD via GitHub Actions com `apply` restrito a cluster efêmero | Aceita |
@@ -30,6 +30,7 @@ seguido pelas próximas ADRs.
 | [ADR-0015](./0015-segredos-kubernetes-templatefile.md) | Gestão de segredos no Kubernetes local via `templatefile()` | Aceita |
 | [ADR-0016](./0016-saga-coreografada.md) | Saga coreografada para a transação distribuída da Fase 4 | Aceita |
 | [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md) | Divisão em três microsserviços e ownership de dados por serviço | Aceita |
+| [ADR-0018](./0018-mensageria-contratos-eventos.md) | Kafka como broker de eventos e contrato padrão de evento da Fase 4 | Aceita |
 
 ADRs 0006-0015 registram decisões das Fases 1 e 2 (retroativas — a solução
 já estava construída), a partir do rascunho de descoberta em
