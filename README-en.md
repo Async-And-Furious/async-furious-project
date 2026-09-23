@@ -246,6 +246,47 @@ RECEIVED
 
 ---
 
+## Phase 4 — Distributed Transaction (Saga)
+
+Starting in Phase 4, this monolith is refactored into three independent
+microservices — **OS Service** (this repository), **Billing Service**, and
+**Execução e Produção** (Execution and Production) — and the flow above
+starts crossing service boundaries via asynchronous events (Kafka).
+
+**Chosen strategy: choreographed Saga.** There is no central orchestrator
+and no dedicated coordinator service/repository — each service publishes
+the events belonging to its own boundary and reacts to the events published
+by the other two, running its own compensation whenever something fails. We
+considered and rejected a central orchestrator with its own repository
+(infrastructure cost and single point of failure not justified, since the
+assignment treats orchestration and choreography as equivalent options) and
+an orchestrator embedded in the OS Service without a separate repository
+(it would couple the other two services to decisions made by this one).
+
+The flow covered by the saga is `Open OS → estimate → approval → payment →
+execution started` — payment happens right after estimate approval and
+**before** execution starts, as a mandatory step so that the Billing
+Service participates in the distributed transaction. Delivery is left out
+of the saga's scope because it is an in-person act with no asynchronous
+counterpart to coordinate; the "payment confirmed" check performed before
+`registrar-entrega` is a safety lock on that same payment — not a second
+charge. Compensation is logical by default (revert OS status, close the
+estimate without execution); a real Mercado Pago refund is only triggered
+if the payment had already been captured before the failure.
+
+With no orchestrator, there is no single "saga state" — traceability of the
+distributed flow combines a New Relic trace, the `correlationId` carried in
+the event envelope, and the `HistoricoStatusOS.motivo` field already
+present in the database.
+
+Full detail (sequence diagram, per-step responsibility map, and the
+`step → failure → compensation` matrix):
+[ADR-0016](./docs/adr/0016-saga-coreografada.md) and
+[`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md)
+(Portuguese only, following the project's ADR/architecture doc convention).
+
+---
+
 ## Authentication and Roles
 
 All endpoints except those marked with `@Public()` require the `Authorization: Bearer <token>` header.

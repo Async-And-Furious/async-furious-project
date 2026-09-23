@@ -300,6 +300,45 @@ RECEIVED
 
 ---
 
+## Fase 4 — Transação Distribuída (Saga)
+
+A partir da Fase 4, este monólito é refatorado em três microsserviços
+independentes — **OS Service** (este repositório), **Billing Service** e
+**Execução e Produção** — e o fluxo acima passa a atravessar fronteiras de
+serviço via eventos assíncronos (Kafka).
+
+**Estratégia escolhida: Saga coreografada.** Não existe orquestrador
+central nem um serviço/repositório coordenador — cada serviço publica os
+eventos de sua própria fronteira e reage aos eventos dos outros dois,
+executando a própria compensação quando algo falha. Consideramos e
+recusamos um orquestrador central com repositório próprio (custo de
+infraestrutura e de ponto único de falha não compensado pelo requisito, que
+trata orquestração e coreografia como opções equivalentes) e um
+orquestrador embutido no OS Service sem repositório separado (acoplaria os
+outros dois serviços a decisões tomadas por este).
+
+O fluxo coberto pela saga é `Abrir OS → orçamento → aprovação → pagamento →
+execução iniciada` — o pagamento acontece logo após a aprovação do
+orçamento e **antes** do início da execução, como etapa obrigatória para
+que o Billing Service participe da transação distribuída. A entrega fica
+fora do escopo da saga por ser um ato presencial, sem contrapartida
+assíncrona a coordenar; a checagem de "pagamento confirmado" feita antes de
+`registrar-entrega` é uma trava de segurança sobre esse mesmo pagamento —
+não uma segunda cobrança. Compensação é lógica por padrão (reverter status
+da OS, encerrar orçamento sem execução); o estorno real no Mercado Pago só
+é acionado se o pagamento já tiver sido capturado antes da falha.
+
+Sem orquestrador, não há um "estado único da saga" — a rastreabilidade do
+fluxo distribuído combina trace no New Relic, o `correlationId` propagado
+no envelope de evento e o `HistoricoStatusOS.motivo` já existente no banco.
+
+Detalhamento completo (diagrama de sequência, mapa de responsabilidade por
+etapa e matriz `etapa → falha → compensação`):
+[ADR-0016](./docs/adr/0016-saga-coreografada.md) e
+[`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md).
+
+---
+
 ## Autenticação e Papéis
 
 Todos os endpoints, exceto os marcados com `@Public()`, exigem o header `Authorization: Bearer <token>`.
