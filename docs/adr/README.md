@@ -22,16 +22,25 @@ seguido pelas próximas ADRs.
 | [ADR-0007](./0007-stack-tecnologica-aplicacao.md) | Stack tecnológica da aplicação: NestJS + PostgreSQL + Prisma | Aceita |
 | [ADR-0008](./0008-autenticacao-local-jwt-rbac.md) | Autenticação e autorização locais: JWT + bcrypt + RBAC via guards | Aceita |
 | [ADR-0009](./0009-eventos-dominio-in-process.md) | Comunicação entre Bounded Contexts via eventos de domínio in-process | Aceita |
-| [ADR-0010](./0010-monolito-modular.md) | Monólito modular como topologia de implantação | Aceita |
-| [ADR-0011](./0011-aprovacao-orcamento-api-publica.md) | Aprovação de orçamento via API pública síncrona | Aceita |
+| [ADR-0010](./0010-monolito-modular.md) | Monólito modular como topologia de implantação | Substituída (ver ADR-0017) |
+| [ADR-0011](./0011-aprovacao-orcamento-api-publica.md) | Aprovação de orçamento via API pública síncrona | Aceita (revisada na Fase 4 — migração do `Orcamento`) |
 | [ADR-0012](./0012-cicd-github-actions-apply-efemero.md) | CI/CD via GitHub Actions com `apply` restrito a cluster efêmero | Aceita |
 | [ADR-0013](./0013-seguranca-pipeline-zap-trivy.md) | Segurança automatizada no pipeline: OWASP ZAP + Trivy | Aceita |
 | [ADR-0014](./0014-cobertura-minima-testes.md) | Cobertura mínima de testes automatizados (80% uniforme) | Aceita |
 | [ADR-0015](./0015-segredos-kubernetes-templatefile.md) | Gestão de segredos no Kubernetes local via `templatefile()` | Aceita |
+| [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md) | Divisão em três microsserviços e ownership de dados por serviço | Aceita |
 
 ADRs 0006-0015 registram decisões das Fases 1 e 2 (retroativas — a solução
 já estava construída), a partir do rascunho de descoberta em
-[`notas-fases-anteriores.md`](./notas-fases-anteriores.md).
+[`notas-fases-anteriores.md`](./notas-fases-anteriores.md). ADRs a partir da
+0016 registram decisões da Fase 4.
+
+> **Nota de numeração (22/09/2026):** o número 0016 está reservado para a
+> Feature #308 (Definir Estratégia de Saga), em desenvolvimento em paralelo
+> numa outra branch (`feat/I-308_DefinirEstrategiaDeSaga`, ainda não
+> mesclada em `develop` no momento desta edição). Esta Feature (#307) usa
+> 0017 para não colidir com o arquivo dessa outra branch. Conferir a
+> numeração final deste índice depois que as duas branches integrarem.
 
 ## Template
 

@@ -64,6 +64,34 @@ presente em `package.json` — confirmado por busca nesta auditoria.
   alheios. `TODO`: avaliar se isso é aceitável para o escopo acadêmico ou
   se merece um mecanismo de verificação (ex.: token de uso único por OS).
 
+## Atualização (Fase 4 — migração do `Orcamento` para o Billing Service)
+
+**Revisão de 22/09/2026, Feature #307.** A decisão original desta ADR
+(rotas públicas de aprovação/recusa síncronas) **continua valendo** — o que
+muda é onde o `model Orcamento` e as rotas passam a viver.
+
+- `Orcamento` migra de `ordem-servico` (OS Service) para o **Billing
+  Service** (decisão 1.4 do `fase4-decisoes-epico1.md`, formalizada em
+  [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md)).
+- A FK `id_ordem_servico` → `OrdemServico.id`, hoje `@relation(...,
+  onDelete: Cascade)`, vira referência por id sem FK real
+  (`ordemServicoId String`), no mesmo padrão que `Pagamento.ordemServicoId`
+  já usa. Deletar uma `OrdemServico` deixa de cascatear a exclusão do
+  `Orcamento` — consequência aceita, sem mecanismo de compensação definido
+  nesta revisão (ver ADR-0017, "Consequências negativas").
+- As rotas `PATCH /ordens-servico/:id/orcamento/aprovar` e
+  `.../orcamento/recusar` migram junto para o Billing Service, **mantendo o
+  comportamento `@Public()`** decidido nesta ADR — não há mudança na
+  exposição pública, só na localização física do serviço que a atende.
+  `GET /ordens-servico/:id/status` permanece no OS Service (lê o status da
+  OS, não do orçamento).
+- O risco de segurança já registrado acima (ID previsível, sem verificação
+  de identidade) **não é resolvido por esta revisão** — atravessa a
+  migração sem mudança.
+- Fora do escopo desta revisão (e desta Feature #307): como o Billing
+  Service publica o evento de aprovação/recusa para o OS Service consumir
+  (Feature de Mensageria, #309) e a extração de código em si (#330).
+
 ## Referências
 
 - `README.md` (tabela de rotas "Ordens de Servico")
@@ -71,3 +99,5 @@ presente em `package.json` — confirmado por busca nesta auditoria.
 - `docs/domain-storytelling/suggestions/domain-storytelling.suggestion.vic.png`
 - `docs/contexto-tecnico-consolidado.md` §4
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #8)
+- [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md) — divisão em microsserviços e ownership de dados
+- [`docs/architecture/service-boundaries.md`](../architecture/service-boundaries.md) — mapa de ownership completo
