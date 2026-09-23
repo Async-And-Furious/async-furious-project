@@ -21,21 +21,26 @@
 > ([ADR-0011](../adr/0011-aprovacao-orcamento-api-publica.md) revisada); e
 > a checagem de pagamento confirmado antes de `registrar-entrega`
 > (`service-order-flow.md`) é a **mesma** cobrança feita na etapa de
-> pagamento da saga, não uma segunda — ver seção 4. O formato final do
-> envelope de evento (campos, serialização) continua sendo definido pela
-> Feature #309 — este documento só fixa o vocabulário de eventos necessário
-> para descrever o fluxo, não o contrato de transporte.
+> pagamento da saga, não uma segunda — ver seção 4. O formato do envelope
+> de evento (campos, serialização), a topologia de tópicos e a estratégia
+> de retry/DLQ estão fechados em
+> [ADR-0018](../adr/0018-mensageria-contratos-eventos.md); o catálogo de
+> eventos de integração consolidado está em
+> [`event-catalog.md`](./event-catalog.md) — este documento mantém apenas o
+> vocabulário de eventos necessário para descrever o fluxo, não repete o
+> contrato de transporte.
 
 ---
 
 ## 1. Diagrama de sequência
 
 Eventos já catalogados em [`docs/ddd.md`](../ddd.md) §5 são reaproveitados
-com o mesmo nome. Eventos marcados `[novo]` ainda não existem no catálogo
-atual porque dependem de comportamento que só passa a existir na Fase 4
-(o Billing Service e o Execução e Produção não existem hoje) — ficam como
-proposta de vocabulário para a Feature #309 consolidar no catálogo oficial
-de eventos de integração.
+com o mesmo nome. Os demais eventos deste fluxo (`OrcamentoCalculado`,
+`PagamentoConfirmado`, `PagamentoRecusado`, `ExecucaoIniciada`), propostos
+originalmente aqui como vocabulário mínimo para descrever a saga, estão
+formalizados no catálogo oficial de eventos de integração — ver
+[ADR-0018](../adr/0018-mensageria-contratos-eventos.md) e
+[`event-catalog.md`](./event-catalog.md).
 
 ```mermaid
 sequenceDiagram
@@ -55,7 +60,7 @@ sequenceDiagram
     Mecanico->>OS: PATCH /ordens-servico/:id/assumir, /analisar, /servicos-insumos
     OS->>OS: status=UNDER_DIAGNOSIS
     OS->>OS: calcula orcamento (valor_total_servicos, valor_total_pecas, valor_total_geral)
-    OS->>Kafka: evento OrcamentoCalculado [novo] (correlationId, com os valores calculados)
+    OS->>Kafka: evento OrcamentoCalculado (correlationId, com os valores calculados)
 
     Kafka->>Billing: consome OrcamentoCalculado
     Billing->>Billing: persiste Orcamento (status=PENDING)
@@ -77,11 +82,11 @@ sequenceDiagram
         alt Pagamento confirmado
             MP-->>Billing: pagamento capturado
             Billing->>Billing: Pagamento.status=CONFIRMADO
-            Billing->>Kafka: evento PagamentoConfirmado [novo] (correlationId)
+            Billing->>Kafka: evento PagamentoConfirmado (correlationId)
 
             Kafka->>Exec: consome PagamentoConfirmado
             Exec->>Exec: cria registro de execucao
-            Exec->>Kafka: evento ExecucaoIniciada [novo] (correlationId)
+            Exec->>Kafka: evento ExecucaoIniciada (correlationId)
 
             Kafka->>OS: consome ExecucaoIniciada
             OS->>OS: status=IN_PROGRESS
@@ -89,7 +94,7 @@ sequenceDiagram
         else Pagamento recusado/nao confirmado
             MP-->>Billing: pagamento recusado
             Billing->>Billing: Pagamento.status=RECUSADO
-            Billing->>Kafka: evento PagamentoRecusado [novo] (correlationId)
+            Billing->>Kafka: evento PagamentoRecusado (correlationId)
 
             Kafka->>OS: consome PagamentoRecusado
             OS->>OS: status=CLOSED_WITHOUT_EXECUTION
@@ -116,23 +121,23 @@ sequenceDiagram
 | Etapa | Serviço executor | Evento publicado | Evento(s) consumido(s) |
 |---|---|---|---|
 | Abertura da OS | OS Service | `OrdemDeServicoRecebida` | — (início da saga) |
-| Diagnóstico, definição dos itens (serviços/peças) e **cálculo** do orçamento | OS Service | `OrcamentoCalculado` `[novo]` | — |
+| Diagnóstico, definição dos itens (serviços/peças) e **cálculo** do orçamento | OS Service | `OrcamentoCalculado` | — |
 | Geração/persistência do documento de orçamento | Billing Service | `OrcamentoGerado` | `OrcamentoCalculado` |
 | Aprovação do orçamento pelo cliente (`PATCH /ordens-servico/:id/orcamento/aprovar`, `@Public()`) | Billing Service | `OrcamentoAprovado` | — (ação direta do cliente na API do Billing Service) |
 | Recusa do orçamento pelo cliente (`PATCH /ordens-servico/:id/orcamento/recusar`, `@Public()`, caminho de falha) | Billing Service | `OrcamentoRejeitado` | — (ação direta do cliente) |
 | Atualização da OS para "aguardando execução" após aprovação | OS Service | — (só atualiza estado local) | `OrcamentoAprovado` |
-| Cobrança/pagamento | Billing Service | `PagamentoConfirmado` `[novo]` ou `PagamentoRecusado` `[novo]` | — (integração direta com Mercado Pago, fora do broker) |
-| Início da execução | Execução e Produção | `ExecucaoIniciada` `[novo]` | `PagamentoConfirmado` |
+| Cobrança/pagamento | Billing Service | `PagamentoConfirmado` ou `PagamentoRecusado` | — (integração direta com Mercado Pago, fora do broker) |
+| Início da execução | Execução e Produção | `ExecucaoIniciada` | `PagamentoConfirmado` |
 | Fechamento da OS por recusa de orçamento ou pagamento | OS Service | — (só atualiza estado local) | `OrcamentoRejeitado`, `PagamentoRecusado` |
 | Atualização da OS para "em execução" | OS Service | — (só atualiza estado local) | `ExecucaoIniciada` |
 
 Os eventos reaproveitados de `docs/ddd.md` §5.1 (`OrdemDeServicoRecebida`,
 `OrcamentoGerado`, `OrcamentoAprovado`, `OrcamentoRejeitado`) mantêm o nome
-já catalogado. Os quatro eventos marcados `[novo]` (`OrcamentoCalculado`,
-`PagamentoConfirmado`, `PagamentoRecusado`, `ExecucaoIniciada`) não existem
-ainda no catálogo — são propostos aqui como vocabulário mínimo necessário
-para descrever o fluxo e ficam sujeitos à consolidação formal no catálogo
-de eventos de integração da Feature #309. `OrcamentoCalculado` carrega os
+já catalogado. Os outros quatro eventos (`OrcamentoCalculado`,
+`PagamentoConfirmado`, `PagamentoRecusado`, `ExecucaoIniciada`), propostos
+originalmente aqui, estão consolidados no catálogo oficial de eventos de
+integração — ver [ADR-0018](../adr/0018-mensageria-contratos-eventos.md) e
+[`event-catalog.md`](./event-catalog.md). `OrcamentoCalculado` carrega os
 valores calculados pelo OS Service (`valor_total_servicos`,
 `valor_total_pecas`, `valor_total_geral`) — é o Billing Service quem
 persiste esses valores no documento de orçamento, não quem os calcula
@@ -146,10 +151,10 @@ persiste esses valores no documento de orçamento, não quem os calcula
 | Etapa onde a falha ocorre | Tipo de falha | Compensação | Estorno Mercado Pago? |
 |---|---|---|---|
 | Diagnóstico / cálculo do orçamento | OS Service não consegue calcular o orçamento (ex.: item removido ou sem preço definido entre a definição e o cálculo) | OS Service marca a OS como `CLOSED_WITHOUT_EXECUTION`, com `HistoricoStatusOS.motivo` registrando a causa. Nenhum outro serviço chegou a ser envolvido — compensação local, sem evento de compensação a propagar. | Não se aplica (nenhum pagamento existe nesta etapa) |
-| Geração/persistência do documento de orçamento | Billing Service não consegue persistir o documento a partir do `OrcamentoCalculado` recebido (ex.: falha de banco no Billing Service) | Billing Service publica evento de falha equivalente (a formalizar com #309); OS Service consome e marca a OS como `CLOSED_WITHOUT_EXECUTION` | Não se aplica |
+| Geração/persistência do documento de orçamento | Billing Service não consegue persistir o documento a partir do `OrcamentoCalculado` recebido (ex.: falha de banco no Billing Service) | Billing Service publica `OrcamentoGeracaoFalhou` (ver [ADR-0018](../adr/0018-mensageria-contratos-eventos.md) e [`event-catalog.md`](./event-catalog.md)); OS Service consome e marca a OS como `CLOSED_WITHOUT_EXECUTION` | Não se aplica |
 | Aprovação do orçamento | Cliente recusa (`OrcamentoRejeitado`) | Billing Service marca `Orcamento.status=REJECTED` (estado já existente no `EstimateStatus`); OS Service consome e marca a OS como `CLOSED_WITHOUT_EXECUTION` | Não se aplica — pagamento ainda não foi cobrado |
 | Cobrança/pagamento | Pagamento recusado ou não confirmado pelo Mercado Pago | Billing Service marca o `Pagamento` como recusado e publica `PagamentoRecusado`; OS Service consome e marca a OS como `CLOSED_WITHOUT_EXECUTION` | **Não** — o pagamento nunca foi capturado, não há valor a estornar |
-| Início da execução (após pagamento já confirmado) | Execução e Produção não consegue iniciar (ex.: indisponibilidade de peça identificada só nesta etapa, capacidade de oficina esgotada) | Execução e Produção publica evento de falha (a formalizar com #309); Billing Service consome e aciona o estorno; OS Service consome e marca a OS como `CLOSED_WITHOUT_EXECUTION` | **Sim** — o pagamento já havia sido capturado antes desta falha, então esta é a única etapa da saga em que o estorno real no Mercado Pago é acionado |
+| Início da execução (após pagamento já confirmado) | Execução e Produção não consegue iniciar (ex.: indisponibilidade de peça identificada só nesta etapa, capacidade de oficina esgotada) | Execução e Produção publica `ExecucaoInicioFalhou` (ver [ADR-0018](../adr/0018-mensageria-contratos-eventos.md) e [`event-catalog.md`](./event-catalog.md)); Billing Service consome e aciona o estorno; OS Service consome e marca a OS como `CLOSED_WITHOUT_EXECUTION` | **Sim** — o pagamento já havia sido capturado antes desta falha, então esta é a única etapa da saga em que o estorno real no Mercado Pago é acionado |
 
 A regra geral, já fixada na ADR-0016, é: **estorno real no Mercado Pago
 apenas quando a falha ocorre depois da captura do pagamento** — hoje isso
@@ -213,9 +218,9 @@ combinadas (detalhado na [ADR-0016](../adr/0016-saga-coreografada.md)):
    escopo deste documento.
 2. **`correlationId` no envelope de evento** — nasce no `OrdemDeServicoRecebida`
    e é propagado, sem alteração, por todos os eventos subsequentes da mesma
-   OS (inclusive os de compensação). O formato exato do envelope é definido
-   na Feature #309; este documento só exige que o campo exista e não seja
-   regenerado a cada etapa.
+   OS (inclusive os de compensação). O formato exato do envelope está
+   definido na [ADR-0018](../adr/0018-mensageria-contratos-eventos.md); este
+   documento só exige que o campo exista e não seja regenerado a cada etapa.
 3. **`HistoricoStatusOS.motivo`** (model já existente em
    `prisma/schema.prisma`, sem necessidade de alteração de schema) —
    continua sendo, dentro do OS Service, o registro textual de por que
@@ -239,5 +244,7 @@ eventos publicados por cada serviço sob aquele `correlationId`.
 - [`docs/ddd.md`](../ddd.md) §5 — catálogo de eventos de domínio existentes
 - `prisma/schema.prisma` — enum `SOStatus`, `EstimateStatus`, model `HistoricoStatusOS`, model `Pagamento`
 - Issue #307 — Definir Divisão de Microsserviços e Ownership de Dados
+- [ADR-0018 — Kafka como broker de eventos e contrato padrão de evento](../adr/0018-mensageria-contratos-eventos.md)
+- [`event-catalog.md`](./event-catalog.md) — catálogo de eventos de integração (produtor/consumidores)
 - Issue #309 — Definir Mensageria e Contratos de Eventos
 - Issue #337 — implementação da Saga (épico de Saga); decide se alguma falha precisa de um status distinto de `CLOSED_WITHOUT_EXECUTION`
