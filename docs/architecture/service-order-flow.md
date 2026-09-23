@@ -109,27 +109,22 @@ de entrega — não é o gatilho automático dela.**
   como `Pagamento` migra para o Billing Service, essa validação deixa de ser
   uma consulta local ao mesmo banco e passa a depender de informação vinda
   de outro serviço — o mecanismo exato (consulta síncrona ao Billing Service,
-  ou leitura de um evento `PagamentoAprovado` já consumido e refletido no OS
+  ou leitura de um evento `PagamentoConfirmado` já consumido e refletido no OS
   Service) é **decisão de implementação fora do escopo desta Feature**,
   tratada nas Features de Mensageria (#309) e de extração do Financeiro
   (#330).
 
-> **Divergência sinalizada, não resolvida por esta Feature:** a sequência de
-> Saga já registrada em `fase4-decisoes-epico1.md` (F2, decisão 2.2) é
-> "abrir OS → orçamento → aprovação → **pagamento** → execução iniciada" —
-> ou seja, o pagamento acontece **antes** de `IN_PROGRESS`, logo após a
-> aprovação do orçamento pelo cliente. Já a regra pagamento → entrega
-> definida acima trata o pagamento como pré-condição da **entrega**, que só
-> acontece **depois** de `FINISHED` (fim da execução), no fim do fluxo. As
-> duas leituras não são automaticamente conciliáveis: se o pagamento já é
-> etapa obrigatória da Saga logo após a aprovação (F2/2.2), não fica claro
-> por que o mesmo pagamento seria checado de novo como pré-requisito da
-> entrega no fim do fluxo — a menos que existam **dois pagamentos/dois
-> momentos de cobrança** (ex.: sinal na aprovação + saldo na entrega), o que
-> não está registrado em nenhum artefato. Por instrução explícita, esta
-> Feature não decide qual das duas leituras prevalece nem inventa um segundo
-> pagamento — fica registrado aqui para validação do grupo antes de #330/#337
-> (implementação da Saga) assumirem uma ou outra.
+> **Relação com a Saga (resolvida pela Feature #308 / ADR-0016):** a
+> sequência de Saga (`fase4-decisoes-epico1.md`, F2/2.2) é "abrir OS →
+> orçamento → aprovação → **pagamento** → execução iniciada" — o pagamento
+> acontece **antes** de `IN_PROGRESS`, logo após a aprovação do orçamento.
+> Existe **um único pagamento**, cobrado nessa etapa da Saga; não há sinal +
+> saldo nem segundo momento de cobrança. A validação em `registrar-entrega`
+> definida acima continua valendo, mas como **trava de segurança**: no fluxo
+> normal ela já está sempre satisfeita, porque nenhuma OS chega a
+> `FINISHED` sem ter passado pelo pagamento. Detalhes em
+> [ADR-0016](../adr/0016-saga-coreografada.md) e
+> [`saga-flow.md` §4](./saga-flow.md).
 
 ## Erros e fluxos alternativos cobertos pela API (evidência: tabela de rotas do README)
 

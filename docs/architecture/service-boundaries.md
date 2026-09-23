@@ -119,9 +119,10 @@ Tratada com o detalhe completo em
 [`service-order-flow.md`](./service-order-flow.md#integração-com-o-contexto-financeiro-fase-4)
 — aqui fica só o resumo decidido: **pagamento aprovado é pré-requisito para
 o registro de entrega** (`PATCH /ordens-servico/:id/registrar-entrega`), não
-gatilho automático dela. Ver naquele documento a divergência sinalizada em
-relação à sequência de Saga já registrada em `fase4-decisoes-epico1.md` (F2,
-2.2), que não foi resolvida por esta Feature — fica para validação do grupo.
+gatilho automático dela. A relação com a sequência de Saga
+(`fase4-decisoes-epico1.md`, F2/2.2) foi resolvida pela
+[ADR-0016](../adr/0016-saga-coreografada.md): um único pagamento, cobrado
+antes da execução, e a checagem na entrega como trava de segurança.
 
 ## 5. Documentação e ADRs derivadas desta Feature
 
@@ -135,11 +136,10 @@ relação à sequência de Saga já registrada em `fase4-decisoes-epico1.md` (F2
 
 1. Confirmar o dono provisório de `User` (§2) — ou fechar isso já dentro da
    Feature #311, que trata da borda.
-2. Confirmar a semântica pagamento → entrega documentada em
-   `service-order-flow.md` **e** resolver (ou aceitar conscientemente) a
-   divergência com a sequência de Saga (`abrir OS → orçamento → aprovação →
-   pagamento → execução iniciada`), que posiciona o pagamento **antes** da
-   execução, não depois dela.
+2. ~~Resolver a divergência entre a regra pagamento → entrega e a sequência
+   de Saga~~ — **resolvida** pela [ADR-0016](../adr/0016-saga-coreografada.md)
+   (Feature #308): pagamento único antes da execução; checagem na entrega é
+   trava de segurança.
 3. Validar que a contagem "14 models" (não 16) não esconde nenhuma tabela
    fora do `schema.prisma` que devesse entrar neste mapa.
 

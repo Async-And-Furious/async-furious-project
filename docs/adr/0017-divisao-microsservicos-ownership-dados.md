@@ -84,20 +84,13 @@ aqui para não haver duas fontes de verdade divergentes.
   extração do Financeiro/#330).
 - A regra de pagamento → entrega, antes uma checagem local ao mesmo banco,
   passa a depender de informação vinda de outro serviço (ver
-  `docs/architecture/service-order-flow.md`) — com uma divergência ainda não
-  resolvida entre essa regra e a sequência de Saga já registrada
-  (`fase4-decisoes-epico1.md`, F2/2.2), sinalizada e não decidida por esta
-  ADR.
+  `docs/architecture/service-order-flow.md`). A relação dessa regra com a
+  sequência de Saga foi resolvida pela [ADR-0016](./0016-saga-coreografada.md):
+  há um único pagamento, cobrado na etapa da Saga logo após a aprovação, e a
+  checagem em `registrar-entrega` é apenas trava de segurança sobre ele.
 
 ## Riscos
 
-- **Médio**: a divergência entre "pagamento como pré-requisito da entrega"
-  (esta Feature) e "pagamento como etapa da Saga logo após a aprovação"
-  (F2/2.2 do `fase4-decisoes-epico1.md`) não está resolvida. Se as Features
-  de implementação da Saga (#337) e de extração do Financeiro (#330)
-  assumirem leituras diferentes uma da outra, o fluxo quebra em produção.
-  `TODO`: validação do grupo antes do início da Sprint que implementa
-  qualquer uma das duas Features.
 - **Baixo**: colisão de numeração de ADR com a branch paralela de #308 (ver
   nota em "Status") — resolução mecânica no momento do merge, sem impacto de
   conteúdo.
