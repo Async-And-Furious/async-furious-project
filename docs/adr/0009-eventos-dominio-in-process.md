@@ -3,12 +3,14 @@
 ## Status
 
 Aceita (parcialmente substituída pela [ADR-0016](./0016-saga-coreografada.md)
-a partir da Fase 4 — ver nota abaixo)
+e pela [ADR-0018](./0018-mensageria-contratos-eventos.md) a partir da
+Fase 4 — ver nota abaixo)
 
 > **Nota (Fase 4):** a comunicação **entre** OS Service, Billing Service e
 > Execução e Produção passa a usar eventos publicados em um broker externo
-> (Kafka, topologia definida na Feature de Mensageria, issue #309) e a
-> coordenação distribuída segue o modelo de Saga coreografada da
+> (Kafka, broker, topologia e contrato de evento definidos na
+> [ADR-0018](./0018-mensageria-contratos-eventos.md)) e a coordenação
+> distribuída segue o modelo de Saga coreografada da
 > [ADR-0016](./0016-saga-coreografada.md). Esta ADR continua vigente,
 > **sem alteração**, para a comunicação **interna** ao OS Service — em
 > particular entre os Bounded Contexts `ordem-servico` e `pecas-insumos`,
