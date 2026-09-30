@@ -21,7 +21,7 @@ flowchart TB
         subgraph VPC["VPC tc3-vpc-hml, dona: repo-k8s-infra"]
             link["VPC Link"]
             alb["ALB interno<br/>regras por path"]
-            subgraph EKS["EKS compartilhado, NetworkPolicy: só o ALB alcança os pods"]
+            subgraph EKS["EKS compartilhado, sem NetworkPolicy (Feature #313)"]
                 subgraph nsOs["namespace OS Service"]
                     os["Pods OS Service"]
                 end
@@ -55,61 +55,59 @@ flowchart TB
     exec <--> kafka
 ```
 
-Não há BFF: o API Gateway fala direto com o ALB, e o ALB com cada serviço.
+Não há BFF: o API Gateway fala direto com o ALB, e o ALB com cada serviço. Cada serviço valida o JWT localmente além do Authorizer da borda.
 
 ## 2. Mapa de roteamento
 
 | Path no API Gateway | Autenticação | Destino | Observação |
 |---|---|---|---|
 | `POST /auth` | pública | Lambda `authenticate-customer` | inalterada da Fase 3 |
-| `ANY /os/{proxy+}` | Lambda Authorizer | OS Service | |
-| `ANY /billing/{proxy+}` | Lambda Authorizer | Billing Service | |
-| `ANY /execucao/{proxy+}` | Lambda Authorizer | Execução e Produção | |
+| `ANY /{proxy+}` | Lambda Authorizer | ALB → serviço por path (`/os`, `/billing`, `/execucao`) | rota única no Gateway |
+| rotas públicas de orçamento | nenhuma no Gateway | Billing Service | `@Public()`, ADR-0011 |
+| webhook do Mercado Pago | nenhuma no Gateway (assinatura HMAC) | Billing Service | `POST /billing/webhooks/mercado-pago` |
 
 Consequências para a implementação (Epic de Plataforma):
 
 - **Um destino por path no ALB.** Hoje há um único target group
   (`tc3-<env>-app`); são necessários três, um por serviço, com regras de
-  listener por prefixo de path, cada um com seu `TargetGroupBinding`.
+  listener por prefixo de path (`aws_lb_listener_rule` em
+  `repo-k8s-infra/modules/alb`), cada um com seu `TargetGroupBinding`. O Gateway
+  mantém a rota `/{proxy+}` única, então Authorizer e
+  `overwrite:header.x-correlation-id` continuam declarados num lugar só
+  (Feature #317).
 - **Prefixo de path.** A aplicação hoje serve em `/api/v1/...`
   (`setGlobalPrefix('api/v1')` em `src/main.ts`). Ou o Gateway remove o prefixo
   (`/os`) antes de encaminhar, ou cada serviço incorpora o prefixo no seu prefixo
   global. A escolha é detalhe de implementação e deve ser feita uma vez, igual
   para os três serviços.
-- **Rotas públicas novas** (aprovação de orçamento, webhook do Mercado Pago)
-  exigem rota sem authorizer explícita no Gateway; hoje só `POST /auth` é
-  pública. Ver pendências na ADR-0021.
+- **Rotas públicas novas.** Hoje `ANY /{proxy+}` usa `authorization_type = CUSTOM`
+  e o Authorizer nega requisição sem Bearer; por isso as rotas `@Public()` de
+  aprovação de orçamento não são alcançáveis pelo Gateway. Precisam de rota
+  explícita sem authorizer apontando para o Billing (Feature #317). O webhook do
+  Mercado Pago precisa da mesma rota sem authorizer, porque o provedor não
+  apresenta o nosso JWT; a proteção é a assinatura (Feature #325).
 
-## 3. Network policy (requisito)
+## 3. Autenticação nos serviços
 
-- Os pods dos três serviços só aceitam tráfego de entrada originado no ALB
-  interno. Acesso direto ao pod, inclusive vindo de pod de outro serviço do
-  cluster, é bloqueado.
-- O tráfego de Kafka e de saída (RDS, DynamoDB, Mercado Pago) não é coberto por
-  esta política de entrada; egress fica para o card de implementação decidir.
-- **Pré-requisito técnico:** o CNI do EKS precisa impor `NetworkPolicy`. A
-  implementação deve demonstrar o bloqueio com um teste (requisição direta ao
-  pod falha; via ALB passa).
-- Implementação em `repo-k8s-infra` / manifests de cada serviço: fora do escopo
-  da Feature #311.
+- **Duas camadas.** O Lambda Authorizer valida o token na borda; cada serviço
+  valida o JWT de novo localmente, com `src/auth/` copiado do OS Service
+  (`jwt.strategy.ts`, `JwtAuthGuard`, `RolesGuard`, enum de papéis).
+- **Sem `NetworkPolicy`** (Feature #313): não há isolamento de rede entre pods,
+  então a validação local é o que impede acesso direto a um pod sem token.
+- **RBAC local.** O papel e o `sub` saem do token validado no serviço. O
+  Authorizer não propaga claims por header.
+- **Emissão de token de staff.** `POST /api/v1/auth/login` e o `User` ficam no
+  OS Service; os demais serviços só validam.
+- **Rotas sem token** são exceção explícita, marcadas como públicas no serviço
+  e com rota sem authorizer no Gateway (seção 2).
 
-## 4. Bypass de autenticação para desenvolvimento local
+## 4. Desenvolvimento local
 
-Como o serviço não valida token, o "bypass" precisa de um critério para o que
-cada serviço assume como identidade quando roda fora da borda. Especificação:
-
-- **Mecanismo**: variável `AUTH_BYPASS=true`. Com ela, o serviço não exige
-  `Authorization` e aceita a identidade de teste vinda de variáveis de ambiente
-  (`AUTH_BYPASS_SUB`, `AUTH_BYPASS_ROLE`) em vez de claims do token.
-- **Critério de ativação**: somente com `NODE_ENV` diferente de `production`.
-  No boot, se `AUTH_BYPASS=true` e `NODE_ENV=production`, o processo **aborta**
-  (mesmo padrão de `resolveJwtContract`, que recusa HS256 em produção). Os
-  manifests de HML nunca definem `AUTH_BYPASS`.
-- **Escopo**: `pnpm run dev` e cluster `kind` local (`scripts/local-up.sh`), onde
-  não existe API Gateway. Em `kind`, `AUTH_MODE=local` da Fase 3 é o precedente
-  que este mecanismo substitui para os serviços novos.
-- **Teste**: um teste por serviço garantindo que o boot falha com
-  `AUTH_BYPASS=true` e `NODE_ENV=production`.
+Fora da borda (`pnpm run dev`, cluster `kind` via `scripts/local-up.sh`) não
+existe API Gateway nem Authorizer. Os serviços novos reaproveitam o modo local
+da Fase 3 (`AUTH_MODE=local`, HS256), que `resolveJwtContract` recusa em
+produção, e o desenvolvedor usa um token de teste. Não há variável de bypass
+nova.
 
 ## 5. Ambientes
 

@@ -20,7 +20,7 @@ seguido pelas próximas ADRs.
 | [ADR-0005](./0005-observabilidade.md) | Estratégia de observabilidade | Aceita (implementação em código, pendente validação — issue #163) |
 | [ADR-0006](./0006-clean-architecture-ddd.md) | Clean Architecture + DDD como estilo arquitetural | Aceita |
 | [ADR-0007](./0007-stack-tecnologica-aplicacao.md) | Stack tecnológica da aplicação: NestJS + PostgreSQL + Prisma | Aceita |
-| [ADR-0008](./0008-autenticacao-local-jwt-rbac.md) | Autenticação e autorização locais: JWT + bcrypt + RBAC via guards | Substituída (ver ADR-0021) |
+| [ADR-0008](./0008-autenticacao-local-jwt-rbac.md) | Autenticação e autorização locais: JWT + bcrypt + RBAC via guards | Parcialmente substituída (ver ADR-0021) |
 | [ADR-0009](./0009-eventos-dominio-in-process.md) | Comunicação entre Bounded Contexts via eventos de domínio in-process | Aceita (parcialmente substituída pelas ADR-0016 e ADR-0018 para eventos entre serviços da Fase 4) |
 | [ADR-0010](./0010-monolito-modular.md) | Monólito modular como topologia de implantação | Substituída (ver ADR-0017) |
 | [ADR-0011](./0011-aprovacao-orcamento-api-publica.md) | Aprovação de orçamento via API pública síncrona | Aceita (revisada na Fase 4 — migração do `Orcamento`) |
@@ -33,7 +33,7 @@ seguido pelas próximas ADRs.
 | [ADR-0018](./0018-mensageria-contratos-eventos.md) | Kafka como broker de eventos e contrato padrão de evento da Fase 4 | Aceita |
 | [ADR-0019](./0019-dynamodb-read-model-os-cliente.md) | DynamoDB como banco de leitura de Ordem de Serviço e Cliente | Aceita |
 | [ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md) | Bancos compartilhados com isolamento por credencial | Aceita |
-| [ADR-0021](./0021-borda-sem-bff.md) | Borda sem BFF: autenticação 100% no Lambda Authorizer e roteamento direto por path | Aceita |
+| [ADR-0021](./0021-borda-sem-bff.md) | Borda sem BFF: Authorizer na borda, validação local nos serviços e roteamento direto por path | Aceita |
 
 ADRs 0006-0015 registram decisões das Fases 1 e 2 (retroativas — a solução
 já estava construída), a partir do rascunho de descoberta em
