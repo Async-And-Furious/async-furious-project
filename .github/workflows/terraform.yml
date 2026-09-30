@@ -2,6 +2,7 @@ name: Terraform & Kubernetes
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "infra/**"
       - "k8s/**"
@@ -20,7 +21,7 @@ jobs:
   # PRs: apenas valida e planeja, sem provisionar nada (rapido, seguro para rodar em toda PR)
   plan:
     name: Terraform Validate & Plan
-    if: github.event_name == 'pull_request'
+    if: ${{ github.event_name == 'pull_request' && ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação')) }}
     runs-on: ubuntu-latest
 
     steps:
