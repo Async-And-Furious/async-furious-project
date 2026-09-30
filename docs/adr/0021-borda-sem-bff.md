@@ -132,8 +132,11 @@ não faz parte da entrega), o que elimina o consumidor típico de um BFF.
   (Feature #325).
 - **Baixo — `HS256` local em ambiente remoto**: o modo de desenvolvimento local
   usa o mecanismo já existente, que recusa HS256 em produção
-  (`resolveJwtContract`). O `NODE_ENV` efetivo dos manifests de HML ainda não
-  foi verificado.
+  (`resolveJwtContract`). O overlay `aws` do OS Service
+  (`k8s/overlays/aws/configmap-patch.yaml`) define `NODE_ENV=production` com
+  `JWT_ALGORITHM=RS256` e `JWT_EXPIRES_IN=1800`, então o HML já roda no modo
+  estrito. Os serviços novos devem nascer com o mesmo ConfigMap; do contrário
+  o boot falha por contrato JWT incompleto.
 
 ## Referências
 
