@@ -2,7 +2,12 @@
 
 ## Status
 
-Aceita
+**Substituída** por [ADR-0021](./0021-borda-sem-bff.md) (30/09/2026) — a Fase 4
+delega 100% da validação de token ao Lambda Authorizer da borda, e os serviços
+não revalidam. O conteúdo abaixo permanece como registro histórico da
+autenticação local das Fases 1 a 3 — não é reescrito nem removido. A emissão do
+token de staff e o RBAC por papel seguem como pendência registrada na
+ADR-0021.
 
 ## Contexto
 

@@ -93,12 +93,13 @@ coreografada, F4/4.1).
 **Nota sobre `User`:** a Fase 4 decidiu (F5/5.1 do `fase4-decisoes-epico1.md`)
 migrar 100% da autenticação para o Lambda Authorizer da borda
 (`repo-auth-serverless`), o que supera `docs/adr/0008-autenticacao-local-jwt-rbac.md`.
-Essa ADR **não é revisada por esta Feature** — é escopo da Feature de
-Topologia de Infraestrutura e Borda (#311). Por isso este documento atribui
+A [ADR-0021](../adr/0021-borda-sem-bff.md) (Feature #311) formalizou essa
+substituição, mas **não decidiu** quem emite o token de staff depois que o
+`AuthModule` sair do OS Service. Por isso este documento atribui
 `User` ao OS Service apenas como posição provisória (é onde a tabela existe
 hoje), **sem fechar** se cada serviço nasce com sua própria cópia local de
 `User` (fallback de dev HS256, per `AGENTS.md`) ou se o model é descontinuado
-inteiramente. Fica registrado como pendência para a Feature #311 — não é
+inteiramente. Fica registrado como pendência na ADR-0021 — não é
 "tabela sem dono": é dono provisório com nota explícita, para não travar o
 critério de aceite desta Feature ("nenhuma tabela sem dono").
 
