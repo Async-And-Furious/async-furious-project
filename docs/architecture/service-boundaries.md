@@ -40,8 +40,9 @@ atual (`docs/adr/0010-monolito-modular.md`, agora superseded — ver
 [ADR-0017](../adr/0017-divisao-microsservicos-ownership-dados.md)).
 Permanece com PostgreSQL como lado de escrita e ganha o DynamoDB como lado
 de leitura (CQRS de `OrdemServico` e `Cliente`, decisão F4/4.1-4.5 do
-`fase4-decisoes-epico1.md` — fora do escopo desta Feature, tratado em
-Feature própria de Persistência, #310).
+`fase4-decisoes-epico1.md` — modelo de dados completo fechado pela Feature
+#310, ver [`persistence-model.md`](./persistence-model.md) e
+[ADR-0019](../adr/0019-dynamodb-read-model-os-cliente.md)).
 
 ### 1.2. Billing Service
 
