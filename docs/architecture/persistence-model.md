@@ -205,14 +205,19 @@ usuário separados) está em
 
 ## 9. Pendências para validação do grupo
 
-1. Confirmar a partição fixa `"ATIVA"` do GSI (§3) como aceitável dado o
-   volume esperado de OS ativas simultâneas — nenhum dado de produção
-   existe ainda para validar isso empiricamente.
-2. Confirmar que `Scan` + `FilterExpression` para `GET /clientes?search=`
-   (§4) é aceitável como trade-off de custo de leitura, dado o volume de
-   clientes esperado.
-3. Validar os nomes de banco lógico propostos em §8 (`os_service`,
-   `billing`, `execucao_producao`) antes da Feature #315 provisionar.
+1. ~~Confirmar a partição fixa `"ATIVA"` do GSI (§3)~~ — **[DECIDIDO]**
+   mantida como está. A Fase 4 não exige particionamento por
+   oficina/unidade; isso seria a solução "ideal", não a mínima exigida
+   pelo enunciado. Sem dado de produção para justificar a complexidade
+   extra, o grupo optou por não implementá-la.
+2. ~~Confirmar `Scan` + `FilterExpression` para `GET /clientes?search=`
+   (§4)~~ — **[DECIDIDO]** mantido como está, pelo mesmo motivo: um GSI
+   por prefixo de nome resolveria melhor, mas não é exigido pela fase —
+   o grupo optou pelo mínimo que atende ao critério de aceite.
+3. Nomes de banco lógico em §8 (`os_service`, `billing`,
+   `execucao_producao`) são só uma proposta — definição final fica a
+   cargo de quem for trabalhar a Feature #315 (provisionamento
+   Terraform), não bloqueia o fechamento desta Feature.
 
 ## 10. Referências
 
