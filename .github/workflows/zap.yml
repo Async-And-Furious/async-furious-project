@@ -2,6 +2,7 @@ name: DAST - OWASP ZAP
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     branches:
       - main
       - develop
@@ -11,6 +12,7 @@ on:
 
 jobs:
   zap-scan:
+    if: ${{ github.event_name != 'pull_request' || ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação')) }}
     name: ZAP ${{ github.event_name == 'pull_request' && 'Baseline (PR)' || 'Full API Scan' }}
     runs-on: ubuntu-latest
     permissions:

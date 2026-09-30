@@ -2,6 +2,7 @@ name: Protected API route diagnostics
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
       target:
@@ -19,7 +20,7 @@ permissions:
 jobs:
   hml:
     name: HML protected routes and EKS health
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'hml' }}
+    if: ${{ (github.event_name != 'workflow_dispatch' || inputs.target == 'hml') && (github.event_name != 'pull_request' || ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação'))) }}
     runs-on: ubuntu-latest
     environment: hml
     env:

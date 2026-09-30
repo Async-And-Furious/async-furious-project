@@ -90,17 +90,12 @@ coreografada, F4/4.1).
 | `User` | `auth` (transversal) | **OS Service** `[PENDENTE — ver nota]` | ver nota abaixo |
 | — | — | **Execução e Produção** | nasce sem nenhum model herdado (schema vazio); modelagem em Feature #320 |
 
-**Nota sobre `User`:** a Fase 4 decidiu (F5/5.1 do `fase4-decisoes-epico1.md`)
-migrar 100% da autenticação para o Lambda Authorizer da borda
-(`repo-auth-serverless`), o que supera `docs/adr/0008-autenticacao-local-jwt-rbac.md`.
-Essa ADR **não é revisada por esta Feature** — é escopo da Feature de
-Topologia de Infraestrutura e Borda (#311). Por isso este documento atribui
-`User` ao OS Service apenas como posição provisória (é onde a tabela existe
-hoje), **sem fechar** se cada serviço nasce com sua própria cópia local de
-`User` (fallback de dev HS256, per `AGENTS.md`) ou se o model é descontinuado
-inteiramente. Fica registrado como pendência para a Feature #311 — não é
-"tabela sem dono": é dono provisório com nota explícita, para não travar o
-critério de aceite desta Feature ("nenhuma tabela sem dono").
+**Nota sobre `User`:** a [ADR-0021](../adr/0021-borda-sem-bff.md) (Feature #311)
+mantém a autenticação em duas camadas: Lambda Authorizer na borda e validação
+local do JWT em cada serviço, com RBAC local. O login de staff
+(`POST /api/v1/auth/login`) e o model `User` permanecem no OS Service, que é
+onde a tabela existe hoje; Billing e Execução e Produção só validam o token e
+não têm `User`.
 
 ## 3. FKs que cruzam fronteira de serviço
 

@@ -6,11 +6,12 @@ on:
       - main
       - develop
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 jobs:
   test:
     name: Run All Tests
+    if: ${{ github.event_name != 'pull_request' || ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação')) }}
     runs-on: ubuntu-latest
 
     services:

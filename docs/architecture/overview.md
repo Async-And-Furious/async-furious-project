@@ -1,5 +1,10 @@
 # Visão Geral da Arquitetura — Async & Furious (Fase 3)
 
+> **Fase 4:** a topologia-alvo (três serviços, Authorizer na borda mais validação local
+> nos serviços, roteamento por path, sem BFF) está em [edge-topology.md](./edge-topology.md) e na
+> [ADR-0021](../adr/0021-borda-sem-bff.md). Este documento descreve o estado
+> implantado da Fase 3.
+
 > Duas camadas de informação: **[ATUAL]**, o que está implementado e rodando,
 > e **[PENDENTE]**, o que a Fase 3 exige e ainda não tem decisão ou evidência.
 > A marca `[PROPOSTA FASE 3]`, usada em versões anteriores deste documento,
