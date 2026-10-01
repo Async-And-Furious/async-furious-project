@@ -132,7 +132,7 @@ Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na se
 
 - Python 3 (para o orquestrador de stack)
 - GitHub CLI (`gh`), autenticado com `gh auth login` (para o orquestrador de stack)
-- Node.js 20+
+- Node.js 22
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
 - Terraform 1.6+

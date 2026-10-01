@@ -39,48 +39,80 @@ não faz parte da entrega), o que elimina o consumidor típico de um BFF.
    - **Borda**: o Lambda Authorizer (`authorize-request`) continua sendo a
      primeira camada e valida o token. É reaproveitado como está, sem reescrita
      e sem propagar `sub`/`role` por header.
-   - **Serviços**: cada serviço valida o JWT localmente (segunda camada), com
-     `src/auth/` **copiado** do OS Service (`jwt.strategy.ts`, `JwtAuthGuard`,
-     `RolesGuard` e o enum de papéis). Reuso direto, sem pacote npm
-     compartilhado.
+   - **Serviços novos (Billing e Execução e Produção)**: cada um valida o JWT
+     localmente (segunda camada), numa **variante stateless** de `src/auth/`,
+     **não** uma cópia do diretório inteiro. Copia-se apenas:
+     - `jwt.strategy` simplificada: `validate` devolve `{ id: sub, email, role }`
+       a partir dos claims, sem consultar banco; rejeita `role` fora do enum;
+       token sem `role` vira `Role.CLIENTE`;
+     - `JwtAuthGuard`, `RolesGuard`, decorators `public`/`roles`/`current-user`,
+       enum `Role` e `public-route.util`;
+     - a verificação do `jwt.config` (**sem** assinatura e **sem**
+       `JWT_PRIVATE_KEY`).
+
+     **Não** se copiam `AuthService`, `AuthController`, Prisma,
+     `JwtCustomerStrategy` nem `WebhookAuthGuard`. Variáveis de ambiente:
+     `JWT_PUBLIC_KEY`, `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ALGORITHM`. Reuso
+     direto, sem pacote npm compartilhado. O OS Service mantém o `src/auth/`
+     completo (login e `User`).
 2. **RBAC permanece local.** O papel (`ADMIN`, `RECEPCIONISTA`, `MECANICO`) e o
    `sub` saem do token validado dentro de cada serviço. Nenhum serviço depende
-   de o Gateway injetar claims.
+   de o Gateway injetar claims. **Trade-off da variante stateless**: um usuário
+   removido ou desativado no OS Service continua aceito pelos serviços novos
+   até o `exp` do token (30 min).
 3. **Login de staff e `User` permanecem no OS Service.** `POST /api/v1/auth/login`
    continua emitido pela aplicação com a chave privada já usada hoje; não há
    decisão de mover a emissão na Fase 4.
 4. **Sem `NetworkPolicy`** (decisão da Feature #313). É a razão da decisão 1:
    a validação local substitui a segunda camada de rede que não existirá.
-5. **Roteamento direto por path**, sem BFF, mantendo o caminho atual
-   API Gateway → VPC Link → ALB interno, agora com três destinos:
+5. **Roteamento direto por path de recurso**, sem BFF, mantendo o caminho
+   atual API Gateway → VPC Link → ALB interno, agora com três destinos.
+   **Todos os serviços mantêm `setGlobalPrefix('api/v1')`**: a URL final é
+   `/api/v1/<recurso>` e ninguém reescreve path. Os prefixos `/os`,
+   `/billing` e `/execucao`, cogitados antes, foram **descartados**.
 
-   | Path de entrada | Serviço de destino |
+   | Path de entrada (`path_pattern` do ALB) | Serviço de destino |
    |---|---|
-   | `/os/*` | OS Service |
-   | `/billing/*` | Billing Service |
-   | `/execucao/*` | Execução e Produção |
-   | `POST /auth` | Lambda `authenticate-customer` (rota pública, inalterada) |
+   | `/api/v1/orcamentos*`, `/api/v1/pagamentos*`, `/api/v1/webhooks/mercado-pago`, `/api/docs/billing*` | Billing Service |
+   | `/api/v1/execucoes*`, `/api/docs/execucao*` | Execução e Produção |
+   | demais paths (`default_action`): `auth`, `clientes`, `veiculos`, `servicos`, `ordens-servico`, `webhooks/service-orders`, `pecas`, `health` | OS Service |
+   | `POST /auth` (no Gateway) | Lambda `authenticate-customer` (rota pública, inalterada) |
+
+   Swagger: cada serviço publica a documentação em `/api/docs/<servico>` (`/api/docs/billing`, `/api/docs/execucao`); o do OS Service continua em `/api/docs` (`default_action`).
 
    O Gateway mantém a rota única `/{proxy+}`; a diferenciação por serviço é
-   feita por regra de listener do ALB (Feature #317). O mapa detalhado está em
+   feita por regra de listener do ALB (Feature #317). O health é
+   `/api/v1/health/live`, igual nos três serviços. O mapa detalhado está em
    [`docs/architecture/edge-topology.md`](../architecture/edge-topology.md).
 6. **Rotas públicas explícitas e sem authorizer no Gateway** (Feature #317):
-   - aprovação, recusa e consulta de status de orçamento (`@Public()`,
-     [ADR-0011](./0011-aprovacao-orcamento-api-publica.md)), apontando para o
-     Billing Service;
-   - webhook do Mercado Pago, cuja autenticação é a assinatura HMAC
-     (`x-signature`), validada no Billing (Feature #325).
-7. **Ambientes: a Fase 4 é HML-only.** Não haverá PROD na Fase 4 e nenhuma
+   rotas específicas com `authorization_type = "NONE"`, na **mesma
+   integração** da `/{proxy+}` (a rota mais específica vence):
+   - `GET /api/v1/ordens-servico/{id}/status` (OS Service);
+   - `PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar` e
+     `PATCH /api/v1/orcamentos/{ordemServicoId}/recusar` (`@Public()`,
+     [ADR-0011](./0011-aprovacao-orcamento-api-publica.md), Billing Service);
+   - `POST /api/v1/webhooks/mercado-pago`, cuja autenticação é a assinatura
+     HMAC (`x-signature`) mais a reconsulta ao Mercado Pago, validadas no
+     Billing (Feature #325).
+7. **Só dois mecanismos de autenticação, e nenhum segredo entre serviços.**
+   A Fase 4 não tem chamada REST entre serviços: toda a coordenação é por
+   evento (ADR-0016/0018). Logo, **não existe segredo compartilhado
+   serviço-a-serviço**. Os mecanismos são: (a) **JWT** (rotas autenticadas);
+   (b) **HMAC do webhook** do Mercado Pago. O `WebhookAuthGuard` /
+   `WEBHOOK_SECRET` legado vale **só** para `webhooks/service-orders` no OS
+   Service.
+8. **Ambientes: a Fase 4 é HML-only.** Não haverá PROD na Fase 4 e nenhuma
    decisão de PROD é tomada aqui. O PROD da Fase 3 permanece como está.
-8. **Cluster Kubernetes compartilhado** pelos três serviços, em namespaces e
+9. **Cluster Kubernetes compartilhado** pelos três serviços, em namespaces e
    deployments separados. A defesa por escrito (custo de conta acadêmica,
    risco de ponto único de falha) está na
    [ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md), junto
    com a da instância RDS compartilhada, como decidido em conjunto; esta ADR
    apenas a referencia.
-9. A [ADR-0008](./0008-autenticacao-local-jwt-rbac.md) passa a **Parcialmente
-   substituída** por esta ADR: a validação local e o RBAC permanecem, agora
-   como segunda camada atrás do Authorizer e replicados nos serviços novos.
+10. A [ADR-0008](./0008-autenticacao-local-jwt-rbac.md) passa a **Parcialmente
+    substituída** por esta ADR: a validação local e o RBAC permanecem, agora
+    como segunda camada atrás do Authorizer e replicados (variante stateless)
+    nos serviços novos.
 
 ## Alternativas consideradas
 
@@ -92,7 +124,14 @@ não faz parte da entrega), o que elimina o consumidor típico de um BFF.
 - **Biblioteca compartilhada de validação de token**: recusada. Reacopla os
   serviços por pacote e exige publicação e versionamento de pacote, o mesmo
   motivo pelo qual o catálogo de eventos usa tipos duplicados (ADR-0018). A
-  cópia de `src/auth/` tem custo quase nulo e cada serviço evolui sozinho.
+  cópia dos poucos arquivos da variante stateless tem custo quase nulo e cada
+  serviço evolui sozinho.
+- **Copiar `src/auth/` inteiro nos serviços novos**: recusada. Traria
+  `AuthService`, `AuthController`, Prisma e a assinatura de token (e a
+  `JWT_PRIVATE_KEY`) para serviços que só validam. A variante stateless copia
+  só o necessário para validar e aplicar RBAC.
+- **Segredo compartilhado serviço-a-serviço (ex.: header interno)**: não se
+  aplica. Sem chamada REST entre serviços, não há o que autenticar entre eles.
 - **Propagar `sub`/`role` do Authorizer como header**: recusada. Mudaria
   `repo-auth-serverless` e o mapeamento do Gateway, e o serviço ainda ficaria
   aceitando header forjado em acesso direto ao pod.
@@ -110,9 +149,12 @@ não faz parte da entrega), o que elimina o consumidor típico de um BFF.
 
 ## Consequências negativas
 
-- **A validação de token existe em três lugares** (cópia do `src/auth/` em cada
-  serviço). Correção de bug ou rotação de chave pública exige replicar a
-  mudança. Aceito pelo tamanho do código e pelo prazo.
+- **A validação de token existe em três lugares** (os arquivos de auth
+  copiados em cada serviço). Correção de bug ou rotação de chave pública exige
+  replicar a mudança. Aceito pelo tamanho do código e pelo prazo.
+- **Usuário removido vale até o `exp`**: como `validate` não consulta o banco
+  nos serviços novos, um usuário desativado no OS Service continua aceito
+  neles por até 30 min (vida do token). Aceito em HML.
 - **Rotas públicas exigem rota sem authorizer no Gateway**, além de `POST /auth`,
   e cada uma carrega sua própria proteção (assinatura no webhook, ADR-0011 na
   aprovação de orçamento).
@@ -122,18 +164,44 @@ não faz parte da entrega), o que elimina o consumidor típico de um BFF.
 
 ## Riscos
 
-- **Médio — divergência entre as cópias de `src/auth/`**: claims, `issuer`,
+- **Médio — divergência entre as cópias da validação**: claims, `issuer`,
   `audience` e chave pública devem permanecer iguais nos três serviços e no
   Authorizer. Mitigação: a cópia nasce idêntica e a chave pública vem do mesmo
-  parâmetro SSM.
+  parâmetro SSM (`JWT_PUBLIC_KEY`, `JWT_ISSUER`, `JWT_AUDIENCE`,
+  `JWT_ALGORITHM`).
 - **Médio — rota pública sem proteção própria**: uma rota marcada sem authorizer
   passa a ser um endpoint aberto na internet. O webhook do Mercado Pago só muda
   status de pagamento depois de validar a assinatura e reconsultar o pagamento
   (Feature #325).
 - **Baixo — `HS256` local em ambiente remoto**: o modo de desenvolvimento local
   usa o mecanismo já existente, que recusa HS256 em produção
-  (`resolveJwtContract`). O `NODE_ENV` efetivo dos manifests de HML ainda não
-  foi verificado.
+  (`resolveJwtContract`). O overlay `aws` do OS Service
+  (`k8s/overlays/aws/configmap-patch.yaml`) define `NODE_ENV=production` com
+  `JWT_ALGORITHM=RS256` e `JWT_EXPIRES_IN=1800`, então o HML já roda no modo
+  estrito. Os serviços novos devem nascer com o mesmo ConfigMap; do contrário
+  o boot falha por contrato JWT incompleto.
+
+## Revisão de 30/09/2026
+
+Revisão do épico #306 (`rev/Epic_1`), alinhada a
+[`saga-flow.md`](../architecture/saga-flow.md). A decisão central (borda com
+Authorizer, validação local, sem BFF) **continua valendo**. Mudou:
+
+- **URLs**: todos os serviços mantêm `setGlobalPrefix('api/v1')`; o ALB roteia
+  por `path_pattern` de recurso (Billing: `orcamentos*`, `pagamentos*`,
+  `webhooks/mercado-pago`; Execução: `execucoes*`; OS Service: padrão).
+  Descartados `/os`, `/billing` e `/execucao`.
+- **Rotas públicas** passam a ser rotas específicas no Gateway
+  (`authorization_type = "NONE"`, mesma integração): `GET .../status`,
+  `PATCH .../orcamentos/{ordemServicoId}/aprovar|recusar` (path param é o
+  `ordemServicoId`) e
+  `POST .../webhooks/mercado-pago`. `aprovar-servico` (POST público) e
+  `rastreamento` saem na Fase 4 (ADR-0011).
+- **Auth nos serviços novos**: variante **stateless**, em vez de copiar
+  `src/auth/` inteiro; trade-off do usuário removido válido até o `exp`.
+- **Zero chamada REST entre serviços** e nenhum segredo compartilhado entre
+  eles: só JWT e HMAC do webhook (mais o `WebhookAuthGuard` legado só em
+  `webhooks/service-orders`).
 
 ## Referências
 

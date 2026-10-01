@@ -4,16 +4,6 @@
 
 Aceita
 
-> Numeração escolhida como 0017, não 0016: no momento da escrita desta ADR
-> existe trabalho em andamento (não commitado) em outra branch do grupo
-> (`feat/I-308_DefinirEstrategiaDeSaga`) já usando `0016-saga-coreografada.md`
-> para a Feature #308. Como as duas branches partem do mesmo ponto de
-> `develop` (onde a última ADR commitada é a 0015), usar 0017 aqui evita a
-> colisão de nome de arquivo no merge — mas o índice de
-> [`docs/adr/README.md`](./README.md) ainda vai precisar de conferência
-> manual quando as duas branches integrarem, para garantir que a numeração
-> final fique sequencial e sem lacuna.
-
 ## Contexto
 
 A Fase 1 exigia "back-end monolítico" e o grupo organizou esse monólito em
@@ -37,11 +27,14 @@ Dividir o monólito em três serviços, decisão fechada pelo grupo em
 2. **Billing Service** — repositório novo (issue #323), extraído do módulo
    `financeiro`, somado ao model `Orcamento` (que migra de `ordem-servico`).
 3. **Execução e Produção** — repositório novo (issue #319), serviço sem
-   nenhum model herdado do monólito.
+   nenhum model herdado do monólito. É dono da `Execucao`, da fila de
+   diagnóstico e de reparo e das ações do mecânico `iniciar-diagnostico`,
+   `iniciar-reparo` e `concluir` (ver "Revisão de 30/09/2026").
 
 Cada serviço ganha banco de dados próprio (uma instância RDS compartilhada,
 mas com banco lógico e credencial isolados por serviço, mais o DynamoDB do
-OS Service — decisão de infraestrutura tratada no Epic #312, fora desta ADR).
+OS Service — decisão de infraestrutura registrada na
+[ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md)).
 Toda FK que cruzar a fronteira de serviço vira referência por id, sem
 integridade referencial no banco — o padrão que `Pagamento.ordemServicoId`
 já usava antes mesmo desta divisão existir.
@@ -80,20 +73,48 @@ aqui para não haver duas fontes de verdade divergentes.
   Cascade`) que tinha dentro do mesmo banco — deletar uma `OrdemServico` no
   OS Service não cascateia mais para o `Orcamento` no Billing Service. A
   Feature #307 registrou essa consequência como aceita, sem propor
-  mecanismo de compensação (fica para as Features de Mensageria/#309 e de
-  extração do Financeiro/#330).
+  mecanismo de compensação; na Fase 4 isso é aceito sem evento de deleção
+  (fora do `event-catalog.md`), e a extração do `Orcamento` é da #330.
 - A regra de pagamento → entrega, antes uma checagem local ao mesmo banco,
-  passa a depender de informação vinda de outro serviço (ver
-  `docs/architecture/service-order-flow.md`). A relação dessa regra com a
-  sequência de Saga foi resolvida pela [ADR-0016](./0016-saga-coreografada.md):
-  há um único pagamento, cobrado na etapa da Saga logo após a aprovação, e a
-  checagem em `registrar-entrega` é apenas trava de segurança sobre ele.
+  passaria a depender de informação vinda de outro serviço. Por isso a
+  checagem de pagamento em `registrar-entrega` foi **cortada** (revisão de
+  30/09/2026): o `Pagamento` é do Billing Service e a Fase 4 não tem chamada
+  REST entre serviços (ver `docs/architecture/service-order-flow.md`). A
+  relação com a sequência de Saga foi resolvida pela
+  [ADR-0016](./0016-saga-coreografada.md): há um único pagamento, cobrado na
+  etapa da Saga logo após a aprovação.
 
 ## Riscos
 
-- **Baixo**: colisão de numeração de ADR com a branch paralela de #308 (ver
-  nota em "Status") — resolução mecânica no momento do merge, sem impacto de
-  conteúdo.
+- Nenhum risco novo além dos já descritos em "Consequências negativas".
+
+## Revisão de 30/09/2026
+
+Revisão do épico #306 (`rev/Epic_1`). A divisão em três serviços e o
+ownership de dados **continuam valendo**. Mudou a fronteira do Execução e
+Produção, que passa ao **modelo híbrido mínimo** (fluxo em
+[`saga-flow.md`](../architecture/saga-flow.md) §2), porque o enunciado (p.3)
+atribui ao serviço "gerenciar a fila de execução da OS", "atualizar status
+durante diagnóstico e reparos" e "comunicar finalização ao OS Service":
+
+- **Responsabilidades do Execução e Produção**: fila de diagnóstico
+  (consome `OrdemServicoRecebida`) e de reparo (consome
+  `PagamentoConfirmado`); início do diagnóstico, início do reparo e
+  conclusão por ação do mecânico; cancelamento nas recusas e em
+  `EtapaDaSagaFalhou`.
+- **Rotas que migram do OS Service para o Execução e Produção**:
+  `assumir` e `analisar` → `PATCH /api/v1/execucoes/{id}/iniciar-diagnostico`;
+  `finalizar-execucao` → `PATCH /api/v1/execucoes/{id}/concluir`; novas
+  `PATCH /api/v1/execucoes/{id}/iniciar-reparo` e
+  `GET /api/v1/execucoes?status=...` (fila por `createdAt`).
+- **Ficam no OS Service**: `PATCH /api/v1/ordens-servico/{id}/servicos-insumos`
+  (listar serviços/peças e calcular o orçamento, que dependem de `Servico` e
+  `Peca`) e `registrar-entrega`.
+- O OS Service ganha a coluna `pago_em` (`nullable`) em `OrdemServico`,
+  gravada ao consumir `PagamentoConfirmado`, só para o detector de OS parada
+  não encerrar OS já paga que espera na fila de reparo. Não é uma cópia do
+  `Pagamento`, que segue do Billing Service.
+- Rotas de orçamento: `/api/v1/orcamentos/{ordemServicoId}/aprovar|recusar`.
 
 ## Referências
 

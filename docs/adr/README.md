@@ -1,8 +1,13 @@
 # ADRs — Async & Furious
 
 Architecture Decision Records para decisões **permanentes e de alto
-impacto** da arquitetura da Fase 3. Para decisões técnicas mais detalhadas e
+impacto** da arquitetura das Fases 3 e 4. Para decisões técnicas mais detalhadas e
 ainda passíveis de evolução, ver [RFCs](../rfcs/README.md).
+
+> Algumas ADRs da Fase 4 citam `fase4-decisoes-epico*.md`: são notas de
+> trabalho do grupo, mantidas fora do repositório. A decisão vinculante é
+> sempre a registrada na própria ADR; o fluxo da Saga tem como fonte única
+> [`saga-flow.md`](../architecture/saga-flow.md).
 
 Nenhum padrão de ADR numerado existia neste repositório antes desta
 auditoria (confirmado: nenhuma pasta `docs/adr/` em nenhuma branch
@@ -34,6 +39,7 @@ seguido pelas próximas ADRs.
 | [ADR-0019](./0019-dynamodb-read-model-os-cliente.md) | DynamoDB como banco de leitura de Ordem de Serviço e Cliente | Aceita |
 | [ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md) | Bancos compartilhados com isolamento por credencial | Aceita |
 | [ADR-0021](./0021-borda-sem-bff.md) | Borda sem BFF: Authorizer na borda, validação local nos serviços e roteamento direto por path | Aceita |
+| ADR-0022 | Integração com o Mercado Pago (Checkout Pro, webhook HMAC, estorno) | Pendente — a criar na Feature #325 |
 
 ADRs 0006-0015 registram decisões das Fases 1 e 2 (retroativas — a solução
 já estava construída), a partir do rascunho de descoberta em

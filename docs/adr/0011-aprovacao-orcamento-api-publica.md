@@ -20,8 +20,14 @@ diretamente com o ciclo da OS:
 
 - `PATCH /ordens-servico/:id/orcamento/aprovar`
 - `PATCH /ordens-servico/:id/orcamento/recusar`
-- `PATCH /ordens-servico/:id/aprovar-servico`
 - `GET /ordens-servico/:id/status`
+
+(Lista da Fase 2 no monólito. Versões anteriores deste ADR listavam também
+`PATCH /ordens-servico/:id/aprovar-servico` como pública, o que era um erro:
+no código essa rota é **autenticada** (cliente aprova o serviço já prestado).
+A rota pública com esse path é o `POST /ordens-servico/:id/aprovar-servico`
+(`@Public()`, notificação de aprovação/recusa de orçamento). Ver "Revisão de
+30/09/2026" para a lista da Fase 4.)
 
 Nenhuma biblioteca de e-mail (`nodemailer`, `sendgrid`, SES, etc.) está
 presente em `package.json` — confirmado por busca nesta auditoria.
@@ -79,10 +85,10 @@ muda é onde o `model Orcamento` e as rotas passam a viver.
   já usa. Deletar uma `OrdemServico` deixa de cascatear a exclusão do
   `Orcamento` — consequência aceita, sem mecanismo de compensação definido
   nesta revisão (ver ADR-0017, "Consequências negativas").
-- As rotas `PATCH /ordens-servico/:id/orcamento/aprovar` e
-  `.../orcamento/recusar` migram junto para o Billing Service, **mantendo o
-  comportamento `@Public()`** decidido nesta ADR — não há mudança na
-  exposição pública, só na localização física do serviço que a atende.
+- As rotas de aprovação/recusa migram junto para o Billing Service,
+  **mantendo o comportamento `@Public()`** decidido nesta ADR — não há mudança
+  na exposição pública, só na localização física do serviço que a atende e
+  no path (ver "Revisão de 30/09/2026").
   `GET /ordens-servico/:id/status` permanece no OS Service (lê o status da
   OS, não do orçamento).
 - O risco de segurança já registrado acima (ID previsível, sem verificação
@@ -91,6 +97,44 @@ muda é onde o `model Orcamento` e as rotas passam a viver.
 - Fora do escopo desta revisão (e desta Feature #307): como o Billing
   Service publica o evento de aprovação/recusa para o OS Service consumir
   (Feature de Mensageria, #309) e a extração de código em si (#330).
+
+## Revisão de 30/09/2026
+
+Revisão do épico #306 (`rev/Epic_1`), alinhada a
+[`saga-flow.md`](../architecture/saga-flow.md) e a
+[ADR-0021](./0021-borda-sem-bff.md). A decisão central (rotas públicas
+síncronas, sem e-mail) **continua valendo**. Mudou:
+
+**Rotas públicas na Fase 4** (rotas específicas no API Gateway com
+`authorization_type = "NONE"`, mesma integração da `/{proxy+}`; a rota mais
+específica vence):
+
+| Rota | Serviço | Observação |
+|---|---|---|
+| `GET /api/v1/ordens-servico/{id}/status` | OS Service | consulta de status |
+| `PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar` | Billing Service | cria a cobrança e devolve `{ linkPagamento }` |
+| `PATCH /api/v1/orcamentos/{ordemServicoId}/recusar` | Billing Service | |
+| `POST /api/v1/webhooks/mercado-pago` | Billing Service | autenticada por HMAC `x-signature` + reconsulta (#325), não por JWT |
+
+- **Paths novos.** As rotas de orçamento deixam de ser
+  `/ordens-servico/:id/orcamento/...` e passam a ser
+  `/api/v1/orcamentos/{ordemServicoId}/...` no Billing Service. O path param
+  é o `ordemServicoId` (e não um id de orçamento): o cliente só conhece o id
+  da OS, e `Orcamento.ordemServicoId` é único.
+- **Removidas na Fase 4**: `POST /ordens-servico/:id/aprovar-servico`
+  (`@Public()`, uma **terceira via** de aprovação que pulava o pagamento) e
+  `GET /ordens-servico/:id/rastreamento` (alias de `/status`). Correção: a
+  versão anterior desta ADR listava `PATCH .../aprovar-servico` como pública;
+  esse `PATCH` é autenticado e **não é afetado** por esta remoção.
+- A aprovação pública agora **cria a preference do Checkout Pro** e devolve
+  `{ linkPagamento }` (fluxo e idempotência em `saga-flow.md` §1). Falha do
+  Mercado Pago devolve `502` e o orçamento segue `PENDING`.
+- `WebhookAuthGuard`/`WEBHOOK_SECRET` valem **só** para
+  `webhooks/service-orders`; o webhook do Mercado Pago não os usa.
+- **Risco do ID previsível segue aberto**: a aprovação continua sem verificar
+  a identidade do cliente. O endpoint de aprovação agora tem consequência
+  financeira (gera cobrança), o que agrava o risco registrado acima sem
+  resolvê-lo.
 
 ## Referências
 
