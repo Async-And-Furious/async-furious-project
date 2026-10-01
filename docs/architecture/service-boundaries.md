@@ -36,12 +36,8 @@ criação dos dois repositórios novos e da infraestrutura correspondente (Epic
 código (Epics #322 e #318), migração de dados existentes e contratos de
 evento entre os serviços (Feature #309).
 
-> **Nota de escopo (confirmada com o solicitante em 22/09/2026):** a
-> contagem de "repositórios novos" para a Fase 4 é **2** (Billing + Execução)
-> — o OS Service reaproveita `async-furious-project`. Uma leitura anterior
-> de que seriam "3 a 4 repositórios novos" foi confirmada como engano de
-> memória e descartada; a divisão em 3 serviços / 2 repositórios novos segue
-> como está fechada em `fase4-decisoes-epico1.md` (F1) e não foi reaberta.
+> **Escopo:** a Fase 4 cria **2** repositórios novos (Billing e Execução);
+> o OS Service reaproveita o `async-furious-project`.
 
 ### 1.1. OS Service
 
@@ -101,15 +97,10 @@ serviços/peças e calcular o orçamento — dependem de `Servico` e `Peca`) e
 
 ## 2. Mapa de Ownership — todos os models do `prisma/schema.prisma`
 
-> **Nota factual:** a issue #307 fala em "16 models". A contagem real no
-> `prisma/schema.prisma` atual (commit `develop` na data deste documento) é
-> **14 models** (`User`, `Cliente`, `Veiculo`, `OrdemServico`, `Orcamento`,
-> `Peca`, `Servico`, `OsPeca`, `OsServico`, `PedidoFornecedor`,
-> `PedidoFornecedorItem`, `ReservaEstoque`, `Pagamento`, `HistoricoStatusOS`).
-> Sinalizando a divergência em vez de inventar 2 models para bater com o
-> número da issue — nem somando os 3 `enum` (`TaxIdType`, `SOStatus`,
-> `EstimateStatus`) o número bate (daria 17); é imprecisão do texto da issue,
-> a confirmar com o grupo.
+> **Contagem:** o `prisma/schema.prisma` tem **14 models** (`User`, `Cliente`,
+> `Veiculo`, `OrdemServico`, `Orcamento`, `Peca`, `Servico`, `OsPeca`,
+> `OsServico`, `PedidoFornecedor`, `PedidoFornecedorItem`, `ReservaEstoque`,
+> `Pagamento`, `HistoricoStatusOS`). O texto original da #307 citava 16.
 
 | Model | Módulo atual | Serviço dono (Fase 4) | Observação |
 |---|---|---|---|
@@ -140,7 +131,7 @@ não têm `User`.
 
 | Origem | Referência | Situação hoje | Decisão Fase 4 |
 |---|---|---|---|
-| `Orcamento.id_ordem_servico` | `OrdemServico.id` | `@relation(..., onDelete: Cascade)` — FK real no Postgres, deleção de OS cascade-deleta o Orçamento | **Vira referência por id, sem FK.** Campo passa a ser `ordemServicoId String` (sem `@relation`), no mesmo padrão que `Pagamento.ordemServicoId` já usa hoje. **Consequência assumida:** deletar uma `OrdemServico` no OS Service deixa de cascatear para o `Orcamento` no Billing Service — se isso for necessário, vira evento de domínio consumido pelo Billing (fora do escopo desta Feature, tratado em #309/#331) |
+| `Orcamento.id_ordem_servico` | `OrdemServico.id` | `@relation(..., onDelete: Cascade)` — FK real no Postgres, deleção de OS cascade-deleta o Orçamento | **Vira referência por id, sem FK.** Campo passa a ser `ordemServicoId String` (sem `@relation`), no mesmo padrão que `Pagamento.ordemServicoId` já usa hoje. **Consequência assumida:** deletar uma `OrdemServico` no OS Service deixa de cascatear para o `Orcamento` no Billing Service — aceito na Fase 4 sem evento de deleção (o catálogo `event-catalog.md` não prevê um); a extração do `Orcamento` é da #330 |
 | `Pagamento.ordemServicoId` | `OrdemServico.id` | Já é `String` solto, sem `@relation` — nenhuma FK a remover | **Nenhuma FK a remover.** Muda de banco lógico (`os_service` → `billing`, na mesma instância RDS, isolado por credencial, Epic #312) |
 
 Nenhuma outra FK do schema atual cruza a fronteira OS Service / Billing

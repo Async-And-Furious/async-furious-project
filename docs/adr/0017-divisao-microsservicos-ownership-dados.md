@@ -73,8 +73,8 @@ aqui para não haver duas fontes de verdade divergentes.
   Cascade`) que tinha dentro do mesmo banco — deletar uma `OrdemServico` no
   OS Service não cascateia mais para o `Orcamento` no Billing Service. A
   Feature #307 registrou essa consequência como aceita, sem propor
-  mecanismo de compensação (fica para as Features de Mensageria/#309 e de
-  extração do Financeiro/#330).
+  mecanismo de compensação; na Fase 4 isso é aceito sem evento de deleção
+  (fora do `event-catalog.md`), e a extração do `Orcamento` é da #330.
 - A regra de pagamento → entrega, antes uma checagem local ao mesmo banco,
   passaria a depender de informação vinda de outro serviço. Por isso a
   checagem de pagamento em `registrar-entrega` foi **cortada** (revisão de
