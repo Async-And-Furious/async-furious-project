@@ -34,6 +34,7 @@ seguido pelas próximas ADRs.
 | [ADR-0019](./0019-dynamodb-read-model-os-cliente.md) | DynamoDB como banco de leitura de Ordem de Serviço e Cliente | Aceita |
 | [ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md) | Bancos compartilhados com isolamento por credencial | Aceita |
 | [ADR-0021](./0021-borda-sem-bff.md) | Borda sem BFF: Authorizer na borda, validação local nos serviços e roteamento direto por path | Aceita |
+| ADR-0022 | Integração com o Mercado Pago (Checkout Pro, webhook HMAC, estorno) | Pendente — a criar na Feature #325 |
 
 ADRs 0006-0015 registram decisões das Fases 1 e 2 (retroativas — a solução
 já estava construída), a partir do rascunho de descoberta em

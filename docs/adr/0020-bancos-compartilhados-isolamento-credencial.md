@@ -2,7 +2,7 @@
 
 ## Status
 
-Aceita
+Aceita — complementada em 30/09/2026 (ver [Revisão de 30/09/2026](#revisão-de-30092026)).
 
 ## Contexto
 
@@ -14,7 +14,8 @@ free tier:
 
 - **Uma única instância RDS PostgreSQL por ambiente**
   (`docs/adr/0004-banco-dados-gerenciado.md`), `tc3-db-${environment}`, hoje
-  com um único banco lógico (`workshop`).
+  com um único banco lógico (`workshop`, renomeado para `os_service` — ver
+  [Revisão de 30/09/2026](#revisão-de-30092026)).
 - **Um único cluster EKS compartilhado** (`docs/adr/0003-kubernetes-eks-orquestracao.md`),
   que os três serviços da Fase 4 (OS, Billing, Execução e Produção) vão
   dividir — decisão que também precisa ser defendida por escrito junto com
@@ -31,7 +32,7 @@ Manter **uma única instância RDS por ambiente**, compartilhada pelos três
 serviços, com **banco lógico e credencial (usuário/senha) isolados por
 serviço**:
 
-| Serviço | Banco lógico (proposto) | Motor |
+| Serviço | Banco lógico (nomes fechados em 30/09/2026) | Motor |
 |---|---|---|
 | OS Service | `os_service` | PostgreSQL (na instância `tc3-db-${environment}`) |
 | Billing Service | `billing` | PostgreSQL (na mesma instância) — **começa vazio**: a tabela `pagamentos` hoje só tem dado de teste, sem dado de produção a migrar |
@@ -43,7 +44,8 @@ no banco de outro. Isso cumpre o requisito de isolamento do enunciado (p.4)
 a uma fração do custo de três instâncias RDS separadas. O provisionamento
 real dos bancos/credenciais e a renomeação do banco `workshop` atual são
 escopo da Feature #315 ("Provisionar os Bancos por Serviço", Epic #312) —
-esta ADR fixa a decisão e os nomes, não a aplica em Terraform.
+esta ADR fixa a decisão e os nomes, não a aplica em Terraform (mecanismo de
+bootstrap, secrets e IRSA na Revisão de 30/09/2026, ao final).
 
 No **DynamoDB**, o isolamento é nativo por tabela: o OS Service é o único
 serviço com tabelas DynamoDB (ADR-0019), e a IAM role usada pela aplicação
@@ -95,10 +97,11 @@ acadêmico que justifica a instância RDS única se aplica ao cluster EKS
   IAM/rede poderia, em tese, permitir a um serviço alcançar a rede da
   instância inteira (ainda que sem credencial válida para autenticar no
   banco de outro serviço).
-- `Orcamento.onDelete: Cascade` já foi removido pela Feature #307
-  (ADR-0017) exatamente por essa razão de fronteira — nenhuma consequência
-  nova aqui, só reforça que a ausência de FK real entre bancos já era
-  consequência aceita antes desta ADR.
+- O `Orcamento.onDelete: Cascade` (ainda presente no `schema.prisma`) deixa de
+  existir na extração do Billing Service: a Feature #307 (ADR-0017) decidiu
+  trocá-lo por referência por id, exatamente por essa razão de fronteira —
+  nenhuma consequência nova aqui, só reforça que a ausência de FK real entre
+  bancos já era consequência aceita antes desta ADR.
 
 ## Riscos
 
@@ -109,6 +112,48 @@ acadêmico que justifica a instância RDS única se aplica ao cluster EKS
 - **Baixo**: policy de IAM por tabela DynamoDB (ADR-0019) precisa ser
   revisada quando/se outro serviço algum dia precisar de acesso de leitura
   ao NoSQL do OS Service — hoje nenhum cenário desse tipo está previsto.
+
+## Revisão de 30/09/2026
+
+Revisão do épico #306 (`rev/Epic_1`). A decisão (uma instância RDS por
+ambiente, banco lógico e credencial por serviço) **continua valendo**. Esta
+seção fecha os pontos que a ADR deixava para a Feature #315.
+
+**Nomes dos bancos.** `os_service`, `billing` e `execucao_producao`
+(definitivos, não mais "propostos"). O `db_name = "workshop"` em
+`repo-db-infra/modules/rds/main.tf` passa a ser `os_service`, o que
+**recria a instância**. Aceito em HML (recriado via down/up); em PROD a
+instância tem `deletion_protection`, então a troca exige procedimento
+manual e deliberado.
+
+**Bootstrap dos bancos e roles.** Um **Job in-cluster**, executado no
+pipeline do OS Service, cria os três bancos e os três roles de forma
+**idempotente** (blocos `DO $$ ... $$`). As senhas são geradas por
+`random_password` no Terraform e gravadas no Secrets Manager (mesmo padrão
+da #315). O artifact do `terraform plan` usa `retention-days: 1`.
+**Dívida registrada:** as senhas ficam no state do Terraform.
+
+**Secrets e outputs (`repo-db-infra`).**
+- O output `db_connection_secret_arn` passa a apontar para o secret do **OS
+  Service** (JSON `host`/`port`/`dbname`/`username`/`password`). Isso
+  preserva `deploy-eks.yml` e a CI do `repo-auth-serverless`.
+- Novo output `db_master_secret_arn` expõe o secret do usuário master
+  (usado só pelo Job de bootstrap).
+- O Lambda `authenticate-customer` (`repo-auth-serverless`) passa a usar o
+  secret do OS Service (`customer-repository.ts` já suporta o formato).
+  **Dívida:** role somente leitura dedicado ao Lambda (hoje ele usa a
+  credencial de escrita do OS Service).
+
+**IRSA do DynamoDB.** Criada no `repo-db-infra`, lendo o OIDC provider do
+remote state do `repo-k8s-infra` (RFC-004: db lê k8s, nunca o inverso).
+Namespace e service account são fixos (ex.: `async-furious` / `os-service`).
+A pipeline anota a service account com o `role-arn` lido do output. A
+policy continua restrita às tabelas `os-read-model` e `cliente-read-model`
+do ambiente.
+
+**Conexões.** Cada serviço usa `connection_limit=3` na `DATABASE_URL`.
+Alarme proporcional ao `max_connections` do `db.t4g.micro` (estimado entre
+~80 e ~110). Se o consumo não couber, a saída é subir para `db.t4g.small`.
 
 ## Referências
 
