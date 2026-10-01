@@ -53,7 +53,7 @@ We use Node.js with NestJS for modular architecture and native dependency inject
 
 - Python 3 (for the stack orchestrator)
 - GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
-- Node.js 20+
+- Node.js 22
 - pnpm (`npm install -g pnpm`)
 - Docker and Docker Compose
 - Terraform 1.6+
