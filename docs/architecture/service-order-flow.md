@@ -89,42 +89,28 @@ fecha esse gap, como parte da Feature #307 (Fase 4).
 
 ### Integração com o contexto Financeiro (Fase 4) {#integração-com-o-contexto-financeiro-fase-4}
 
-**Decidido (22/09/2026): pagamento aprovado é pré-requisito para o registro
-de entrega — não é o gatilho automático dela.**
+**Decidido na revisão de 30/09/2026: não há checagem de pagamento em
+`registrar-entrega`.** A decisão de 22/09/2026 (validar um `Pagamento`
+confirmado antes de aceitar `DELIVERED`) foi **cortada**.
 
 - "Entrega" aqui é a devolução do veículo ao cliente, ato presencial
   registrado por `PATCH /ordens-servico/:id/registrar-entrega` (papel
-  RECEPCIONISTA), como já mostra o diagrama acima.
-- O endpoint continua sendo acionado manualmente pelo Recepcionista — o
-  pagamento **não** dispara a transição para `DELIVERED` sozinho.
-- O que muda: `registrar-entrega` passa a **validar** que existe um
-  `Pagamento` já registrado (e aprovado) para aquela `OrdemServico` antes de
-  aceitar a transição. Sem pagamento confirmado, a rota rejeita a entrega.
-- Isso substitui a leitura antiga de "dispara a entrega" (implicava
-  automação) por uma checagem de pré-condição — mais barato de implementar
-  (nenhum novo evento acionando o outro serviço) e mais alinhado ao fato de
-  que a entrega continua sendo um ato presencial, fora do sistema, apenas
-  registrado pela API.
-- Consequência para a divisão em microsserviços (`service-boundaries.md`):
-  como `Pagamento` migra para o Billing Service, essa validação deixa de ser
-  uma consulta local ao mesmo banco e passa a depender de informação vinda
-  de outro serviço — o mecanismo exato (consulta síncrona ao Billing Service,
-  ou leitura de um evento `PagamentoConfirmado` já consumido e refletido no OS
-  Service) é **decisão de implementação fora do escopo desta Feature**,
-  tratada nas Features de Mensageria (#309) e de extração do Financeiro
-  (#330).
-
-> **Relação com a Saga (resolvida pela Feature #308 / ADR-0016):** a
-> sequência de Saga (`fase4-decisoes-epico1.md`, F2/2.2) é "abrir OS →
-> orçamento → aprovação → **pagamento** → execução iniciada" — o pagamento
-> acontece **antes** de `IN_PROGRESS`, logo após a aprovação do orçamento.
-> Existe **um único pagamento**, cobrado nessa etapa da Saga; não há sinal +
-> saldo nem segundo momento de cobrança. A validação em `registrar-entrega`
-> definida acima continua valendo, mas como **trava de segurança**: no fluxo
-> normal ela já está sempre satisfeita, porque nenhuma OS chega a
-> `FINISHED` sem ter passado pelo pagamento. Detalhes em
-> [ADR-0016](../adr/0016-saga-coreografada.md) e
-> [`saga-flow.md` §4](./saga-flow.md).
+  RECEPCIONISTA), como já mostra o diagrama acima. Continua acionado
+  manualmente pelo Recepcionista; o pagamento **não** dispara a transição
+  para `DELIVERED`.
+- Na Fase 4 o `Pagamento` pertence ao Billing Service; o OS Service não o
+  tem e guarda só o marcador `pago_em` (usado pelo detector de OS parada,
+  [`saga-flow.md` §2](./saga-flow.md)). Validar a entrega exigiria uma chamada REST entre serviços, que a
+  Fase 4 não tem: toda a coordenação é por evento.
+- A checagem seria sempre verdadeira: a OS só chega a `FINISHED` depois de
+  `ExecucaoConcluida`, que só existe depois de `iniciar-reparo`
+  (`ExecucaoIniciada`), que só é possível depois de `PagamentoConfirmado`. O OS Service aceita `registrar-entrega`
+  para qualquer OS em `FINISHED`.
+- Existe **um único pagamento**, cobrado na etapa de aprovação do orçamento
+  (Checkout Pro), antes de `IN_PROGRESS`; não há sinal + saldo nem segundo
+  momento de cobrança. Detalhes em
+  [ADR-0016](../adr/0016-saga-coreografada.md) e
+  [`saga-flow.md` §4](./saga-flow.md).
 
 ## Erros e fluxos alternativos cobertos pela API (evidência: tabela de rotas do README)
 
@@ -155,9 +141,26 @@ Deixa de ser verdade que este fluxo roda "inteiramente" num único processo:
 com a divisão em microsserviços (`docs/architecture/service-boundaries.md`),
 `Orcamento` e `Pagamento` passam a viver no Billing Service, em banco
 separado do OS Service. As transições `AWAITING_APPROVAL` → aprovação/recusa
-do orçamento e a validação de pagamento antes de `registrar-entrega` (seção
-acima) passam a cruzar a fronteira de serviço — via evento (Saga
-coreografada) ou consulta síncrona, decisão que fica para as Features de
-Mensageria (#309) e de extração do Financeiro (#330). O diagrama de sequência
-acima continua correto como fluxo de **negócio**; deixa de ser preciso como
-fluxo de **um único processo** a partir da Fase 4.
+do orçamento e o pagamento passam a cruzar a fronteira de serviço **somente
+por evento** (Saga coreografada, sem chamada REST entre serviços); o fluxo
+distribuído está em [`saga-flow.md`](./saga-flow.md). O diagrama de sequência
+acima continua correto como fluxo de **negócio** do monólito atual; deixa de
+ser preciso como fluxo de **um único processo** a partir da Fase 4. Na Fase 4
+as rotas públicas `POST /ordens-servico/:id/aprovar-servico` e
+`GET /ordens-servico/:id/rastreamento` são removidas (a primeira era uma
+terceira via de aprovação que pulava o pagamento; a segunda é alias de
+`/status`), e a aprovação/recusa passa a ser
+`PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar|recusar` no Billing Service.
+Também migram para o Execução e Produção as ações do mecânico: `assumir` e
+`analisar` viram `PATCH /api/v1/execucoes/{id}/iniciar-diagnostico` e
+`finalizar-execucao` vira `PATCH /api/v1/execucoes/{id}/concluir`, com a
+nova `iniciar-reparo` entre elas; `servicos-insumos` e `registrar-entrega`
+ficam no OS Service ([`saga-flow.md` §2](./saga-flow.md)).
+
+> **Revisão de 30/09/2026 (`rev/Epic_1`).** Atualizadas apenas as seções de
+> integração com o Financeiro e de arquitetura da Fase 4, alinhadas a
+> [`saga-flow.md`](./saga-flow.md) (fonte única do fluxo distribuído). O
+> diagrama e as demais seções descrevem o monólito atual e não foram
+> alterados. Observação: o diagrama mostra `PATCH .../aprovar-servico` como
+> `@Public`, mas no código esse `PATCH` é autenticado (a rota pública é o
+> `POST` de mesmo path).

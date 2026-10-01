@@ -43,15 +43,47 @@ repositório).
 
 O broker de mensageria da Fase 4 é o **Apache Kafka**, instalado no cluster
 EKS via Helm em modo **KRaft** (sem Zookeeper), substituindo a recomendação
-anterior de RabbitMQ. Custo adicional zero sobre o EKS já provisionado —
-roda igual em ambiente local e em HML — e o `repo-k8s-infra` já instala
-três charts por Terraform (`aws-load-balancer-controller`, `metrics-server`,
-`nri-bundle`); o padrão de instalação por `helm_release` já existe e é
-estável. A instalação em si, a topologia de tópicos aplicada em HML e a
-entrega de credenciais aos serviços são escopo da Feature #314
-("Provisionar a Plataforma de Mensageria"), não desta ADR — aqui fecha-se
-a escolha do broker e o vocabulário/contrato que todos os três serviços
-adotam desde o primeiro evento.
+anterior de RabbitMQ. **Custo marginal**: sem serviço gerenciado à parte,
+mas com nós `t3.medium` e um volume EBS para o broker (ver "Risco de
+memória do Kafka e dimensionamento do node group"). Roda igual em ambiente
+local e em HML, e o `repo-k8s-infra` já instala três charts por Terraform
+(`aws-load-balancer-controller`, `metrics-server`, `nri-bundle`); o padrão de
+instalação por `helm_release` já existe e é estável. A instalação em si, a
+topologia de tópicos aplicada em HML e a entrega de credenciais aos serviços
+são escopo da Feature #314 ("Provisionar a Plataforma de Mensageria"), não
+desta ADR — aqui fecha-se a escolha do broker e o vocabulário/contrato que
+todos os três serviços adotam desde o primeiro evento.
+
+**Imagem e chart do Kafka (decidido na revisão de 30/09/2026).** Chart
+Bitnami `kafka` (OCI) com **versão fixa** e imagens sobrescritas para
+`bitnamilegacy/*` (o catálogo gratuito `bitnami/*` foi descontinuado em 2025). O chart
+cobre por values o que a ADR exige: KRaft, SASL/SCRAM, provisionamento de
+tópicos e persistência.
+
+- **Go/no-go**: `docker pull` do tag exato (broker e imagens auxiliares do
+  chart) na preparação da Sprint 7 (#314), antes de depender dele.
+- **Plano B** (se o go/no-go falhar): chart próprio mínimo (StatefulSet + Job
+  de criação de tópicos) com a imagem oficial `apache/kafka`, usando
+  **SASL/PLAIN em vez de SCRAM** — desvio registrado desta ADR (SCRAM
+  exigiria bootstrap manual das credenciais no armazenamento KRaft, que o
+  chart Bitnami faz sozinho).
+- **Strimzi descartado**: ~0,5 GiB a mais de operador num cluster já
+  apertado em memória, e credenciais geradas dentro do cluster, o que
+  conflita com o fluxo `random_password` → Secrets Manager adotado no projeto.
+- **Risco aceito**: `bitnamilegacy/*` é um repositório congelado, **sem
+  patches** de segurança, e pode ser removido; aceito para HML e para o
+  prazo da Fase 4.
+
+**Persistência do broker.** O broker persiste em um PVC EBS. Isso exige o
+addon `aws-ebs-csi-driver` com IRSA (policy `AmazonEBSCSIDriverPolicy`) no
+`repo-k8s-infra`, **hoje ausente** em `modules/eks/main.tf`. Risco aceito em
+HML: o PV EBS fica preso a uma AZ, o que pode deixar o pod do broker sem nó
+elegível se o nó SPOT daquela AZ for reciclado.
+
+**Biblioteca cliente: `kafkajs` direto**, com um wrapper fino **duplicado por
+serviço** (coerente com a duplicação de tipos de evento, abaixo). O
+`kafkajs` é instrumentado nativamente pelo agente New Relic 14.x.
+`@nestjs/microservices` e o cliente da Confluent foram descartados.
 
 ### Vocabulário: tópico, partição, consumer group
 
@@ -84,12 +116,21 @@ redecidida nesta ADR**:
   `*.eventos.v1` — garante que todos os eventos de uma mesma OS caiam na
   mesma partição e sejam consumidos em ordem. Essencial numa saga
   coreografada: sem essa garantia, um consumidor poderia ver "pagamento
-  confirmado" antes de "orçamento aprovado" para a mesma OS.
+  confirmado" antes de "orçamento aprovado" para a mesma OS. **Limite da
+  garantia**: a ordem por chave vale **somente dentro de um tópico** e é
+  **quebrada pelo retry topic** — uma mensagem que falha vai para
+  `<servico>.retry.v1` e as seguintes da mesma OS, no tópico principal, são
+  processadas antes dela. Entre tópicos diferentes (ex.: `billing.eventos.v1`
+  e `execucao.eventos.v1`) não há ordem alguma. Por isso o consumidor
+  classifica a falha pelo estado atual da OS (ver "Classificação de falha no
+  consumidor").
 - **3 partições por tópico** (conforme #314).
 - **Um consumer group por serviço consumidor**, nomeado `<servico>-consumer`
   (`os-consumer`, `billing-consumer`, `execucao-consumer`) — cada serviço
   interessado no tópico de outro mantém o próprio offset, equivalente
   Kafka de "fila por consumidor" sem precisar criar um objeto de fila novo.
+  Quais tópicos e eventos cada grupo assina está na tabela "Assinaturas por
+  serviço" de [`event-catalog.md`](../architecture/event-catalog.md).
 - **Retry e dead-letter por serviço**: `<servico>.retry.v1` e
   `<servico>.dlt.v1`, populados pelo próprio consumidor quando o
   processamento de uma mensagem falha (ver "Estratégia de retry e
@@ -106,21 +147,20 @@ desde o primeiro evento publicado:
 | `eventType` | string | Nome do evento, igual ao já catalogado em `docs/ddd.md` §5 ou no catálogo de integração (`docs/architecture/event-catalog.md`), ex. `"OrcamentoCalculado"`. |
 | `eventVersion` | integer | Versão do schema do payload deste tipo de evento. Começa em `1`; incrementa em mudança incompatível do campo `data`. |
 | `occurredAt` | string (ISO-8601, UTC) | Instante em que o evento ocorreu no serviço produtor. |
-| `correlationId` | string (UUID) | Nasce no evento `OrdemDeServicoRecebida` e é propagado **sem alteração** por todos os eventos subsequentes da mesma OS, incluindo os de compensação — é o mesmo identificador de correlação já usado nos logs e no Lambda Authorizer da Fase 3 (`repo-auth-serverless`), agora estendido ao broker. |
+| `correlationId` | string (UUID) | **Sempre igual ao `ordemServicoId`**, em todos os eventos da saga, incluindo os de compensação. Determinístico: qualquer serviço o calcula a partir da OS. Não é o `x-correlation-id` HTTP da Fase 3 (Lambda Authorizer, Gateway, Pino), que continua existindo mas vira só o id de requisição nos logs. |
 | `producer` | string | Serviço que publicou o evento: `"os-service"`, `"billing-service"` ou `"execucao-producao-service"`. |
 | `data` | object | Payload específico do tipo de evento. |
 
-**Nota desta ADR**: como a Saga coreografada não tem reentrância (uma única
-execução de saga por OS, do `RECEIVED` até o encerramento), `correlationId`
-e o `ordemServicoId` de negócio coincidem numericamente na prática. Ainda
-assim os dois campos são conceitualmente distintos e mantidos separados no
-envelope: `correlationId` é o identificador de rastreamento (linhagem com a
-Fase 3), `ordemServicoId` é um dado de negócio dentro de `data` **e** a
-chave de partição do registro Kafka. Essa equivalência numérica é uma
-simplificação de implementação assumida por esta ADR, não uma regra a
-reforçar em código — nada impede um `correlationId` divergente do
-`ordemServicoId` se uma necessidade futura exigir (ex.: reprocessamento
-administrativo com novo `correlationId` sobre a mesma OS).
+**Regra desta ADR**: `correlationId` **é** o `ordemServicoId` (não é mera
+coincidência numérica). A Saga coreografada não tem reentrância (uma única
+execução de saga por OS, do `RECEIVED` até o encerramento), então a OS
+identifica a saga inteira; e como a regra é determinística, um serviço que
+nunca viu o `OrdemServicoRecebida` (ex.: o detector de OS parada, ou o
+consumidor de uma DLT) calcula o `correlationId` sem consultar ninguém. O
+campo continua no envelope (para o rastreio não depender de abrir o
+`data`), assim como `ordemServicoId` continua dentro de `data` e como chave
+de partição do registro Kafka. Reprocessamento administrativo reaproveita o
+mesmo `correlationId`; não há `correlationId` divergente.
 
 **Exemplo real de payload** — evento `OrcamentoCalculado`, publicado pelo OS
 Service em `os.eventos.v1`, consumido pelo Billing Service via
@@ -179,43 +219,67 @@ dead-letter-exchange nativo:
    mais reprocessada automaticamente) ao chegar à `dlt.v1` depois da
    terceira tentativa falha. Ela **permanece no tópico DLT** (não é
    apagada) — o histórico e o replay continuam possíveis via offset.
-5. **A DLT não é o fim da linha**: o consumidor do tópico DLT publica um
-   evento de falha genérico, `EtapaDaSagaFalhou` (proposto por esta ADR,
-   conforme a diretriz já registrada na #314 — "DLT → evento de falha →
-   compensação"), no tópico `*.eventos.v1` do próprio serviço que falhou,
-   para que os demais serviços interessados possam compensar. Payload
-   mínimo: `servicoOrigem`, `eventTypeOriginal`, `ordemServicoId`, `motivo`.
-   Este evento cobre falhas **técnicas** de processamento (exceção,
-   indisponibilidade) — é diferente dos eventos de falha **de negócio**
-   já nomeados abaixo, que não passam pelo ciclo de retry porque não são
-   erro de processamento, são um resultado de negócio válido.
+5. **A DLT não é o fim da linha**: o consumidor do tópico DLT publica o
+   evento de falha técnica `EtapaDaSagaFalhou` (conforme a diretriz já
+   registrada na #314 — "DLT → evento de falha → compensação"), no tópico
+   `*.eventos.v1` do próprio serviço que falhou, com o campo `etapa`
+   indicando onde a saga parou, para que os demais serviços interessados
+   possam compensar. O **detector de OS parada** (ver "Garantias de
+   publicação") publica o mesmo evento quando uma OS passa do prazo numa
+   etapa. Payload: ver "Eventos de falha da saga" abaixo.
 
-### Dois eventos de falha de negócio, formalizados por esta ADR
+### Classificação de falha no consumidor
 
-O documento `docs/architecture/saga-flow.md` (Feature #308/ADR-0016) já
-desenhava dois pontos da saga em que o serviço não consegue completar sua
-etapa por razão de negócio (não por falha técnica de processamento) e
-deixava o nome do evento **"a formalizar com a #309"**. Esta ADR fecha os
-dois nomes, seguindo o mesmo estilo dos eventos de negócio já catalogados
-(`OrcamentoRejeitado`, `PagamentoRecusado`):
+Nem toda falha merece retry: como a ordem por chave só vale dentro de um
+tópico e é quebrada pelo retry topic (ver "Topologia"), o consumidor decide
+pelo **estado atual da OS** (ou do agregado local) comparado ao que o evento
+pressupõe:
 
-- **`OrcamentoGeracaoFalhou`** — publicado pelo **Billing Service** em
-  `billing.eventos.v1` quando não consegue persistir o documento de
-  orçamento a partir de um `OrcamentoCalculado` recebido (ex.: falha de
-  banco no Billing Service). Consumido pelo **OS Service**, que fecha a OS
-  como `CLOSED_WITHOUT_EXECUTION`.
-- **`ExecucaoInicioFalhou`** — publicado pelo **Execução e Produção** em
-  `execucao.eventos.v1` quando não consegue iniciar a execução após
-  `PagamentoConfirmado` (ex.: indisponibilidade de peça identificada só
-  nesta etapa, capacidade de oficina esgotada). Consumido pelo **Billing
-  Service** (aciona o estorno real no Mercado Pago, já que o pagamento foi
-  capturado) e pelo **OS Service** (fecha a OS como
-  `CLOSED_WITHOUT_EXECUTION`).
+| Situação | Tratamento |
+|---|---|
+| Estado atual **abaixo** do esperado (o evento anterior ainda não foi processado, ex.: `ExecucaoIniciada` antes de `OrcamentoGerado`) | **Erro retentável**: lança, entra no ciclo de retry (3 tentativas, backoff por `notBefore`). |
+| Estado atual **igual ou acima** do esperado, ou OS em estado terminal (evento repetido ou obsoleto) | **Ack e ignora**, com log. É a idempotência do consumidor; não retenta nem vai à DLT. |
+| **Erro de negócio** que não se resolve sozinho (ex.: `ExecucaoConcluida` com a OS em `AWAITING_PARTS`) | **Não retenta.** Registra o motivo em `HistoricoStatusOS` e publica `EtapaDaSagaFalhou` com `etapa=reparo` (caminho manual, sem compensação automática). |
 
-Os dois entram no catálogo de eventos de integração
-(`docs/architecture/event-catalog.md`), junto com os demais eventos `[novo]`
-que `saga-flow.md` já vinha antecipando (`OrcamentoCalculado`,
-`PagamentoConfirmado`, `PagamentoRecusado`, `ExecucaoIniciada`).
+Casos específicos já decididos:
+
+- `OrcamentoAprovado` consumido com a OS já `CLOSED_WITHOUT_EXECUTION`:
+  **não reserva** peças (ack e ignora, com log).
+- O Billing **ignora** um `OrcamentoCalculado` repetido depois da aprovação
+  do orçamento; não lança `DomainException`.
+
+### Eventos de falha da saga
+
+A saga distingue dois tipos de falha, e **só o segundo é um evento
+genérico**:
+
+- **Recusa de negócio** — resultado válido de uma etapa, não é erro de
+  processamento e não passa pelo ciclo de retry. Cada uma tem **evento
+  próprio**, publicado pelo **Billing Service** em `billing.eventos.v1` e
+  consumido pelo **OS Service**: `OrcamentoRecusado` (cliente recusa o
+  orçamento) e `PagamentoRecusado` (Mercado Pago devolve status terminal
+  `rejected` ou `cancelled`).
+- **Falha técnica** — exceção que esgotou o retry (DLT) ou OS parada além do
+  prazo (detector). Vira sempre **um único evento**, `EtapaDaSagaFalhou`.
+  Substitui os antigos `OrcamentoGeracaoFalhou` e `ExecucaoInicioFalhou`,
+  que deixam de existir.
+
+Payload de `EtapaDaSagaFalhou` (campo `data` do envelope):
+
+| Campo | Descrição |
+|---|---|
+| `servicoOrigem` | Serviço em que o processamento falhou (ou que detectou a OS parada): `"os-service"`, `"billing-service"` ou `"execucao-producao-service"`. O detector publica sempre `"os-service"`. |
+| `eventTypeOriginal` | `eventType` da mensagem que falhou (na DLT). **`null` quando publicado pelo detector de OS parada** (não há mensagem original). |
+| `ordemServicoId` | Identificador da OS afetada. |
+| `etapa` | Onde a saga parou: `diagnostico`, `orcamento`, `aprovacao-pagamento`, `inicio-execucao` ou `reparo`. Na DLT, sai do `eventType` da mensagem que falhou (tabela "evento original → etapa" em [`saga-flow.md`](../architecture/saga-flow.md) §3). |
+| `motivo` | Mensagem resumida da falha (`lastError` na DLT; descrição do prazo excedido no detector). |
+
+Os três serviços consomem `EtapaDaSagaFalhou` e cada um aplica a própria
+compensação conforme a `etapa`, de forma idempotente — a matriz
+`etapa → falha → compensação` está em
+[`saga-flow.md`](../architecture/saga-flow.md) §3. Todos os eventos de falha
+entram no catálogo de integração
+([`event-catalog.md`](../architecture/event-catalog.md)).
 
 ### Garantias de publicação
 
@@ -225,9 +289,23 @@ registrada na #314): o evento é publicado diretamente após o commit da
 transação local. A rede de proteção contra uma publicação que nunca
 acontece (ex.: processo do serviço cai entre o commit e a publicação) é o
 **detector de OS parada**, de responsabilidade do OS Service (especificado
-na #314, implementado no épico do OS Service) — varre OS em estado
-intermediário além do prazo esperado e publica o evento de falha
-correspondente.
+na #314, implementado no épico do OS Service):
+
+- Roda como **CronJob do Kubernetes** — uma execução por vez, sem duplicata
+  mesmo com HPA nos pods do serviço.
+- **Prazo configurável por variável de ambiente**, padrão **48 h**; na
+  demonstração, alguns minutos.
+- Na Fase 4 varre **apenas OS em `AWAITING_APPROVAL` com `pago_em` nulo**
+  além do prazo e publica `EtapaDaSagaFalhou` com
+  `etapa=aprovacao-pagamento`, `eventTypeOriginal = null` e
+  `servicoOrigem = "os-service"` (cliente que não aprova ou não paga). OS já
+  paga esperando o mecânico na fila de reparo não é varrida (o OS Service
+  grava `pago_em` ao consumir `PagamentoConfirmado`). Não há
+  `etapa=orcamento` nem `etapa=diagnostico` pelo detector.
+- Como a publicação sai depois do commit (sem outbox), o detector cobre a
+  perda de eventos **só na etapa de aprovação/pagamento**. Nas demais
+  etapas, um evento perdido é **risco aceito** em HML, recuperado por
+  replay manual.
 
 ### Duplicação de tipos de evento por serviço (sem pacote npm compartilhado)
 
@@ -260,6 +338,19 @@ redecidido aqui**:
   ficam para a #313/#314, antes da Sprint 7 — esta ADR só registra o risco
   e aponta para onde ele é mitigado, não fixa o valor de heap.
 
+**Critério go/no-go antes da Sprint 7.** Medido com Kafka + New Relic + os
+três serviços no HPA mínimo, sobre os nós `t3.medium`:
+
+1. soma dos `requests` ≤ **70 %** do `allocatable` dos nós;
+2. **drain de 1 nó** sem nenhum pod em `Pending`;
+3. Kafka sob carga (~1 mil msg/s por 5 min) com *working set* ≤ **85 %** do
+   `limit` e **0 restarts em 30 min**.
+
+**Escada de fallback**, na ordem, se algum critério falhar: (a) heap 512 m
+com `limit` de 1 GiB; (b) HPA `min=1` em HML para Billing e Execução;
+(c) nós `t3.large`; (d) trocar o broker por um compatível com a API Kafka
+sem JVM (ex.: Redpanda — licença **não verificada**).
+
 ## Alternativas consideradas
 
 - **RabbitMQ** — recomendação anterior do grupo, descartada. Não oferece
@@ -279,8 +370,9 @@ redecidido aqui**:
   (o grupo teria a complexidade operacional de um serviço gerenciado sem o
   ganho de replay do Kafka).
 - **MSK (Kafka gerenciado pela AWS)** — descartado por custo. A decisão de
-  usar Kafka já assume custo adicional zero sobre o EKS já provisionado
-  (broker rodando dentro do próprio cluster); MSK é cobrado à parte, por
+  usar Kafka já assume apenas custo marginal sobre o EKS já provisionado
+  (nós `t3.medium` e um volume EBS, com o broker rodando dentro do próprio
+  cluster); MSK é cobrado à parte, por
   broker e por hora, incompatível com o orçamento de conta acadêmica da
   Fase 4.
 
@@ -292,9 +384,10 @@ redecidido aqui**:
 - Replay por offset dá ao grupo uma forma real de reprocessar um fluxo de
   saga quebrado (inclusive como recurso de demonstração no vídeo de
   entrega), o que RabbitMQ não oferecia.
-- `correlationId` propagado no envelope, herdado do padrão já usado nos
-  logs e no Lambda Authorizer da Fase 3, evita inventar um segundo esquema
-  de rastreamento para a Fase 4.
+- `correlationId` = `ordemServicoId`, determinístico: qualquer serviço (e o
+  detector de OS parada) o calcula sem depender de ter visto o primeiro
+  evento, e o rastreio de uma OS no New Relic e nos logs parte de um
+  identificador de negócio que o time já conhece.
 - Catálogo de eventos documentado (não pacote compilado) mantém os três
   serviços desacoplados em tempo de build/deploy — nenhum serviço depende
   do ciclo de release de outro para consumir um evento.
@@ -309,8 +402,9 @@ redecidido aqui**:
 - **Sem outbox transacional**: existe uma janela, por menor que seja, entre
   o commit da transação local e a publicação no Kafka em que um crash do
   processo perde o evento sem que ninguém mais tente publicá-lo de novo —
-  mitigada apenas pelo detector de OS parada (job periódico, não uma
-  garantia de entrega imediata).
+  mitigada pelo detector de OS parada apenas na etapa de
+  aprovação/pagamento; nas demais etapas é risco aceito, recuperado por
+  replay manual.
 - **Kafka é operacionalmente mais pesado que RabbitMQ** para o time operar
   em 8 semanas (JVM, heap, KRaft) — aceito conscientemente pelo grupo em
   troca do replay por offset.
@@ -320,14 +414,61 @@ redecidido aqui**:
 - **Alto, sinalizado e mitigado em outra Feature**: consumo de memória do
   Kafka (JVM) frente à capacidade do node group — ver "Risco de memória do
   Kafka" acima. Mitigação (migração para `t3.medium`, medição de consumo
-  real) é escopo da #313/#314, não desta ADR.
+  real) é escopo da #313/#314, não desta ADR. O critério go/no-go e a escada
+  de fallback estão na seção acima.
 - **Médio**: broker de nó único (KRaft com controller e broker no mesmo
   pod, sem replicação) é um ponto único de falha, aceito para HML — decisão
   de infraestrutura tratada na #314, fora do escopo desta ADR.
+- **Médio, aceito em HML**: PV EBS preso a uma AZ com nós SPOT; e o addon
+  `aws-ebs-csi-driver` com IRSA ainda não existe no `repo-k8s-infra`
+  (trabalho obrigatório para a persistência do broker).
+- **Médio, aceito em HML**: imagem `bitnamilegacy/*` congelada, sem patches
+  e sujeita a remoção (ver "Decisão"); mitigado pelo go/no-go (`docker pull`
+  na Sprint 7) e pelo plano B (`apache/kafka` com SASL/PLAIN).
 - **Baixo, aceito conscientemente**: um único usuário Kafka (SASL/SCRAM)
   compartilhado pelos três serviços por ambiente — isolamento fica no nível
   de tópico e consumer group, não de credencial (ACL por tópico registrada
   como evolução futura na #314, não avaliada nesta entrega).
+
+## Revisão de 30/09/2026
+
+Revisão do épico #306 (`rev/Epic_1`), alinhada a
+[`saga-flow.md`](../architecture/saga-flow.md). A escolha do broker, a
+topologia e o envelope **continuam valendo**. Mudou:
+
+- Os eventos de falha de negócio `OrcamentoGeracaoFalhou` e
+  `ExecucaoInicioFalhou` foram **extintos**; as falhas técnicas passam a ser
+  um único `EtapaDaSagaFalhou`, agora com o campo `etapa`, emitido pela DLT
+  e pelo detector de OS parada.
+- Nomes de evento iguais aos do código: `OrdemServicoRecebida` (antes
+  `OrdemDeServicoRecebida`) e `OrcamentoRecusado` (antes `OrcamentoRejeitado`).
+- Novo evento `ExecucaoConcluida` (Execução e Produção → OS Service).
+- `correlationId` = `ordemServicoId` em todos os eventos (regra
+  determinística, não simplificação); o `x-correlation-id` HTTP vira só id
+  de requisição nos logs.
+- Nova seção "Classificação de falha no consumidor" (retentável / ignorar /
+  erro de negócio) e registro de que a ordem por chave **só vale dentro de
+  um tópico** e é quebrada pelo retry topic.
+- Detector de OS parada: CronJob do Kubernetes, prazo por variável de
+  ambiente (padrão 48 h), cobrindo só `AWAITING_APPROVAL`
+  (`etapa=aprovacao-pagamento`).
+- Kafka: persistência em PVC EBS (exige `aws-ebs-csi-driver` com IRSA no
+  `repo-k8s-infra`); biblioteca cliente `kafkajs` direto com wrapper fino
+  duplicado por serviço; "custo adicional zero" trocado por custo marginal
+  (nós `t3.medium` + volume EBS); critério go/no-go antes da Sprint 7 e
+  escada de fallback.
+- Imagem e chart do Kafka decididos: chart Bitnami `kafka` (OCI) em versão
+  fixa com imagens `bitnamilegacy/*`; go/no-go por `docker pull` na Sprint 7;
+  plano B com chart próprio e `apache/kafka` (SASL/PLAIN); Strimzi descartado.
+- Modelo híbrido do Execução e Produção: novo evento `DiagnosticoIniciado`;
+  o Execução passa a consumir `OrdemServicoRecebida` e `PagamentoConfirmado`
+  (e as recusas) e o OS Service passa a consumir `PagamentoConfirmado` (só
+  `pago_em`); `ExecucaoIniciada` passa a significar "mecânico iniciou o
+  reparo".
+- `EtapaDaSagaFalhou`: `etapa` ganha `diagnostico`; tabela "evento original →
+  etapa" em `saga-flow.md` §3; no detector, `eventTypeOriginal = null` e
+  `servicoOrigem = "os-service"`; o detector ignora OS com `pago_em`
+  preenchido.
 
 ## Referências
 
@@ -339,7 +480,7 @@ redecidido aqui**:
 - [ADR-0009 — Eventos de domínio in-process](./0009-eventos-dominio-in-process.md) (parcialmente substituída por esta ADR para comunicação entre serviços)
 - [ADR-0016 — Saga coreografada](./0016-saga-coreografada.md)
 - [ADR-0017 — Divisão em três microsserviços e ownership de dados](./0017-divisao-microsservicos-ownership-dados.md)
-- [`docs/architecture/saga-flow.md`](../architecture/saga-flow.md) — fluxo detalhado que motiva os eventos `[novo]` formalizados nesta ADR
+- [`docs/architecture/saga-flow.md`](../architecture/saga-flow.md) — fluxo detalhado (fonte única) que motiva os eventos formalizados nesta ADR
 - [`docs/architecture/event-catalog.md`](../architecture/event-catalog.md) — catálogo de eventos de integração (produtor/consumidores)
 - [`docs/ddd.md`](../ddd.md) §5 — catálogo de eventos de domínio existentes
 - Documentação oficial do Apache Kafka — modo KRaft, consumer groups, produtor idempotente (`acks=all`, `enable.idempotence`)

@@ -15,10 +15,9 @@ processo — eventos de domínio emitidos e tratados in-process via
 a atravessar fronteiras de serviço: **OS Service** (herda `ordem-servico`,
 `cadastro` e `pecas-insumos`), **Billing Service** (herda `financeiro` e
 passa a ser dono do `Orcamento`) e **Execução e Produção** (serviço novo).
-A divisão exata de ownership de tabelas foi formalizada em paralelo pela
-Feature "Definir Divisão de Microsserviços e Ownership de Dados" (issue
-#307, publicada em `feat/I-307_DefinirDivisaoMicrosservicosOwnershipDados`,
-ainda não mesclada em `develop` no momento desta revisão), registrada em
+A divisão exata de ownership de tabelas foi formalizada pela Feature
+"Definir Divisão de Microsserviços e Ownership de Dados" (issue #307),
+registrada em
 [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md) e
 [`service-boundaries.md`](../architecture/service-boundaries.md). Os nomes
 dos três serviços usados nesta ADR são os mesmos adotados por aquela
@@ -30,7 +29,7 @@ aprovação/recusa ([ADR-0011](./0011-aprovacao-orcamento-api-publica.md),
 revisada pela Feature #307).
 
 Sem coordenação de transação distribuída, uma falha em qualquer etapa
-(orçamento recusado, pagamento não confirmado, indisponibilidade de peça)
+(orçamento recusado, pagamento recusado, falha técnica em alguma etapa)
 deixaria os três serviços em estados inconsistentes entre si — o enunciado
 exige explicitamente "rollback e compensação no caso de falha em qualquer
 etapa" (p.4) e cobra a descrição da estratégia escolhida tanto no README
@@ -52,13 +51,27 @@ própria compensação quando um evento de falha chega.
 **Escopo do fluxo coberto pela saga:**
 
 ```
-Abrir OS → orçamento → aprovação → pagamento → execução iniciada
+Abrir OS → diagnóstico → orçamento → aprovação → pagamento → execução (início do reparo e conclusão)
 ```
 
 - O **pagamento entra como etapa obrigatória** da saga, logo após a
   aprovação do orçamento pelo cliente e **antes** do início da execução
   (`IN_PROGRESS`) — sem ele, o Billing Service ficaria de fora da transação
-  distribuída, apesar de ser um dos três serviços do desenho.
+  distribuída, apesar de ser um dos três serviços do desenho. O pagamento é
+  **assíncrono** (Checkout Pro, confirmação por webhook do Mercado Pago, ver
+  issue #325): enquanto espera, a OS permanece em `AWAITING_APPROVAL`.
+- O **Execução e Produção participa em duas filas** (modelo híbrido mínimo,
+  alinhado ao enunciado, p.3: "gerenciar a fila de execução da OS",
+  "atualizar status durante diagnóstico e reparos" e "comunicar finalização
+  ao OS Service"). Consome `OrdemServicoRecebida` e cria a `Execucao` em
+  `AGUARDANDO_DIAGNOSTICO`; o mecânico inicia o diagnóstico
+  (`DiagnosticoIniciado`), o reparo (`ExecucaoIniciada`) e a conclusão
+  (`ExecucaoConcluida`) por rotas do próprio serviço. Consome
+  `PagamentoConfirmado` (leva a `AGUARDANDO_REPARO`, sem publicar evento) e
+  cancela a `Execucao` nas recusas e em `EtapaDaSagaFalhou`. Listar
+  serviços/peças e calcular o orçamento ficam no OS Service
+  (`PATCH /api/v1/ordens-servico/{id}/servicos-insumos`), porque dependem de
+  `Servico` e `Peca`.
 - A **entrega fica fora do escopo da saga**: é um ato presencial
   (`PATCH /ordens-servico/:id/registrar-entrega`, disparado pela
   recepcionista com o cliente físicamente presente), sem contrapartida
@@ -73,26 +86,29 @@ Abrir OS → orçamento → aprovação → pagamento → execução iniciada
   ("Riscos") e como pendência de validação em `service-boundaries.md` §6,
   item 2. Esta ADR fecha essa pendência: **há um único pagamento**, cobrado
   logo após a aprovação do orçamento, como etapa da saga. A checagem de
-  "pagamento confirmado" antes de `registrar-entrega` não é um segundo
-  momento de cobrança — é uma **trava de segurança** sobre o mesmo
-  pagamento já capturado etapas antes no fluxo (a entrega só é possível
-  depois de `FINISHED`, que por sua vez só existe porque a execução foi
-  iniciada, o que só acontece após o pagamento confirmado). Se o pagamento
-  não tivesse sido confirmado, a OS já teria sido compensada e encerrada
-  muito antes de chegar a `registrar-entrega` — a checagem na entrega nunca
-  encontra, na prática, um pagamento pendente.
+  "pagamento confirmado" antes de `registrar-entrega` (prevista na decisão
+  de 22/09/2026) foi **cortada na revisão de 30/09/2026**: o `Pagamento` é
+  do Billing Service (o OS Service guarda só o marcador `pago_em`), e
+  `FINISHED` só é alcançável depois de `ExecucaoConcluida`, que só existe
+  depois de `iniciar-reparo`, que só é possível depois de
+  `PagamentoConfirmado` — a checagem seria sempre verdadeira e exigiria
+  chamada REST entre serviços, que a Fase 4 não tem.
 - O detalhamento passo a passo (serviço executor, evento publicado, evento
   consumido) e a matriz `etapa → falha → compensação` estão em
   [`docs/architecture/saga-flow.md`](../architecture/saga-flow.md), não
   duplicados aqui.
 
-**Natureza da compensação:** lógica por padrão — reverter status da OS,
-cancelar reserva de peça, marcar orçamento/OS como encerrados sem execução.
-O estorno real no Mercado Pago só é acionado **se o pagamento já tiver sido
-capturado** pelo gateway antes da falha que dispara a compensação (ex.:
-peça fica indisponível depois do pagamento confirmado). Se a falha ocorre
-antes da captura (ex.: orçamento recusado, pagamento nunca chega a ser
-confirmado), a compensação é puramente lógica, sem chamada ao Mercado Pago.
+**Natureza da compensação:** lógica por padrão — **liberar a reserva de
+peças**, marcar orçamento/OS como encerrados sem execução. O estorno real no
+Mercado Pago só é acionado **se o pagamento já tiver sido capturado** pelo
+gateway antes da falha que dispara a compensação (ex.: falha técnica em
+`inicio-execucao` depois do `PagamentoConfirmado`, ou pagamento confirmado
+que chega depois do prazo de pagamento). Se a falha ocorre antes da captura
+(ex.: orçamento recusado, `PagamentoRecusado`, pagamento nunca confirmado), a
+compensação é puramente lógica, sem chamada ao Mercado Pago. Falha técnica
+em `reparo` (OS não processou `ExecucaoIniciada` ou `ExecucaoConcluida`) não
+compensa: o mecânico já está trabalhando ou já terminou, e o caso é
+tratado manualmente. A matriz completa está em `saga-flow.md` §3.
 
 **Rastreabilidade sem estado central:** como não há orquestrador, não existe
 um documento único com "o estado da saga" em um dado momento. A evidência
@@ -101,12 +117,12 @@ de três mecanismos, nenhum deles novo em relação ao que o projeto já usa:
 
 1. **Trace distribuído no New Relic** — instrumentação tratada pelo épico
    de Observabilidade da Fase 4, fora do escopo desta ADR.
-2. **`correlationId` propagado no envelope de evento** — o mesmo
-   identificador de correlação já usado nos logs e no Lambda Authorizer da
-   Fase 3, agora viajando de evento em evento entre os três serviços. O
-   formato exato do envelope é definido na Feature de Mensageria
-   (issue #309); esta ADR só fixa que o `correlationId` deve nascer na
-   abertura da OS e atravessar toda a cadeia de eventos do fluxo acima.
+2. **`correlationId` propagado no envelope de evento** — é sempre o
+   `ordemServicoId` (regra determinística: qualquer serviço o calcula),
+   viajando de evento em evento entre os três serviços. Não é o
+   `x-correlation-id` HTTP da Fase 3 (Authorizer/Gateway/Pino), que passa a
+   ser só o id de requisição nos logs. O formato exato do envelope está na
+   [ADR-0018](./0018-mensageria-contratos-eventos.md).
 3. **`HistoricoStatusOS.motivo`** (`prisma/schema.prisma`, model já
    existente) — cada transição de status da OS, incluindo as motivadas por
    compensação, é registrada com o motivo em texto, permanecendo a fonte de
@@ -143,8 +159,7 @@ de três mecanismos, nenhum deles novo em relação ao que o projeto já usa:
   (nome, payload, `correlationId`) — não a uma API de coordenação central.
 - Fecha a divergência que a Feature #307 havia sinalizado e deixado em
   aberto (ver "Decisão" acima) entre a regra de pagamento→entrega e a
-  sequência de saga — sem precisar de um segundo momento de cobrança nem de
-  mudança na regra já registrada em `service-order-flow.md`.
+  sequência de saga — sem precisar de um segundo momento de cobrança.
 
 ## Consequências negativas
 
@@ -176,13 +191,66 @@ de três mecanismos, nenhum deles novo em relação ao que o projeto já usa:
   sandbox para o cenário de estorno real. Por isso a compensação é lógica
   por padrão, reduzindo a superfície de dependência externa nos testes de
   falha que não envolvem pagamento já capturado.
-- **Fora de escopo desta ADR, registrado para decisão futura**: todas as
-  compensações da saga encerram a OS reaproveitando o status já existente
-  `CLOSED_WITHOUT_EXECUTION` (`SOStatus` em `prisma/schema.prisma`, hoje usado
-  para orçamento recusado). O motivo específico de cada falha fica em
-  `HistoricoStatusOS.motivo`. Se a implementação (issue #337, épico de Saga)
-  precisar diferenciar falhas por status, a mudança de schema é decidida lá,
-  não por este card de documentação.
+- **Baixo, aceito conscientemente (decisão, não mais pendência)**: não há
+  status novo no `SOStatus`. Todas as compensações da saga encerram a OS
+  reaproveitando `CLOSED_WITHOUT_EXECUTION`, e a espera pelo pagamento
+  reaproveita `AWAITING_APPROVAL`. O motivo específico de cada falha, e a
+  distinção "aprovado e aguardando pagamento", ficam em
+  `HistoricoStatusOS.motivo`. Custo aceito: o tempo médio em
+  `AWAITING_APPROVAL` soma a espera de aprovação e a de pagamento, e
+  relatórios por status não distinguem o motivo do encerramento sem ler o
+  histórico.
+
+## Revisão de 30/09/2026
+
+Revisão do épico #306 (`rev/Epic_1`). A decisão central (coreografia, sem
+orquestrador) **continua valendo**; mudou o desenho do fluxo, agora
+detalhado em [`saga-flow.md`](../architecture/saga-flow.md) como fonte
+única:
+
+- Fluxo passa a terminar na **conclusão** da execução (novo evento
+  `ExecucaoConcluida`, que leva a OS a `FINISHED`), não mais no início.
+- Execução e Produção em **modelo híbrido mínimo**: consome
+  `OrdemServicoRecebida` (fila de diagnóstico) e `PagamentoConfirmado` (fila
+  de reparo); o mecânico chama `iniciar-diagnostico` (publica
+  `DiagnosticoIniciado`, OS vai a `UNDER_DIAGNOSIS`), `iniciar-reparo`
+  (publica `ExecucaoIniciada`, OS vai a `IN_PROGRESS`/`AWAITING_PARTS`) e
+  `concluir` (publica `ExecucaoConcluida`, OS vai a `FINISHED`). Ciclo:
+  `AGUARDANDO_DIAGNOSTICO` → `EM_DIAGNOSTICO` → `AGUARDANDO_REPARO` →
+  `EM_REPARO` → `CONCLUIDA`; `CANCELADA` a partir de qualquer não terminal
+  (recusas e `EtapaDaSagaFalhou`). `assumir`/`analisar` e
+  `finalizar-execucao` saem do OS Service; `servicos-insumos` fica. Ficam
+  fora da Fase 4: pausa por falta de peça no Execução, rejeição de
+  apontamento e reposição.
+- Como o reparo começa por ação do mecânico, uma OS paga pode esperar na
+  fila de reparo além do prazo do detector: o OS Service consome
+  `PagamentoConfirmado` só para gravar `pago_em` (sem mudar o status) e o
+  detector só considera OS em `AWAITING_APPROVAL` com `pago_em` nulo.
+- Falhas técnicas ganham `etapa=diagnostico`; `inicio-execucao` passa a
+  cobrir `PagamentoConfirmado` (Execução) e `ExecucaoIniciada` (OS). A
+  matriz ganhou a tabela "evento original → etapa" para a DLT.
+- **Reserva de estoque** no OS Service ao consumir `OrcamentoAprovado`; a
+  OS não vai a `IN_PROGRESS` ao reservar (quem faz isso é
+  `ExecucaoIniciada`). A compensação de `PagamentoRecusado` **libera a
+  reserva** (operação nova).
+- Falhas: recusas de negócio com evento próprio (`OrcamentoRecusado`,
+  `PagamentoRecusado`) e **um único** evento técnico, `EtapaDaSagaFalhou`,
+  com o campo `etapa` (ver [ADR-0018](./0018-mensageria-contratos-eventos.md)).
+  Somem `OrcamentoGeracaoFalhou` e `ExecucaoInicioFalhou`.
+- OS permanece em `AWAITING_APPROVAL` enquanto espera o pagamento; o risco
+  "status distinto para compensação" virou decisão de **não criar status
+  novo** (reaproveita `CLOSED_WITHOUT_EXECUTION` e `AWAITING_APPROVAL`).
+- Pagamento assíncrono via Mercado Pago (Checkout Pro, webhook HMAC +
+  reconsulta); `PagamentoRecusado` só para status terminal.
+- Exemplo de estorno real deixa de ser "peça indisponível depois do
+  pagamento" e passa a ser falha técnica em `inicio-execucao` ou pagamento
+  fora do prazo.
+- Removidos os textos transitórios sobre a Feature #307 "ainda não
+  mesclada".
+- `correlationId` = `ordemServicoId` em todos os eventos (não mais o
+  `x-correlation-id` do Authorizer, que vira só id de requisição).
+- Checagem de pagamento em `registrar-entrega` **cortada** (ver "Decisão").
+- Zero chamada REST entre serviços: toda a coordenação é por evento.
 
 ## Referências
 
