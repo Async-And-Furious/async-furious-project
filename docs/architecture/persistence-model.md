@@ -231,7 +231,7 @@ recriadas:
 
 | Serviço | Banco relacional | Banco não relacional |
 |---|---|---|
-| OS Service | PostgreSQL, banco lógico `os_service` na instância `tc3-db-${environment}` (ADR-0020); `db_name` hoje `workshop` em `repo-db-infra` passa a `os_service` (recria a instância) | DynamoDB — `os-read-model`, `cliente-read-model` |
+| OS Service | PostgreSQL, banco lógico `os_service` na instância `tc3-db-${environment}` (ADR-0020); `db_name` de `workshop` para `os_service` em `repo-db-infra` (recria a instância) | DynamoDB — `os-read-model-<env>`, `cliente-read-model-<env>` |
 | Billing Service | PostgreSQL, banco lógico `billing` na mesma instância — **começa vazio** (`pagamentos` hoje só tem dado de teste) | Nenhum |
 | Execução e Produção | PostgreSQL, banco lógico `execucao_producao` na mesma instância — schema nasce vazio | Nenhum |
 

@@ -150,7 +150,7 @@ exatamente o mesmo binário (passo "Build and push commit-SHA image" do `.github
 | Engine | PostgreSQL `16.4` |
 | Classe | `db.t4g.micro` (padrão) |
 | Armazenamento | 20 GB, criptografado (`storage_encrypted = true`) |
-| Database | `workshop`, usuário `postgres` |
+| Database | `os_service` (OS Service), `billing` e `execucao_producao`; usuário master `postgres` só para o Job de bootstrap |
 | Senha | gerenciada pelo RDS via Secrets Manager (`manage_master_user_password = true`), nunca no estado Terraform |
 | Backup | 1 dia nos dois ambientes |
 | Multi-AZ | somente PROD |

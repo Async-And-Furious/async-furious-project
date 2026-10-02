@@ -221,6 +221,18 @@ handlers `atualizar-status-*` e o `AtualizarOrdemServicoUseCase`, que gravam
 veículo como foto no momento do refresh da OS; editar o cliente/veículo não
 reprojeta as OS existentes até a próxima escrita na OS ou um rebuild.
 
+**Provisionamento e IRSA (Feature #315).** As tabelas e o GSI são
+declarados em Terraform no `repo-db-infra` (módulo `dynamodb-read-model`),
+sem passo de migration de schema. Os nomes levam o ambiente como sufixo
+(`os-read-model-<env>`, `cliente-read-model-<env>`) para HML e PROD
+coexistirem na mesma conta e região; o nome efetivo sai dos outputs
+`dynamodb_os_table_name` e `dynamodb_cliente_table_name`. A role IRSA
+(`tc3-os-service-dynamodb-<env>`) é criada no `repo-db-infra`, com trust no
+OIDC provider lido do remote state do `repo-k8s-infra`, restrita ao service
+account `async-furious/os-service` e, por policy, às duas tabelas e ao índice.
+O pipeline do OS anota o service account com o output
+`dynamodb_irsa_role_arn`. O DocumentDB segue descartado por custo.
+
 ## Referências
 
 - Tech Challenge — Fase 4 (`12SOAT - Fase 4 - Tech challenge.pdf`), p.3, p.4 e p.6

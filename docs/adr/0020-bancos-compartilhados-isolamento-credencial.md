@@ -155,6 +155,19 @@ do ambiente.
 Alarme proporcional ao `max_connections` do `db.t4g.micro` (estimado entre
 ~80 e ~110). Se o consumo não couber, a saída é subir para `db.t4g.small`.
 
+**Provider `postgresql` do Terraform não adotado (Feature #315).** O grupo
+optou por não introduzir o provider `postgresql`: é ferramenta nova e traria
+um obstáculo real de conectividade, já que o CI do `repo-db-infra` roda em
+`ubuntu-latest` e o RDS é privado. O bootstrap é um `Job` Kubernetes
+(`scripts/db-bootstrap/`), que roda dentro da VPC no pipeline do OS Service,
+com `\gexec` + `format()` no lugar de `DO $$`, porque `CREATE DATABASE` não
+roda em bloco `DO`. O Job usa o master (`db_master_secret_arn`) materializado
+no namespace só durante a execução, cria os bancos `billing` e
+`execucao_producao` e as três roles, revoga `PUBLIC` e roda uma verificação
+que exige conexão cruzada recusada. Senhas das roles vêm dos secrets
+`tc3-db-*`, não são geradas pelo Job. **Consequência:** Billing e Execução só
+sobem depois do 1º deploy do OS.
+
 ## Referências
 
 - Tech Challenge — Fase 4 (`12SOAT - Fase 4 - Tech challenge.pdf`), p.2 e p.4

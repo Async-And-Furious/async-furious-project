@@ -252,17 +252,30 @@ jobs:
           db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
           db_name=$(jq -er '.outputs.db_name.value' "$state_file")
           db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
-          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+          master_secret_arn=$(jq -er '.outputs.db_master_secret_arn.value' "$state_file")
+          billing_secret_arn=$(jq -er '.outputs.db_billing_secret_arn.value' "$state_file")
+          billing_name=$(jq -er '.outputs.db_billing_name.value' "$state_file")
+          execucao_secret_arn=$(jq -er '.outputs.db_execucao_secret_arn.value' "$state_file")
+          execucao_name=$(jq -er '.outputs.db_execucao_name.value' "$state_file")
+          dynamodb_role_arn=$(jq -r '.outputs.dynamodb_irsa_role_arn.value // empty' "$state_file")
+          for value in secret_arn db_host db_port db_name db_ssl_mode master_secret_arn billing_secret_arn billing_name execucao_secret_arn execucao_name; do
             test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
           done
           printf '::add-mask::%s\n' "$secret_arn"
           printf '::add-mask::%s\n' "$db_host"
+          printf '::add-mask::%s\n' "$master_secret_arn"
           {
             printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
             printf 'DB_HOST=%s\n' "$db_host"
             printf 'DB_PORT=%s\n' "$db_port"
             printf 'DB_NAME=%s\n' "$db_name"
             printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+            printf 'MASTER_SECRET_ARN=%s\n' "$master_secret_arn"
+            printf 'BILLING_SECRET_ARN=%s\n' "$billing_secret_arn"
+            printf 'BILLING_DB_NAME=%s\n' "$billing_name"
+            printf 'EXECUCAO_SECRET_ARN=%s\n' "$execucao_secret_arn"
+            printf 'EXECUCAO_DB_NAME=%s\n' "$execucao_name"
+            printf 'DYNAMODB_ROLE_ARN=%s\n' "$dynamodb_role_arn"
           } >> "$GITHUB_ENV"
       - name: Save original HML EKS endpoint access
         run: |
@@ -354,7 +367,7 @@ jobs:
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
             --namespace "$K8S_NAMESPACE" \
-            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" \
+            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}&connection_limit=3" \
             --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
@@ -405,6 +418,8 @@ jobs:
           fi
           kubectl delete jobs --namespace "$K8S_NAMESPACE" \
             --selector app.kubernetes.io/component=migration --ignore-not-found=true --wait=true
+      - name: Bootstrap per-service databases and roles
+        run: bash scripts/db-bootstrap/run-bootstrap-job.sh
       - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
@@ -508,6 +523,10 @@ jobs:
           set -euo pipefail
           webhook_secret_hash=$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n' | sha256sum | cut -d' ' -f1)
           sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
+          kubectl apply -f k8s/app/serviceaccount.yaml
+          if [[ -n "${DYNAMODB_ROLE_ARN:-}" ]]; then
+            kubectl annotate serviceaccount/os-service --namespace "$K8S_NAMESPACE" --overwrite "eks.amazonaws.com/role-arn=$DYNAMODB_ROLE_ARN"
+          fi
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl patch deployment/async-furious-api --namespace "$K8S_NAMESPACE" --type merge -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"webhook-secret-hash\":\"$webhook_secret_hash\"}}}}}"
           kubectl apply -f k8s/app/service.yaml
@@ -672,17 +691,30 @@ jobs:
           db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
           db_name=$(jq -er '.outputs.db_name.value' "$state_file")
           db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
-          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+          master_secret_arn=$(jq -er '.outputs.db_master_secret_arn.value' "$state_file")
+          billing_secret_arn=$(jq -er '.outputs.db_billing_secret_arn.value' "$state_file")
+          billing_name=$(jq -er '.outputs.db_billing_name.value' "$state_file")
+          execucao_secret_arn=$(jq -er '.outputs.db_execucao_secret_arn.value' "$state_file")
+          execucao_name=$(jq -er '.outputs.db_execucao_name.value' "$state_file")
+          dynamodb_role_arn=$(jq -r '.outputs.dynamodb_irsa_role_arn.value // empty' "$state_file")
+          for value in secret_arn db_host db_port db_name db_ssl_mode master_secret_arn billing_secret_arn billing_name execucao_secret_arn execucao_name; do
             test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
           done
           printf '::add-mask::%s\n' "$secret_arn"
           printf '::add-mask::%s\n' "$db_host"
+          printf '::add-mask::%s\n' "$master_secret_arn"
           {
             printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
             printf 'DB_HOST=%s\n' "$db_host"
             printf 'DB_PORT=%s\n' "$db_port"
             printf 'DB_NAME=%s\n' "$db_name"
             printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+            printf 'MASTER_SECRET_ARN=%s\n' "$master_secret_arn"
+            printf 'BILLING_SECRET_ARN=%s\n' "$billing_secret_arn"
+            printf 'BILLING_DB_NAME=%s\n' "$billing_name"
+            printf 'EXECUCAO_SECRET_ARN=%s\n' "$execucao_secret_arn"
+            printf 'EXECUCAO_DB_NAME=%s\n' "$execucao_name"
+            printf 'DYNAMODB_ROLE_ARN=%s\n' "$dynamodb_role_arn"
           } >> "$GITHUB_ENV"
       - name: Save original PROD EKS endpoint access
         run: |
@@ -747,7 +779,7 @@ jobs:
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
             --namespace "$K8S_NAMESPACE" \
-            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" \
+            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}&connection_limit=3" \
             --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
@@ -762,6 +794,8 @@ jobs:
             --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
             --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
+      - name: Bootstrap per-service databases and roles
+        run: bash scripts/db-bootstrap/run-bootstrap-job.sh
       - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
@@ -851,6 +885,10 @@ jobs:
           set -euo pipefail
           webhook_secret_hash=$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n' | sha256sum | cut -d' ' -f1)
           sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
+          kubectl apply -f k8s/app/serviceaccount.yaml
+          if [[ -n "${DYNAMODB_ROLE_ARN:-}" ]]; then
+            kubectl annotate serviceaccount/os-service --namespace "$K8S_NAMESPACE" --overwrite "eks.amazonaws.com/role-arn=$DYNAMODB_ROLE_ARN"
+          fi
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl patch deployment/async-furious-api --namespace "$K8S_NAMESPACE" --type merge -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"webhook-secret-hash\":\"$webhook_secret_hash\"}}}}}"
           kubectl apply -f k8s/app/service.yaml
