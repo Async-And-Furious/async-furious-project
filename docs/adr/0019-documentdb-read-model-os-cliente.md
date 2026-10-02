@@ -1,9 +1,10 @@
-# ADR-0019: DynamoDB como banco de leitura de Ordem de Serviço e Cliente
+# ADR-0019: DocumentDB como banco de leitura de Ordem de Serviço e Cliente
 
 ## Status
 
-Aceita — escopo revisado em 30/09/2026 (ver [Revisão de 30/09/2026](#revisão-de-30092026)).
-Onde o texto abaixo divergir da revisão, **vale a revisão**.
+Aceita — escopo revisado em 30/09/2026 e **motor trocado de DynamoDB para
+DocumentDB em 02/10/2026** (ver [Revisão de 02/10/2026](#revisão-de-02102026)).
+Onde o texto abaixo divergir das revisões, **valem as revisões**.
 
 ## Contexto
 
@@ -16,8 +17,9 @@ como peça decorativa, o que alimenta diretamente o item "Justificativa da
 divisão dos microsserviços e tecnologias utilizadas" do PDF de entrega
 (p.6).
 
-O motor escolhido no mesmo dia foi o **DynamoDB**, revisão da escolha
-inicial de MongoDB feita horas antes. A fila de execução por prioridade
+O motor escolhido em 21/09/2026 foi o **DynamoDB**, revisão da escolha
+inicial de MongoDB; em 02/10/2026 o grupo trocou o motor para o
+**DocumentDB** (ver revisão ao final). A fila de execução por prioridade
 (`GET /ordens-servico`) hoje ordena em memória, no próprio código da
 aplicação, usando `STATUS_PRIORIDADE`
 (`src/modules/ordem-servico/domain/policies/status-priority.policy.ts`):
@@ -39,51 +41,51 @@ Esse `sort()` em memória (`ordem-servico.repository.ts`) funciona hoje
 porque o Postgres é consultado inteiro e ordenado depois na aplicação. Um
 banco de leitura dedicado permite que essa ordenação seja resolvida pelo
 próprio armazenamento, e é o motivo concreto — não decorativo — de o
-DynamoDB existir nesta arquitetura.
+o banco de leitura existir nesta arquitetura.
 
 ## Decisão
 
 Manter o **PostgreSQL como fonte da verdade** (lado de escrita, sem
-alteração) e introduzir o **DynamoDB como lado de leitura** de
+alteração) e introduzir o **DocumentDB como lado de leitura** de
 `OrdemServico` e `Cliente`, exclusivo do OS Service:
 
-- Duas tabelas — `os-read-model` (item por OS) e `cliente-read-model` (item
-  por cliente) — em vez de single-table design: mais simples de operar em 8
-  semanas, ao custo de não ter uma query só que atravesse os dois.
-- Um GSI obrigatório em `os-read-model`, com chave de ordenação composta
-  `prioridade#createdAt`, para servir `GET /ordens-servico` sem `ORDER BY`
-  em memória.
+- Duas coleções — `os_read_model` (documento por OS) e `cliente_read_model`
+  (documento por cliente) — no banco lógico `os_read_model`: mais simples de
+  operar em 8 semanas, ao custo de não ter uma query só que atravesse os dois.
+- Um **índice composto parcial** obrigatório em `os_read_model` (`filaGrupo`,
+  `filaOrdem`), com campo de ordenação composto `prioridade#createdAt`, para
+  servir `GET /ordens-servico` sem `ORDER BY` em memória.
 - Sincronização por **write-through síncrono**: quem grava no Postgres (o
   repository, ver "Write-through no repository" na revisão abaixo) atualiza o
-  item correspondente no DynamoDB logo após o commit, dentro do mesmo request.
-- DynamoDB em modo `PAY_PER_REQUEST`, provisionado por Terraform no
-  `repo-db-infra` (Epic #312, Feature #315 — fora do escopo desta ADR).
-- Acesso via AWS SDK v3 (`@aws-sdk/lib-dynamodb`) — não há suporte Prisma
-  para DynamoDB; o custo de manter dois mecanismos de acesso a dado
-  (Prisma + SDK) é aceito.
+  documento correspondente no DocumentDB logo após o commit, dentro do mesmo request.
+- Cluster DocumentDB provisionado por Terraform no `repo-db-infra` (Epic
+  #312, Feature #315), com uma instância e TLS obrigatório.
+- Acesso via driver `mongodb` — não há suporte Prisma para DocumentDB; o
+  custo de manter dois mecanismos de acesso a dado (Prisma + driver) é
+  aceito.
 
-O modelo de dados completo (chaves, atributos, formato do GSI, rotas
+O modelo de dados completo (chaves, atributos, formato do índice, rotas
 migradas, mecanismo de write-through e procedimento de reconstrução) está
 em [`docs/architecture/persistence-model.md`](../architecture/persistence-model.md)
 — não duplicado aqui para não haver duas fontes de verdade divergentes.
 
 ## Alternativas consideradas
 
-- **MongoDB** (escolha inicial do mesmo dia, revisada horas depois):
-  descartada — nenhum ganho de modelagem sobre DynamoDB para um read model
-  de duas tabelas simples, e DynamoDB evita mais um componente para
-  operar/atualizar no cluster (sem StatefulSet, sem operador, sem
-  dimensionamento de nó).
-- **DocumentDB** (API compatível com MongoDB, gerenciado pela AWS):
-  descartado por custo — não cabe em conta acadêmica de free tier (ver nota
-  em `docs/adr/0004-banco-dados-gerenciado.md`).
+- **MongoDB in-cluster** (escolha inicial de 21/09/2026): descartado —
+  mais um componente para operar e dimensionar (StatefulSet, operador, nó)
+  num cluster já apertado pelo Kafka. O DocumentDB entrega a mesma API como
+  serviço gerenciado.
+- **DynamoDB** (escolha de 21/09 a 02/10/2026): descartado na troca de
+  motor. Atenderia o read model com `PAY_PER_REQUEST` e IRSA, mas o grupo
+  preferiu o modelo de documento (consultas e índices MongoDB) e o acesso
+  por usuário/senha com o mesmo padrão de secret dos bancos relacionais.
 - **Single-table design**: avaliado e descartado — ganharia uma query que
   atravessasse OS e Cliente em uma única chamada, mas custaria mais
   complexidade de modelagem de chave composta para um ganho que nenhuma
   rota hoje precisa (nenhuma rota lista "OS de um cliente" combinando os
   dois itens numa única consulta).
 - **Projeção assíncrona por evento** (o caso de uso publica um evento de
-  domínio e um consumidor separado atualiza o DynamoDB): descartada —
+  domínio e um consumidor separado atualiza o DocumentDB): descartada —
   traria consistência eventual visível ao cliente (ex.: `GET
   /ordens-servico/:id/status` logo após `POST /ordens-servico` podia não
   encontrar o item) sem necessidade real, já que o próprio processo já está
@@ -96,15 +98,14 @@ em [`docs/architecture/persistence-model.md`](../architecture/persistence-model.
 
 ## Consequências positivas
 
-- O DynamoDB ganha papel de negócio real: resolve a ordenação da fila por
+- O DocumentDB ganha papel de negócio real: resolve a ordenação da fila por
   prioridade no próprio armazenamento, em vez de o código da aplicação
   buscar tudo do Postgres e ordenar em memória.
 - Read model **descartável e reconstruível** a partir do Postgres (ver
   `persistence-model.md`) — nenhuma escrita de negócio depende do
-  DynamoDB estar no ar; só a leitura.
-- `PAY_PER_REQUEST` elimina a necessidade de dimensionar capacidade
-  provisionada para um volume de dados e tráfego que ainda não existe
-  (contexto acadêmico).
+  DocumentDB estar no ar; só a leitura.
+- O modelo de documento e os índices parciais servem a fila por prioridade
+  sem filtro adicional na query.
 
 ## Consequências negativas
 
@@ -115,26 +116,26 @@ em [`docs/architecture/persistence-model.md`](../architecture/persistence-model.
   `PagamentoRecusado`, `ExecucaoIniciada`, `ExecucaoConcluida`,
   `EtapaDaSagaFalhou`, ver
   [`event-catalog.md`](../architecture/event-catalog.md)) ganha uma segunda
-  escrita, ao SDK do DynamoDB, depois do commit no Postgres.
+  escrita, ao driver do DocumentDB, depois do commit no Postgres.
 - Sem transação entre os dois bancos: o commit no Postgres e a atualização
-  no DynamoDB não são atômicos. O comportamento em caso de falha da segunda
+  no DocumentDB não são atômicos. O comportamento em caso de falha da segunda
   escrita está documentado em `persistence-model.md` — aceito como trade-off
   de não introduzir 2PC/saga interna só para dois bancos do mesmo serviço.
 - Duas fontes de verdade para o mesmo dado (Postgres escreve,
-  DynamoDB serve leitura) exigem disciplina de manter os dois em sincronia
+  DocumentDB serve leitura) exigem disciplina de manter os dois em sincronia
   toda vez que um novo campo for adicionado ao agregado de OS ou Cliente —
   não há geração automática de schema como o Prisma faz para o lado
   relacional.
-- Nenhuma leitura ad-hoc (filtro arbitrário, relatório): o DynamoDB só serve
-  os acessos por chave/GSI já modelados. Qualquer necessidade de consulta
+- Nenhuma leitura ad-hoc (filtro arbitrário, relatório): o DocumentDB está
+  modelado e indexado só para os acessos já definidos. Qualquer necessidade de consulta
   nova (ex.: relatório administrativo por período livre) exige nova
   Feature de modelagem, não uma query improvisada como seria possível hoje
   com SQL.
 
 ## Riscos
 
-- **Médio**: write-through síncrono adiciona uma chamada de rede (SDK v3 →
-  DynamoDB) ao caminho de escrita de cada caso de uso afetado — aumenta a
+- **Médio**: write-through síncrono adiciona uma chamada de rede (driver →
+  DocumentDB) ao caminho de escrita de cada caso de uso afetado — aumenta a
   latência de cada request que já grava no Postgres. Aceito por ora; se
   virar gargalo perceptível, é decisão de revisão futura (fora do escopo
   desta ADR).
@@ -147,7 +148,7 @@ em [`docs/architecture/persistence-model.md`](../architecture/persistence-model.
 ## Revisão de 30/09/2026
 
 Revisão do épico #306 (`rev/Epic_1`). A decisão central (Postgres como
-fonte da verdade, DynamoDB como lado de leitura exclusivo do OS Service,
+fonte da verdade, DocumentDB (antes DynamoDB) como lado de leitura exclusivo do OS Service,
 CQRS com write-through síncrono) **continua valendo**. O que mudou foi o
 **escopo** do read model e o **ponto de integração** do write-through. O
 texto original acima fica como registro histórico; o desenho vigente é o de
@@ -156,10 +157,10 @@ esta seção.
 
 **Motivo da revisão: minimalismo.** O motivo real do NoSQL nesta
 arquitetura é (1) a **fila de OS ordenada por prioridade**, resolvida pelo
-GSI no próprio armazenamento, e (2) a **exigência do enunciado** de ter um
+índice no próprio armazenamento, e (2) a **exigência do enunciado** de ter um
 banco não relacional. Nada além disso justifica custo de modelagem e de
 sincronização; o escopo inicial (itens com peças/serviços, histórico
-embutido, resumo de OS dentro do cliente, busca de cliente por `Scan`) foi
+embutido, resumo de OS dentro do cliente, busca de cliente por varredura de coleção) foi
 cortado para o que sustenta esses dois motivos.
 
 Escopo vigente — **"OS + Cliente simples"**:
@@ -168,7 +169,7 @@ Escopo vigente — **"OS + Cliente simples"**:
   `GET /ordens-servico/:id` devolve só `clienteId`/`veiculoId`; nome do
   cliente e dados do veículo são embutidos pelo read model como acréscimo),
   `status`, `marcos` (`createdAt`, `iniciadaEm`, `finalizadaEm`,
-  `entregueEm`) e os atributos do GSI da fila. **Sem** `itens` e **sem** `historico` embutidos
+  `entregueEm`) e os campos do índice da fila. **Sem** `itens` e **sem** `historico` embutidos
   (a resposta atual da OS não os devolve; o histórico continua só no
   Postgres). Serve `GET /ordens-servico`, `GET /ordens-servico/:id` e
   `GET /ordens-servico/:id/status`. A rota `/rastreamento` foi **removida**
@@ -179,16 +180,16 @@ Escopo vigente — **"OS + Cliente simples"**:
   `resumoOrdensServico`. Serve apenas `GET /clientes/:id`.
 - **Permanecem no Postgres**: `GET /ordens-servico/tempo-medio` (agregação),
   `GET /veiculos/:id` e **`GET /clientes`** (listagem e `?search=`): a
-  listagem exige `Scan` (busca parcial em `nome`/`email`/`documento` e
-  `pagination.total`) e o `Scan` foi rejeitado por não escalar. A decisão
-  anterior (Scan + `FilterExpression`) fica **revogada**.
+  listagem exige varredura de coleção (busca parcial em `nome`/`email`/`documento` e
+  `pagination.total`) e a varredura foi rejeitada por não escalar. A decisão
+  anterior (varredura + filtro) fica **revogada**.
 - **`orcamento` sai da resposta da OS.** `Orcamento` pertence ao Billing
   Service (ADR-0017). **Quebra de contrato aceita** em `GET
   /ordens-servico` e `GET /ordens-servico/:id`. O read model e o rebuild
   **não** dependem de `Orcamento`.
 - **`CLOSED_WITHOUT_EXECUTION` entra em `STATUS_EXCLUIDOS_DA_LISTAGEM`**
   (`status-priority.policy.ts`): a OS encerrada sem execução sai da fila e
-  do GSI (índice esparso), como `FINISHED`/`DELIVERED`. **Mudança de
+  do índice (parcial), como `FINISHED`/`DELIVERED`. **Mudança de
   comportamento** da listagem — hoje essa OS aparece na fila, com prioridade
   6. Implementação do código pendente (esta revisão é só de documentação).
 
@@ -199,9 +200,9 @@ handlers `atualizar-status-*` e o `AtualizarOrdemServicoUseCase`, que gravam
 
 - Um port de domínio `IOsReadModelProjector` é injetado no repository
   Prisma de OS (e no de Cliente, para o `cliente-read-model`).
-  Implementação com AWS SDK v3 na infraestrutura.
+  Implementação com o driver `mongodb` na infraestrutura.
 - A projeção é **refresh por id**: relê o agregado do Postgres e faz
-  `PutItem`. O **mesmo builder** de item serve ao job de rebuild
+  `replaceOne` com `upsert`. O **mesmo builder** de documento serve ao job de rebuild
   (`persistence-model.md` §6).
 - `OrdemServicoRepository.update` passa a gravar `HistoricoStatusOS`
   **sempre que `data.status` muda**, no mesmo `$transaction`, com `motivo`
@@ -213,7 +214,7 @@ handlers `atualizar-status-*` e o `AtualizarOrdemServicoUseCase`, que gravam
   `PrismaService` injetado).
 - Hoje não existe `prisma.$transaction` no código; "após o commit" passa a
   significar **após a transação do repository**.
-- Falha no DynamoDB é **capturada, logada e emite métrica/evento custom**
+- Falha no DocumentDB é **capturada, logada e emite métrica/evento custom**
   (#335); não derruba a requisição (comportamento já descrito no
   `persistence-model.md` §5).
 
@@ -221,17 +222,37 @@ handlers `atualizar-status-*` e o `AtualizarOrdemServicoUseCase`, que gravam
 veículo como foto no momento do refresh da OS; editar o cliente/veículo não
 reprojeta as OS existentes até a próxima escrita na OS ou um rebuild.
 
-**Provisionamento e IRSA (Feature #315).** As tabelas e o GSI são
-declarados em Terraform no `repo-db-infra` (módulo `dynamodb-read-model`),
-sem passo de migration de schema. Os nomes levam o ambiente como sufixo
-(`os-read-model-<env>`, `cliente-read-model-<env>`) para HML e PROD
-coexistirem na mesma conta e região; o nome efetivo sai dos outputs
-`dynamodb_os_table_name` e `dynamodb_cliente_table_name`. A role IRSA
-(`tc3-os-service-dynamodb-<env>`) é criada no `repo-db-infra`, com trust no
-OIDC provider lido do remote state do `repo-k8s-infra`, restrita ao service
-account `async-furious/os-service` e, por policy, às duas tabelas e ao índice.
-O pipeline do OS anota o service account com o output
-`dynamodb_irsa_role_arn`. O DocumentDB segue descartado por custo.
+## Revisão de 02/10/2026
+
+**Troca de motor: DynamoDB para DocumentDB.** Postgres como fonte da verdade,
+CQRS, write-through síncrono no repository e o escopo "OS + Cliente simples"
+**continuam valendo**; muda só o armazenamento do lado de leitura.
+
+- **Provisionamento (Feature #315).** Módulo `docdb-read-model` no
+  `repo-db-infra`: cluster `tc3-docdb-<env>` (engine `docdb` 5.0, uma
+  instância `db.t4g.medium`, storage criptografado, TLS obrigatório), subnet
+  group nas subnets privadas do `repo-k8s-infra` e security group na porta
+  27017 com a mesma política de ingress do RDS (HML por CIDR, PROD por SG).
+  Outputs `docdb_endpoint`, `docdb_port`, `docdb_name`, `docdb_secret_arn`.
+- **Credenciais.** Secret `tc3-docdb-os-<env>`, JSON
+  `{username,password,host,port,dbname}`, mesmo contrato dos secrets
+  relacionais. O pipeline do OS o materializa como `DOCDB_*` no secret do
+  namespace. **A IRSA e a role de IAM foram removidas**: o acesso é por
+  usuário e senha, via TLS com o bundle de CA da AWS. **Dívida registrada:**
+  o OS Service usa o usuário master do cluster (único consumidor); um
+  usuário restrito à coleção exige um passo de bootstrap com `mongosh`.
+- **Mapeamento.** Tabela vira coleção, item vira documento, chave de
+  partição vira `_id` (`ordemServicoId`, `clienteId`), GSI esparso vira
+  índice composto **parcial** (`partialFilterExpression` sobre `filaGrupo`),
+  `Query`/`GetItem` viram `find`/`findOne`, e a paginação passa a usar
+  `limit` com cursor por `filaOrdem`. Coleções e índices são criados de forma
+  idempotente pelo OS Service, não pelo Terraform (`persistence-model.md`).
+- **Custo (consequência aceita).** O DocumentDB não tem free tier contínuo e
+  a instância é cobrada por hora; em HML o `down.yml` destrói o cluster, e a
+  ausência de réplica é aceita porque o read model é reconstruível.
+- **Dependências removidas.** O `@aws-sdk/lib-dynamodb` sai do desenho; entra
+  o driver `mongodb`. O `repo-db-infra` deixa de ler o OIDC provider do
+  `repo-k8s-infra`.
 
 ## Referências
 
@@ -245,4 +266,4 @@ O pipeline do OS anota o service account com o output
 - [`docs/architecture/event-catalog.md`](../architecture/event-catalog.md), [`docs/architecture/saga-flow.md`](../architecture/saga-flow.md)
 - `src/modules/ordem-servico/domain/policies/status-priority.policy.ts`
 - `prisma/schema.prisma`
-- Documentação oficial do Amazon DynamoDB (Global Secondary Index, esparsidade de índice) e do AWS SDK v3 (`@aws-sdk/lib-dynamodb`)
+- Documentação oficial do Amazon DocumentDB (índices, índices parciais, TLS) e do driver `mongodb`

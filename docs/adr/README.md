@@ -36,7 +36,7 @@ seguido pelas próximas ADRs.
 | [ADR-0016](./0016-saga-coreografada.md) | Saga coreografada para a transação distribuída da Fase 4 | Aceita |
 | [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md) | Divisão em três microsserviços e ownership de dados por serviço | Aceita |
 | [ADR-0018](./0018-mensageria-contratos-eventos.md) | Kafka como broker de eventos e contrato padrão de evento da Fase 4 | Aceita |
-| [ADR-0019](./0019-dynamodb-read-model-os-cliente.md) | DynamoDB como banco de leitura de Ordem de Serviço e Cliente | Aceita |
+| [ADR-0019](./0019-documentdb-read-model-os-cliente.md) | DocumentDB como banco de leitura de Ordem de Serviço e Cliente | Aceita |
 | [ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md) | Bancos compartilhados com isolamento por credencial | Aceita |
 | [ADR-0021](./0021-borda-sem-bff.md) | Borda sem BFF: Authorizer na borda, validação local nos serviços e roteamento direto por path | Aceita |
 | ADR-0022 | Integração com o Mercado Pago (Checkout Pro, webhook HMAC, estorno) | Pendente — a criar na Feature #325 |

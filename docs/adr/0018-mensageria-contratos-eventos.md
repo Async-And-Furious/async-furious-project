@@ -331,7 +331,7 @@ redecidido aqui**:
   conservador de Kafka pede ~1 GiB, e o node group atual (`t3.small`, 2 GiB)
   não comporta isso com folga.
 - Decisão já fechada em #313: **migrar o node group para `t3.medium`**, com
-  o DynamoDB (decisão de persistência do Epic #306) ficando fora do
+  o DocumentDB (decisão de persistência do Epic #306) ficando fora do
   cluster — sobra capacidade só para o Kafka e os três serviços.
 - A medição real de consumo de memória do broker (via `kubectl describe
   node` e subida isolada do chart) e o ajuste fino do heap (`-Xmx`/`-Xms`)

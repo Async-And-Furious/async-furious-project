@@ -151,6 +151,7 @@ exatamente o mesmo binário (passo "Build and push commit-SHA image" do `.github
 | Classe | `db.t4g.micro` (padrão) |
 | Armazenamento | 20 GB, criptografado (`storage_encrypted = true`) |
 | Database | `os_service` (OS Service), `billing` e `execucao_producao`; usuário master `postgres` só para o Job de bootstrap |
+| NoSQL (read model) | cluster DocumentDB `tc3-docdb-<env>` (`db.t4g.medium`, TLS), banco `os_read_model`, secret `tc3-docdb-os-<env>` |
 | Senha | gerenciada pelo RDS via Secrets Manager (`manage_master_user_password = true`), nunca no estado Terraform |
 | Backup | 1 dia nos dois ambientes |
 | Multi-AZ | somente PROD |

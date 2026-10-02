@@ -23,8 +23,8 @@ free tier:
 
 Provisionar uma instância RDS por serviço (3 instâncias) resolveria o
 isolamento com mais margem, mas não é opção viável dentro do orçamento
-acadêmico do projeto — o mesmo tipo de restrição que já levou à exclusão do
-DocumentDB em favor do DynamoDB (ADR-0019).
+acadêmico do projeto — o mesmo tipo de restrição que mantém uma única
+instância DocumentDB, sem réplica, para o read model (ADR-0019).
 
 ## Decisão
 
@@ -47,11 +47,10 @@ escopo da Feature #315 ("Provisionar os Bancos por Serviço", Epic #312) —
 esta ADR fixa a decisão e os nomes, não a aplica em Terraform (mecanismo de
 bootstrap, secrets e IRSA na Revisão de 30/09/2026, ao final).
 
-No **DynamoDB**, o isolamento é nativo por tabela: o OS Service é o único
-serviço com tabelas DynamoDB (ADR-0019), e a IAM role usada pela aplicação
-é restrita, por policy, às tabelas `os-read-model` e `cliente-read-model`
-do próprio ambiente — não há usuário DynamoDB compartilhado entre serviços,
-porque não há outro serviço com acesso a DynamoDB para compartilhar.
+No **DocumentDB**, o OS Service é o único serviço com acesso (ADR-0019): o
+cluster é próprio dele, atrás do security group na porta 27017, e nenhum
+outro serviço recebe o secret `tc3-docdb-os-<env>`. Não há banco NoSQL
+compartilhado entre serviços para isolar por credencial.
 
 Esta ADR também serve de defesa por escrito, em conjunto, para o **cluster
 Kubernetes compartilhado** (ADR-0003) — o mesmo raciocínio de custo
@@ -109,9 +108,9 @@ acadêmico que justifica a instância RDS única se aplica ao cluster EKS
   (Feature #315) precisa garantir que a policy de IAM/usuário Postgres seja
   de fato restritiva (não apenas "banco lógico diferente, mesma
   superusuário") — esta ADR decide o desenho, não valida a implementação.
-- **Baixo**: policy de IAM por tabela DynamoDB (ADR-0019) precisa ser
-  revisada quando/se outro serviço algum dia precisar de acesso de leitura
-  ao NoSQL do OS Service — hoje nenhum cenário desse tipo está previsto.
+- **Baixo**: o usuário do DocumentDB (ADR-0019) é hoje o master do cluster e
+  precisa virar usuário restrito por coleção quando/se outro serviço algum
+  dia precisar de acesso de leitura ao NoSQL do OS Service — hoje nenhum cenário desse tipo está previsto.
 
 ## Revisão de 30/09/2026
 
@@ -144,12 +143,10 @@ da #315). O artifact do `terraform plan` usa `retention-days: 1`.
   **Dívida:** role somente leitura dedicado ao Lambda (hoje ele usa a
   credencial de escrita do OS Service).
 
-**IRSA do DynamoDB.** Criada no `repo-db-infra`, lendo o OIDC provider do
-remote state do `repo-k8s-infra` (RFC-004: db lê k8s, nunca o inverso).
-Namespace e service account são fixos (ex.: `async-furious` / `os-service`).
-A pipeline anota a service account com o `role-arn` lido do output. A
-policy continua restrita às tabelas `os-read-model` e `cliente-read-model`
-do ambiente.
+**DocumentDB (revisão de 02/10/2026).** O cluster é criado no `repo-db-infra`
+e o acesso é por usuário e senha do secret `tc3-docdb-os-<env>`, via TLS; a
+pipeline materializa `DOCDB_*` no namespace do OS. Não há IRSA nem role de
+IAM para o NoSQL.
 
 **Conexões.** Cada serviço usa `connection_limit=3` na `DATABASE_URL`.
 Alarme proporcional ao `max_connections` do `db.t4g.micro` (estimado entre
@@ -177,7 +174,7 @@ sobem depois do 1º deploy do OS.
 - [ADR-0003 — Kubernetes/EKS como plataforma de orquestração](./0003-kubernetes-eks-orquestracao.md)
 - [ADR-0004 — Banco de dados gerenciado (RDS PostgreSQL)](./0004-banco-dados-gerenciado.md)
 - [ADR-0017 — Divisão em três microsserviços e ownership de dados](./0017-divisao-microsservicos-ownership-dados.md)
-- [ADR-0019 — DynamoDB como banco de leitura de OS e Cliente](./0019-dynamodb-read-model-os-cliente.md)
+- [ADR-0019 — DocumentDB como banco de leitura de OS e Cliente](./0019-documentdb-read-model-os-cliente.md)
 - [`docs/architecture/persistence-model.md`](../architecture/persistence-model.md)
 - Issue #315 — Provisionar os Bancos por Serviço (Epic #312)
 - `repo-db-infra` (Terraform do RDS, `modules/rds/main.tf`)

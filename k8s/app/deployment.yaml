@@ -13,7 +13,6 @@ spec:
       labels:
         app: async-furious-api
     spec:
-      serviceAccountName: os-service
       automountServiceAccountToken: false
       containers:
         - name: api

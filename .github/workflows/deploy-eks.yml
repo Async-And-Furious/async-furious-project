@@ -257,7 +257,15 @@ jobs:
           billing_name=$(jq -er '.outputs.db_billing_name.value' "$state_file")
           execucao_secret_arn=$(jq -er '.outputs.db_execucao_secret_arn.value' "$state_file")
           execucao_name=$(jq -er '.outputs.db_execucao_name.value' "$state_file")
-          dynamodb_role_arn=$(jq -r '.outputs.dynamodb_irsa_role_arn.value // empty' "$state_file")
+          docdb_secret_arn=$(jq -er '.outputs.docdb_secret_arn.value' "$state_file")
+          docdb_endpoint=$(jq -er '.outputs.docdb_endpoint.value' "$state_file")
+          docdb_port=$(jq -er '.outputs.docdb_port.value | tostring' "$state_file")
+          docdb_name=$(jq -er '.outputs.docdb_name.value' "$state_file")
+          for value in docdb_secret_arn docdb_endpoint docdb_port docdb_name; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$docdb_secret_arn"
+          printf '::add-mask::%s\n' "$docdb_endpoint"
           for value in secret_arn db_host db_port db_name db_ssl_mode master_secret_arn billing_secret_arn billing_name execucao_secret_arn execucao_name; do
             test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
           done
@@ -275,7 +283,10 @@ jobs:
             printf 'BILLING_DB_NAME=%s\n' "$billing_name"
             printf 'EXECUCAO_SECRET_ARN=%s\n' "$execucao_secret_arn"
             printf 'EXECUCAO_DB_NAME=%s\n' "$execucao_name"
-            printf 'DYNAMODB_ROLE_ARN=%s\n' "$dynamodb_role_arn"
+            printf 'DOCDB_SECRET_ARN=%s\n' "$docdb_secret_arn"
+            printf 'DOCDB_HOST=%s\n' "$docdb_endpoint"
+            printf 'DOCDB_PORT=%s\n' "$docdb_port"
+            printf 'DOCDB_NAME=%s\n' "$docdb_name"
           } >> "$GITHUB_ENV"
       - name: Save original HML EKS endpoint access
         run: |
@@ -340,7 +351,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DOCDB_SECRET_ARN DOCDB_HOST DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -363,6 +374,10 @@ jobs:
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           printf '::add-mask::%s\n' "$DB_USER"
           printf '::add-mask::%s\n' "$DB_PASSWORD"
+          docdb_json=$(aws secretsmanager get-secret-value --secret-id "$DOCDB_SECRET_ARN" --query SecretString --output text)
+          export DOCDB_USER=$(jq -er '.username' <<<"$docdb_json")
+          export DOCDB_PASSWORD=$(jq -er '.password' <<<"$docdb_json")
+          printf '::add-mask::%s\n' "$DOCDB_PASSWORD"
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
@@ -371,6 +386,9 @@ jobs:
             --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
+            --from-literal=DOCDB_HOST="$DOCDB_HOST" --from-literal=DOCDB_PORT="$DOCDB_PORT" \
+            --from-literal=DOCDB_NAME="$DOCDB_NAME" --from-literal=DOCDB_USER="$DOCDB_USER" \
+            --from-literal=DOCDB_PASSWORD="$DOCDB_PASSWORD" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
              --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
@@ -523,10 +541,6 @@ jobs:
           set -euo pipefail
           webhook_secret_hash=$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n' | sha256sum | cut -d' ' -f1)
           sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
-          kubectl apply -f k8s/app/serviceaccount.yaml
-          if [[ -n "${DYNAMODB_ROLE_ARN:-}" ]]; then
-            kubectl annotate serviceaccount/os-service --namespace "$K8S_NAMESPACE" --overwrite "eks.amazonaws.com/role-arn=$DYNAMODB_ROLE_ARN"
-          fi
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl patch deployment/async-furious-api --namespace "$K8S_NAMESPACE" --type merge -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"webhook-secret-hash\":\"$webhook_secret_hash\"}}}}}"
           kubectl apply -f k8s/app/service.yaml
@@ -696,7 +710,15 @@ jobs:
           billing_name=$(jq -er '.outputs.db_billing_name.value' "$state_file")
           execucao_secret_arn=$(jq -er '.outputs.db_execucao_secret_arn.value' "$state_file")
           execucao_name=$(jq -er '.outputs.db_execucao_name.value' "$state_file")
-          dynamodb_role_arn=$(jq -r '.outputs.dynamodb_irsa_role_arn.value // empty' "$state_file")
+          docdb_secret_arn=$(jq -er '.outputs.docdb_secret_arn.value' "$state_file")
+          docdb_endpoint=$(jq -er '.outputs.docdb_endpoint.value' "$state_file")
+          docdb_port=$(jq -er '.outputs.docdb_port.value | tostring' "$state_file")
+          docdb_name=$(jq -er '.outputs.docdb_name.value' "$state_file")
+          for value in docdb_secret_arn docdb_endpoint docdb_port docdb_name; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$docdb_secret_arn"
+          printf '::add-mask::%s\n' "$docdb_endpoint"
           for value in secret_arn db_host db_port db_name db_ssl_mode master_secret_arn billing_secret_arn billing_name execucao_secret_arn execucao_name; do
             test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
           done
@@ -714,7 +736,10 @@ jobs:
             printf 'BILLING_DB_NAME=%s\n' "$billing_name"
             printf 'EXECUCAO_SECRET_ARN=%s\n' "$execucao_secret_arn"
             printf 'EXECUCAO_DB_NAME=%s\n' "$execucao_name"
-            printf 'DYNAMODB_ROLE_ARN=%s\n' "$dynamodb_role_arn"
+            printf 'DOCDB_SECRET_ARN=%s\n' "$docdb_secret_arn"
+            printf 'DOCDB_HOST=%s\n' "$docdb_endpoint"
+            printf 'DOCDB_PORT=%s\n' "$docdb_port"
+            printf 'DOCDB_NAME=%s\n' "$docdb_name"
           } >> "$GITHUB_ENV"
       - name: Save original PROD EKS endpoint access
         run: |
@@ -752,7 +777,7 @@ jobs:
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DOCDB_SECRET_ARN DOCDB_HOST DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -775,6 +800,10 @@ jobs:
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           printf '::add-mask::%s\n' "$DB_USER"
           printf '::add-mask::%s\n' "$DB_PASSWORD"
+          docdb_json=$(aws secretsmanager get-secret-value --secret-id "$DOCDB_SECRET_ARN" --query SecretString --output text)
+          export DOCDB_USER=$(jq -er '.username' <<<"$docdb_json")
+          export DOCDB_PASSWORD=$(jq -er '.password' <<<"$docdb_json")
+          printf '::add-mask::%s\n' "$DOCDB_PASSWORD"
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
@@ -783,6 +812,9 @@ jobs:
             --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
+            --from-literal=DOCDB_HOST="$DOCDB_HOST" --from-literal=DOCDB_PORT="$DOCDB_PORT" \
+            --from-literal=DOCDB_NAME="$DOCDB_NAME" --from-literal=DOCDB_USER="$DOCDB_USER" \
+            --from-literal=DOCDB_PASSWORD="$DOCDB_PASSWORD" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
              --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
@@ -885,10 +917,6 @@ jobs:
           set -euo pipefail
           webhook_secret_hash=$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n' | sha256sum | cut -d' ' -f1)
           sed -e "s|\${app_image}|$IMAGE|g" -e 's|\${app_replicas}|2|g' k8s/app/deployment.yaml > "$RUNNER_TEMP/deployment.yaml"
-          kubectl apply -f k8s/app/serviceaccount.yaml
-          if [[ -n "${DYNAMODB_ROLE_ARN:-}" ]]; then
-            kubectl annotate serviceaccount/os-service --namespace "$K8S_NAMESPACE" --overwrite "eks.amazonaws.com/role-arn=$DYNAMODB_ROLE_ARN"
-          fi
           kubectl apply -f "$RUNNER_TEMP/deployment.yaml"
           kubectl patch deployment/async-furious-api --namespace "$K8S_NAMESPACE" --type merge -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"webhook-secret-hash\":\"$webhook_secret_hash\"}}}}}"
           kubectl apply -f k8s/app/service.yaml
