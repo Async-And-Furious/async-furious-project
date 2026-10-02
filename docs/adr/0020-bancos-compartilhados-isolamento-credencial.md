@@ -45,7 +45,7 @@ a uma fração do custo de três instâncias RDS separadas. O provisionamento
 real dos bancos/credenciais e a renomeação do banco `workshop` atual são
 escopo da Feature #315 ("Provisionar os Bancos por Serviço", Epic #312) —
 esta ADR fixa a decisão e os nomes, não a aplica em Terraform (mecanismo de
-bootstrap, secrets e IRSA na Revisão de 30/09/2026, ao final).
+bootstrap, secrets e DocumentDB na Revisão de 30/09/2026, ao final).
 
 No **DocumentDB**, o OS Service é o único serviço com acesso (ADR-0019): o
 cluster é próprio dele, atrás do security group na porta 27017, e nenhum
