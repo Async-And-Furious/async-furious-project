@@ -46,7 +46,7 @@ flowchart TB
             end
             rds[("RDS PostgreSQL compartilhado<br/>um banco e credencial por serviço")]
         end
-        ddb[("DynamoDB<br/>read model do OS Service")]
+        ddb[("DocumentDB<br/>read model do OS Service")]
     end
 
     client -->|"POST /auth"| apigw

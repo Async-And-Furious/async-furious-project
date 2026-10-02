@@ -10,7 +10,7 @@ data:
   DEPLOY_ENV: "local"
   JWT_ISSUER: ""
   JWT_AUDIENCE: ""
-  DB_NAME: "workshop"
+  DB_NAME: "os_service"
   DB_USER: "postgres"
   JWT_ALGORITHM: "HS256"
   JWT_ISSUER: "repo-auth-serverless"
