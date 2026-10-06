@@ -278,10 +278,20 @@ describe('AuthService', () => {
       await expect(service.validateCustomer('customer-id')).resolves.toEqual({
         id: 'customer-id',
         email: 'customer@test.com',
-        role: 'RECEPCIONISTA',
+        role: 'CLIENTE',
       });
       expect(mockPrisma.cliente.findFirst).toHaveBeenCalledWith({
         where: { id: 'customer-id', ativo: true },
+        select: { id: true, email: true },
+      });
+    });
+
+    it('returns null for an inactive or unknown Cliente', async () => {
+      mockPrisma.cliente.findFirst.mockResolvedValue(null);
+
+      await expect(service.validateCustomer('missing-id')).resolves.toBeNull();
+      expect(mockPrisma.cliente.findFirst).toHaveBeenCalledWith({
+        where: { id: 'missing-id', ativo: true },
         select: { id: true, email: true },
       });
     });
