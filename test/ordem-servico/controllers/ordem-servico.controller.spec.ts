@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Reflector } from '@nestjs/core';
 import { OrdemServicoController } from '../../../src/modules/ordem-servico/presentation/controllers/ordem-servico.controller';
 import {
   CreateOrdemServicoDto,
@@ -9,6 +10,7 @@ import {
 import { Role } from '../../../src/auth/enums/role.enum';
 import { JwtAuthGuard } from '../../../src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../src/auth/guards/roles.guard';
+import { ROLES_KEY } from '../../../src/auth/decorators/roles.decorator';
 import {
   CriarOrdemServicoUseCase,
   AssumirOrdemServicoUseCase,
@@ -148,6 +150,28 @@ describe('OrdemServicoController', () => {
 
   it('deve estar definido', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('autorização de leitura', () => {
+    it('deve restringir listagem e detalhe às roles de staff', () => {
+      const reflector = new Reflector();
+      const staffRoles = [Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO];
+
+      expect(
+        reflector.getAllAndOverride(ROLES_KEY, [controller.listar, OrdemServicoController])
+      ).toEqual(staffRoles);
+      expect(
+        reflector.getAllAndOverride(ROLES_KEY, [controller.detalhar, OrdemServicoController])
+      ).toEqual(staffRoles);
+    });
+
+    it('deve manter a consulta pública de status sem roles', () => {
+      const reflector = new Reflector();
+
+      expect(
+        reflector.getAllAndOverride(ROLES_KEY, [controller.consultarStatus, OrdemServicoController])
+      ).toBeUndefined();
+    });
   });
 
   describe('criar', () => {

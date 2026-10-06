@@ -57,6 +57,17 @@ describe('RolesGuard', () => {
     expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
   });
 
+  it.each([Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO])(
+    'should deny CLIENTE for staff role %s',
+    (requiredRole) => {
+      setMetadata([requiredRole]);
+      const request = { user: { id: '1', email: 'client@test.com', role: Role.CLIENTE } };
+      (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue(request);
+
+      expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
+    }
+  );
+
   it('should throw ForbiddenException when user is absent from request', () => {
     setMetadata([Role.ADMIN]);
     (mockContext.switchToHttp().getRequest as jest.Mock).mockReturnValue({});

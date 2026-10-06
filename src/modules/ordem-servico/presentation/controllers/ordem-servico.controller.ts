@@ -111,6 +111,8 @@ export class OrdemServicoController {
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
   @ApiOperation({
     summary: 'Listar ordens de serviço ativas por prioridade',
     description:
@@ -164,6 +166,8 @@ export class OrdemServicoController {
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
   @ApiOperation({ summary: 'Detalhar ordem de serviço' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Ordem de serviço encontrada' })

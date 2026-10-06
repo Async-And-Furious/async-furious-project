@@ -99,7 +99,7 @@ describe('JwtStrategy', () => {
     const customer = {
       id: 'customer-id',
       email: 'customer@test.com',
-      role: Role.RECEPCIONISTA,
+      role: Role.CLIENTE,
     };
     authService.validateCustomer.mockResolvedValue(customer);
 
@@ -113,6 +113,34 @@ describe('JwtStrategy', () => {
     ).resolves.toEqual(customer);
     expect(authService.validateCustomer).toHaveBeenCalledWith('customer-id');
   });
+
+  it.each([Role.ADMIN, Role.RECEPCIONISTA])(
+    'resolves gateway token with forged role %s from customer identity',
+    async (role) => {
+      const gatewayValues: Record<string, string> = {
+        AUTH_MODE: 'gateway',
+        JWT_PUBLIC_KEY: 'public-key',
+        JWT_ISSUER: 'auth-lambda',
+        JWT_AUDIENCE: 'workshop-api',
+      };
+      config.get.mockImplementation((key: string) => gatewayValues[key]);
+      strategy = new JwtStrategy(config, authService);
+      const customer = { id: 'customer-id', email: 'customer@test.com', role: Role.CLIENTE };
+      authService.validateCustomer.mockResolvedValue(customer);
+
+      await expect(
+        strategy.validate({
+          sub: 'customer-id',
+          role,
+          email: 'forged@test.com',
+          iss: 'auth-lambda',
+          aud: 'workshop-api',
+          exp: 9999999999,
+        })
+      ).resolves.toEqual(customer);
+      expect(authService.validateCustomer).toHaveBeenCalledWith('customer-id');
+    }
+  );
 
   it('should reject a gateway token whose customer does not exist', async () => {
     const gatewayValues: Record<string, string> = {

@@ -99,7 +99,7 @@ export class AuthService {
       select: { id: true, email: true },
     });
     if (!customer) return null;
-    return { id: customer.id, email: customer.email, role: Role.RECEPCIONISTA };
+    return { id: customer.id, email: customer.email, role: Role.CLIENTE };
   }
 
   async validateTokenSubject(payload: JwtPayload): Promise<AuthenticatedUser | null> {
