@@ -17,6 +17,7 @@ describe('SagaCompensationService', () => {
       releaseByOrdemId: jest.fn().mockResolvedValue(1),
     } as unknown as jest.Mocked<IReservaEstoqueRepository>;
     const pagamentos = {
+      findById: jest.fn(),
       findByOrdemServicoId: jest.fn().mockResolvedValue(payment),
       save: jest.fn(),
     };
@@ -50,6 +51,7 @@ describe('SagaCompensationService', () => {
       releaseByOrdemId: jest.fn().mockResolvedValue(0),
     } as unknown as jest.Mocked<IReservaEstoqueRepository>;
     const pagamentos = {
+      findById: jest.fn(),
       findByOrdemServicoId: jest.fn().mockResolvedValue(payment),
       save: jest.fn(),
     };

@@ -23,7 +23,11 @@ describe('Módulo Financeiro: Event handlers de Fluxo', () => {
   let mockEmissor: jest.Mocked<IPagamentoEventPublisher>;
 
   beforeEach(() => {
-    mockRepository = { save: jest.fn(), findById: jest.fn() } as jest.Mocked<IPagamentoRepository>;
+    mockRepository = {
+      save: jest.fn(),
+      findById: jest.fn(),
+      findByOrdemServicoId: jest.fn(),
+    } as jest.Mocked<IPagamentoRepository>;
     mockEmissor = { emitir: jest.fn() } as jest.Mocked<IPagamentoEventPublisher>;
   });
 

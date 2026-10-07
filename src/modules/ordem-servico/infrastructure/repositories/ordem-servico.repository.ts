@@ -157,6 +157,16 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     return this.mapToEntity(record);
   }
 
+  async closeWithoutExecution(ordemServicoId: string, motivo: string): Promise<void> {
+    await this.prisma.ordemServico.update({
+      where: { id: ordemServicoId },
+      data: { status: 'CLOSED_WITHOUT_EXECUTION' },
+    });
+    await this.prisma.historicoStatusOS.create({
+      data: { ordem_servico_id: ordemServicoId, status_novo: 'CLOSED_WITHOUT_EXECUTION', motivo },
+    });
+  }
+
   async calcularTempoMedioExecucao(): Promise<{ totalMinutos: number; total: number }> {
     const ordens = await this.prisma.ordemServico.findMany({
       where: {

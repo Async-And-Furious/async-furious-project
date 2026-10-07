@@ -9,11 +9,14 @@ import {
   IEmissorEventos,
 } from '../../shared/domain/interfaces/emissor-eventos.interface';
 import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
+import { REFUND_GATEWAY } from './domain/interfaces/pagamento.interface';
+import { RefundGatewayStub } from './infrastructure/gateways/refund.gateway.stub';
 
 @Module({
   controllers: [PagamentoController],
   providers: [
     PagamentoRepository,
+    { provide: REFUND_GATEWAY, useClass: RefundGatewayStub },
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
     {
       provide: PAGAMENTO_REPOSITORY,
@@ -31,5 +34,6 @@ import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
       inject: [EMISSOR_EVENTOS],
     },
   ],
+  exports: [PagamentoRepository, PAGAMENTO_REPOSITORY, REFUND_GATEWAY],
 })
 export class FinanceiroModule {}

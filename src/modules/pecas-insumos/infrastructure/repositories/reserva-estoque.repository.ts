@@ -53,13 +53,13 @@ export class ReservaEstoqueRepository implements IReservaEstoqueRepository {
     return this.prisma.$transaction(async (tx) => {
       const reservas = await tx.reservaEstoque.findMany({ where: { ordem_id: ordemId } });
       for (const reserva of reservas) {
-        await tx.peca.update({
-          where: { id: reserva.peca_id },
-          data: { quantidade_estoque: { increment: reserva.quantidade } },
-        });
-      }
-      if (reservas.length > 0) {
-        await tx.reservaEstoque.deleteMany({ where: { ordem_id: ordemId } });
+        const deleted = await tx.reservaEstoque.deleteMany({ where: { id: reserva.id } });
+        if (deleted.count === 1) {
+          await tx.peca.update({
+            where: { id: reserva.peca_id },
+            data: { quantidade_estoque: { increment: reserva.quantidade } },
+          });
+        }
       }
       return reservas.length;
     });
