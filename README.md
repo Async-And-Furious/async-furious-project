@@ -4,6 +4,14 @@
 
 English version: [README-en.md](./README-en.md)
 
+## Kafka integration
+
+Kafka is provisioned by `repo-k8s-infra` in KRaft mode. Deployment injects
+`KAFKA_BROKERS`, `KAFKA_USERNAME` and `KAFKA_PASSWORD` from the environment's
+Secrets Manager contract; event topics are `os.eventos.v1`, `billing.eventos.v1`
+and `execucao.eventos.v1`, with `<servico>.retry.v1` and `<servico>.dlt.v1`.
+HML connectivity remains a pending runtime gate.
+
 ## Objetivo do Projeto
 
 Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech Challenge da pós-graduação em Arquitetura de Software (15SOAT - FIAP). A arquitetura combina Clean Architecture e DDD.

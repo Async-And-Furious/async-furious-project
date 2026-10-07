@@ -12,6 +12,7 @@ data:
   JWT_AUDIENCE: ""
   DB_NAME: "workshop"
   DB_USER: "postgres"
+  KAFKA_ENABLED: "true"
   JWT_ALGORITHM: "HS256"
   JWT_ISSUER: "repo-auth-serverless"
   JWT_AUDIENCE: "async-furious-project"

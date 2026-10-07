@@ -35,3 +35,5 @@ spec:
                 name: async-furious-config
             - secretRef:
                 name: async-furious-secret
+            - secretRef:
+                name: async-furious-kafka
