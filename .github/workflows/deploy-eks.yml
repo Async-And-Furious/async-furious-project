@@ -242,6 +242,8 @@ jobs:
           test -n "${KAFKA_BOOTSTRAP_SERVERS:-}" || { echo 'KAFKA_BOOTSTRAP_SERVERS repository variable is required.' >&2; exit 1; }
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Configure kubectl for HML
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
       - name: Apply application namespace
         run: kubectl apply -f k8s/namespace.yaml
       - name: Materialize Kafka credentials
@@ -342,7 +344,6 @@ jobs:
           aws sts get-caller-identity >/dev/null
           status=$(aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query 'cluster.status' --output text)
           [[ "$status" == 'ACTIVE' ]] || { echo "EKS cluster is not ACTIVE: $status" >&2; exit 1; }
-          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl get --raw=/readyz >/dev/null
       - name: Apply namespace and configuration
         run: |
@@ -670,6 +671,8 @@ jobs:
           test -n "${KAFKA_BOOTSTRAP_SERVERS:-}" || { echo 'KAFKA_BOOTSTRAP_SERVERS repository variable is required.' >&2; exit 1; }
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Configure kubectl for PROD
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
       - name: Apply application namespace
         run: kubectl apply -f k8s/namespace.yaml
       - name: Materialize Kafka credentials
@@ -743,7 +746,6 @@ jobs:
           aws sts get-caller-identity >/dev/null
           status=$(aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --query 'cluster.status' --output text)
           [[ "$status" == 'ACTIVE' ]] || { echo "EKS cluster is not ACTIVE: $status" >&2; exit 1; }
-          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl get --raw=/readyz >/dev/null
       - name: Apply namespace and configuration
         run: |

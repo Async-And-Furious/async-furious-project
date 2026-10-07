@@ -8,7 +8,8 @@ secret_name="${KAFKA_SECRET_NAME:-tc3/kafka/$DEPLOY_ENV}"
 secret_json=$(aws secretsmanager get-secret-value --secret-id "$secret_name" --query SecretString --output text)
 username=$(jq -er '.username' <<<"$secret_json")
 password=$(jq -er '.password' <<<"$secret_json")
-[[ -n "$username" && -n "$password" ]] || { echo 'Kafka secret has empty credentials.' >&2; exit 1; }
+[[ "$username" == 'app' ]] || { echo 'Kafka secret username must be app.' >&2; exit 1; }
+[[ -n "$password" ]] || { echo 'Kafka secret has an empty password.' >&2; exit 1; }
 printf '::add-mask::%s\n' "$username"
 printf '::add-mask::%s\n' "$password"
 
@@ -17,7 +18,7 @@ kubectl get namespace "${K8S_NAMESPACE:-async-furious}" >/dev/null || {
   exit 1
 }
 kubectl create secret generic async-furious-kafka --namespace "${K8S_NAMESPACE:-async-furious}" \
-  --from-literal=KAFKA_USERNAME="$username" \
-  --from-literal=KAFKA_PASSWORD="$password" \
+  --from-literal=KAFKA_SASL_USERNAME="$username" \
+  --from-literal=KAFKA_SASL_PASSWORD="$password" \
   --from-literal=KAFKA_BROKERS="$KAFKA_BOOTSTRAP_SERVERS" \
   --dry-run=client -o yaml | kubectl apply -f -
