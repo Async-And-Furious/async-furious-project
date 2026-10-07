@@ -29,4 +29,9 @@ export class PagamentoRepository implements IPagamentoRepository {
 
     return PagamentoMapper.toDomain(record);
   }
+
+  async findByOrdemServicoId(ordemServicoId: string): Promise<Pagamento | null> {
+    const record = await this.prisma.pagamento.findFirst({ where: { ordemServicoId } });
+    return record ? PagamentoMapper.toDomain(record) : null;
+  }
 }
