@@ -236,6 +236,7 @@ model SagaCompletion {
   nextAttemptAt  DateTime @default(now())
   lastError      String?
   lockedUntil    DateTime?
+  fencingToken   String?
   createdAt      DateTime @default(now())
 
   @@unique([ordemServicoId])

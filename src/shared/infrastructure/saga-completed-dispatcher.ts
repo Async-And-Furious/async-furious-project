@@ -32,11 +32,12 @@ export class SagaCompletedDispatcher implements OnModuleInit, OnModuleDestroy {
       while ((item = await this.store.claimSagaForPublication())) {
         try {
           await this.emissor.emitir(new SagaCompleted(item.ordemServicoId, item.compensacoes, item.eventId));
-          await this.store.markSagaPublished(item.eventId);
+           await this.store.markSagaPublished(item.eventId, item.fencingToken);
         } catch (error) {
           await this.store.markSagaPublicationFailed(
-            item.eventId,
-            error instanceof Error ? error.message : String(error)
+             item.eventId,
+             error instanceof Error ? error.message : String(error),
+             item.fencingToken
           );
         }
       }

@@ -2,7 +2,7 @@ import { SagaCompletedDispatcher } from '../../src/shared/infrastructure/saga-co
 import { SagaCompleted } from '../../src/shared/domain/events/saga-compensation.events';
 
 describe('SagaCompletedDispatcher', () => {
-  const item = { eventId: 'event-1', ordemServicoId: 'os-1', compensacoes: ['os-fechada'], attempts: 1 };
+  const item = { eventId: 'event-1', ordemServicoId: 'os-1', compensacoes: ['os-fechada'], attempts: 1, fencingToken: 'fence-1' };
 
   it('polls durable outbox records and publishes with the persisted event id', async () => {
     const store = {
@@ -19,7 +19,7 @@ describe('SagaCompletedDispatcher', () => {
       expect.objectContaining({ eventId: 'event-1', ordemServicoId: 'os-1' })
     );
     expect(emissor.emitir.mock.calls[0][0]).toBeInstanceOf(SagaCompleted);
-    expect(store.markSagaPublished).toHaveBeenCalledWith('event-1');
+    expect(store.markSagaPublished).toHaveBeenCalledWith('event-1', 'fence-1');
   });
 
   it('marks a failed delivery for durable retry instead of losing it', async () => {
@@ -34,14 +34,14 @@ describe('SagaCompletedDispatcher', () => {
 
     await dispatcher.poll();
 
-    expect(store.markSagaPublicationFailed).toHaveBeenCalledWith('event-1', 'broker down');
+    expect(store.markSagaPublicationFailed).toHaveBeenCalledWith('event-1', 'broker down', 'fence-1');
     expect(store.markSagaPublished).not.toHaveBeenCalled();
   });
 
   it('continues polling after a publisher crash and preserves idempotency', async () => {
     const store = {
-      claimSagaForPublication: jest.fn().mockResolvedValueOnce(item).mockResolvedValueOnce(null),
-      markSagaPublished: jest.fn().mockRejectedValueOnce(new Error('crash')),
+      claimSagaForPublication: jest.fn().mockResolvedValueOnce(item).mockResolvedValueOnce(item).mockResolvedValueOnce(null),
+      markSagaPublished: jest.fn().mockRejectedValueOnce(new Error('crash')).mockResolvedValue(undefined),
       markSagaPublicationFailed: jest.fn().mockResolvedValue(undefined),
     };
     const emissor = { emitir: jest.fn().mockResolvedValue(undefined) };
@@ -50,7 +50,8 @@ describe('SagaCompletedDispatcher', () => {
     await dispatcher.poll();
     await dispatcher.poll();
 
-    expect(emissor.emitir).toHaveBeenCalledTimes(1);
-    expect(emissor.emitir.mock.calls[0][0].eventId).toBe('event-1');
+    expect(emissor.emitir).toHaveBeenCalledTimes(2);
+    expect(emissor.emitir.mock.calls[1][0].eventId).toBe('event-1');
+    expect(store.markSagaPublished).toHaveBeenLastCalledWith('event-1', 'fence-1');
   });
 });
