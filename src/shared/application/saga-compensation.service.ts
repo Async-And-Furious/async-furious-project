@@ -1,4 +1,8 @@
-import { EtapaDaSagaFalhou, SagaCompleted, SagaEtapa } from '../domain/events/saga-compensation.events';
+import {
+  EtapaDaSagaFalhou,
+  SagaCompleted,
+  SagaEtapa,
+} from '../domain/events/saga-compensation.events';
 import type { IEmissorEventos } from '../domain/interfaces/emissor-eventos.interface';
 import type { IReservaEstoqueRepository } from '../../modules/pecas-insumos/domain/interfaces/reserva-estoque.repository.interface';
 import type { IPagamentoRepository } from '../../modules/financeiro/domain/interfaces/pagamento.interface';
@@ -19,9 +23,15 @@ export class SagaCompensationService {
   ) {}
 
   async compensate(event: EtapaDaSagaFalhou): Promise<void> {
-    if (this.store ? !(await this.store.claimEvent(event.eventId, event.ordemServicoId)) : this.legacyProcessed.has(event.eventId)) return;
+    if (
+      this.store
+        ? !(await this.store.claimEvent(event.eventId, event.ordemServicoId))
+        : this.legacyProcessed.has(event.eventId)
+    )
+      return;
     if (event.etapa === 'reparo') {
-      if (this.store) await this.store.recordEvidence(event.eventId, `reparo-falhou:${event.motivo}`);
+      if (this.store)
+        await this.store.recordEvidence(event.eventId, `reparo-falhou:${event.motivo}`);
       else this.legacyProcessed.add(event.eventId);
       await this.emitCompletion(event, []);
       return;
@@ -37,12 +47,18 @@ export class SagaCompensationService {
 
     const pagamento = await this.pagamentos.findByOrdemServicoId(event.ordemServicoId);
     if (pagamento && event.etapa === 'inicio-execucao' && pagamento.getStatus() === 'PAGO') {
-      const claim = this.store ? await this.store.claimRefund(pagamento.getId(), pagamento.getValor()) : null;
+      const claim = this.store
+        ? await this.store.claimRefund(pagamento.getId(), pagamento.getValor())
+        : null;
       if (this.store && claim) {
         await this.refund.refund(pagamento.getId(), pagamento.getValor(), claim.idempotencyKey);
         await this.store.completeRefund(pagamento.getId(), claim.fencingToken);
       } else if (!this.store) {
-        await this.refund.refund(pagamento.getId(), pagamento.getValor(), `refund:${pagamento.getId()}`);
+        await this.refund.refund(
+          pagamento.getId(),
+          pagamento.getValor(),
+          `refund:${pagamento.getId()}`
+        );
       } else if (!(await this.store.refundCompleted(pagamento.getId()))) {
         throw new Error(`Refund is leased by another compensation worker: ${pagamento.getId()}`);
       }
@@ -82,8 +98,18 @@ export class SagaCompensationService {
       ? await this.store.completeSaga(ordemServicoId, eventId, compensacoes)
       : !this.legacyProcessed.has(eventId);
     if (completed) {
-      await this.emissor.emitir(new SagaCompleted(ordemServicoId, compensacoes, eventId));
-      if (this.store) await this.store.markSagaPublished(eventId);
+      try {
+        await this.emissor.emitir(new SagaCompleted(ordemServicoId, compensacoes, eventId));
+        if (this.store) await this.store.markSagaPublished(eventId);
+      } catch (error) {
+        if (this.store) {
+          await this.store.markSagaPublicationFailed(
+            eventId,
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+        throw error;
+      }
     }
     if (!this.store) this.legacyProcessed.add(eventId);
   }
@@ -93,8 +119,20 @@ export class SagaCompensationService {
       ? await this.store.completeSaga(event.ordemServicoId, event.eventId, compensacoes)
       : true;
     if (completed) {
-      await this.emissor.emitir(new SagaCompleted(event.ordemServicoId, compensacoes, event.eventId));
-      if (this.store) await this.store.markSagaPublished(event.eventId);
+      try {
+        await this.emissor.emitir(
+          new SagaCompleted(event.ordemServicoId, compensacoes, event.eventId)
+        );
+        if (this.store) await this.store.markSagaPublished(event.eventId);
+      } catch (error) {
+        if (this.store) {
+          await this.store.markSagaPublicationFailed(
+            event.eventId,
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+        throw error;
+      }
     }
   }
 }

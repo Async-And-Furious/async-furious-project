@@ -14,7 +14,8 @@ export class SagaCompensationStore implements ISagaCompensationStore {
       await this.prisma.sagaEventReceipt.create({ data: { eventId, ordemServicoId, lockedUntil } });
       return true;
     } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+        throw error;
       const claimed = await this.prisma.sagaEventReceipt.updateMany({
         where: { eventId, status: { not: 'COMPLETED' }, lockedUntil: { lt: new Date() } },
         data: { status: 'PROCESSING', lockedUntil },
@@ -24,15 +25,36 @@ export class SagaCompensationStore implements ISagaCompensationStore {
   }
 
   async recordEvidence(eventId: string, evidence: string): Promise<void> {
-    await this.prisma.sagaEventReceipt.update({ where: { eventId }, data: { status: 'COMPLETED', evidence } });
+    await this.prisma.sagaEventReceipt.update({
+      where: { eventId },
+      data: { status: 'PENDING', evidence },
+    });
   }
 
-  async claimRefund(paymentId: string, amount: number): Promise<{ idempotencyKey: string; fencingToken: string } | null> {
+  async markSagaPublicationFailed(eventId: string, error: string): Promise<void> {
+    await this.prisma.sagaEventReceipt.update({
+      where: { eventId },
+      data: { status: 'FAILED', evidence: error },
+    });
+    await this.prisma.sagaCompletion.updateMany({ where: { eventId }, data: { status: 'FAILED' } });
+  }
+
+  async claimRefund(
+    paymentId: string,
+    amount: number
+  ): Promise<{ idempotencyKey: string; fencingToken: string } | null> {
     const now = new Date();
     const fencingToken = randomUUID();
     const lockedUntil = new Date(Date.now() + 60_000);
     const result = await this.prisma.refundOperation.createMany({
-      data: { paymentId, idempotencyKey: `refund:${paymentId}`, amount, status: 'PROCESSING', fencingToken, lockedUntil },
+      data: {
+        paymentId,
+        idempotencyKey: `refund:${paymentId}`,
+        amount,
+        status: 'PROCESSING',
+        fencingToken,
+        lockedUntil,
+      },
       skipDuplicates: true,
     });
     if (result.count === 1) return { idempotencyKey: `refund:${paymentId}`, fencingToken };
@@ -55,20 +77,25 @@ export class SagaCompensationStore implements ISagaCompensationStore {
     return operation?.status === 'COMPLETED';
   }
 
-  async completeSaga(ordemServicoId: string, eventId: string, compensacoes: string[]): Promise<boolean> {
+  async completeSaga(
+    ordemServicoId: string,
+    eventId: string,
+    compensacoes: string[]
+  ): Promise<boolean> {
     try {
       await this.prisma.sagaCompletion.create({
-        data: { ordemServicoId, eventId, compensacoes },
+        data: { ordemServicoId, eventId, compensacoes, status: 'OUTBOX' },
       });
       return true;
     } catch (error) {
-      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002')
+        throw error;
 
       const [sameEvent, sameOrder] = await Promise.all([
         this.prisma.sagaCompletion.findUnique({ where: { eventId } }),
         this.prisma.sagaCompletion.findUnique({ where: { ordemServicoId } }),
       ]);
-      if (sameEvent?.ordemServicoId === ordemServicoId) return sameEvent.publishedAt === null;
+      if (sameEvent?.ordemServicoId === ordemServicoId) return sameEvent.status !== 'COMPLETED';
       if (sameOrder) return false;
       throw error;
     }
@@ -76,8 +103,14 @@ export class SagaCompensationStore implements ISagaCompensationStore {
 
   async markSagaPublished(eventId: string): Promise<void> {
     await this.prisma.$transaction([
-      this.prisma.sagaCompletion.update({ where: { eventId }, data: { publishedAt: new Date() } }),
-      this.prisma.sagaEventReceipt.updateMany({ where: { eventId }, data: { status: 'COMPLETED' } }),
+      this.prisma.sagaCompletion.update({
+        where: { eventId },
+        data: { status: 'COMPLETED', publishedAt: new Date() },
+      }),
+      this.prisma.sagaEventReceipt.updateMany({
+        where: { eventId },
+        data: { status: 'COMPLETED' },
+      }),
     ]);
   }
 }

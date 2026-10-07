@@ -1,5 +1,8 @@
 import { SagaCompensationService } from '../../src/shared/application/saga-compensation.service';
-import { EtapaDaSagaFalhou, SagaCompleted } from '../../src/shared/domain/events/saga-compensation.events';
+import {
+  EtapaDaSagaFalhou,
+  SagaCompleted,
+} from '../../src/shared/domain/events/saga-compensation.events';
 import { Pagamento } from '../../src/modules/financeiro/domain/entities/pagamento.entity';
 import type { IReservaEstoqueRepository } from '../../src/modules/pecas-insumos/domain/interfaces/reserva-estoque.repository.interface';
 
@@ -23,13 +26,7 @@ describe('SagaCompensationService', () => {
     };
     const refund = { refund: jest.fn().mockResolvedValue(undefined) };
     const emissor = { emitir: jest.fn() };
-    const service = new SagaCompensationService(
-      os,
-      reservas,
-      pagamentos,
-      refund,
-      emissor
-    );
+    const service = new SagaCompensationService(os, reservas, pagamentos, refund, emissor);
     const event = new EtapaDaSagaFalhou('os-1', 'inicio-execucao', 'timeout');
 
     await service.compensate(event);
@@ -56,7 +53,12 @@ describe('SagaCompensationService', () => {
       findByOrdemServicoId: jest.fn().mockResolvedValue(payment),
       save: jest.fn(),
     };
-    const refund = { refund: jest.fn().mockRejectedValueOnce(new Error('gateway down')).mockResolvedValue(undefined) };
+    const refund = {
+      refund: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('gateway down'))
+        .mockResolvedValue(undefined),
+    };
     const emissor = { emitir: jest.fn() };
     const service = new SagaCompensationService(os, reservas, pagamentos, refund, emissor);
     const event = new EtapaDaSagaFalhou('os-1', 'inicio-execucao', 'timeout');
@@ -71,11 +73,14 @@ describe('SagaCompensationService', () => {
     const payment = makePayment('PAGO');
     const store = {
       claimEvent: jest.fn().mockResolvedValue(true),
-      claimRefund: jest.fn().mockResolvedValue({ idempotencyKey: 'refund:pag-1', fencingToken: 'fence-1' }),
+      claimRefund: jest
+        .fn()
+        .mockResolvedValue({ idempotencyKey: 'refund:pag-1', fencingToken: 'fence-1' }),
       refundCompleted: jest.fn().mockResolvedValue(false),
       completeRefund: jest.fn().mockResolvedValue(undefined),
       completeSaga: jest.fn().mockResolvedValue(true),
       markSagaPublished: jest.fn().mockResolvedValue(undefined),
+      markSagaPublicationFailed: jest.fn().mockResolvedValue(undefined),
       recordEvidence: jest.fn(),
     };
     const refund = { refund: jest.fn().mockResolvedValue(undefined) };
@@ -88,7 +93,9 @@ describe('SagaCompensationService', () => {
       store
     );
 
-    await service.compensate(new EtapaDaSagaFalhou('os-1', 'inicio-execucao', 'timeout', 'failed-1'));
+    await service.compensate(
+      new EtapaDaSagaFalhou('os-1', 'inicio-execucao', 'timeout', 'failed-1')
+    );
 
     expect(refund.refund).toHaveBeenCalledWith('pag-1', 100, 'refund:pag-1');
     expect(store.completeRefund).toHaveBeenCalledWith('pag-1', 'fence-1');
@@ -98,13 +105,15 @@ describe('SagaCompensationService', () => {
     const payment = makePayment('PAGO');
     const store = {
       claimEvent: jest.fn().mockResolvedValue(true),
-      claimRefund: jest.fn()
+      claimRefund: jest
+        .fn()
         .mockResolvedValueOnce({ idempotencyKey: 'refund:pag-1', fencingToken: 'fence-1' })
         .mockResolvedValueOnce(null),
       refundCompleted: jest.fn().mockResolvedValue(false),
       completeRefund: jest.fn().mockResolvedValue(undefined),
       completeSaga: jest.fn().mockResolvedValue(true),
       markSagaPublished: jest.fn().mockResolvedValue(undefined),
+      markSagaPublicationFailed: jest.fn().mockResolvedValue(undefined),
       recordEvidence: jest.fn(),
     };
     const refund = { refund: jest.fn().mockResolvedValue(undefined) };
@@ -118,7 +127,10 @@ describe('SagaCompensationService', () => {
     );
     const event = new EtapaDaSagaFalhou('os-1', 'inicio-execucao', 'timeout', 'failed-1');
 
-    const results = await Promise.allSettled([service.compensate(event), service.compensate(event)]);
+    const results = await Promise.allSettled([
+      service.compensate(event),
+      service.compensate(event),
+    ]);
 
     expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
     expect(refund.refund).toHaveBeenCalledTimes(1);
@@ -129,7 +141,11 @@ describe('SagaCompensationService', () => {
     const store = {
       claimEvent: jest.fn().mockResolvedValue(true),
       completeSaga: jest.fn().mockResolvedValue(true),
-      markSagaPublished: jest.fn().mockRejectedValueOnce(new Error('crash')).mockResolvedValue(undefined),
+      markSagaPublished: jest
+        .fn()
+        .mockRejectedValueOnce(new Error('crash'))
+        .mockResolvedValue(undefined),
+      markSagaPublicationFailed: jest.fn().mockResolvedValue(undefined),
     };
     const emitted: SagaCompleted[] = [];
     const service = new SagaCompensationService(
@@ -147,12 +163,14 @@ describe('SagaCompensationService', () => {
 
     expect(emitted).toHaveLength(2);
     expect(emitted[1].eventId).toBe(emitted[0].eventId);
+    expect(store.markSagaPublicationFailed).toHaveBeenCalledWith(emitted[0].eventId, 'crash');
   });
 
   it('does not publish a second completion when the order is already completed', async () => {
     const store = {
       claimEvent: jest.fn().mockResolvedValue(true),
       completeSaga: jest.fn().mockResolvedValue(false),
+      markSagaPublicationFailed: jest.fn().mockResolvedValue(undefined),
     };
     const emit = jest.fn();
     const service = new SagaCompensationService(

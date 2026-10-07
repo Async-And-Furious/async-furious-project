@@ -219,7 +219,7 @@ model RefundOperation {
 model SagaEventReceipt {
   eventId          String   @id
   ordemServicoId   String
-  status           String   @default("PROCESSING")
+  status           String   @default("PENDING")
   evidence         String?
   lockedUntil      DateTime
   createdAt        DateTime @default(now())
@@ -230,6 +230,7 @@ model SagaCompletion {
   ordemServicoId String
   eventId        String   @id
   compensacoes   Json
+  status         String   @default("OUTBOX")
   publishedAt    DateTime?
   createdAt      DateTime @default(now())
 

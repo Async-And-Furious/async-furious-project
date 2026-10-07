@@ -271,8 +271,15 @@ of the saga's scope because it is an in-person act with no asynchronous
 counterpart to coordinate; the "payment confirmed" check performed before
 `registrar-entrega` is a safety lock on that same payment — not a second
 charge. Compensation is logical by default (revert OS status, close the
-estimate without execution); a real Mercado Pago refund is only triggered
-if the payment had already been captured before the failure.
+ estimate without execution); a real refund is only triggered if the payment
+ had already been captured and a configured provider adapter is available.
+ Without `REFUND_GATEWAY_URL` and `REFUND_GATEWAY_TOKEN`, the flow fails closed
+ and does not mark the payment as refunded.
+
+`SagaCompleted` uses a durable outbox: the receipt remains `PENDING`/`FAILED`
+ until publication is confirmed, and retries reuse the same `eventId`. The
+ uniqueness migration preserves replaced duplicates in
+ `SagaCompletionDeduplicationAudit` before creating the unique index.
 
 With no orchestrator, there is no single "saga state" — traceability of the
 distributed flow combines a New Relic trace, the `correlationId` carried in

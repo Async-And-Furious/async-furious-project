@@ -10,13 +10,20 @@ import {
 } from '../../shared/domain/interfaces/emissor-eventos.interface';
 import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
 import { REFUND_GATEWAY } from './domain/interfaces/pagamento.interface';
-import { RefundGatewayStub } from './infrastructure/gateways/refund.gateway.stub';
+import { ConfiguredRefundGateway } from './infrastructure/gateways/configured-refund.gateway';
 
 @Module({
   controllers: [PagamentoController],
   providers: [
     PagamentoRepository,
-    { provide: REFUND_GATEWAY, useClass: RefundGatewayStub },
+    {
+      provide: REFUND_GATEWAY,
+      useFactory: () =>
+        new ConfiguredRefundGateway({
+          endpoint: process.env.REFUND_GATEWAY_URL,
+          token: process.env.REFUND_GATEWAY_TOKEN,
+        }),
+    },
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
     {
       provide: PAGAMENTO_REPOSITORY,
