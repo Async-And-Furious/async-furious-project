@@ -6,6 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "prebuild": "prisma generate",
     "build": "nest build",
@@ -16,7 +19,8 @@
     "debug": "nest start --debug --watch",
     "prod": "node dist/main",
     "type:check": "tsc --noEmit",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "pnpm run type:check",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
