@@ -8,7 +8,7 @@ Aceita
 
 O OS Service valida cada checkout localmente e no GitHub Actions com Node.js
 22, instalação reprodutível via pnpm, Prisma generate, testes com cobertura
-mínima de 75%, lint, typecheck e build. A cobertura é publicada como artifact
+mínima de 80% uniforme, lint, typecheck e build. A cobertura é publicada como artifact
 para tornar o gate auditável.
 
 SonarCloud/SonarQube permanece opcional: quando `SONAR_TOKEN` existe, o
@@ -27,3 +27,11 @@ recurso AWS.
 - Falhas de cobertura, tipagem, lint ou compilação bloqueiam a validação.
 - O custo de Sonar é evitado em forks e instalações sem credenciais, mantendo
   um seam pronto para o ambiente configurado.
+
+## Checks e proteção de branch
+
+Os checks produzidos pelo workflow são `Run All Tests` e, quando configurado,
+`Sonar quality gate`. Os nomes
+devem ser usados na configuração de required status checks do GitHub. A
+proteção da branch é uma configuração externa do repositório; este código não
+alega criá-la nem consegue confirmá-la sem permissão da API do GitHub.

@@ -21,7 +21,8 @@ checkout, without requiring HML or production access.
 
 1. A clean Node.js 22 checkout can run tests, lint, typecheck, and build using
    the repository's package manager.
-2. CI fails when coverage is below the configured 75% minimum threshold and
+2. CI fails when coverage is below the configured 80% minimum threshold in
+   statements, branches, functions, and lines, and
    publishes the coverage report.
 3. CI validates deploy-related configuration without running Terraform apply,
    Kubernetes apply, or production deployment.

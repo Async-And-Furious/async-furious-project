@@ -81,6 +81,23 @@ describe('AuthService', () => {
       });
     });
 
+    it('uses the configured bcrypt cost', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        name: 'Test User',
+        password: 'hashed-password',
+        role: 'RECEPCIONISTA',
+      });
+      const config = (service as unknown as { config: ConfigService }).config;
+      jest.spyOn(config, 'get').mockReturnValue(12);
+
+      await service.register(registerDto);
+
+      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 12);
+    });
+
     it('should throw ConflictException if email already exists', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'existing-user',

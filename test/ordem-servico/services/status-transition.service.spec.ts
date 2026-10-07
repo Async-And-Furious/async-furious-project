@@ -26,4 +26,16 @@ describe('StatusTransitionService', () => {
       DomainException
     );
   });
+
+  it.each([
+    ['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL', 'OrdemServicoAguardandoAprovacao'],
+    ['AWAITING_APPROVAL', 'IN_PROGRESS', 'OrdemServicoEmExecucao'],
+    ['IN_PROGRESS', 'FINISHED', 'OrdemServicoFinalizada'],
+    ['FINISHED', 'DELIVERED', 'OrdemServicoEntregue'],
+    ['RECEIVED', 'CLOSED_WITHOUT_EXECUTION', undefined],
+    ['IN_PROGRESS', 'AWAITING_PARTS', undefined],
+  ] as const)('deve mapear a transição %s -> %s', (currentStatus, newStatus, eventName) => {
+    const event = service.validateAndGetEvent('os-123', currentStatus, newStatus);
+    expect(eventName ? event.constructor.name : event).toBe(eventName ?? null);
+  });
 });

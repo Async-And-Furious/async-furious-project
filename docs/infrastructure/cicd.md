@@ -8,7 +8,8 @@
 
 | Workflow | Gatilho | O que faz |
 |---|---|---|
-| `tests.yml` | push em `main`/`develop`, pull request | Postgres 16 de serviço, `pnpm install`, client Prisma, testes unitários, push do schema, testes e2e, lint, build |
+| `tests.yml` | push em `main`/`develop`, pull request | Postgres 16 de serviço, `pnpm install`, client Prisma, testes unitários, push do schema, testes e2e, lint, build. Check: `Run All Tests` |
+| `sonar.yml` | pull request, push em `main`/`develop`, manual | Teste com cobertura 80% e quality gate somente quando `SONAR_TOKEN` existe. Check: `Sonar quality gate` |
 | `terraform.yml` | pull request e push em `main`/`develop` com paths `infra/**`, `k8s/**`; `workflow_dispatch` | Em PR, apenas `validate` e `plan`. Em push ou manual, sobe um cluster `kind` efêmero no runner, aplica, inspeciona e descarta |
 | `deploy-eks.yml` | push em `main`/`develop` com paths de código, `workflow_dispatch`, `workflow_call` | Publica a imagem no ECR e implanta no EKS. Detalhado abaixo |
 | `cleanup-eks.yml` | `workflow_dispatch`, `workflow_call` | Remove os recursos da aplicação do cluster |
@@ -22,9 +23,12 @@
 | `observability-alert-scenarios.yml` | manual, só HML | Provoca cenários (indisponibilidade, CPU, memória, crash loop) para validar os alertas da New Relic |
 | `protected-route-diagnostics.yml`, `auth-seed-fingerprint-diagnostics.yml`, `customer-lookup-diagnostics.yml` | manual (o primeiro também em pull request) | Diagnóstico somente leitura de rotas protegidas, fingerprint do seed e consulta de cliente pela Lambda |
 
-A cobertura mínima exigida é 80% em todas as métricas (`jest.config.js`). O
-`README.md` afirma 85% em statements e lines; a divergência está registrada em
-[ADR-0014](../adr/0014-cobertura-minima-testes.md).
+A cobertura mínima exigida é 80% em todas as métricas (`jest.config.js`), sem
+redução do requisito definido na ADR-0014.
+
+Required status checks e branch protection são configurações do GitHub fora do
+código deste repositório. Devem referenciar os nomes acima; a confirmação da
+proteção depende de acesso administrativo à API do repositório.
 
 ### `deploy-eks.yml`
 

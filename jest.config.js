@@ -23,6 +23,7 @@ export default {
     '!src/auth/enums/*.ts',
   ],
   coverageDirectory: './coverage',
+  setupFiles: ['<rootDir>/test/support/jest.setup.ts'],
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/node_modules/', '/dist/', 'jest-e2e.json'],
   moduleNameMapper: {
@@ -32,7 +33,7 @@ export default {
   coverageReporters: ['lcov', 'text', 'clover'],
   coverageThreshold: {
     global: {
-      branches: 75,
+      branches: 80,
       functions: 80,
       lines: 80,
       statements: 80,
