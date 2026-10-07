@@ -6,7 +6,15 @@ import { AppModule } from '@/app.module';
 jest.mock('helmet', () => jest.fn(() => jest.fn()));
 jest.mock('cookie-parser', () => jest.fn(() => jest.fn()));
 
-describe('Main Bootstrap', () => {
+const hasDatabaseConfig = Boolean(
+  process.env.DATABASE_URL ||
+    (process.env.DB_HOST && process.env.DB_NAME && process.env.DB_USER && process.env.DB_PASSWORD)
+);
+const describeWithDatabase = hasDatabaseConfig ? describe : describe.skip;
+
+describeWithDatabase(
+  'Main Bootstrap (requires DATABASE_URL or DB_HOST/DB_NAME/DB_USER/DB_PASSWORD)',
+  () => {
   let app: INestApplication;
   let originalJwtSecret: string | undefined;
   let originalJwtCustomerPublicKey: string | undefined;
@@ -209,4 +217,5 @@ describe('Main Bootstrap', () => {
       exitSpy.mockRestore();
     });
   });
-});
+  }
+);

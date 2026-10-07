@@ -232,6 +232,10 @@ model SagaCompletion {
   compensacoes   Json
   status         String   @default("OUTBOX")
   publishedAt    DateTime?
+  attempts       Int      @default(0)
+  nextAttemptAt  DateTime @default(now())
+  lastError      String?
+  lockedUntil    DateTime?
   createdAt      DateTime @default(now())
 
   @@unique([ordemServicoId])

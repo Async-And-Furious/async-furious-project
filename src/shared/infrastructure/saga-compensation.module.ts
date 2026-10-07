@@ -13,6 +13,7 @@ import { SagaCompensationHandler } from './saga-compensation.handler';
 import { EmissorEventos } from './emissor-eventos/emissor-eventos.service';
 import { REFUND_GATEWAY } from '../../modules/financeiro/domain/interfaces/pagamento.interface';
 import type { IRefundGateway } from '../../modules/financeiro/application/ports/refund.gateway';
+import { SagaCompletedDispatcher } from './saga-completed-dispatcher';
 
 @Module({
   imports: [FinanceiroModule, OrdemServicoModule, PecasInsumosModule],
@@ -20,6 +21,7 @@ import type { IRefundGateway } from '../../modules/financeiro/application/ports/
     SagaCompensationStore,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
     SagaCompensationHandler,
+    SagaCompletedDispatcher,
     {
       provide: SagaCompensationService,
       useFactory: (

@@ -24,7 +24,8 @@ export default {
   ],
   coverageDirectory: './coverage',
   testEnvironment: 'node',
-  testPathIgnorePatterns: ['/node_modules/', '/dist/', 'jest-e2e.json'],
+  // E2E is an explicit DB suite; keeping it out of unit `test` avoids a false green run.
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', 'jest-e2e.json', '\\.e2e-spec\\.ts$'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },

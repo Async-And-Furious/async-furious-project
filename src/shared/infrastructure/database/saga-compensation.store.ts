@@ -32,11 +32,17 @@ export class SagaCompensationStore implements ISagaCompensationStore {
   }
 
   async markSagaPublicationFailed(eventId: string, error: string): Promise<void> {
+    const completion = await this.prisma.sagaCompletion.findUnique({ where: { eventId } });
+    const attempts = completion?.attempts ?? 0;
+    const delay = Math.min(300_000, 1_000 * 2 ** Math.min(attempts, 8));
     await this.prisma.sagaEventReceipt.update({
       where: { eventId },
       data: { status: 'FAILED', evidence: error },
     });
-    await this.prisma.sagaCompletion.updateMany({ where: { eventId }, data: { status: 'FAILED' } });
+    await this.prisma.sagaCompletion.updateMany({
+      where: { eventId },
+      data: { status: 'FAILED', lastError: error, nextAttemptAt: new Date(Date.now() + delay), lockedUntil: null },
+    });
   }
 
   async claimRefund(
@@ -105,12 +111,47 @@ export class SagaCompensationStore implements ISagaCompensationStore {
     await this.prisma.$transaction([
       this.prisma.sagaCompletion.update({
         where: { eventId },
-        data: { status: 'COMPLETED', publishedAt: new Date() },
+        data: { status: 'COMPLETED', publishedAt: new Date(), lockedUntil: null },
       }),
       this.prisma.sagaEventReceipt.updateMany({
         where: { eventId },
         data: { status: 'COMPLETED' },
       }),
     ]);
+  }
+
+  async claimSagaForPublication(): Promise<{
+    eventId: string;
+    ordemServicoId: string;
+    compensacoes: string[];
+    attempts: number;
+  } | null> {
+    const now = new Date();
+    const lockedUntil = new Date(Date.now() + 60_000);
+    const candidate = await this.prisma.sagaCompletion.findFirst({
+      where: {
+        status: { in: ['OUTBOX', 'FAILED'] },
+        nextAttemptAt: { lte: now },
+        OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    if (!candidate) return null;
+    const claimed = await this.prisma.sagaCompletion.updateMany({
+      where: {
+        eventId: candidate.eventId,
+        status: { in: ['OUTBOX', 'FAILED'] },
+        nextAttemptAt: { lte: now },
+        OR: [{ lockedUntil: null }, { lockedUntil: { lt: now } }],
+      },
+      data: { status: 'PROCESSING', lockedUntil, attempts: { increment: 1 } },
+    });
+    if (claimed.count !== 1) return null;
+    return {
+      eventId: candidate.eventId,
+      ordemServicoId: candidate.ordemServicoId,
+      compensacoes: Array.isArray(candidate.compensacoes) ? candidate.compensacoes.map(String) : [],
+      attempts: candidate.attempts + 1,
+    };
   }
 }
