@@ -21,8 +21,9 @@ export class EtapaDaSagaFalhou extends DomainEvent {
 export class SagaCompleted extends DomainEvent {
   constructor(
     public readonly ordemServicoId: string,
-    public readonly compensacoes: string[]
+    public readonly compensacoes: string[],
+    eventId?: string
   ) {
-    super();
+    super(eventId);
   }
 }

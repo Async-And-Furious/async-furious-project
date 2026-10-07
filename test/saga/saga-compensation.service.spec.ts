@@ -36,6 +36,7 @@ describe('SagaCompensationService', () => {
     await service.compensate(event);
 
     expect(refund.refund).toHaveBeenCalledTimes(1);
+    expect(refund.refund).toHaveBeenCalledWith('pag-1', 100, 'refund:pag-1');
     expect(reservas.releaseByOrdemId).toHaveBeenCalledTimes(1);
     expect(payment.getStatus()).toBe(Pagamento.STATUS_ESTORNADO);
     expect(emissor.emitir).toHaveBeenCalledWith(expect.any(SagaCompleted));
@@ -64,5 +65,87 @@ describe('SagaCompensationService', () => {
     expect(payment.getStatus()).toBe(Pagamento.STATUS_CONFIRMADO);
     await service.compensate(event);
     expect(payment.getStatus()).toBe(Pagamento.STATUS_ESTORNADO);
+  });
+
+  it('passes the durable idempotency key and fencing token to the gateway', async () => {
+    const payment = makePayment('PAGO');
+    const store = {
+      claimEvent: jest.fn().mockResolvedValue(true),
+      claimRefund: jest.fn().mockResolvedValue({ idempotencyKey: 'refund:pag-1', fencingToken: 'fence-1' }),
+      refundCompleted: jest.fn().mockResolvedValue(false),
+      completeRefund: jest.fn().mockResolvedValue(undefined),
+      completeSaga: jest.fn().mockResolvedValue(true),
+      markSagaPublished: jest.fn().mockResolvedValue(undefined),
+      recordEvidence: jest.fn(),
+    };
+    const refund = { refund: jest.fn().mockResolvedValue(undefined) };
+    const service = new SagaCompensationService(
+      { closeWithoutExecution: jest.fn() },
+      { releaseByOrdemId: jest.fn().mockResolvedValue(0) } as never,
+      { findByOrdemServicoId: jest.fn().mockResolvedValue(payment), save: jest.fn() } as never,
+      refund,
+      { emitir: jest.fn() } as never,
+      store
+    );
+
+    await service.compensate(new EtapaDaSagaFalhou('os-1', 'inicio-execucao', 'timeout', 'failed-1'));
+
+    expect(refund.refund).toHaveBeenCalledWith('pag-1', 100, 'refund:pag-1');
+    expect(store.completeRefund).toHaveBeenCalledWith('pag-1', 'fence-1');
+  });
+
+  it('does not call the gateway from a concurrent retry without the lease', async () => {
+    const payment = makePayment('PAGO');
+    const store = {
+      claimEvent: jest.fn().mockResolvedValue(true),
+      claimRefund: jest.fn()
+        .mockResolvedValueOnce({ idempotencyKey: 'refund:pag-1', fencingToken: 'fence-1' })
+        .mockResolvedValueOnce(null),
+      refundCompleted: jest.fn().mockResolvedValue(false),
+      completeRefund: jest.fn().mockResolvedValue(undefined),
+      completeSaga: jest.fn().mockResolvedValue(true),
+      markSagaPublished: jest.fn().mockResolvedValue(undefined),
+      recordEvidence: jest.fn(),
+    };
+    const refund = { refund: jest.fn().mockResolvedValue(undefined) };
+    const service = new SagaCompensationService(
+      { closeWithoutExecution: jest.fn() },
+      { releaseByOrdemId: jest.fn().mockResolvedValue(0) } as never,
+      { findByOrdemServicoId: jest.fn().mockResolvedValue(payment), save: jest.fn() } as never,
+      refund,
+      { emitir: jest.fn() },
+      store
+    );
+    const event = new EtapaDaSagaFalhou('os-1', 'inicio-execucao', 'timeout', 'failed-1');
+
+    const results = await Promise.allSettled([service.compensate(event), service.compensate(event)]);
+
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(refund.refund).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries completion publication after a crash and keeps the saga identity', async () => {
+    const payment = makePayment('AGUARDANDO_PAGAMENTO');
+    const store = {
+      claimEvent: jest.fn().mockResolvedValue(true),
+      completeSaga: jest.fn().mockResolvedValue(true),
+      markSagaPublished: jest.fn().mockRejectedValueOnce(new Error('crash')).mockResolvedValue(undefined),
+    };
+    const emitted: SagaCompleted[] = [];
+    const service = new SagaCompensationService(
+      { closeWithoutExecution: jest.fn() },
+      { releaseByOrdemId: jest.fn().mockResolvedValue(0) } as never,
+      { findByOrdemServicoId: jest.fn().mockResolvedValue(payment), save: jest.fn() } as never,
+      { refund: jest.fn() },
+      { emitir: jest.fn(async (event: SagaCompleted) => void emitted.push(event)) },
+      store as never
+    );
+    const event = new EtapaDaSagaFalhou('os-1', 'aprovacao-pagamento', 'timeout', 'failed-1');
+
+    await expect(service.compensate(event)).rejects.toThrow('crash');
+    await service.compensate(event);
+
+    expect(emitted).toHaveLength(2);
+    expect(emitted[1].eventId).toBe(emitted[0].eventId);
   });
 });

@@ -4,8 +4,8 @@ export abstract class DomainEvent {
   readonly ocorridoEm: Date;
   readonly eventId: string;
 
-  constructor() {
+  constructor(eventId: string = randomUUID()) {
     this.ocorridoEm = new Date();
-    this.eventId = randomUUID();
+    this.eventId = eventId;
   }
 }

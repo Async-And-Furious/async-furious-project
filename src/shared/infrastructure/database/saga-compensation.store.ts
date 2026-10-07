@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from './prisma.service';
 import type { ISagaCompensationStore } from '../../application/saga-compensation.store';
+import { randomUUID } from 'node:crypto';
 
 @Injectable()
 export class SagaCompensationStore implements ISagaCompensationStore {
@@ -26,17 +27,27 @@ export class SagaCompensationStore implements ISagaCompensationStore {
     await this.prisma.sagaEventReceipt.update({ where: { eventId }, data: { status: 'COMPLETED', evidence } });
   }
 
-  async prepareRefund(paymentId: string, amount: number): Promise<boolean> {
+  async claimRefund(paymentId: string, amount: number): Promise<{ idempotencyKey: string; fencingToken: string } | null> {
+    const now = new Date();
+    const fencingToken = randomUUID();
+    const lockedUntil = new Date(Date.now() + 60_000);
     const result = await this.prisma.refundOperation.createMany({
-      data: { paymentId, idempotencyKey: `refund:${paymentId}`, amount },
+      data: { paymentId, idempotencyKey: `refund:${paymentId}`, amount, status: 'PROCESSING', fencingToken, lockedUntil },
       skipDuplicates: true,
     });
-    if (result.count === 1) return true;
-    return !(await this.refundCompleted(paymentId));
+    if (result.count === 1) return { idempotencyKey: `refund:${paymentId}`, fencingToken };
+    const claimed = await this.prisma.refundOperation.updateMany({
+      where: { paymentId, status: { not: 'COMPLETED' }, lockedUntil: { lt: now } },
+      data: { status: 'PROCESSING', fencingToken, lockedUntil },
+    });
+    return claimed.count === 1 ? { idempotencyKey: `refund:${paymentId}`, fencingToken } : null;
   }
 
-  async completeRefund(paymentId: string): Promise<void> {
-    await this.prisma.refundOperation.update({ where: { paymentId }, data: { status: 'COMPLETED' } });
+  async completeRefund(paymentId: string, fencingToken: string): Promise<void> {
+    await this.prisma.refundOperation.updateMany({
+      where: { paymentId, fencingToken, status: 'PROCESSING' },
+      data: { status: 'COMPLETED', lockedUntil: null },
+    });
   }
 
   async refundCompleted(paymentId: string): Promise<boolean> {
@@ -49,7 +60,15 @@ export class SagaCompensationStore implements ISagaCompensationStore {
       data: { ordemServicoId, eventId, compensacoes },
       skipDuplicates: true,
     });
-    await this.prisma.sagaEventReceipt.updateMany({ where: { eventId }, data: { status: 'COMPLETED' } });
-    return result.count === 1;
+    if (result.count === 1) return true;
+    const existing = await this.prisma.sagaCompletion.findUnique({ where: { eventId } });
+    return existing?.publishedAt === null;
+  }
+
+  async markSagaPublished(eventId: string): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.sagaCompletion.update({ where: { eventId }, data: { publishedAt: new Date() } }),
+      this.prisma.sagaEventReceipt.updateMany({ where: { eventId }, data: { status: 'COMPLETED' } }),
+    ]);
   }
 }

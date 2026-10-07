@@ -5,6 +5,8 @@ CREATE TABLE "RefundOperation" (
     "status" TEXT NOT NULL DEFAULT 'PENDING',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "fencingToken" TEXT,
+    "lockedUntil" TIMESTAMP(3),
     CONSTRAINT "RefundOperation_pkey" PRIMARY KEY ("paymentId")
 );
 CREATE UNIQUE INDEX "RefundOperation_idempotencyKey_key" ON "RefundOperation"("idempotencyKey");
@@ -25,6 +27,6 @@ CREATE TABLE "SagaCompletion" (
     "eventId" TEXT NOT NULL,
     "compensacoes" JSONB NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "SagaCompletion_pkey" PRIMARY KEY ("ordemServicoId")
+    "publishedAt" TIMESTAMP(3),
+    CONSTRAINT "SagaCompletion_pkey" PRIMARY KEY ("eventId")
 );
-CREATE UNIQUE INDEX "SagaCompletion_eventId_key" ON "SagaCompletion"("eventId");

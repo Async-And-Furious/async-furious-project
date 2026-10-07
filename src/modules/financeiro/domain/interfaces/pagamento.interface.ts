@@ -8,7 +8,7 @@ export interface IPagamentoRepository {
 }
 
 export interface IRefundGateway {
-  refund(paymentId: string, amount: number): Promise<void>;
+  refund(paymentId: string, amount: number, idempotencyKey: string): Promise<void>;
 }
 
 export const REFUND_GATEWAY = Symbol('REFUND_GATEWAY');

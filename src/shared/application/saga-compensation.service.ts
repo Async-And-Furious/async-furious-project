@@ -37,10 +37,14 @@ export class SagaCompensationService {
 
     const pagamento = await this.pagamentos.findByOrdemServicoId(event.ordemServicoId);
     if (pagamento && event.etapa === 'inicio-execucao' && pagamento.getStatus() === 'PAGO') {
-      const shouldRefund = this.store ? await this.store.prepareRefund(pagamento.getId(), pagamento.getValor()) : true;
-      if (shouldRefund && !(this.store && (await this.store.refundCompleted(pagamento.getId())))) {
-        await this.refund.refund(pagamento.getId(), pagamento.getValor());
-        if (this.store) await this.store.completeRefund(pagamento.getId());
+      const claim = this.store ? await this.store.claimRefund(pagamento.getId(), pagamento.getValor()) : null;
+      if (this.store && claim) {
+        await this.refund.refund(pagamento.getId(), pagamento.getValor(), claim.idempotencyKey);
+        await this.store.completeRefund(pagamento.getId(), claim.fencingToken);
+      } else if (!this.store) {
+        await this.refund.refund(pagamento.getId(), pagamento.getValor(), `refund:${pagamento.getId()}`);
+      } else if (!(await this.store.refundCompleted(pagamento.getId()))) {
+        throw new Error(`Refund is leased by another compensation worker: ${pagamento.getId()}`);
       }
       pagamento.estornar();
       await this.pagamentos.save(pagamento);
@@ -77,7 +81,10 @@ export class SagaCompensationService {
     const completed = this.store
       ? await this.store.completeSaga(ordemServicoId, eventId, compensacoes)
       : !this.legacyProcessed.has(eventId);
-    if (completed) await this.emissor.emitir(new SagaCompleted(ordemServicoId, compensacoes));
+    if (completed) {
+      await this.emissor.emitir(new SagaCompleted(ordemServicoId, compensacoes, eventId));
+      if (this.store) await this.store.markSagaPublished(eventId);
+    }
     if (!this.store) this.legacyProcessed.add(eventId);
   }
 
@@ -85,6 +92,9 @@ export class SagaCompensationService {
     const completed = this.store
       ? await this.store.completeSaga(event.ordemServicoId, event.eventId, compensacoes)
       : true;
-    if (completed) await this.emissor.emitir(new SagaCompleted(event.ordemServicoId, compensacoes));
+    if (completed) {
+      await this.emissor.emitir(new SagaCompleted(event.ordemServicoId, compensacoes, event.eventId));
+      if (this.store) await this.store.markSagaPublished(event.eventId);
+    }
   }
 }

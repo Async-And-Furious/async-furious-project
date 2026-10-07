@@ -210,6 +210,8 @@ model RefundOperation {
   status         String   @default("PENDING")
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  fencingToken   String?
+  lockedUntil    DateTime?
 
   payment Pagamento @relation(fields: [paymentId], references: [id], onDelete: Cascade)
 }
@@ -225,9 +227,10 @@ model SagaEventReceipt {
 }
 
 model SagaCompletion {
-  ordemServicoId String   @id
-  eventId        String   @unique
+  ordemServicoId String
+  eventId        String   @id
   compensacoes   Json
+  publishedAt    DateTime?
   createdAt      DateTime @default(now())
 }
 
