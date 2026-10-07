@@ -8,8 +8,9 @@ English version: [README-en.md](./README-en.md)
 
 Kafka is provisioned by `repo-k8s-infra` in KRaft mode. Deployment injects
 `KAFKA_BROKERS`, `KAFKA_USERNAME` and `KAFKA_PASSWORD` from the environment's
-Secrets Manager contract; event topics are `os.events`, `os.events.retry` and
-`os.events.dlt`. HML connectivity remains a pending runtime gate.
+Secrets Manager contract; event topics are `os.eventos.v1`, `billing.eventos.v1`
+and `execucao.eventos.v1`, with `<servico>.retry.v1` and `<servico>.dlt.v1`.
+HML connectivity remains a pending runtime gate.
 
 ## Objetivo do Projeto
 

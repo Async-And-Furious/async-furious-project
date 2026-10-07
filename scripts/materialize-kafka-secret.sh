@@ -12,12 +12,10 @@ password=$(jq -er '.password' <<<"$secret_json")
 printf '::add-mask::%s\n' "$username"
 printf '::add-mask::%s\n' "$password"
 
-kubectl create namespace kafka --dry-run=client -o yaml | kubectl apply -f -
-kubectl create secret generic kafka-sasl --namespace kafka \
-  --from-literal=client-passwords="$password" \
-  --from-literal=inter-broker-password="$password" \
-  --from-literal=controller-password="$password" \
-  --dry-run=client -o yaml | kubectl apply -f -
+kubectl get namespace "${K8S_NAMESPACE:-async-furious}" >/dev/null || {
+  echo "Application namespace ${K8S_NAMESPACE:-async-furious} must be applied before materializing its Secret." >&2
+  exit 1
+}
 kubectl create secret generic async-furious-kafka --namespace "${K8S_NAMESPACE:-async-furious}" \
   --from-literal=KAFKA_USERNAME="$username" \
   --from-literal=KAFKA_PASSWORD="$password" \

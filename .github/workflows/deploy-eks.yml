@@ -239,10 +239,11 @@ jobs:
             exit 1
           }
           printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
-          KAFKA_BOOTSTRAP_SERVERS=$(jq -er '.outputs.kafka_bootstrap_servers.value' "$state_file")
-          printf 'KAFKA_BOOTSTRAP_SERVERS=%s\n' "$KAFKA_BOOTSTRAP_SERVERS" >> "$GITHUB_ENV"
+          test -n "${KAFKA_BOOTSTRAP_SERVERS:-}" || { echo 'KAFKA_BOOTSTRAP_SERVERS repository variable is required.' >&2; exit 1; }
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Apply application namespace
+        run: kubectl apply -f k8s/namespace.yaml
       - name: Materialize Kafka credentials
         env:
           DEPLOY_ENV: hml
@@ -347,7 +348,6 @@ jobs:
         run: |
           set -euo pipefail
           WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
-          kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
@@ -667,10 +667,11 @@ jobs:
             exit 1
           }
           printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
-          KAFKA_BOOTSTRAP_SERVERS=$(jq -er '.outputs.kafka_bootstrap_servers.value' "$state_file")
-          printf 'KAFKA_BOOTSTRAP_SERVERS=%s\n' "$KAFKA_BOOTSTRAP_SERVERS" >> "$GITHUB_ENV"
+          test -n "${KAFKA_BOOTSTRAP_SERVERS:-}" || { echo 'KAFKA_BOOTSTRAP_SERVERS repository variable is required.' >&2; exit 1; }
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Apply application namespace
+        run: kubectl apply -f k8s/namespace.yaml
       - name: Materialize Kafka credentials
         env:
           DEPLOY_ENV: prod
@@ -748,7 +749,6 @@ jobs:
         run: |
           set -euo pipefail
           WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
-          kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
