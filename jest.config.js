@@ -23,6 +23,7 @@ export default {
     '!src/auth/enums/*.ts',
   ],
   coverageDirectory: './coverage',
+  setupFiles: ['<rootDir>/test/support/jest.setup.ts'],
   testEnvironment: 'node',
   testPathIgnorePatterns: ['/node_modules/', '/dist/', 'jest-e2e.json'],
   moduleNameMapper: {

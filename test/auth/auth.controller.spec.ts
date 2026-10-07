@@ -85,6 +85,15 @@ describe('AuthController', () => {
       expect(result).toEqual(expectedResult);
     });
 
+    it('should forward the request correlation id', async () => {
+      authService.register.mockResolvedValue(expectedResult);
+      const request = { res: { locals: { correlationId: 'corr-register' } } } as never;
+
+      await controller.register(registerDto, request);
+
+      expect(authService.register).toHaveBeenCalledWith(registerDto, 'corr-register');
+    });
+
     it('should register user with default role when role is not provided', async () => {
       const registerDtoWithoutRole = {
         email: 'test@example.com',
@@ -187,6 +196,15 @@ describe('AuthController', () => {
       expect(authService.login).toHaveBeenCalledWith(loginDto);
       expect(authService.login).toHaveBeenCalledTimes(1);
       expect(result).toEqual(expectedResult);
+    });
+
+    it('should forward the request correlation id', async () => {
+      authService.login.mockResolvedValue(expectedResult);
+      const request = { res: { locals: { correlationId: 'corr-login' } } } as never;
+
+      await controller.login(loginDto, request);
+
+      expect(authService.login).toHaveBeenCalledWith(loginDto, 'corr-login');
     });
 
     it('should handle login with different email formats', async () => {
