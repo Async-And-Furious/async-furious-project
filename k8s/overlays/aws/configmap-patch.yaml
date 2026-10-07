@@ -10,3 +10,7 @@ data:
   JWT_ISSUER: "repo-auth-serverless"
   JWT_AUDIENCE: "async-furious-project"
   JWT_EXPIRES_IN: "1800"
+  KAFKA_CLIENT_ID: "async-furious-api"
+  KAFKA_TOPIC_EVENTS: "os.events"
+  KAFKA_TOPIC_RETRY: "os.events.retry"
+  KAFKA_TOPIC_DLT: "os.events.dlt"

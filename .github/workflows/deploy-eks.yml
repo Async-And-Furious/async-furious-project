@@ -184,6 +184,8 @@ jobs:
       SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
       SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+      KAFKA_SECRET_NAME: ${{ vars.KAFKA_SECRET_NAME || format('tc3/kafka/{0}', 'hml') }}
+      KAFKA_BOOTSTRAP_SERVERS: ${{ vars.KAFKA_BOOTSTRAP_SERVERS }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -237,8 +239,14 @@ jobs:
             exit 1
           }
           printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
+          KAFKA_BOOTSTRAP_SERVERS=$(jq -er '.outputs.kafka_bootstrap_servers.value' "$state_file")
+          printf 'KAFKA_BOOTSTRAP_SERVERS=%s\n' "$KAFKA_BOOTSTRAP_SERVERS" >> "$GITHUB_ENV"
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Materialize Kafka credentials
+        env:
+          DEPLOY_ENV: hml
+        run: bash scripts/materialize-kafka-secret.sh
       - name: Resolve database outputs from repo-db-infra state
         env:
           DEPLOY_ENV: hml
@@ -595,6 +603,8 @@ jobs:
       SEED_RECEPCIONISTA_PASSWORD: ${{ secrets.SEED_RECEPCIONISTA_PASSWORD }}
       SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
+      KAFKA_SECRET_NAME: ${{ vars.KAFKA_SECRET_NAME || format('tc3/kafka/{0}', 'prod') }}
+      KAFKA_BOOTSTRAP_SERVERS: ${{ vars.KAFKA_BOOTSTRAP_SERVERS }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -657,8 +667,14 @@ jobs:
             exit 1
           }
           printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
+          KAFKA_BOOTSTRAP_SERVERS=$(jq -er '.outputs.kafka_bootstrap_servers.value' "$state_file")
+          printf 'KAFKA_BOOTSTRAP_SERVERS=%s\n' "$KAFKA_BOOTSTRAP_SERVERS" >> "$GITHUB_ENV"
       - name: Setup kubectl
         uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Materialize Kafka credentials
+        env:
+          DEPLOY_ENV: prod
+        run: bash scripts/materialize-kafka-secret.sh
       - name: Resolve database outputs from repo-db-infra state
         env:
           DEPLOY_ENV: prod
