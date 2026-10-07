@@ -148,4 +148,25 @@ describe('SagaCompensationService', () => {
     expect(emitted).toHaveLength(2);
     expect(emitted[1].eventId).toBe(emitted[0].eventId);
   });
+
+  it('does not publish a second completion when the order is already completed', async () => {
+    const store = {
+      claimEvent: jest.fn().mockResolvedValue(true),
+      completeSaga: jest.fn().mockResolvedValue(false),
+    };
+    const emit = jest.fn();
+    const service = new SagaCompensationService(
+      { closeWithoutExecution: jest.fn() },
+      { releaseByOrdemId: jest.fn().mockResolvedValue(0) } as never,
+      { findByOrdemServicoId: jest.fn().mockResolvedValue(undefined) } as never,
+      { refund: jest.fn() },
+      { emitir: emit },
+      store as never
+    );
+
+    await service.compensateRefusal('os-1', 'OrcamentoRecusado', 'event-2');
+
+    expect(store.completeSaga).toHaveBeenCalledWith('os-1', 'event-2', ['os-fechada']);
+    expect(emit).not.toHaveBeenCalled();
+  });
 });

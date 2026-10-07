@@ -232,6 +232,8 @@ model SagaCompletion {
   compensacoes   Json
   publishedAt    DateTime?
   createdAt      DateTime @default(now())
+
+  @@unique([ordemServicoId])
 }
 
 model HistoricoStatusOS {

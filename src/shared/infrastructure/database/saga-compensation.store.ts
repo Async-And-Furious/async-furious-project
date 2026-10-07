@@ -56,13 +56,22 @@ export class SagaCompensationStore implements ISagaCompensationStore {
   }
 
   async completeSaga(ordemServicoId: string, eventId: string, compensacoes: string[]): Promise<boolean> {
-    const result = await this.prisma.sagaCompletion.createMany({
-      data: { ordemServicoId, eventId, compensacoes },
-      skipDuplicates: true,
-    });
-    if (result.count === 1) return true;
-    const existing = await this.prisma.sagaCompletion.findUnique({ where: { eventId } });
-    return existing?.publishedAt === null;
+    try {
+      await this.prisma.sagaCompletion.create({
+        data: { ordemServicoId, eventId, compensacoes },
+      });
+      return true;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+
+      const [sameEvent, sameOrder] = await Promise.all([
+        this.prisma.sagaCompletion.findUnique({ where: { eventId } }),
+        this.prisma.sagaCompletion.findUnique({ where: { ordemServicoId } }),
+      ]);
+      if (sameEvent?.ordemServicoId === ordemServicoId) return sameEvent.publishedAt === null;
+      if (sameOrder) return false;
+      throw error;
+    }
   }
 
   async markSagaPublished(eventId: string): Promise<void> {
