@@ -185,7 +185,6 @@ jobs:
       SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
       KAFKA_SECRET_NAME: ${{ vars.KAFKA_SECRET_NAME || format('tc3/kafka/{0}', 'hml') }}
-      KAFKA_BOOTSTRAP_SERVERS: ${{ vars.KAFKA_BOOTSTRAP_SERVERS }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -233,23 +232,18 @@ jobs:
           account_id=$(aws sts get-caller-identity --query Account --output text)
           state_file="$RUNNER_TEMP/repo-k8s-infra-${DEPLOY_ENV}.tfstate"
           aws s3 cp "s3://tc3-tfstate-${account_id}/repo-k8s-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
-          TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
-          [[ "$TARGET_GROUP_ARN" =~ ^arn:aws(-[a-z0-9-]+)?:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/[A-Za-z0-9._+=/@-]+/[0-9a-fA-F]+$ ]] || {
+           TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
+           KAFKA_BOOTSTRAP_SERVERS=$(jq -er '.outputs.kafka_bootstrap_servers.value' "$state_file")
+           [[ "$TARGET_GROUP_ARN" =~ ^arn:aws(-[a-z0-9-]+)?:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/[A-Za-z0-9._+=/@-]+/[0-9a-fA-F]+$ ]] || {
             echo 'repo-k8s-infra target group ARN is missing or invalid.' >&2
             exit 1
-          }
-          printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
-          test -n "${KAFKA_BOOTSTRAP_SERVERS:-}" || { echo 'KAFKA_BOOTSTRAP_SERVERS repository variable is required.' >&2; exit 1; }
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
-      - name: Configure kubectl for HML
-        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
-      - name: Apply application namespace
-        run: kubectl apply -f k8s/namespace.yaml
-      - name: Materialize Kafka credentials
-        env:
-          DEPLOY_ENV: hml
-        run: bash scripts/materialize-kafka-secret.sh
+           }
+           [[ "$KAFKA_BOOTSTRAP_SERVERS" =~ ^[A-Za-z0-9.-]+:[0-9]+(,[A-Za-z0-9.-]+:[0-9]+)*$ ]] || {
+             echo 'repo-k8s-infra kafka_bootstrap_servers output is missing or invalid.' >&2
+             exit 1
+           }
+           printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
+           printf 'KAFKA_BOOTSTRAP_SERVERS=%s\n' "$KAFKA_BOOTSTRAP_SERVERS" >> "$GITHUB_ENV"
       - name: Resolve database outputs from repo-db-infra state
         env:
           DEPLOY_ENV: hml
@@ -335,6 +329,16 @@ jobs:
           done
           echo 'Timed out waiting for HML EKS endpoint update.' >&2
           exit 1
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Configure kubectl for HML
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+      - name: Apply application namespace
+        run: kubectl apply -f k8s/namespace.yaml
+      - name: Materialize Kafka credentials
+        env:
+          DEPLOY_ENV: hml
+        run: bash scripts/materialize-kafka-secret.sh
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
@@ -350,6 +354,7 @@ jobs:
           set -euo pipefail
           WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
           kubectl apply -f k8s/config/configmap.yaml
+          envsubst < k8s/overlays/aws/configmap-patch.yaml | kubectl apply -f -
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
@@ -605,7 +610,6 @@ jobs:
       SEED_MECANICO_PASSWORD: ${{ secrets.SEED_MECANICO_PASSWORD }}
       SEEDED_CPF: ${{ secrets.SEEDED_CPF }}
       KAFKA_SECRET_NAME: ${{ vars.KAFKA_SECRET_NAME || format('tc3/kafka/{0}', 'prod') }}
-      KAFKA_BOOTSTRAP_SERVERS: ${{ vars.KAFKA_BOOTSTRAP_SERVERS }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -662,23 +666,18 @@ jobs:
           account_id=$(aws sts get-caller-identity --query Account --output text)
           state_file="$RUNNER_TEMP/repo-k8s-infra-${DEPLOY_ENV}.tfstate"
           aws s3 cp "s3://tc3-tfstate-${account_id}/repo-k8s-infra/${DEPLOY_ENV}/terraform.tfstate" "$state_file" --only-show-errors
-          TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
+           TARGET_GROUP_ARN=$(jq -er '.outputs.application_target_group_arn.value // .outputs.internal_alb_target_group_arn.value' "$state_file")
+           KAFKA_BOOTSTRAP_SERVERS=$(jq -er '.outputs.kafka_bootstrap_servers.value' "$state_file")
           [[ "$TARGET_GROUP_ARN" =~ ^arn:aws(-[a-z0-9-]+)?:elasticloadbalancing:[a-z0-9-]+:[0-9]{12}:targetgroup/[A-Za-z0-9._+=/@-]+/[0-9a-fA-F]+$ ]] || {
             echo 'repo-k8s-infra target group ARN is missing or invalid.' >&2
             exit 1
-          }
-          printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
-          test -n "${KAFKA_BOOTSTRAP_SERVERS:-}" || { echo 'KAFKA_BOOTSTRAP_SERVERS repository variable is required.' >&2; exit 1; }
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
-      - name: Configure kubectl for PROD
-        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
-      - name: Apply application namespace
-        run: kubectl apply -f k8s/namespace.yaml
-      - name: Materialize Kafka credentials
-        env:
-          DEPLOY_ENV: prod
-        run: bash scripts/materialize-kafka-secret.sh
+           }
+           [[ "$KAFKA_BOOTSTRAP_SERVERS" =~ ^[A-Za-z0-9.-]+:[0-9]+(,[A-Za-z0-9.-]+:[0-9]+)*$ ]] || {
+             echo 'repo-k8s-infra kafka_bootstrap_servers output is missing or invalid.' >&2
+             exit 1
+           }
+           printf 'TARGET_GROUP_ARN=%s\n' "$TARGET_GROUP_ARN" >> "$GITHUB_ENV"
+           printf 'KAFKA_BOOTSTRAP_SERVERS=%s\n' "$KAFKA_BOOTSTRAP_SERVERS" >> "$GITHUB_ENV"
       - name: Resolve database outputs from repo-db-infra state
         env:
           DEPLOY_ENV: prod
@@ -737,6 +736,16 @@ jobs:
             sleep 10
           done
           exit 1
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5
+      - name: Configure kubectl for PROD
+        run: aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+      - name: Apply application namespace
+        run: kubectl apply -f k8s/namespace.yaml
+      - name: Materialize Kafka credentials
+        env:
+          DEPLOY_ENV: prod
+        run: bash scripts/materialize-kafka-secret.sh
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
@@ -752,6 +761,7 @@ jobs:
           set -euo pipefail
           WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
           kubectl apply -f k8s/config/configmap.yaml
+          envsubst < k8s/overlays/aws/configmap-patch.yaml | kubectl apply -f -
           kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"prod\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
