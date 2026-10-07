@@ -15,6 +15,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { GlobalExceptionFilter } from './shared/infrastructure/filters/global-exception.filter';
 import { pinoHttpOptions } from './shared/infrastructure/logging/pino-logger.config';
+import { SagaCompensationModule } from './shared/infrastructure/saga-compensation.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { pinoHttpOptions } from './shared/infrastructure/logging/pino-logger.con
     OrdemServicoModule,
     FinanceiroModule,
     HealthModule,
+    SagaCompensationModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

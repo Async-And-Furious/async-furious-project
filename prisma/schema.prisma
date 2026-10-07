@@ -200,6 +200,46 @@ model Pagamento {
   createdAt      DateTime @default(now())
 
   @@map("pagamentos")
+  refundOperation RefundOperation?
+}
+
+model RefundOperation {
+  paymentId      String   @id
+  idempotencyKey String   @unique
+  amount         Decimal  @db.Decimal(10, 2)
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  fencingToken   String?
+  lockedUntil    DateTime?
+
+  payment Pagamento @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+}
+
+model SagaEventReceipt {
+  eventId          String   @id
+  ordemServicoId   String
+  status           String   @default("PENDING")
+  evidence         String?
+  lockedUntil      DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model SagaCompletion {
+  ordemServicoId String
+  eventId        String   @id
+  compensacoes   Json
+  status         String   @default("OUTBOX")
+  publishedAt    DateTime?
+  attempts       Int      @default(0)
+  nextAttemptAt  DateTime @default(now())
+  lastError      String?
+  lockedUntil    DateTime?
+  fencingToken   String?
+  createdAt      DateTime @default(now())
+
+  @@unique([ordemServicoId])
 }
 
 model HistoricoStatusOS {

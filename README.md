@@ -325,8 +325,16 @@ fora do escopo da saga por ser um ato presencial, sem contrapartida
 assíncrona a coordenar; a checagem de "pagamento confirmado" feita antes de
 `registrar-entrega` é uma trava de segurança sobre esse mesmo pagamento —
 não uma segunda cobrança. Compensação é lógica por padrão (reverter status
-da OS, encerrar orçamento sem execução); o estorno real no Mercado Pago só
-é acionado se o pagamento já tiver sido capturado antes da falha.
+ da OS, encerrar orçamento sem execução); o estorno real só é acionado se o
+ pagamento já tiver sido capturado antes da falha e um adapter de provedor
+ configurado estiver disponível. Sem `REFUND_GATEWAY_URL` e
+ `REFUND_GATEWAY_TOKEN`, o fluxo falha fechado e não marca o pagamento como
+ estornado.
+
+`SagaCompleted` usa um outbox durável: receipt fica `PENDING`/`FAILED` até a
+ publicação ser confirmada, e retries reutilizam o mesmo `eventId`. A migration
+ de unicidade preserva os duplicados substituídos em
+ `SagaCompletionDeduplicationAudit` antes de criar o índice único.
 
 Sem orquestrador, não há um "estado único da saga" — a rastreabilidade do
 fluxo distribuído combina trace no New Relic, o `correlationId` propagado

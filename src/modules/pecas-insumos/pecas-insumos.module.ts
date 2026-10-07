@@ -154,6 +154,6 @@ import {
       inject: [PecaInsumoRepository],
     },
   ],
-  exports: [PecaInsumoRepository],
+  exports: [PecaInsumoRepository, ReservaEstoqueRepository],
 })
 export class PecasInsumosModule {}

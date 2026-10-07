@@ -9,11 +9,21 @@ import {
   IEmissorEventos,
 } from '../../shared/domain/interfaces/emissor-eventos.interface';
 import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
+import { REFUND_GATEWAY } from './domain/interfaces/pagamento.interface';
+import { ConfiguredRefundGateway } from './infrastructure/gateways/configured-refund.gateway';
 
 @Module({
   controllers: [PagamentoController],
   providers: [
     PagamentoRepository,
+    {
+      provide: REFUND_GATEWAY,
+      useFactory: () =>
+        new ConfiguredRefundGateway({
+          endpoint: process.env.REFUND_GATEWAY_URL,
+          token: process.env.REFUND_GATEWAY_TOKEN,
+        }),
+    },
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
     {
       provide: PAGAMENTO_REPOSITORY,
@@ -31,5 +41,6 @@ import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
       inject: [EMISSOR_EVENTOS],
     },
   ],
+  exports: [PagamentoRepository, PAGAMENTO_REPOSITORY, REFUND_GATEWAY],
 })
 export class FinanceiroModule {}

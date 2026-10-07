@@ -1,5 +1,14 @@
 # Log de agentes
 
+## 2026-10-07 — Blockers finais da Saga
+
+- Tornada a publicação de `SagaCompleted` recuperável com estados `PENDING` e
+  `FAILED`; o receipt só vira `COMPLETED` após confirmação do emissor.
+- A migration de unicidade deduplica deterministicamente e audita os registros
+  removidos antes do índice único.
+- Substituído o stub de estorno por adapter configurável, com falha fechada sem
+  credenciais. Não foram executados migration real nem AWS apply.
+
 ## 2026-09-14 — Fortalecimento da atualização de capacidade do node group em HML
 
 - Fortalecido o passo de capacidade em HML para esperar um nodegroup ACTIVE,
