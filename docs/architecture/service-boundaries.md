@@ -44,18 +44,18 @@ evento entre os serviços (Feature #309).
 Herda os módulos `ordem-servico`, `cadastro` e `pecas-insumos` do monólito
 atual (`docs/adr/0010-monolito-modular.md`, agora superseded — ver
 [ADR-0017](../adr/0017-divisao-microsservicos-ownership-dados.md)).
-Permanece com PostgreSQL como lado de escrita e ganha o DynamoDB como lado
+Permanece com PostgreSQL como lado de escrita e ganha o DocumentDB como lado
 de leitura (CQRS de `OrdemServico` e `Cliente`, decisão F4/4.1-4.5 do
 `fase4-decisoes-epico1.md` — modelo de dados completo fechado pela Feature
 #310, ver [`persistence-model.md`](./persistence-model.md) e
-[ADR-0019](../adr/0019-dynamodb-read-model-os-cliente.md)).
+[ADR-0019](../adr/0019-documentdb-read-model-os-cliente.md)).
 
 ### 1.2. Billing Service
 
 Nasce da extração do módulo `financeiro` do monólito, **somado ao
 `Orcamento`**, que hoje vive dentro de `ordem-servico` (ver §3 — FKs que
-cruzam fronteira). PostgreSQL próprio, sem DynamoDB (decisão registrada em
-#323: "nenhuma dependência de DynamoDB... presente no `package.json`").
+cruzam fronteira). PostgreSQL próprio, sem DocumentDB (decisão registrada em
+#323: "nenhuma dependência do driver do DocumentDB... presente no `package.json`").
 
 ### 1.3. Execução e Produção
 
@@ -107,7 +107,7 @@ serviços/peças e calcular o orçamento — dependem de `Servico` e `Peca`) e
 | `Cliente` | `cadastro` | **OS Service** | — |
 | `Veiculo` | `cadastro` | **OS Service** | — |
 | `Servico` | `cadastro` | **OS Service** | catálogo de serviços oferecidos (não confundir com "serviço" no sentido de microsserviço) |
-| `OrdemServico` | `ordem-servico` | **OS Service** | fonte da verdade (lado de escrita); ganha réplica de leitura em DynamoDB (F4, fora do escopo aqui) e a coluna `pago_em` (`nullable`, gravada ao consumir `PagamentoConfirmado`, sem mudar o status; usada só pelo detector de OS parada) |
+| `OrdemServico` | `ordem-servico` | **OS Service** | fonte da verdade (lado de escrita); ganha réplica de leitura em DocumentDB (F4, fora do escopo aqui) e a coluna `pago_em` (`nullable`, gravada ao consumir `PagamentoConfirmado`, sem mudar o status; usada só pelo detector de OS parada) |
 | `HistoricoStatusOS` | `ordem-servico` | **OS Service** | FK interna a `OrdemServico`, não cruza fronteira |
 | `OsPeca` | `ordem-servico` × `pecas-insumos` | **OS Service** | módulo-cruzado, mas dentro do mesmo serviço — sem mudança |
 | `OsServico` | `ordem-servico` × `cadastro` | **OS Service** | idem |

@@ -32,7 +32,7 @@ Dividir o monólito em três serviços, decisão fechada pelo grupo em
    `iniciar-reparo` e `concluir` (ver "Revisão de 30/09/2026").
 
 Cada serviço ganha banco de dados próprio (uma instância RDS compartilhada,
-mas com banco lógico e credencial isolados por serviço, mais o DynamoDB do
+mas com banco lógico e credencial isolados por serviço, mais o DocumentDB do
 OS Service — decisão de infraestrutura registrada na
 [ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md)).
 Toda FK que cruzar a fronteira de serviço vira referência por id, sem
