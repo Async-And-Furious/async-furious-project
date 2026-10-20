@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 import {
@@ -320,6 +321,25 @@ describe('OS + Orçamento Use Cases', () => {
       expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
       expect(result.status).toBe('APPROVED');
       expect(result.linkPagamento).toBe('https://mp.test/checkout/os-1');
+    });
+
+    it('deve enviar o valor como number quando o repositório devolve Decimal do Prisma', async () => {
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
+      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
+        ...mockOrcamento,
+        valor_total_geral: new Prisma.Decimal('150.50') as unknown as number,
+      });
+      mockOrcamentoRepository.update.mockResolvedValue({ ...mockOrcamento, status: 'APPROVED' });
+
+      const uc = new AprovarOrcamentoUseCase(
+        mockOsRepository,
+        mockOrcamentoRepository,
+        mockBarramento,
+        mockCobranca
+      );
+      await uc.execute('os-1');
+
+      expect(mockCobranca.gerarLinkPagamento).toHaveBeenCalledWith('os-1', 150.5);
     });
 
     it('deve manter orçamento PENDING quando a cobrança no Mercado Pago falha', async () => {

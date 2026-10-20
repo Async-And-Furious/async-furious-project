@@ -35,9 +35,10 @@ export class AprovarOrcamentoUseCase {
     }
 
     // A cobrança vem antes da aprovação: se o Mercado Pago falhar, o orçamento segue PENDING.
+    // Number(): o repositório devolve o Decimal do Prisma, apesar do tipo declarado.
     const linkPagamento = await this.cobranca.gerarLinkPagamento(
       id_ordem_servico,
-      orcamento.valor_total_geral
+      Number(orcamento.valor_total_geral)
     );
 
     const approved = await this.orcamentoRepository.update(orcamento.id, { status: 'APPROVED' });
