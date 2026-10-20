@@ -13,7 +13,8 @@
   com conta de teste (preference real, pagamento aprovado com cartão de teste,
   notificação assinada simulada). A entrega real do webhook pelo Mercado Pago
   ainda não foi testada. Nenhum deploy, apply ou alteração na AWS.
-- Pendente: ADR-0022, segredos `MP_*` no k8s/Terraform de HML, rota do
+- Decisões registradas na ADR-0022 (Proposta). Pendente: estorno, segredos
+  `MP_*` no k8s/Terraform de HML, rota do
   webhook em `docs/http/routes.yaml` (precisa de um tipo de autenticação novo
   no `route-matrix.py`).
 
