@@ -13,6 +13,14 @@
   com conta de teste (preference real, pagamento aprovado com cartão de teste,
   notificação assinada simulada). A entrega real do webhook pelo Mercado Pago
   ainda não foi testada. Nenhum deploy, apply ou alteração na AWS.
+- Alinhamento com o escopo da #325: `Pagamento.ordemServicoId` único com
+  reserva antes de chamar o Mercado Pago (que ignora `X-Idempotency-Key` em
+  preferences, testado), aprovação atômica do orçamento, `rejected` terminal
+  (`RECUSADO` + `PagamentoRecusadoEvent`), `webhook_recebido` na mesma
+  transação, timeout de 5 s com 1 retry, e `POST /pagamentos/registrar` só
+  dispara a entrega com pagamento `CONFIRMADO`. Concorrência validada contra o
+  banco local (duas aprovações → um pagamento e o mesmo link; três
+  notificações → uma atualização).
 - Decisões registradas na ADR-0022 (Proposta). Pendente: estorno, segredos
   `MP_*` no k8s/Terraform de HML, rota do
   webhook em `docs/http/routes.yaml` (precisa de um tipo de autenticação novo

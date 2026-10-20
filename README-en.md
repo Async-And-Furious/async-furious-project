@@ -232,13 +232,13 @@ docs/http/insomnia.yaml
 
 | Method | Endpoint | Access | Description |
 | ------ | -------- | ------ | ----------- |
-| POST | `/pagamentos/registrar` | Authenticated | Register payment and trigger service order delivery. |
+| POST | `/pagamentos/registrar` | Authenticated | Trigger delivery of a service order whose payment was already confirmed by Mercado Pago (`409` otherwise). Does not create or mark payments. |
 
 #### Mercado Pago webhook (`/api/v1/webhooks/mercado-pago`)
 
 | Method | Endpoint | Access | Description |
 | ------ | -------- | ------ | ----------- |
-| POST | `/webhooks/mercado-pago` | Public (`x-signature` signature) | Payment notification: re-fetches the payment from Mercado Pago and confirms an approved `Pagamento` (`CONFIRMADO`). |
+| POST | `/webhooks/mercado-pago` | Public (`x-signature` signature) | Payment notification: re-fetches the payment from Mercado Pago; approved → `CONFIRMADO`, rejected → `RECUSADO`. Redeliveries have no effect. |
 
 ---
 

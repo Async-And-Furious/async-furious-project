@@ -286,13 +286,13 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/pagamentos/registrar` | Autenticado | Registrar pagamento e disparar entrega da OS. |
+| POST | `/pagamentos/registrar` | Autenticado | Disparar a entrega da OS cujo pagamento já foi confirmado pelo Mercado Pago (`409` se não houver). Não cria nem marca pagamento. |
 
 #### Webhook do Mercado Pago (`/api/v1/webhooks/mercado-pago`)
 
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/webhooks/mercado-pago` | Público (assinatura `x-signature`) | Notificação de pagamento: reconsulta o Mercado Pago e confirma o `Pagamento` aprovado (`CONFIRMADO`). |
+| POST | `/webhooks/mercado-pago` | Público (assinatura `x-signature`) | Notificação de pagamento: reconsulta o Mercado Pago; aprovado → `CONFIRMADO`, recusado → `RECUSADO`. Reentregas não têm efeito. |
 
 ---
 
