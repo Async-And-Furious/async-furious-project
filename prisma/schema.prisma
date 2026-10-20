@@ -197,8 +197,11 @@ model Pagamento {
   ordemServicoId String
   valor          Decimal  @db.Decimal(10, 2)
   status         String
+  preferenceId   String?  @map("preference_id")
+  linkPagamento  String?  @map("link_pagamento")
   createdAt      DateTime @default(now())
 
+  @@index([ordemServicoId])
   @@map("pagamentos")
 }
 

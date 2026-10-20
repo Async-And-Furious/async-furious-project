@@ -44,6 +44,7 @@
     "decimal.js": "^10.6.0",
     "dotenv": "^17.4.2",
     "helmet": "^8.1.0",
+    "mercadopago": "3.6.1",
     "nestjs-pino": "^4.6.1",
     "newrelic": "^14.3.8",
     "passport": "^0.7.0",

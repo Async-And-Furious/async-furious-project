@@ -27,6 +27,7 @@ import type { IServicoRepository } from '../../src/modules/cadastro/domain/inter
 import type { IPecaInsumoRepository } from '../../src/modules/pecas-insumos/domain/interfaces/peca-insumo.interface';
 import type { IOsServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/os-servico.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import type { ICobrancaPagamentoPort } from '../../src/shared/domain/interfaces/cobranca-pagamento.port';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 import {
   OrdemDeServico,
@@ -58,6 +59,7 @@ describe('OS + Orçamento Use Cases', () => {
   let mockOrcamentoRepository: jest.Mocked<IOrcamentoRepository>;
   let mockOsPecaRepository: jest.Mocked<IOsPecaRepository>;
   let mockBarramento: jest.Mocked<EmissorEventos>;
+  let mockCobranca: jest.Mocked<ICobrancaPagamentoPort>;
 
   const mockOs = makeOs();
 
@@ -130,6 +132,9 @@ describe('OS + Orçamento Use Cases', () => {
     mockBarramento = {
       emitir: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<EmissorEventos>;
+    mockCobranca = {
+      gerarLinkPagamento: jest.fn().mockResolvedValue('https://mp.test/checkout/os-1'),
+    };
   });
 
   describe('CriarOrdemServicoUseCase', () => {
@@ -305,13 +310,33 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
-        mockBarramento
+        mockBarramento,
+        mockCobranca
       );
       const result = await uc.execute('os-1');
 
+      expect(mockCobranca.gerarLinkPagamento).toHaveBeenCalledWith('os-1', 150);
       expect(mockOrcamentoRepository.update).toHaveBeenCalledWith('orc-1', { status: 'APPROVED' });
       expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
       expect(result.status).toBe('APPROVED');
+      expect(result.linkPagamento).toBe('https://mp.test/checkout/os-1');
+    });
+
+    it('deve manter orçamento PENDING quando a cobrança no Mercado Pago falha', async () => {
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
+      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
+      mockCobranca.gerarLinkPagamento.mockRejectedValue(new Error('Mercado Pago indisponível'));
+
+      const uc = new AprovarOrcamentoUseCase(
+        mockOsRepository,
+        mockOrcamentoRepository,
+        mockBarramento,
+        mockCobranca
+      );
+
+      await expect(uc.execute('os-1')).rejects.toThrow('Mercado Pago indisponível');
+      expect(mockOrcamentoRepository.update).not.toHaveBeenCalled();
+      expect(mockBarramento.emitir).not.toHaveBeenCalled();
     });
 
     it('deve lançar EntityNotFoundException quando OS não encontrada', async () => {
@@ -322,7 +347,8 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
-        mockBarramento
+        mockBarramento,
+        mockCobranca
       );
       await expect(uc.execute('invalid')).rejects.toThrow(EntityNotFoundException);
     });
@@ -337,7 +363,8 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
-        mockBarramento
+        mockBarramento,
+        mockCobranca
       );
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
@@ -349,7 +376,8 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
-        mockBarramento
+        mockBarramento,
+        mockCobranca
       );
       await expect(uc.execute('os-1')).rejects.toThrow(EntityNotFoundException);
     });
@@ -364,7 +392,8 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
-        mockBarramento
+        mockBarramento,
+        mockCobranca
       );
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
@@ -379,7 +408,8 @@ describe('OS + Orçamento Use Cases', () => {
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
         mockOrcamentoRepository,
-        mockBarramento
+        mockBarramento,
+        mockCobranca
       );
       await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
     });
@@ -400,7 +430,8 @@ describe('OS + Orçamento Use Cases', () => {
         const uc = new AprovarOrcamentoUseCase(
           mockOsRepository,
           mockOrcamentoRepository,
-          mockBarramento
+          mockBarramento,
+          mockCobranca
         );
         await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
         expect(mockOrcamentoRepository.findByOrdemServicoId).not.toHaveBeenCalled();

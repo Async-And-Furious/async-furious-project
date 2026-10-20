@@ -31,6 +31,27 @@ describe('Pagamento Entity', () => {
     });
   });
 
+  describe('vincularCobranca', () => {
+    it('should store preference id and payment link on a pending pagamento', () => {
+      const pagamento = Pagamento.criar('os-123', 100);
+
+      pagamento.vincularCobranca('pref-1', 'https://mp.test/checkout/pref-1');
+
+      expect(pagamento.getPreferenceId()).toBe('pref-1');
+      expect(pagamento.getLinkPagamento()).toBe('https://mp.test/checkout/pref-1');
+      expect(pagamento.getStatus()).toBe('AGUARDANDO_PAGAMENTO');
+    });
+
+    it('should throw DomainException when pagamento is not pending', () => {
+      const pagamento = Pagamento.criar('os-123', 100);
+      pagamento.registrar();
+
+      expect(() => pagamento.vincularCobranca('pref-1', 'https://mp.test/x')).toThrow(
+        DomainException
+      );
+    });
+  });
+
   describe('getters', () => {
     it('should return all properties correctly', () => {
       const pagamento = Pagamento.criar('os-123', 250.5);

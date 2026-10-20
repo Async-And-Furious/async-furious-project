@@ -6,6 +6,7 @@ import { Pagamento } from '../../../src/modules/financeiro/domain/entities/pagam
 interface MockPrismaPagamento {
   upsert: jest.Mock;
   findUnique: jest.Mock;
+  findFirst: jest.Mock;
 }
 
 interface MockPrismaService {
@@ -29,6 +30,7 @@ describe('PagamentoRepository', () => {
       pagamento: {
         upsert: jest.fn().mockResolvedValue({}),
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
 
@@ -86,6 +88,32 @@ describe('PagamentoRepository', () => {
       expect(mockPrismaService.pagamento.findUnique).toHaveBeenCalledWith({
         where: { id: 'nonexistent' },
       });
+    });
+  });
+
+  describe('findCobrancaByOrdemServicoId', () => {
+    it('should return the latest pagamento with a payment link', async () => {
+      mockPrismaService.pagamento.findFirst.mockResolvedValue({
+        ...mockPagamentoData,
+        preferenceId: 'pref-1',
+        linkPagamento: 'https://mp.test/checkout/pref-1',
+      });
+
+      const result = await repository.findCobrancaByOrdemServicoId('os-123');
+
+      expect(result?.getLinkPagamento()).toBe('https://mp.test/checkout/pref-1');
+      expect(mockPrismaService.pagamento.findFirst).toHaveBeenCalledWith({
+        where: { ordemServicoId: 'os-123', linkPagamento: { not: null } },
+        orderBy: { createdAt: 'desc' },
+      });
+    });
+
+    it('should return null when there is no charge for the ordem de serviço', async () => {
+      mockPrismaService.pagamento.findFirst.mockResolvedValue(null);
+
+      const result = await repository.findCobrancaByOrdemServicoId('os-123');
+
+      expect(result).toBeNull();
     });
   });
 });

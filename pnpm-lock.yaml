@@ -62,6 +62,9 @@ importers:
       helmet:
         specifier: ^8.1.0
         version: 8.1.0
+      mercadopago:
+        specifier: 3.6.1
+        version: 3.6.1
       nestjs-pino:
         specifier: ^4.6.1
         version: 4.6.1(@nestjs/common@10.4.22(class-transformer@0.5.1)(class-validator@0.14.4)(reflect-metadata@0.2.2)(rxjs@7.8.2))(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.2)
@@ -2823,6 +2826,10 @@ packages:
   memfs@3.5.3:
     resolution: {integrity: sha512-UERzLsxzllchadvbPs5aolHh65ISpKpM+ccLbOJ8/vvpBKmAWf+la7dXFy7Mr0ySHbdHrFv5kGFCUHHe6GFEmw==}
     engines: {node: '>= 4.0.0'}
+
+  mercadopago@3.6.1:
+    resolution: {integrity: sha512-JFgKCSRHMxkS1p12VMIcpI/Zki739J+5lbpl7PB0O8WHaFl4SFKQnm9paX/gqBQeh211Ozc498D49Fbe3U1jEw==}
+    engines: {node: '>=18'}
 
   merge-descriptors@1.0.3:
     resolution: {integrity: sha512-gaNvAS7TZ897/rVaZ0nMtAyxNyi/pdbjbAwUpFQpN70GqnVfOiXpeUUMKRBmzXaSQ8DdTX4/0ms62r2K+hE6mQ==}
@@ -7516,6 +7523,8 @@ snapshots:
   memfs@3.5.3:
     dependencies:
       fs-monkey: 1.1.0
+
+  mercadopago@3.6.1: {}
 
   merge-descriptors@1.0.3: {}
 

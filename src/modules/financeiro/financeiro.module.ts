@@ -8,7 +8,15 @@ import {
   EMISSOR_EVENTOS,
   IEmissorEventos,
 } from '../../shared/domain/interfaces/emissor-eventos.interface';
-import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
+import { GATEWAY_PAGAMENTO, PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
+import type {
+  IGatewayPagamento,
+  IPagamentoRepository,
+} from './domain/interfaces/pagamento.interface';
+import { CriarCobrancaUseCase } from './application/use-cases/criar-cobranca.use-case';
+import { MercadoPagoGateway } from './infrastructure/gateways/mercado-pago.gateway';
+import { CobrancaPagamentoAdapter } from './infrastructure/adapters/cobranca-pagamento.adapter';
+import { COBRANCA_PAGAMENTO_PORT } from '../../shared/domain/interfaces/cobranca-pagamento.port';
 
 @Module({
   controllers: [PagamentoController],
@@ -30,6 +38,20 @@ import { PAGAMENTO_REPOSITORY } from './domain/interfaces/pagamento.interface';
       useFactory: (emissor: IEmissorEventos) => new AcionarEntregaOrdemServicoHandler(emissor),
       inject: [EMISSOR_EVENTOS],
     },
+    { provide: GATEWAY_PAGAMENTO, useClass: MercadoPagoGateway },
+    {
+      provide: CriarCobrancaUseCase,
+      useFactory: (repository: IPagamentoRepository, gateway: IGatewayPagamento) =>
+        new CriarCobrancaUseCase(repository, gateway),
+      inject: [PAGAMENTO_REPOSITORY, GATEWAY_PAGAMENTO],
+    },
+
+    // ACL Adapter for ordem-servico
+    {
+      provide: COBRANCA_PAGAMENTO_PORT,
+      useClass: CobrancaPagamentoAdapter,
+    },
   ],
+  exports: [COBRANCA_PAGAMENTO_PORT],
 })
 export class FinanceiroModule {}

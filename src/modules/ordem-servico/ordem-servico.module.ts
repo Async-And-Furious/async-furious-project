@@ -57,8 +57,14 @@ import { AtualizarStatusAguardandoPecasHandler } from './application/event-handl
 import { NotificacaoClienteStub } from './infrastructure/gateways/notificacao-cliente.stub';
 import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cliente.gateway';
 import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
+import { FinanceiroModule } from '../financeiro/financeiro.module';
+import {
+  COBRANCA_PAGAMENTO_PORT,
+  ICobrancaPagamentoPort,
+} from '../../shared/domain/interfaces/cobranca-pagamento.port';
 
 @Module({
+  imports: [FinanceiroModule],
   controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
   providers: [
     OrdemServicoRepository,
@@ -229,9 +235,15 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
       useFactory: (
         osRepo: OrdemServicoRepository,
         orcRepo: OrcamentoRepository,
-        barramento: IEmissorEventos
-      ) => new AprovarOrcamentoUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
+        barramento: IEmissorEventos,
+        cobranca: ICobrancaPagamentoPort
+      ) => new AprovarOrcamentoUseCase(osRepo, orcRepo, barramento, cobranca),
+      inject: [
+        OrdemServicoRepository,
+        OrcamentoRepository,
+        EMISSOR_EVENTOS,
+        COBRANCA_PAGAMENTO_PORT,
+      ],
     },
     {
       provide: RecusarOrcamentoUseCase,

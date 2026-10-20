@@ -281,9 +281,17 @@ export class OrdemServicoController {
     description: 'Aprova o orçamento da ordem de serviço. Público.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Orçamento aprovado. OS → Em Execução' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Orçamento aprovado. OS → Em Execução. Resposta inclui linkPagamento (Checkout Pro)',
+  })
   @ApiResponse({ status: 400, description: 'Orçamento não está pendente ou sem valores' })
   @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
+  @ApiResponse({
+    status: 502,
+    description: 'Falha ao gerar o link no Mercado Pago. Orçamento continua pendente',
+  })
   aprovarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
     return this.aprovarOrcamentoUseCase.execute(id);
   }
