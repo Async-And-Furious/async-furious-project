@@ -101,6 +101,7 @@ erDiagram
     PAGAMENTO {
         string id PK
         string ordemServicoId "sem FK declarada"
+        string preference_id "Checkout Pro"
     }
 
     HISTORICO_STATUS_OS {
@@ -337,8 +338,13 @@ existem em `OrdemServico`/`Peca`.
 | id | text | PK |
 | ordemServicoId | text | not null, **sem FK** (aponta conceitualmente pra `OrdemServico.id`) |
 | valor | numeric(10,2) | not null |
-| status | text | not null (sem enum do Prisma) |
+| status | text | not null (sem enum do Prisma). Valores em uso: `AGUARDANDO_PAGAMENTO`, `CONFIRMADO` (webhook do Mercado Pago), `PAGO` (`POST /pagamentos/registrar`) |
+| preference_id | text | null. Id da preference do Checkout Pro (Mercado Pago) |
+| link_pagamento | text | null. `init_point` devolvido ao aprovar o orçamento |
 | createdAt | timestamp | default now() |
+
+Índice não único em `ordemServicoId`: a cobrança de uma OS é buscada por ele
+(aprovação idempotente e webhook do Mercado Pago, via `external_reference`).
 
 Única tabela sem `updated_at`, e a única com colunas em camelCase
 (`ordemServicoId`, `createdAt`) em vez do `snake_case` usado no resto do
@@ -491,6 +497,7 @@ do schema até o momento desta tarefa):
 | 2026-05-01 | `41179b6` | Módulo Financeiro: tabela `Pagamento` adicionada, já com `@@map("pagamentos")` (snake_case) — quebrando a convenção fixada três dias antes em `7ff1656`. | "Criação de módulo Financeiro", sem justificativa da escolha de nomenclatura na mensagem do commit. |
 | 2026-06-02 | `f85cdc4` | Tabela de junção `OsServico` adicionada, espelhando o padrão de `OsPeca` para o par `OrdemServico`/`Servico`. | "Criação de fluxo de os-servico". |
 | 2026-07-07 | `03693e9` | Tabela `HistoricoStatusOS` adicionada, também com `@@map("historico_status_os")` (snake_case), repetindo a divergência de `Pagamento`. | "implementação de módulo webhook de status da ordem". |
+| 2026-10-20 | `cd284fb` | `Pagamento` ganha `preference_id` e `link_pagamento` (nulas, snake_case via `@map`) e índice em `ordemServicoId`. Migração aditiva `20261020120000_pagamento_cobranca_mercado_pago`. | Integração com o Mercado Pago Checkout Pro (#325): a aprovação do orçamento cria a cobrança e devolve o link. |
 
 A divergência de nomenclatura registrada na seção
 [Convenções observadas](#convenções-observadas-e-onde-elas-quebram) tem

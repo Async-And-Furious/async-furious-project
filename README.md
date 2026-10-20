@@ -24,7 +24,7 @@ Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech 
 | **Veículos** | CRUD com validação de placa brasileira. |
 | **Serviços** | Catálogo de serviços oferecidos pela oficina. |
 | **Peças e Insumos** | CRUD com controle de estoque e pedidos a fornecedores. |
-| **Pagamentos** | Registro de pagamentos com disparo automático da entrega. |
+| **Pagamentos** | Cobrança via Mercado Pago (Checkout Pro) na aprovação do orçamento, confirmada por webhook; registro manual de pagamento com disparo da entrega. |
 | **Autenticação** | JWT com papéis `ADMIN`, `RECEPCIONISTA` e `MECANICO`. |
 
 ---
@@ -165,7 +165,13 @@ BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
 SEED_ADMIN_EMAIL="admin@oficina.com"
 SEED_ADMIN_PASSWORD="changeme123"
+# Mercado Pago (Checkout Pro) — credenciais da aba "Teste" do Painel do Desenvolvedor
+MP_ACCESS_TOKEN=""
+MP_WEBHOOK_SECRET=""      # Webhooks → Configurar notificação → chave secreta
+MP_NOTIFICATION_URL=""    # opcional: URL pública do webhook, enviada em cada preference
 ```
+
+Sem `MP_ACCESS_TOKEN`, aprovar um orçamento falha; sem `MP_WEBHOOK_SECRET`, o webhook do Mercado Pago recusa toda notificação com `401`.
 
 ### 3. Iniciar com Docker para desenvolvimento
 
@@ -256,7 +262,7 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. |
 | PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orçamento. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento. |
+| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento; a resposta traz `linkPagamento` (Checkout Pro do Mercado Pago). `502` se o Mercado Pago falhar (orçamento segue pendente). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
 | PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. |
@@ -281,6 +287,12 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
 | POST | `/pagamentos/registrar` | Autenticado | Registrar pagamento e disparar entrega da OS. |
+
+#### Webhook do Mercado Pago (`/api/v1/webhooks/mercado-pago`)
+
+| Método | Endpoint | Acesso | Descrição |
+| ------ | -------- | ------ | --------- |
+| POST | `/webhooks/mercado-pago` | Público (assinatura `x-signature`) | Notificação de pagamento: reconsulta o Mercado Pago e confirma o `Pagamento` aprovado (`CONFIRMADO`). |
 
 ---
 
