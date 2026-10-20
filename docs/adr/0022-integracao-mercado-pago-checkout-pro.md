@@ -74,8 +74,13 @@ Restrições que pesaram:
    - chave `MP_WEBHOOK_SECRET`, gerada no painel (Webhooks → Configurar
      notificação), **separada** do `WEBHOOK_SECRET` legado, que continua só
      para `webhooks/service-orders` (ADR-0021, item 7);
-   - assinatura ausente ou inválida → `401`; tópico diferente de `payment` →
-     `200` e ignorado.
+   - assinatura ausente ou inválida → `401`;
+   - notificação que não é `type=payment` com `data.id` → `200` e ignorada,
+     **sem** checar assinatura, porque não altera estado. O teste real de
+     20/10/2026 mostrou que o Mercado Pago também manda o IPN legado
+     (`?id=…&topic=payment` e `topic=merchant_order`, user agent
+     "MercadoPago Feed v2.0"), que não traz `data.id` e nunca valida; com `401`
+     ele seria reenviado sem fim.
 7. **O status vem sempre da reconsulta** `GET /v1/payments/{id}`, nunca do
    corpo da notificação:
    - `approved` com valor igual ao da cobrança → `Pagamento` `CONFIRMADO` e

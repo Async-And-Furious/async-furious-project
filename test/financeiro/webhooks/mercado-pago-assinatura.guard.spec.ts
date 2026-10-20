@@ -45,7 +45,7 @@ describe('MercadoPagoAssinaturaGuard', () => {
         'x-signature': `ts=${ts},v1=${assinar('123456', requestId, ts, 'outro')}`,
         'x-request-id': requestId,
       },
-      { 'data.id': '123456' }
+      { 'data.id': '123456', type: 'payment' }
     );
 
     expect(() => makeGuard().canActivate(context)).toThrow(UnauthorizedException);
@@ -57,14 +57,17 @@ describe('MercadoPagoAssinaturaGuard', () => {
         'x-signature': `ts=${ts},v1=${assinar('123456', requestId, ts)}`,
         'x-request-id': requestId,
       },
-      { 'data.id': '999999' }
+      { 'data.id': '999999', type: 'payment' }
     );
 
     expect(() => makeGuard().canActivate(context)).toThrow(UnauthorizedException);
   });
 
   it('deve recusar notificação sem x-signature', () => {
-    const context = makeContext({ 'x-request-id': requestId }, { 'data.id': '123456' });
+    const context = makeContext(
+      { 'x-request-id': requestId },
+      { 'data.id': '123456', type: 'payment' }
+    );
 
     expect(() => makeGuard().canActivate(context)).toThrow(UnauthorizedException);
   });
@@ -75,9 +78,26 @@ describe('MercadoPagoAssinaturaGuard', () => {
         'x-signature': `ts=${ts},v1=${assinar('123456', requestId, ts)}`,
         'x-request-id': requestId,
       },
-      { 'data.id': '123456' }
+      { 'data.id': '123456', type: 'payment' }
     );
 
     expect(() => makeGuard('').canActivate(context)).toThrow(UnauthorizedException);
+  });
+
+  it.each([
+    ['IPN de pagamento', { id: '184185678529', topic: 'payment' }],
+    ['IPN de merchant order', { id: '45417448715', topic: 'merchant_order' }],
+    ['outro tópico do webhook', { 'data.id': '123456', type: 'merchant_order' }],
+    ['type=payment sem data.id', { type: 'payment' }],
+  ])('deve deixar passar sem assinatura notificação que não altera estado (%s)', (_nome, query) => {
+    const context = makeContext({}, query as Record<string, string>);
+
+    expect(makeGuard().canActivate(context)).toBe(true);
+  });
+
+  it('não depende de MP_WEBHOOK_SECRET para notificações que são ignoradas', () => {
+    const context = makeContext({}, { id: '1', topic: 'payment' });
+
+    expect(makeGuard('').canActivate(context)).toBe(true);
   });
 });
