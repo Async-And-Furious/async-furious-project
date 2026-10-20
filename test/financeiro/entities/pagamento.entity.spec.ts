@@ -31,6 +31,23 @@ describe('Pagamento Entity', () => {
     });
   });
 
+  describe('confirmar', () => {
+    it('should change a pending pagamento to CONFIRMADO', () => {
+      const pagamento = Pagamento.criar('os-123', 100);
+
+      pagamento.confirmar();
+
+      expect(pagamento.getStatus()).toBe('CONFIRMADO');
+    });
+
+    it('should throw DomainException when pagamento is not pending', () => {
+      const pagamento = Pagamento.criar('os-123', 100);
+      pagamento.confirmar();
+
+      expect(() => pagamento.confirmar()).toThrow(DomainException);
+    });
+  });
+
   describe('vincularCobranca', () => {
     it('should store preference id and payment link on a pending pagamento', () => {
       const pagamento = Pagamento.criar('os-123', 100);

@@ -45,6 +45,14 @@ export class Pagamento {
     this.status = 'PAGO';
   }
 
+  // Pagamento aprovado no Mercado Pago (Checkout Pro), confirmado pela reconsulta do webhook.
+  confirmar() {
+    if (this.status !== 'AGUARDANDO_PAGAMENTO') {
+      throw new DomainException('Só é possível confirmar um pagamento pendente.');
+    }
+    this.status = 'CONFIRMADO';
+  }
+
   vincularCobranca(preferenceId: string, linkPagamento: string) {
     if (this.status !== 'AGUARDANDO_PAGAMENTO') {
       throw new DomainException('Só é possível vincular cobrança a um pagamento pendente.');

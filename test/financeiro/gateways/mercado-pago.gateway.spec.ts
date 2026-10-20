@@ -1,13 +1,19 @@
 const mockPreferenceCreate = jest.fn();
+const mockPaymentGet = jest.fn();
 
-jest.mock('mercadopago', () => ({
-  MercadoPagoConfig: jest.fn().mockImplementation((config: unknown) => config),
-  Preference: jest.fn().mockImplementation(() => ({ create: mockPreferenceCreate })),
-}));
+jest.mock('mercadopago', () => {
+  class MPNotFoundError extends Error {}
+  return {
+    MercadoPagoConfig: jest.fn().mockImplementation((config: unknown) => config),
+    Preference: jest.fn().mockImplementation(() => ({ create: mockPreferenceCreate })),
+    Payment: jest.fn().mockImplementation(() => ({ get: mockPaymentGet })),
+    MPNotFoundError,
+  };
+});
 
 import { BadGatewayException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { MercadoPagoConfig } from 'mercadopago';
+import { MercadoPagoConfig, MPNotFoundError } from 'mercadopago';
 import { MercadoPagoGateway } from '../../../src/modules/financeiro/infrastructure/gateways/mercado-pago.gateway';
 
 const makeConfig = (env: Record<string, string | undefined>) =>
@@ -87,5 +93,39 @@ describe('MercadoPagoGateway', () => {
     const gateway = new MercadoPagoGateway(makeConfig({ MP_ACCESS_TOKEN: 'APP_USR-fake' }));
 
     await expect(gateway.criarCobranca('os-1', 10)).rejects.toBeInstanceOf(BadGatewayException);
+  });
+
+  describe('consultarPagamento', () => {
+    it('deve mapear o pagamento do Mercado Pago', async () => {
+      mockPaymentGet.mockResolvedValue({
+        id: 123,
+        status: 'approved',
+        external_reference: 'os-1',
+        transaction_amount: 369.9,
+      });
+      const gateway = new MercadoPagoGateway(makeConfig({ MP_ACCESS_TOKEN: 'APP_USR-fake' }));
+
+      await expect(gateway.consultarPagamento('123')).resolves.toEqual({
+        id: '123',
+        status: 'approved',
+        referenciaExterna: 'os-1',
+        valor: 369.9,
+      });
+      expect(mockPaymentGet).toHaveBeenCalledWith({ id: '123' });
+    });
+
+    it('deve devolver null quando o pagamento não existe', async () => {
+      mockPaymentGet.mockRejectedValue(Object.create(MPNotFoundError.prototype) as Error);
+      const gateway = new MercadoPagoGateway(makeConfig({ MP_ACCESS_TOKEN: 'APP_USR-fake' }));
+
+      await expect(gateway.consultarPagamento('123')).resolves.toBeNull();
+    });
+
+    it('deve traduzir outros erros em 502', async () => {
+      mockPaymentGet.mockRejectedValue(new Error('timeout'));
+      const gateway = new MercadoPagoGateway(makeConfig({ MP_ACCESS_TOKEN: 'APP_USR-fake' }));
+
+      await expect(gateway.consultarPagamento('123')).rejects.toBeInstanceOf(BadGatewayException);
+    });
   });
 });

@@ -16,8 +16,17 @@ export interface CobrancaCriada {
   linkPagamento: string;
 }
 
+export interface PagamentoExterno {
+  id: string;
+  status: string;
+  referenciaExterna: string | null;
+  valor: number | null;
+}
+
 export interface IGatewayPagamento {
   criarCobranca(ordemServicoId: string, valor: number): Promise<CobrancaCriada>;
+  // null quando o pagamento não existe no provedor (ex.: notificação de teste do painel).
+  consultarPagamento(id: string): Promise<PagamentoExterno | null>;
 }
 
 export const PAGAMENTO_REPOSITORY = Symbol('PAGAMENTO_REPOSITORY');

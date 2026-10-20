@@ -1,12 +1,16 @@
 import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { MercadoPagoConfig, MPNotFoundError, Payment, Preference } from 'mercadopago';
 import type {
   CobrancaCriada,
   IGatewayPagamento,
+  PagamentoExterno,
 } from '../../domain/interfaces/pagamento.interface';
 
 const TIMEOUT_MS = 5000;
+
+const descreverErro = (error: unknown): string =>
+  error instanceof Error ? error.message : JSON.stringify(error);
 
 // Checkout Pro: cria a preference e devolve o init_point (não existe mais link de sandbox).
 @Injectable()
@@ -16,12 +20,7 @@ export class MercadoPagoGateway implements IGatewayPagamento {
   constructor(private readonly config: ConfigService) {}
 
   async criarCobranca(ordemServicoId: string, valor: number): Promise<CobrancaCriada> {
-    const accessToken = this.config.get<string>('MP_ACCESS_TOKEN');
-    if (!accessToken) {
-      throw new Error('MP_ACCESS_TOKEN não configurado.');
-    }
-
-    const client = new MercadoPagoConfig({ accessToken, options: { timeout: TIMEOUT_MS } });
+    const client = this.criarClient();
     const notificationUrl = this.config.get<string>('MP_NOTIFICATION_URL') || undefined;
 
     let preferenceId: string | undefined;
@@ -46,9 +45,7 @@ export class MercadoPagoGateway implements IGatewayPagamento {
       linkPagamento = result.init_point;
     } catch (error) {
       this.logger.error(
-        `Falha ao criar preference no Mercado Pago para a OS ${ordemServicoId}: ${
-          error instanceof Error ? error.message : JSON.stringify(error)
-        }`
+        `Falha ao criar preference no Mercado Pago para a OS ${ordemServicoId}: ${descreverErro(error)}`
       );
       throw new BadGatewayException('Não foi possível gerar o link de pagamento no Mercado Pago.');
     }
@@ -59,5 +56,36 @@ export class MercadoPagoGateway implements IGatewayPagamento {
     }
 
     return { preferenceId, linkPagamento };
+  }
+
+  async consultarPagamento(id: string): Promise<PagamentoExterno | null> {
+    const client = this.criarClient();
+
+    try {
+      const pagamento = await new Payment(client).get({ id });
+      return {
+        id: String(pagamento.id ?? id),
+        status: pagamento.status ?? '',
+        referenciaExterna: pagamento.external_reference ?? null,
+        valor:
+          typeof pagamento.transaction_amount === 'number' ? pagamento.transaction_amount : null,
+      };
+    } catch (error) {
+      if (error instanceof MPNotFoundError) {
+        return null;
+      }
+      this.logger.error(
+        `Falha ao consultar o pagamento ${id} no Mercado Pago: ${descreverErro(error)}`
+      );
+      throw new BadGatewayException('Não foi possível consultar o pagamento no Mercado Pago.');
+    }
+  }
+
+  private criarClient(): MercadoPagoConfig {
+    const accessToken = this.config.get<string>('MP_ACCESS_TOKEN');
+    if (!accessToken) {
+      throw new Error('MP_ACCESS_TOKEN não configurado.');
+    }
+    return new MercadoPagoConfig({ accessToken, options: { timeout: TIMEOUT_MS } });
   }
 }

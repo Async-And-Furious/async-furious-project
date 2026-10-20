@@ -21,6 +21,7 @@ describe('CriarCobrancaUseCase', () => {
         preferenceId: 'pref-1',
         linkPagamento: 'https://mp.test/checkout/pref-1',
       }),
+      consultarPagamento: jest.fn(),
     };
     useCase = new CriarCobrancaUseCase(mockRepository, mockGateway);
   });

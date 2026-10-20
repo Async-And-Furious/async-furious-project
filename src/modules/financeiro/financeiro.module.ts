@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PagamentoController } from './presentation/controllers/pagamento.controller';
+import { MercadoPagoWebhookController } from './presentation/controllers/mercado-pago-webhook.controller';
 import { PagamentoRepository } from './infrastructure/repositories/pagamento.repository';
 import { RegistrarPagamentoUseCase } from './application/use-cases/registrar-pagamento.use-case';
 import { AcionarEntregaOrdemServicoHandler } from './application/event-handlers/acionar-entrega-ordem-servico.handler';
@@ -14,12 +15,14 @@ import type {
   IPagamentoRepository,
 } from './domain/interfaces/pagamento.interface';
 import { CriarCobrancaUseCase } from './application/use-cases/criar-cobranca.use-case';
+import { ProcessarNotificacaoPagamentoUseCase } from './application/use-cases/processar-notificacao-pagamento.use-case';
+import { MercadoPagoAssinaturaGuard } from './infrastructure/webhooks/mercado-pago-assinatura.guard';
 import { MercadoPagoGateway } from './infrastructure/gateways/mercado-pago.gateway';
 import { CobrancaPagamentoAdapter } from './infrastructure/adapters/cobranca-pagamento.adapter';
 import { COBRANCA_PAGAMENTO_PORT } from '../../shared/domain/interfaces/cobranca-pagamento.port';
 
 @Module({
-  controllers: [PagamentoController],
+  controllers: [PagamentoController, MercadoPagoWebhookController],
   providers: [
     PagamentoRepository,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
@@ -45,6 +48,16 @@ import { COBRANCA_PAGAMENTO_PORT } from '../../shared/domain/interfaces/cobranca
         new CriarCobrancaUseCase(repository, gateway),
       inject: [PAGAMENTO_REPOSITORY, GATEWAY_PAGAMENTO],
     },
+    {
+      provide: ProcessarNotificacaoPagamentoUseCase,
+      useFactory: (
+        repository: IPagamentoRepository,
+        gateway: IGatewayPagamento,
+        emissor: IEmissorEventos
+      ) => new ProcessarNotificacaoPagamentoUseCase(repository, gateway, emissor),
+      inject: [PAGAMENTO_REPOSITORY, GATEWAY_PAGAMENTO, EMISSOR_EVENTOS],
+    },
+    MercadoPagoAssinaturaGuard,
 
     // ACL Adapter for ordem-servico
     {
