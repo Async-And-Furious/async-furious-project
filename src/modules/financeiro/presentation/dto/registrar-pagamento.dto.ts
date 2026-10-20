@@ -1,5 +1,5 @@
-import { IsNumber, IsUUID, IsPositive } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNumber, IsOptional, IsUUID, IsPositive } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegistrarPagamentoDto {
   @ApiProperty({
@@ -9,11 +9,14 @@ export class RegistrarPagamentoDto {
   @IsUUID()
   ordemServicoId!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 150.5,
-    description: 'Valor a ser registrado para o pagamento',
+    description:
+      'Ignorado: o valor vem da cobrança do Mercado Pago. Mantido opcional por compatibilidade.',
+    deprecated: true,
   })
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  valor!: number;
+  valor?: number;
 }

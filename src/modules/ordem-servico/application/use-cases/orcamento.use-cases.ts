@@ -41,7 +41,11 @@ export class AprovarOrcamentoUseCase {
       Number(orcamento.valor_total_geral)
     );
 
-    const approved = await this.orcamentoRepository.update(orcamento.id, { status: 'APPROVED' });
+    const approved = await this.orcamentoRepository.aprovarSePendente(orcamento.id);
+    if (!approved) {
+      // Aprovação concorrente venceu: mesmo link, sem publicar OrcamentoAprovado de novo.
+      return { ...orcamento, status: 'APPROVED', linkPagamento };
+    }
     await this.emissor.emitir(
       new OrcamentoAprovado(id_ordem_servico, approved.id, approved.valor_total_pecas)
     );

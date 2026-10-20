@@ -16,4 +16,6 @@ export interface IOrcamentoRepository {
   }): Promise<Orcamento>;
   findByOrdemServicoId(id_ordem_servico: string): Promise<Orcamento | null>;
   update(id: string, data: OrcamentoUpdateData): Promise<Orcamento>;
+  // Transição atômica PENDING → APPROVED; null se outra aprovação já mudou o status.
+  aprovarSePendente(id: string): Promise<Orcamento | null>;
 }

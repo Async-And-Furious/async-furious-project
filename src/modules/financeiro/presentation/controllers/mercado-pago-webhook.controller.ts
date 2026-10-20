@@ -39,7 +39,7 @@ export class MercadoPagoWebhookController {
     // Síncrono de propósito: falha na reconsulta devolve 5xx e o Mercado Pago reenvia.
     const resultado = await this.processarNotificacaoPagamentoUseCase.execute(dataId);
     const mensagem = `Notificação do pagamento ${dataId} no Mercado Pago: ${resultado}`;
-    if (resultado === 'VALOR_DIVERGENTE') {
+    if (resultado === 'VALOR_DIVERGENTE' || resultado === 'APROVADO_APOS_ENCERRAMENTO') {
       this.logger.error(mensagem);
     } else {
       this.logger.log(mensagem);

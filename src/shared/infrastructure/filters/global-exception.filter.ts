@@ -10,6 +10,7 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Request, Response } from 'express';
 import { DomainException } from '../../domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../domain/exceptions/entity-not-found.exception';
+import { ConflitoException } from '../../domain/exceptions/conflito.exception';
 
 interface ErrorResponse {
   statusCode: number;
@@ -39,6 +40,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       statusCode = HttpStatus.NOT_FOUND;
       message = exception.message;
       error = 'Not Found';
+    } else if (exception instanceof ConflitoException) {
+      statusCode = HttpStatus.CONFLICT;
+      message = exception.message;
+      error = 'Conflict';
     } else if (exception instanceof DomainException) {
       statusCode = HttpStatus.BAD_REQUEST;
       message = exception.message;

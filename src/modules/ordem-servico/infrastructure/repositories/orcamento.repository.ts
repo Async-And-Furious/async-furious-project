@@ -34,4 +34,13 @@ export class OrcamentoRepository implements IOrcamentoRepository {
       data,
     })) as unknown as Orcamento;
   }
+
+  async aprovarSePendente(id: string): Promise<Orcamento | null> {
+    const { count } = await this.prisma.orcamento.updateMany({
+      where: { id, status: 'PENDING' },
+      data: { status: 'APPROVED' },
+    });
+    if (count === 0) return null;
+    return (await this.prisma.orcamento.findUnique({ where: { id } })) as unknown as Orcamento;
+  }
 }

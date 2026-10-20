@@ -9,6 +9,7 @@ describe('Pagamento Entity', () => {
       expect(pagamento.getOrdemServicoId()).toBe('os-123');
       expect(pagamento.getValor()).toBe(100);
       expect(pagamento.getStatus()).toBe('AGUARDANDO_PAGAMENTO');
+      expect(pagamento.estaPendente()).toBe(true);
       expect(pagamento.getId()).toBeDefined();
     });
 
@@ -21,30 +22,34 @@ describe('Pagamento Entity', () => {
     });
   });
 
-  describe('registrar', () => {
-    it('should change status to PAGO', () => {
-      const pagamento = Pagamento.criar('os-123', 100);
-
-      pagamento.registrar();
-
-      expect(pagamento.getStatus()).toBe('PAGO');
-    });
-  });
-
   describe('confirmar', () => {
-    it('should change a pending pagamento to CONFIRMADO', () => {
+    it('should change a pending pagamento to CONFIRMADO and keep the external payment id', () => {
       const pagamento = Pagamento.criar('os-123', 100);
 
-      pagamento.confirmar();
+      pagamento.confirmar('mp-1');
 
       expect(pagamento.getStatus()).toBe('CONFIRMADO');
+      expect(pagamento.getPagamentoExternoId()).toBe('mp-1');
+      expect(pagamento.estaPendente()).toBe(false);
     });
 
     it('should throw DomainException when pagamento is not pending', () => {
       const pagamento = Pagamento.criar('os-123', 100);
-      pagamento.confirmar();
+      pagamento.confirmar('mp-1');
 
-      expect(() => pagamento.confirmar()).toThrow(DomainException);
+      expect(() => pagamento.confirmar('mp-2')).toThrow(DomainException);
+    });
+  });
+
+  describe('recusar', () => {
+    it('should change a pending pagamento to RECUSADO (terminal)', () => {
+      const pagamento = Pagamento.criar('os-123', 100);
+
+      pagamento.recusar('mp-1');
+
+      expect(pagamento.getStatus()).toBe('RECUSADO');
+      expect(pagamento.getPagamentoExternoId()).toBe('mp-1');
+      expect(() => pagamento.confirmar('mp-2')).toThrow(DomainException);
     });
   });
 
@@ -61,7 +66,7 @@ describe('Pagamento Entity', () => {
 
     it('should throw DomainException when pagamento is not pending', () => {
       const pagamento = Pagamento.criar('os-123', 100);
-      pagamento.registrar();
+      pagamento.confirmar('mp-1');
 
       expect(() => pagamento.vincularCobranca('pref-1', 'https://mp.test/x')).toThrow(
         DomainException
@@ -69,14 +74,17 @@ describe('Pagamento Entity', () => {
     });
   });
 
-  describe('getters', () => {
-    it('should return all properties correctly', () => {
-      const pagamento = Pagamento.criar('os-123', 250.5);
+  describe('reconstituir', () => {
+    it('should accept legacy statuses such as PAGO as non-pending', () => {
+      const pagamento = Pagamento.reconstituir({
+        id: 'pag-1',
+        ordemServicoId: 'os-123',
+        valor: 100,
+        status: 'PAGO',
+      });
 
-      expect(pagamento.getId()).toBeDefined();
-      expect(pagamento.getOrdemServicoId()).toBe('os-123');
-      expect(pagamento.getValor()).toBe(250.5);
-      expect(pagamento.getStatus()).toBe('AGUARDANDO_PAGAMENTO');
+      expect(pagamento.estaPendente()).toBe(false);
+      expect(pagamento.getPagamentoExternoId()).toBeNull();
     });
   });
 });

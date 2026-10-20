@@ -7,7 +7,10 @@ import type {
   PagamentoExterno,
 } from '../../domain/interfaces/pagamento.interface';
 
+// Timeout curto + 1 retry com backoff exponencial (feito pelo SDK em 429/5xx e falha de rede),
+// para caber no prazo de resposta do webhook (22 s) e não segurar a aprovação.
 const TIMEOUT_MS = 5000;
+const MAX_RETRIES = 1;
 
 const descreverErro = (error: unknown): string =>
   error instanceof Error ? error.message : JSON.stringify(error);
@@ -86,6 +89,9 @@ export class MercadoPagoGateway implements IGatewayPagamento {
     if (!accessToken) {
       throw new Error('MP_ACCESS_TOKEN não configurado.');
     }
-    return new MercadoPagoConfig({ accessToken, options: { timeout: TIMEOUT_MS } });
+    return new MercadoPagoConfig({
+      accessToken,
+      options: { timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES },
+    });
   }
 }

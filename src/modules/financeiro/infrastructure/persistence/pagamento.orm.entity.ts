@@ -9,6 +9,7 @@ export interface PagamentoORMEntity {
   status: string;
   preferenceId: string | null;
   linkPagamento: string | null;
+  mercadoPagoPaymentId: string | null;
   createdAt: Date;
 }
 
@@ -21,6 +22,7 @@ export class PagamentoMapper {
       status: orm.status,
       preferenceId: orm.preferenceId,
       linkPagamento: orm.linkPagamento,
+      pagamentoExternoId: orm.mercadoPagoPaymentId,
     });
   }
 
@@ -32,6 +34,7 @@ export class PagamentoMapper {
       status: pagamento.getStatus(),
       preferenceId: pagamento.getPreferenceId(),
       linkPagamento: pagamento.getLinkPagamento(),
+      mercadoPagoPaymentId: pagamento.getPagamentoExternoId(),
     };
   }
 }

@@ -125,6 +125,7 @@ describe('OS + Orçamento Use Cases', () => {
       create: jest.fn(),
       findByOrdemServicoId: jest.fn(),
       update: jest.fn(),
+      aprovarSePendente: jest.fn(),
     } as jest.Mocked<IOrcamentoRepository>;
     mockOsPecaRepository = {
       replaceAll: jest.fn(),
@@ -306,7 +307,7 @@ describe('OS + Orçamento Use Cases', () => {
       const orcamentoAprovado = { ...mockOrcamento, status: 'APPROVED' as const };
       mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
       mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
-      mockOrcamentoRepository.update.mockResolvedValue(orcamentoAprovado);
+      mockOrcamentoRepository.aprovarSePendente.mockResolvedValue(orcamentoAprovado);
 
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
@@ -317,7 +318,7 @@ describe('OS + Orçamento Use Cases', () => {
       const result = await uc.execute('os-1');
 
       expect(mockCobranca.gerarLinkPagamento).toHaveBeenCalledWith('os-1', 150);
-      expect(mockOrcamentoRepository.update).toHaveBeenCalledWith('orc-1', { status: 'APPROVED' });
+      expect(mockOrcamentoRepository.aprovarSePendente).toHaveBeenCalledWith('orc-1');
       expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
       expect(result.status).toBe('APPROVED');
       expect(result.linkPagamento).toBe('https://mp.test/checkout/os-1');
@@ -329,7 +330,10 @@ describe('OS + Orçamento Use Cases', () => {
         ...mockOrcamento,
         valor_total_geral: new Prisma.Decimal('150.50') as unknown as number,
       });
-      mockOrcamentoRepository.update.mockResolvedValue({ ...mockOrcamento, status: 'APPROVED' });
+      mockOrcamentoRepository.aprovarSePendente.mockResolvedValue({
+        ...mockOrcamento,
+        status: 'APPROVED',
+      });
 
       const uc = new AprovarOrcamentoUseCase(
         mockOsRepository,
@@ -355,7 +359,25 @@ describe('OS + Orçamento Use Cases', () => {
       );
 
       await expect(uc.execute('os-1')).rejects.toThrow('Mercado Pago indisponível');
-      expect(mockOrcamentoRepository.update).not.toHaveBeenCalled();
+      expect(mockOrcamentoRepository.aprovarSePendente).not.toHaveBeenCalled();
+      expect(mockBarramento.emitir).not.toHaveBeenCalled();
+    });
+
+    it('aprovação concorrente que perde a transição devolve o mesmo link sem publicar OrcamentoAprovado', async () => {
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
+      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
+      mockOrcamentoRepository.aprovarSePendente.mockResolvedValue(null);
+
+      const uc = new AprovarOrcamentoUseCase(
+        mockOsRepository,
+        mockOrcamentoRepository,
+        mockBarramento,
+        mockCobranca
+      );
+      const result = await uc.execute('os-1');
+
+      expect(result.status).toBe('APPROVED');
+      expect(result.linkPagamento).toBe('https://mp.test/checkout/os-1');
       expect(mockBarramento.emitir).not.toHaveBeenCalled();
     });
 

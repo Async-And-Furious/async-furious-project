@@ -8,10 +8,7 @@ export class PagamentoController {
 
   @Post('registrar')
   async registrar(@Body() dto: RegistrarPagamentoDto) {
-    await this.registrarPagamentoUseCase.execute({
-      ordemServicoId: dto.ordemServicoId,
-      valor: dto.valor,
-    });
+    await this.registrarPagamentoUseCase.execute({ ordemServicoId: dto.ordemServicoId });
 
     return { message: 'Pagamento registrado com sucesso' };
   }
