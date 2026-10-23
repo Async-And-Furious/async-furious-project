@@ -24,7 +24,7 @@ Backend for **integrated auto repair shop management**, built as the FIAP Softwa
 | **Vehicles** | CRUD with Brazilian plate validation. |
 | **Services** | Catalog of services offered by the shop. |
 | **Parts and Supplies** | CRUD with inventory control and supplier requests. |
-| **Payments** | Payment registration with automatic delivery trigger. |
+| **Payments** | Mercado Pago charge (Checkout Pro) on estimate approval, confirmed by webhook; manual payment registration with delivery trigger. |
 | **Authentication** | JWT with `ADMIN`, `RECEPCIONISTA`, and `MECANICO` roles. |
 
 ---
@@ -113,7 +113,13 @@ BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
 SEED_ADMIN_EMAIL="admin@oficina.com"
 SEED_ADMIN_PASSWORD="changeme123"
+# Mercado Pago (Checkout Pro) — credentials from the "Teste" tab of the Developer Dashboard
+MP_ACCESS_TOKEN=""
+MP_WEBHOOK_SECRET=""      # Webhooks → Configure notifications → secret key
+MP_NOTIFICATION_URL=""    # optional: public webhook URL, sent with each preference
 ```
+
+Without `MP_ACCESS_TOKEN`, approving an estimate fails; without `MP_WEBHOOK_SECRET`, the Mercado Pago webhook rejects every notification with `401`.
 
 ### 3. Start with Docker for development
 
@@ -202,7 +208,7 @@ docs/http/insomnia.yaml
 | PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mechanic takes ownership. |
 | PATCH | `/ordens-servico/:id/analisar` | MECANICO | Register diagnostic analysis. |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Generate estimate. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Public | Customer approves estimate. |
+| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Public | Customer approves estimate; the response includes `linkPagamento` (Mercado Pago Checkout Pro). `502` if Mercado Pago fails (estimate stays pending). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Public | Customer rejects estimate. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Public | Customer approves performed service. |
 | PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mechanic finishes execution. |
@@ -226,7 +232,13 @@ docs/http/insomnia.yaml
 
 | Method | Endpoint | Access | Description |
 | ------ | -------- | ------ | ----------- |
-| POST | `/pagamentos/registrar` | Authenticated | Register payment and trigger service order delivery. |
+| POST | `/pagamentos/registrar` | Authenticated | Trigger delivery of a service order whose payment was already confirmed by Mercado Pago (`409` otherwise). Does not create or mark payments. |
+
+#### Mercado Pago webhook (`/api/v1/webhooks/mercado-pago`)
+
+| Method | Endpoint | Access | Description |
+| ------ | -------- | ------ | ----------- |
+| POST | `/webhooks/mercado-pago` | Public (`x-signature` signature) | Payment notification: re-fetches the payment from Mercado Pago; approved → `CONFIRMADO`, rejected → `RECUSADO`. Redeliveries have no effect. |
 
 ---
 

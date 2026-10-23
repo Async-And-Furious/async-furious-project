@@ -87,6 +87,30 @@ nem Event Storming, nem diagrama de sequência dedicado ao financeiro) — gap
 pré-existente, não introduzido nem resolvido pela Fase 3. A definição abaixo
 fecha esse gap, como parte da Feature #307 (Fase 4).
 
+**Mercado Pago no monólito (Feature #325, 20/10/2026).** Antes do Billing
+Service existir, a cobrança já roda no módulo `financeiro`:
+
+- `PATCH /ordens-servico/:id/orcamento/aprovar` (e `POST /:id/aprovar-servico`
+  com `APROVADO`) cria a preference do Checkout Pro **antes** de marcar o
+  orçamento `APPROVED` e devolve `linkPagamento`. Falha no Mercado Pago →
+  `502` e o orçamento segue `PENDING`. A chamada passa pela porta
+  `ICobrancaPagamentoPort` (`src/shared/domain/interfaces`). Uma cobrança por
+  OS (`Pagamento.ordemServicoId` único, reservado antes de chamar o Mercado
+  Pago); aprovações concorrentes devolvem o mesmo link e só uma publica
+  `OrcamentoAprovado`.
+- `POST /api/v1/webhooks/mercado-pago` valida o `x-signature`, reconsulta
+  `GET /v1/payments/{id}` e grava a notificação em `webhook_recebido` na mesma
+  transação do `Pagamento`: aprovado com o valor da cobrança → `CONFIRMADO` +
+  `PagamentoConfirmadoEvent`; `rejected`/`cancelled` → `RECUSADO` +
+  `PagamentoRecusadoEvent` (terminal, simplificação da ADR-0022); pendente →
+  sem efeito.
+- `POST /pagamentos/registrar` não cria nem marca pagamento: só dispara a
+  entrega (`PagamentoRegistrado`) se o `Pagamento` da OS estiver `CONFIRMADO`;
+  caso contrário, `409`.
+- Diferenças em relação ao fluxo da Fase 4 descrito abaixo: a OS ainda vai
+  para `IN_PROGRESS` logo na aprovação (não espera o pagamento) e nada consome
+  os eventos de pagamento por enquanto.
+
 ### Integração com o contexto Financeiro (Fase 4) {#integração-com-o-contexto-financeiro-fase-4}
 
 **Decidido na revisão de 30/09/2026: não há checagem de pagamento em

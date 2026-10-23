@@ -7,6 +7,9 @@ export interface PagamentoORMEntity {
   ordemServicoId: string;
   valor: Prisma.Decimal;
   status: string;
+  preferenceId: string | null;
+  linkPagamento: string | null;
+  mercadoPagoPaymentId: string | null;
   createdAt: Date;
 }
 
@@ -17,6 +20,9 @@ export class PagamentoMapper {
       ordemServicoId: orm.ordemServicoId,
       valor: Number(orm.valor),
       status: orm.status,
+      preferenceId: orm.preferenceId,
+      linkPagamento: orm.linkPagamento,
+      pagamentoExternoId: orm.mercadoPagoPaymentId,
     });
   }
 
@@ -26,6 +32,9 @@ export class PagamentoMapper {
       ordemServicoId: pagamento.getOrdemServicoId(),
       valor: new Prisma.Decimal(pagamento.getValor()),
       status: pagamento.getStatus(),
+      preferenceId: pagamento.getPreferenceId(),
+      linkPagamento: pagamento.getLinkPagamento(),
+      mercadoPagoPaymentId: pagamento.getPagamentoExternoId(),
     };
   }
 }

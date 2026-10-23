@@ -101,6 +101,14 @@ erDiagram
     PAGAMENTO {
         string id PK
         string ordemServicoId "sem FK declarada"
+        string preference_id "Checkout Pro"
+        string mercado_pago_payment_id UK
+    }
+
+    WEBHOOK_RECEBIDO {
+        string id PK
+        string provider_event_id "UK com tipo"
+        string tipo
     }
 
     HISTORICO_STATUS_OS {
@@ -337,8 +345,28 @@ existem em `OrdemServico`/`Peca`.
 | id | text | PK |
 | ordemServicoId | text | not null, **sem FK** (aponta conceitualmente pra `OrdemServico.id`) |
 | valor | numeric(10,2) | not null |
-| status | text | not null (sem enum do Prisma) |
+| ordemServicoId | text | (ver acima) **único** desde `20261020150000`: uma cobrança por OS |
+| status | text | not null (sem enum do Prisma). Valores em uso: `AGUARDANDO_PAGAMENTO`, `CONFIRMADO` e `RECUSADO` (webhook do Mercado Pago); `PAGO` só em registros antigos |
+| preference_id | text | null. Id da preference do Checkout Pro (Mercado Pago) |
+| link_pagamento | text | null. `init_point` devolvido ao aprovar o orçamento |
+| mercado_pago_payment_id | text | null, **único**. Id do pagamento no Mercado Pago que confirmou ou recusou a cobrança |
 | createdAt | timestamp | default now() |
+
+A cobrança de uma OS é buscada pelo `ordemServicoId` único (aprovação
+idempotente e webhook do Mercado Pago, via `external_reference`).
+
+### `WebhookRecebido` (tabela física: `webhook_recebido`, via `@@map`)
+
+| Coluna | Tipo | Constraints |
+| --- | --- | --- |
+| id | text | PK |
+| provider_event_id | text | not null. Id do pagamento no Mercado Pago |
+| tipo | text | not null. `payment.{status}` (ex.: `payment.approved`) |
+| recebido_em | timestamp | default now() |
+
+`UNIQUE(provider_event_id, tipo)`. Idempotência de entrada do webhook do
+Mercado Pago: gravada na mesma transação que atualiza o `Pagamento`; uma
+reentrega viola a constraint e não altera nada.
 
 Única tabela sem `updated_at`, e a única com colunas em camelCase
 (`ordemServicoId`, `createdAt`) em vez do `snake_case` usado no resto do
@@ -491,6 +519,8 @@ do schema até o momento desta tarefa):
 | 2026-05-01 | `41179b6` | Módulo Financeiro: tabela `Pagamento` adicionada, já com `@@map("pagamentos")` (snake_case) — quebrando a convenção fixada três dias antes em `7ff1656`. | "Criação de módulo Financeiro", sem justificativa da escolha de nomenclatura na mensagem do commit. |
 | 2026-06-02 | `f85cdc4` | Tabela de junção `OsServico` adicionada, espelhando o padrão de `OsPeca` para o par `OrdemServico`/`Servico`. | "Criação de fluxo de os-servico". |
 | 2026-07-07 | `03693e9` | Tabela `HistoricoStatusOS` adicionada, também com `@@map("historico_status_os")` (snake_case), repetindo a divergência de `Pagamento`. | "implementação de módulo webhook de status da ordem". |
+| 2026-10-20 | `406ebcf` | `Pagamento` ganha `preference_id` e `link_pagamento` (nulas, snake_case via `@map`) e índice em `ordemServicoId`. Migração aditiva `20261020120000_pagamento_cobranca_mercado_pago`. | Integração com o Mercado Pago Checkout Pro (#325): a aprovação do orçamento cria a cobrança e devolve o link. |
+| 2026-10-20 | — | `Pagamento.ordemServicoId` passa a ser único, ganha `mercado_pago_payment_id` (único) e é criada a tabela `webhook_recebido`. Migração `20261020150000_pagamento_idempotencia_mercado_pago` (falha se já houver dois pagamentos para a mesma OS). | Idempotência da cobrança e do webhook exigida pela #325; o Mercado Pago ignora `X-Idempotency-Key` em preferences. |
 
 A divergência de nomenclatura registrada na seção
 [Convenções observadas](#convenções-observadas-e-onde-elas-quebram) tem

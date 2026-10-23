@@ -1,6 +1,7 @@
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
+import type { ICobrancaPagamentoPort } from '../../../../shared/domain/interfaces/cobranca-pagamento.port';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -12,10 +13,11 @@ export class AprovarOrcamentoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly orcamentoRepository: IOrcamentoRepository,
-    private readonly emissor: IEmissorEventos
+    private readonly emissor: IEmissorEventos,
+    private readonly cobranca: ICobrancaPagamentoPort
   ) {}
 
-  async execute(id_ordem_servico: string): Promise<Orcamento> {
+  async execute(id_ordem_servico: string): Promise<Orcamento & { linkPagamento: string }> {
     const os = await this.ordemServicoRepository.findOne(id_ordem_servico);
     os.podeAprovarOuRecusarOrcamento();
 
@@ -32,11 +34,22 @@ export class AprovarOrcamentoUseCase {
       throw new DomainException('Não é possível aprovar orçamento sem valores definidos.');
     }
 
-    const approved = await this.orcamentoRepository.update(orcamento.id, { status: 'APPROVED' });
+    // A cobrança vem antes da aprovação: se o Mercado Pago falhar, o orçamento segue PENDING.
+    // Number(): o repositório devolve o Decimal do Prisma, apesar do tipo declarado.
+    const linkPagamento = await this.cobranca.gerarLinkPagamento(
+      id_ordem_servico,
+      Number(orcamento.valor_total_geral)
+    );
+
+    const approved = await this.orcamentoRepository.aprovarSePendente(orcamento.id);
+    if (!approved) {
+      // Aprovação concorrente venceu: mesmo link, sem publicar OrcamentoAprovado de novo.
+      return { ...orcamento, status: 'APPROVED', linkPagamento };
+    }
     await this.emissor.emitir(
       new OrcamentoAprovado(id_ordem_servico, approved.id, approved.valor_total_pecas)
     );
-    return approved;
+    return { ...approved, linkPagamento };
   }
 }
 

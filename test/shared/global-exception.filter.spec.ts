@@ -3,6 +3,7 @@ import { ArgumentsHost, HttpStatus, HttpException } from '@nestjs/common';
 import { getLoggerToken } from 'nestjs-pino';
 import { GlobalExceptionFilter } from '../../src/shared/infrastructure/filters/global-exception.filter';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
+import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
@@ -67,6 +68,19 @@ describe('GlobalExceptionFilter', () => {
         path: '/api/v1/test',
         message: 'Erro de domínio',
         error: 'Bad Request',
+      });
+    });
+
+    it('deve tratar ConflitoException como 409', () => {
+      filter.catch(new ConflitoException('Já existe'), mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.CONFLICT);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        statusCode: HttpStatus.CONFLICT,
+        timestamp: expect.any(String),
+        path: '/api/v1/test',
+        message: 'Já existe',
+        error: 'Conflict',
       });
     });
 

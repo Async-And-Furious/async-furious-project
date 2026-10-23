@@ -1,5 +1,31 @@
 # Log de agentes
 
+## 2026-10-20 — Mercado Pago Checkout Pro no monólito (#325)
+
+- Aprovar o orçamento cria a preference do Checkout Pro (SDK oficial
+  `mercadopago@3.6.1`) e devolve `linkPagamento`; falha no Mercado Pago dá
+  `502` e o orçamento segue `PENDING`. Migração aditiva em `pagamentos`
+  (`preference_id`, `link_pagamento`, índice em `ordemServicoId`).
+- `POST /api/v1/webhooks/mercado-pago` valida o `x-signature` com o validador
+  do SDK (`data.id` da query string), reconsulta o pagamento e confirma o
+  `Pagamento` aprovado (`CONFIRMADO` + `PagamentoConfirmadoEvent`).
+- Validação: 779 testes, type-check e build passando; fluxo testado localmente
+  com conta de teste (preference real, pagamento aprovado com cartão de teste,
+  notificação assinada simulada). A entrega real do webhook pelo Mercado Pago
+  ainda não foi testada. Nenhum deploy, apply ou alteração na AWS.
+- Alinhamento com o escopo da #325: `Pagamento.ordemServicoId` único com
+  reserva antes de chamar o Mercado Pago (que ignora `X-Idempotency-Key` em
+  preferences, testado), aprovação atômica do orçamento, `rejected` terminal
+  (`RECUSADO` + `PagamentoRecusadoEvent`), `webhook_recebido` na mesma
+  transação, timeout de 5 s com 1 retry, e `POST /pagamentos/registrar` só
+  dispara a entrega com pagamento `CONFIRMADO`. Concorrência validada contra o
+  banco local (duas aprovações → um pagamento e o mesmo link; três
+  notificações → uma atualização).
+- Decisões registradas na ADR-0022 (Proposta). Pendente: estorno, segredos
+  `MP_*` no k8s/Terraform de HML, rota do
+  webhook em `docs/http/routes.yaml` (precisa de um tipo de autenticação novo
+  no `route-matrix.py`).
+
 ## 2026-09-14 — Fortalecimento da atualização de capacidade do node group em HML
 
 - Fortalecido o passo de capacidade em HML para esperar um nodegroup ACTIVE,

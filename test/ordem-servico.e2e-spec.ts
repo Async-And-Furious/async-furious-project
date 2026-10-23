@@ -5,6 +5,7 @@ import type { Application } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
+import { GATEWAY_PAGAMENTO } from '../src/modules/financeiro/domain/interfaces/pagamento.interface';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
 import { randomInt } from 'node:crypto';
 
@@ -28,9 +29,21 @@ describe('OrdemServico Happy Flow (e2e)', () => {
   const clienteEmail = 'e2e-os-cliente@example.com';
 
   beforeAll(async () => {
+    // O Mercado Pago é externo: no e2e a cobrança usa um gateway falso.
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(GATEWAY_PAGAMENTO)
+      .useValue({
+        criarCobranca: jest.fn((ordemServicoId: string) =>
+          Promise.resolve({
+            preferenceId: `pref-e2e-${ordemServicoId}`,
+            linkPagamento: `https://mp.test/checkout/${ordemServicoId}`,
+          })
+        ),
+        consultarPagamento: jest.fn().mockResolvedValue(null),
+      })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -171,7 +184,10 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       })
       .expect(200);
 
-    await server.patch(`/ordens-servico/${ordemServicoId}/orcamento/aprovar`).expect(200);
+    const aprovacao = await server
+      .patch(`/ordens-servico/${ordemServicoId}/orcamento/aprovar`)
+      .expect(200);
+    expect(aprovacao.body.linkPagamento).toBe(`https://mp.test/checkout/${ordemServicoId}`);
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/finalizar-execucao`)

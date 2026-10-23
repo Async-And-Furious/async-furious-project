@@ -194,12 +194,26 @@ model ReservaEstoque {
 
 model Pagamento {
   id             String   @id @default(uuid())
-  ordemServicoId String
-  valor          Decimal  @db.Decimal(10, 2)
-  status         String
-  createdAt      DateTime @default(now())
+  ordemServicoId       String   @unique
+  valor                Decimal  @db.Decimal(10, 2)
+  status               String
+  preferenceId         String?  @map("preference_id")
+  linkPagamento        String?  @map("link_pagamento")
+  mercadoPagoPaymentId String?  @unique @map("mercado_pago_payment_id")
+  createdAt            DateTime @default(now())
 
   @@map("pagamentos")
+}
+
+// Idempotência de entrada do webhook do Mercado Pago (gravada na mesma transação do Pagamento).
+model WebhookRecebido {
+  id              String   @id @default(uuid())
+  providerEventId String   @map("provider_event_id")
+  tipo            String
+  recebidoEm      DateTime @default(now()) @map("recebido_em")
+
+  @@unique([providerEventId, tipo])
+  @@map("webhook_recebido")
 }
 
 model HistoricoStatusOS {

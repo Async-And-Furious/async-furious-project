@@ -17,13 +17,22 @@ import {
 import { PagamentoRegistradoEvent } from '../../src/modules/financeiro/domain/events/pagamento-registrado.event';
 import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 import { EMISSOR_EVENTOS } from '../../src/shared/domain/interfaces/emissor-eventos.interface';
+import { Pagamento } from '../../src/modules/financeiro/domain/entities/pagamento.entity';
+import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
 
 describe('Módulo Financeiro: Event handlers de Fluxo', () => {
   let mockRepository: jest.Mocked<IPagamentoRepository>;
   let mockEmissor: jest.Mocked<IPagamentoEventPublisher>;
 
   beforeEach(() => {
-    mockRepository = { save: jest.fn(), findById: jest.fn() } as jest.Mocked<IPagamentoRepository>;
+    mockRepository = {
+      save: jest.fn(),
+      findById: jest.fn(),
+      findByOrdemServicoId: jest.fn(),
+      reservar: jest.fn(),
+      remover: jest.fn(),
+      saveComNotificacao: jest.fn(),
+    } as jest.Mocked<IPagamentoRepository>;
     mockEmissor = { emitir: jest.fn() } as jest.Mocked<IPagamentoEventPublisher>;
   });
 
@@ -44,11 +53,47 @@ describe('Módulo Financeiro: Event handlers de Fluxo', () => {
       useCase = module.get<RegistrarPagamentoUseCase>(RegistrarPagamentoUseCase);
     });
 
-    it('deve persistir pagamento e emitir evento de sucesso', async () => {
-      await useCase.execute({ ordemServicoId: 'os-1', valor: 100 });
+    it('deve disparar a entrega quando o pagamento foi confirmado pelo Mercado Pago', async () => {
+      mockRepository.findByOrdemServicoId.mockResolvedValue(
+        Pagamento.reconstituir({
+          id: 'pag-1',
+          ordemServicoId: 'os-1',
+          valor: 100,
+          status: 'CONFIRMADO',
+        })
+      );
 
-      expect(mockRepository.save).toHaveBeenCalled();
+      await useCase.execute({ ordemServicoId: 'os-1' });
+
+      expect(mockRepository.save).not.toHaveBeenCalled();
       expect(mockEmissor.emitir).toHaveBeenCalledWith(expect.any(PagamentoRegistradoEvent));
+      expect(mockEmissor.emitir.mock.calls[0][0]).toMatchObject({
+        pagamentoId: 'pag-1',
+        ordemServicoId: 'os-1',
+      });
+    });
+
+    it.each(['AGUARDANDO_PAGAMENTO', 'RECUSADO', 'PAGO'])(
+      'deve recusar com 409 quando o pagamento está %s',
+      async (status) => {
+        mockRepository.findByOrdemServicoId.mockResolvedValue(
+          Pagamento.reconstituir({ id: 'pag-1', ordemServicoId: 'os-1', valor: 100, status })
+        );
+
+        await expect(useCase.execute({ ordemServicoId: 'os-1' })).rejects.toBeInstanceOf(
+          ConflitoException
+        );
+        expect(mockEmissor.emitir).not.toHaveBeenCalled();
+      }
+    );
+
+    it('deve recusar com 409 quando a OS não tem pagamento', async () => {
+      mockRepository.findByOrdemServicoId.mockResolvedValue(null);
+
+      await expect(useCase.execute({ ordemServicoId: 'os-1' })).rejects.toBeInstanceOf(
+        ConflitoException
+      );
+      expect(mockEmissor.emitir).not.toHaveBeenCalled();
     });
   });
 

@@ -30,25 +30,14 @@ describe('PagamentoController', () => {
 
       const result = await controller.registrar(dto);
 
-      expect(mockUseCase.execute).toHaveBeenCalledWith({
-        ordemServicoId: 'os-123',
-        valor: 150.0,
-      });
+      expect(mockUseCase.execute).toHaveBeenCalledWith({ ordemServicoId: 'os-123' });
       expect(result).toEqual({ message: 'Pagamento registrado com sucesso' });
     });
 
-    it('should handle different values', async () => {
-      const dto = {
-        ordemServicoId: 'os-456',
-        valor: 299.99,
-      };
+    it('should ignore the deprecated valor field', async () => {
+      await controller.registrar({ ordemServicoId: 'os-456' });
 
-      await controller.registrar(dto);
-
-      expect(mockUseCase.execute).toHaveBeenCalledWith({
-        ordemServicoId: 'os-456',
-        valor: 299.99,
-      });
+      expect(mockUseCase.execute).toHaveBeenCalledWith({ ordemServicoId: 'os-456' });
     });
   });
 });

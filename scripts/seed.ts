@@ -932,12 +932,13 @@ async function seedRelations(
 
     if (index % 3 === 0) {
       const paymentId = stableSeedId(`pagamento:${order.id}`);
-      await db.pagamento.upsert({
-        where: { id: paymentId },
+      // Upsert pela OS: ordemServicoId é único, e a OS pode já ter uma cobrança do Mercado Pago com outro id.
+      const payment = await db.pagamento.upsert({
+        where: { ordemServicoId: order.id },
         update: { valor: 100 + index * 10, status: index % 2 === 0 ? 'PAGO' : 'AGUARDANDO_PAGAMENTO' },
         create: { id: paymentId, ordemServicoId: order.id, valor: 100 + index * 10, status: index % 2 === 0 ? 'PAGO' : 'AGUARDANDO_PAGAMENTO' },
       });
-      payments.push(paymentId);
+      payments.push(payment.id);
     }
     if (index % 2 === 0) {
       const reservationId = stableSeedId(`reserva:${order.id}:${partId}`);

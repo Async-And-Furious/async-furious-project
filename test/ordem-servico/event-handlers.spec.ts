@@ -120,6 +120,7 @@ describe('OS Event handlers', () => {
       findByOrdemServicoId: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      aprovarSePendente: jest.fn(),
     } as jest.Mocked<IOrcamentoRepository>;
     emissor = {
       emitir: jest.fn().mockResolvedValue(undefined),
