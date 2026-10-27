@@ -15,9 +15,9 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'billing_user') \gexec
 SELECT format('CREATE ROLE %I LOGIN', :'execucao_user')
 WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'execucao_user') \gexec
 
-SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE', :'os_user', :'os_password') \gexec
-SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE', :'billing_user', :'billing_password') \gexec
-SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L NOSUPERUSER NOCREATEDB NOCREATEROLE', :'execucao_user', :'execucao_password') \gexec
+SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L NOCREATEDB NOCREATEROLE', :'os_user', :'os_password') \gexec
+SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L NOCREATEDB NOCREATEROLE', :'billing_user', :'billing_password') \gexec
+SELECT format('ALTER ROLE %I WITH LOGIN PASSWORD %L NOCREATEDB NOCREATEROLE', :'execucao_user', :'execucao_password') \gexec
 
 -- RDS master is not a real superuser: it must be a member of a role to hand
 -- ownership to it.
