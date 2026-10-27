@@ -87,6 +87,48 @@
   middleware manual) e sua propagação automática para qualquer log emitido
   durante a requisição.
 
+## Contrato de log (issue #316)
+
+Todo serviço da Fase 4 copia `src/shared/infrastructure/logging/pino-logger.config.ts`
+deste repositório e segue o mesmo contrato, para uma consulta na New Relic
+achar a mesma OS em qualquer serviço.
+
+| Campo | Quando aparece | Origem |
+|---|---|---|
+| `service` | Todo log, HTTP ou não | Variável `SERVICE_NAME`; padrão `os-service` |
+| `correlationId` | Log de requisição HTTP | Header `x-correlation-id` válido do cliente, ou `randomUUID()`; sempre ecoado na resposta |
+| `correlationId` | Log de consumidor de evento | Igual ao `ordemServicoId` do envelope ([ADR-0018](../adr/0018-mensageria-contratos-eventos.md)) |
+| `ordemServicoId`, `eventId` | Log de consumidor de evento | Envelope do evento consumido |
+| `level` | Todo log | `error` para 5xx ou erro, `warn` para 4xx, `info` no resto (log de requisição) |
+
+Regras:
+
+- **Consumidor usa `runWithLogContext`.** O handler de cada mensagem roda
+  dentro de `runWithLogContext({ ordemServicoId, eventId }, handler)`, e
+  todo log emitido ali, inclusive depois de `await`, sai com os três campos
+  de rastreio. Não use o helper dentro de requisição HTTP: o log já tem o
+  `correlationId` da requisição e o campo sairia duplicado.
+- **No HTTP, `correlationId` é só o id da requisição.** O rastreio da saga
+  entre serviços é pelo `ordemServicoId` (ADR-0018). Para seguir uma OS de
+  ponta a ponta, filtre por `ordemServicoId` ou pelo `correlationId` dos
+  logs de consumo, não pelo `x-correlation-id`.
+- **Cada serviço define `SERVICE_NAME`** no próprio ConfigMap (ex.:
+  `billing-service`). Este repositório não define a variável e usa o padrão
+  `os-service`.
+- **Redact obrigatório**: `authorization`, `cookie` e `set-cookie` saem como
+  `[REDACTED]`.
+- **Cobertura do contrato**: `test/shared/pino-logger.config.spec.ts`. O
+  serviço que copia o arquivo copia também o spec.
+
+Consulta de exemplo (NRQL), uma OS em todos os serviços. **Ainda não
+validada na New Relic**: depende de o `newrelic-logging` expor os campos do
+JSON do Pino como atributos do evento `Log`, o que não foi conferido.
+
+```sql
+SELECT * FROM Log
+WHERE ordemServicoId = '<id-da-os>' SINCE 1 day ago ORDER BY timestamp
+```
+
 ## Dashboards operacionais (issue #166)
 
 - **Terraform, não UI manual**: recurso `newrelic_one_dashboard` no
