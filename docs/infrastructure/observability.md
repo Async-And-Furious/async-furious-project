@@ -95,6 +95,9 @@ achar a mesma OS em qualquer serviço.
 
 | Campo | Quando aparece | Origem |
 |---|---|---|
+| `time` | Todo log | Padrão do Pino (epoch em ms). É o "timestamp" do contrato; o nome do campo é `time` |
+| `msg` | Todo log | Padrão do Pino |
+| `trace.id`, `span.id` | Log emitido durante uma transação APM | Logs in Context do agente New Relic ([ADR-0005](../adr/0005-observabilidade.md)); não sai no "request completed" do `pino-http` (ver alertas, abaixo) |
 | `service` | Todo log, HTTP ou não | Variável `SERVICE_NAME`; padrão `os-service` |
 | `correlationId` | Log de requisição HTTP | Header `x-correlation-id` válido do cliente, ou `randomUUID()`; sempre ecoado na resposta |
 | `correlationId` | Log de consumidor de evento | Igual ao `ordemServicoId` do envelope ([ADR-0018](../adr/0018-mensageria-contratos-eventos.md)) |
@@ -111,7 +114,8 @@ Regras:
 - **No HTTP, `correlationId` é só o id da requisição.** O rastreio da saga
   entre serviços é pelo `ordemServicoId` (ADR-0018). Para seguir uma OS de
   ponta a ponta, filtre por `ordemServicoId` ou pelo `correlationId` dos
-  logs de consumo, não pelo `x-correlation-id`.
+  logs de consumo, não pelo `x-correlation-id`. O log HTTP ainda **não**
+  leva `ordemServicoId` quando a OS é conhecida; isso fica para o #344.
 - **Cada serviço define `SERVICE_NAME`** no próprio ConfigMap (ex.:
   `billing-service`). Este repositório não define a variável e usa o padrão
   `os-service`.
