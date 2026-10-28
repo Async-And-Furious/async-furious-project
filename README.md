@@ -80,41 +80,7 @@ Com o aumento da demanda e a expansão para novas unidades, a oficina precisa ga
 
 ### Diagrama de Arquitetura
 
-```mermaid
-flowchart TB
-    C[Cliente HTTP]
-
-    subgraph CI["CI/CD - GitHub Actions"]
-        T1["tests.yml<br/>build + testes automatizados"]
-        T2["terraform.yml<br/>terraform validate + plan"]
-    end
-
-    subgraph IaC["Terraform (/infra)"]
-        KC["modulo kind-cluster<br/>provisiona o cluster"]
-        KA["modulo kubernetes-apps<br/>aplica manifests de /k8s"]
-        KC --> KA
-    end
-
-    subgraph K8s["Cluster Kubernetes (kind local / EKS)"]
-        direction TB
-        SVC["Private ClusterIP Service<br/>:3000"]
-        subgraph DEPLOY["Deployment async-furious-api<br/>2-5 pods via HPA"]
-            API1[Pod API]
-            API2[Pod API]
-        end
-        CM[ConfigMap]
-        SEC[Secret]
-        SVC --> DEPLOY
-        CM -.env.-> DEPLOY
-        SEC -.env.-> DEPLOY
-        RDS[("AWS RDS PostgreSQL")]
-        DEPLOY -->|Prisma via explicit RDS connection secret| RDS
-    end
-
-    C --> SVC
-    T2 -.PR.-> IaC
-    KA -->|kubectl_manifest| K8s
-```
+O diagrama-mestre da arquitetura (três microsserviços, Kafka, bancos, borda com API Gateway e Lambda Authorizer e Mercado Pago) mora em um único lugar: [`docs/architecture/overview.md`](./docs/architecture/overview.md). Este README não mantém cópia dele. A topologia de implantação está em [`docs/architecture/deployment-diagram.md`](./docs/architecture/deployment-diagram.md) e o fluxo da Saga em [`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md).
 
 ### Fluxo de Deploy
 
@@ -124,7 +90,7 @@ flowchart TB
 4. O HPA escala os pods da API de 2 a 5 réplicas conforme o consumo de CPU/memória.
 5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisão humana antes de qualquer `apply` real.
 
-Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na seção [Infraestrutura como Código](#infraestrutura-como-codigo-terraform--kubernetes).
+Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na seção [Infraestrutura como Código](#infraestrutura-como-código-terraform--kubernetes).
 
 ---
 
