@@ -5,9 +5,10 @@
 - A decisão vigente da Fase 4 é HML-only: `deploy-prod` fica inerte, e os
   disparos manuais de deploy/seed aceitam HML. Os recursos PROD existentes da
   Fase 3 permanecem intocados. Nenhum deploy, apply ou acesso AWS foi feito.
-- Removido o bypass dos checks por label `Documentação`; adicionado o agregado
-  `validate` para reprovar quando testes falham ou Sonar é ignorado em `main`.
-  A proteção de branch ainda precisa exigir esse check (passo externo).
+- Removido o bypass por label `Documentação` nos workflows `tests`, `trivy`,
+  `zap` e `terraform`; adicionado o agregado `validate` para reprovar quando
+  testes falham ou Sonar é ignorado em `main`. A proteção de branch ainda
+  precisa exigir esse check (passo externo).
 - Removidos casts `any` do teste do filtro global e adicionados contratos de
   workflow. Coverage permanece 80/80/80/80.
 - SonarCloud HTTP 403 permanece bloqueio externo de autorização; não houve
