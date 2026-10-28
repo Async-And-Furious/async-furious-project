@@ -37,9 +37,22 @@ export class AtualizarStatusAguardandoPecasHandler {
 
     if (os.status === 'IN_PROGRESS') {
       this.transicao.validarTransicao('IN_PROGRESS', 'AWAITING_PARTS');
+      // Registra a pendência antes da gravação condicionada. Se PecasReservadas baixá-la antes
+      // do UPDATE condicionado, a condição não casa e a OS segue em IN_PROGRESS, sem ficar presa.
       await this.ordemServicoRepository.update(evento.ordemServicoId, {
-        status: 'AWAITING_PARTS',
+        reserva_pecas_pendente: true,
       });
+      const aplicou = await this.ordemServicoRepository.atualizarSeCondicao(
+        evento.ordemServicoId,
+        { status: 'IN_PROGRESS', reserva_pecas_pendente: true },
+        { status: 'AWAITING_PARTS' }
+      );
+      if (!aplicou) {
+        this.logger.log(
+          `[P-15] OS ${evento.ordemServicoId}: reserva chegou antes da gravação de AWAITING_PARTS, segue em IN_PROGRESS`
+        );
+        return;
+      }
       await this.emissor.emitir(new StatusAtualizadoAguardandoPecas(evento.ordemServicoId));
       return;
     }

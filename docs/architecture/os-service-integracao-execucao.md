@@ -95,15 +95,19 @@ mecânico inicia o reparo (`ExecucaoIniciada`). Por isso:
   - com a OS em `AWAITING_APPROVAL`, só liga `OrdemServico.reserva_pecas_pendente`;
   - com a OS em `IN_PROGRESS` (**reserva tardia**: `ExecucaoIniciada` foi
     processado antes da reserva, porque eventos de tópicos diferentes não têm
-    ordem entre si), leva a `AWAITING_PARTS` e emite
-    `StatusAtualizadoAguardandoPecas`;
+    ordem entre si), grava `reserva_pecas_pendente = true` e depois leva a
+    `AWAITING_PARTS`, condicionado a status `IN_PROGRESS` e à pendência
+    (`atualizarSeCondicao`). Se `PecasReservadas` baixar a pendência antes dessa
+    gravação, a condição não casa: a OS segue em `IN_PROGRESS`, sem emitir;
   - com a OS em `AWAITING_PARTS`, é reentrega: log, nada gravado.
-- `PecasReservadas` (`AtualizarStatusEmExecucaoHandler`):
-  - com a OS em `AWAITING_APPROVAL`, apenas desliga a pendência;
-  - com a OS em `AWAITING_PARTS`, volta a `IN_PROGRESS` (desliga a pendência e
-    emite `OrdemServicoEmExecucao`);
-  - com a OS em `IN_PROGRESS`, é reserva confirmada depois do início do reparo:
-    log, nada a alterar.
+- `PecasReservadas` (`AtualizarStatusEmExecucaoHandler`), nesta ordem:
+  1. desliga `reserva_pecas_pendente` em qualquer status com reserva (a gravação
+     só casa se a pendência estiver ligada);
+  2. tenta voltar `AWAITING_PARTS` → `IN_PROGRESS`, condicionado ao status no
+     momento da gravação, e só então emite `OrdemServicoEmExecucao`.
+  Com a OS em `AWAITING_APPROVAL` ou `IN_PROGRESS` a volta não casa e só a
+  pendência muda. Com a OS em `IN_PROGRESS`, é reserva confirmada depois do início
+  do reparo: log informativo.
   `OsSemPecasConfirmada` deixou de ter ouvinte.
 - `OrdemServicoBacklogAdapter.findAllAguardandoPecas` passou a devolver também
   as OS em `AWAITING_APPROVAL` com `reserva_pecas_pendente = true`: elas ainda
@@ -120,6 +124,14 @@ stateDiagram-v2
     AWAITING_PARTS --> IN_PROGRESS: PecasReservadas
     IN_PROGRESS --> FINISHED: ExecucaoConcluida
 ```
+
+A ida a `AWAITING_PARTS` no `ExecucaoIniciada` não usa a leitura da OS para
+decidir: a gravação só acontece com `status = IN_PROGRESS` e
+`reserva_pecas_pendente = true` no momento do `UPDATE`
+(`IOrdemServicoRepository.atualizarSeCondicao`). Como o `PecasReservadas` baixa a
+pendência antes de tentar a volta, qualquer intercalação entre os dois eventos
+termina em `IN_PROGRESS` sem pendência, ou em `AWAITING_PARTS` seguido da volta.
+A OS não fica presa em `AWAITING_PARTS` sem evento que a libere.
 
 Não existe `AWAITING_APPROVAL → AWAITING_PARTS` direto e nenhum guard de
 transição mudou. A coluna é necessária porque a pendência precisa sobreviver
@@ -168,7 +180,8 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
 - **Duas gravações não atômicas, retomáveis.** `IN_PROGRESS → AWAITING_PARTS` são
   duas chamadas a `update`. Se a segunda falhar, a OS fica em `IN_PROGRESS` com
   `reserva_pecas_pendente = true`, e a reentrega de `ExecucaoIniciada` faz só o
-  segundo passo. Resíduo: se a falha ocorrer depois de `update(IN_PROGRESS)` e na
+  segundo passo. O segundo passo é condicionado (§4): se a reserva chegar antes
+  dele, a OS segue em `IN_PROGRESS` em vez de ficar presa em `AWAITING_PARTS`. Resíduo: se a falha ocorrer depois de `update(IN_PROGRESS)` e na
   emissão de `OrdemServicoEmExecucao` (que inicia o monitoramento de tempo), a
   reentrega não a repete e `iniciada_em` pode ficar sem valor, o que afeta o tempo
   médio. Sem transação única, isso fica como risco aceito até o consumidor Kafka.
@@ -182,6 +195,18 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
 - **`PecasIndisponiveis` antes da aprovação.** Com a OS antes de
   `AWAITING_APPROVAL`, o evento é ignorado com `warn` e não grava nada. Ele só nasce
   na aprovação do orçamento, então o caso é anomalia.
+- **`PecasIndisponiveis` em `AWAITING_APPROVAL` (cosmético).** A pendência é
+  gravada sem condição. Se `ExecucaoIniciada` já tiver levado a OS a `IN_PROGRESS`
+  antes dessa gravação, a OS fica em `IN_PROGRESS` com a pendência ligada até a
+  reserva chegar, sem passar por `AWAITING_PARTS`. Não fica presa: a reserva
+  baixa a pendência. Fica documentado, sem mudança.
+- **Inversão entre `PecasReservadas` e `PecasIndisponiveis` da mesma OS (aberto).**
+  `PecasReservadas` sem pendência ligada não faz nada. Se ele for processado antes
+  de `PecasIndisponiveis` da mesma OS, a pendência gravada depois não tem quem a
+  libere, e a OS pode ficar em `AWAITING_PARTS`. As condições acima protegem a
+  intercalação com a pendência já registrada, não essa ordem. Hoje a causalidade
+  (a reserva nasce do recebimento de peças pedidas após a indisponibilidade) torna
+  o caso improvável, mas não impossível entre tópicos. Decisão pendente.
 - **Listeners na camada de aplicação.** Os handlers de evento ficam em
   `application/event-handlers/`, com `@OnEvent`, como os demais handlers do módulo.
   O `AGENTS.md` pede que listeners fiquem em `infrastructure`; a mudança fica para um

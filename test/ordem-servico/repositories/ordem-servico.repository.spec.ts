@@ -57,6 +57,7 @@ describe('OrdemServicoRepository', () => {
         findMany: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
         delete: jest.fn(),
         count: jest.fn(),
       },
@@ -339,6 +340,58 @@ describe('OrdemServicoRepository', () => {
       (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(null);
 
       await expect(repository.update(id, updateData)).rejects.toThrow(EntityNotFoundException);
+    });
+  });
+
+  describe('atualizarSeCondicao', () => {
+    it('grava com a condição no where e devolve true quando a linha casou', async () => {
+      const id = 'os-123';
+      (prismaService.ordemServico.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      const aplicou = await repository.atualizarSeCondicao(
+        id,
+        { status: 'IN_PROGRESS', reserva_pecas_pendente: true },
+        { status: 'AWAITING_PARTS' }
+      );
+
+      expect(prismaService.ordemServico.updateMany).toHaveBeenCalledWith({
+        where: { id, status: 'IN_PROGRESS', reserva_pecas_pendente: true },
+        data: { status: 'AWAITING_PARTS' },
+      });
+      expect(aplicou).toBe(true);
+    });
+
+    it('usa só a condição informada e devolve false quando nenhuma linha casou', async () => {
+      const id = 'os-123';
+      (prismaService.ordemServico.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
+
+      const aplicou = await repository.atualizarSeCondicao(
+        id,
+        { status: 'AWAITING_PARTS' },
+        { status: 'IN_PROGRESS' }
+      );
+
+      expect(prismaService.ordemServico.updateMany).toHaveBeenCalledWith({
+        where: { id, status: 'AWAITING_PARTS' },
+        data: { status: 'IN_PROGRESS' },
+      });
+      expect(aplicou).toBe(false);
+    });
+
+    it('aceita condição só pela reserva de peças pendente', async () => {
+      const id = 'os-123';
+      (prismaService.ordemServico.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await repository.atualizarSeCondicao(
+        id,
+        { reserva_pecas_pendente: true },
+        { reserva_pecas_pendente: false }
+      );
+
+      expect(prismaService.ordemServico.updateMany).toHaveBeenCalledWith({
+        where: { id, reserva_pecas_pendente: true },
+        data: { reserva_pecas_pendente: false },
+      });
     });
   });
 

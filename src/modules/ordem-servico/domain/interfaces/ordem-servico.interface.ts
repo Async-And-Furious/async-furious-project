@@ -9,6 +9,12 @@ export type OrdemServicoUpdateData = {
   reserva_pecas_pendente?: boolean;
 };
 
+// Condição checada no próprio UPDATE (where), não numa leitura anterior.
+export type OrdemServicoCondicao = Pick<
+  OrdemServicoUpdateData,
+  'status' | 'reserva_pecas_pendente'
+>;
+
 export interface IOrdemServicoRepository {
   create(data: {
     veiculoId: string;
@@ -32,6 +38,12 @@ export interface IOrdemServicoRepository {
   }>;
   findOne(id: string): Promise<OrdemDeServico>;
   update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico>;
+  /** Grava só se a OS ainda satisfaz a condição; devolve false se nenhuma linha casou. */
+  atualizarSeCondicao(
+    id: string,
+    condicao: OrdemServicoCondicao,
+    data: OrdemServicoUpdateData
+  ): Promise<boolean>;
   remove(id: string): Promise<OrdemDeServico>;
   calcularTempoMedioExecucao(): Promise<{ totalMinutos: number; total: number }>;
 }

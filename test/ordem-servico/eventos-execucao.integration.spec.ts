@@ -60,18 +60,42 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
       updated_at: new Date(),
     });
 
+  const gravar = (data: OrdemServicoUpdateData): void => {
+    updates.push(data);
+    if (data.status) osStore.status = data.status;
+    if (data.iniciada_em !== undefined) osStore.iniciada_em = data.iniciada_em;
+    if (data.finalizada_em !== undefined) osStore.finalizada_em = data.finalizada_em;
+    if (data.reserva_pecas_pendente !== undefined) {
+      osStore.reservaPecasPendente = data.reserva_pecas_pendente;
+    }
+  };
+
   const osRepo: IOrdemServicoRepository = {
     findOne: jest.fn(() => Promise.resolve(Object.assign(new OrdemDeServico(), osStore))),
     update: jest.fn((_id: string, data: OrdemServicoUpdateData) => {
-      updates.push(data);
-      if (data.status) osStore.status = data.status;
-      if (data.iniciada_em !== undefined) osStore.iniciada_em = data.iniciada_em;
-      if (data.finalizada_em !== undefined) osStore.finalizada_em = data.finalizada_em;
-      if (data.reserva_pecas_pendente !== undefined) {
-        osStore.reservaPecasPendente = data.reserva_pecas_pendente;
-      }
+      gravar(data);
       return Promise.resolve(Object.assign(new OrdemDeServico(), osStore));
     }),
+    // Condição avaliada no momento da escrita, como o UPDATE ... WHERE do banco.
+    atualizarSeCondicao: jest.fn(
+      (
+        _id: string,
+        condicao: { status?: OSStatus; reserva_pecas_pendente?: boolean },
+        data: OrdemServicoUpdateData
+      ) => {
+        if (condicao.status !== undefined && osStore.status !== condicao.status) {
+          return Promise.resolve(false);
+        }
+        if (
+          condicao.reserva_pecas_pendente !== undefined &&
+          osStore.reservaPecasPendente !== condicao.reserva_pecas_pendente
+        ) {
+          return Promise.resolve(false);
+        }
+        gravar(data);
+        return Promise.resolve(true);
+      }
+    ),
   } as unknown as IOrdemServicoRepository;
 
   const gateway: INotificacaoClienteGateway = {

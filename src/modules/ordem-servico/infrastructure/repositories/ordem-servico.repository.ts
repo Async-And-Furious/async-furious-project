@@ -8,6 +8,7 @@ import {
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import {
   IOrdemServicoRepository,
+  OrdemServicoCondicao,
   OrdemServicoUpdateData,
 } from '../../domain/interfaces/ordem-servico.interface';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
@@ -142,18 +143,40 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     await this.findOne(id);
     const record = await this.prisma.ordemServico.update({
       where: { id },
-      data: {
-        ...(data.status && { status: data.status }),
-        ...(data.descricao !== undefined && { descricao: data.descricao }),
-        ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
-        ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
-        ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
-        ...(data.reserva_pecas_pendente !== undefined && {
-          reserva_pecas_pendente: data.reserva_pecas_pendente,
-        }),
-      },
+      data: this.paraDadosPrisma(data),
     });
     return this.mapToEntity(record);
+  }
+
+  async atualizarSeCondicao(
+    id: string,
+    condicao: OrdemServicoCondicao,
+    data: OrdemServicoUpdateData
+  ): Promise<boolean> {
+    const { count } = await this.prisma.ordemServico.updateMany({
+      where: {
+        id,
+        ...(condicao.status !== undefined && { status: condicao.status }),
+        ...(condicao.reserva_pecas_pendente !== undefined && {
+          reserva_pecas_pendente: condicao.reserva_pecas_pendente,
+        }),
+      },
+      data: this.paraDadosPrisma(data),
+    });
+    return count > 0;
+  }
+
+  private paraDadosPrisma(data: OrdemServicoUpdateData) {
+    return {
+      ...(data.status && { status: data.status }),
+      ...(data.descricao !== undefined && { descricao: data.descricao }),
+      ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
+      ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
+      ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
+      ...(data.reserva_pecas_pendente !== undefined && {
+        reserva_pecas_pendente: data.reserva_pecas_pendente,
+      }),
+    };
   }
 
   async remove(id: string): Promise<OrdemDeServico> {

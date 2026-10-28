@@ -16,6 +16,11 @@ import { StatusAtualizadoAguardandoPecas } from '../../domain/events/status-atua
  *
  * As duas gravações são retomáveis: se a segunda falhar, a OS fica em IN_PROGRESS com a
  * pendência ligada, e a reentrega faz só o segundo passo.
+ *
+ * A ida a AWAITING_PARTS é condicionada, no próprio UPDATE, a status IN_PROGRESS e a
+ * reserva_pecas_pendente = true. Se PecasReservadas baixar a pendência entre as duas
+ * gravações, o UPDATE não casa e a OS segue em IN_PROGRESS (a leitura de `findOne` não
+ * decide nada sozinha).
  */
 // Estados anteriores à aprovação: o evento chegou antes da hora. Falha retentável (ADR-0018).
 const ANTES_DA_APROVACAO: OSStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS'];
@@ -44,15 +49,13 @@ export class AtualizarStatusExecucaoIniciadaHandler {
       this.transicao.validarTransicao('AWAITING_APPROVAL', 'IN_PROGRESS');
       await this.ordemServicoRepository.update(evento.ordemServicoId, { status: 'IN_PROGRESS' });
       await this.emissor.emitir(new OrdemServicoEmExecucao(evento.ordemServicoId));
-      if (os.reservaPecasPendente) {
-        await this.aguardarPecas(evento.ordemServicoId);
-      }
+      await this.aguardarPecasSePendente(evento.ordemServicoId);
       return;
     }
 
     // Retomada: a primeira gravação foi feita numa entrega anterior que falhou antes da segunda.
-    if (os.status === 'IN_PROGRESS' && os.reservaPecasPendente) {
-      await this.aguardarPecas(evento.ordemServicoId);
+    if (os.status === 'IN_PROGRESS') {
+      await this.aguardarPecasSePendente(evento.ordemServicoId);
       return;
     }
 
@@ -61,9 +64,19 @@ export class AtualizarStatusExecucaoIniciadaHandler {
     );
   }
 
-  private async aguardarPecas(ordemServicoId: string): Promise<void> {
+  private async aguardarPecasSePendente(ordemServicoId: string): Promise<void> {
     this.transicao.validarTransicao('IN_PROGRESS', 'AWAITING_PARTS');
-    await this.ordemServicoRepository.update(ordemServicoId, { status: 'AWAITING_PARTS' });
+    const aplicou = await this.ordemServicoRepository.atualizarSeCondicao(
+      ordemServicoId,
+      { status: 'IN_PROGRESS', reserva_pecas_pendente: true },
+      { status: 'AWAITING_PARTS' }
+    );
+    if (!aplicou) {
+      this.logger.log(
+        `[P-08] OS ${ordemServicoId} sem reserva de peças pendente no momento da gravação: segue em IN_PROGRESS`
+      );
+      return;
+    }
     await this.emissor.emitir(new StatusAtualizadoAguardandoPecas(ordemServicoId));
   }
 }

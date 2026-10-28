@@ -83,6 +83,7 @@ describe('OS + Orçamento Use Cases', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      atualizarSeCondicao: jest.fn(),
       findAll: jest.fn(),
       findAllAtivas: jest.fn(),
       remove: jest.fn(),
