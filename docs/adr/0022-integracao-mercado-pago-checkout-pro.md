@@ -74,12 +74,17 @@ Restrições que pesaram:
    inserido antes de chamar o Mercado Pago.
    - Uma **segunda aprovação** devolve o mesmo link, sem chamar o Mercado Pago
      e sem republicar o evento.
-   - Em **aprovações concorrentes**, as duas podem criar preference: a
-     vencedora grava; a perdedora faz rollback pela constraint única e devolve
-     o link da vencedora. A preference da perdedora fica **órfã** no Mercado
-     Pago. É inofensiva (ninguém recebe o link, e ela expira), mas é uma
-     limitação conhecida.
-   - Não existe `409` de espera por aprovação concorrente no Billing.
+   - Em **aprovações concorrentes**, as duas podem criar preference. A corrida
+     se resolve no `updateMany` condicionado a `PENDING`: a vencedora grava; a
+     perdedora espera o commit dela, vê `APPROVED` e afeta 0 linhas. Se as
+     transações se cruzarem, a constraint única de `Pagamento.ordemServicoId`
+     barra a inserção e serve de rede de segurança. Nos dois casos a perdedora
+     devolve o link da vencedora (`linkExistente`). A preference da perdedora
+     fica **órfã** no Mercado Pago. É inofensiva (ninguém recebe o link, e ela
+     expira), mas é uma limitação conhecida.
+   - Não existe `409` de espera por aprovação concorrente no Billing. Ainda
+     existe um `409` (`ConflitoException`) em `linkExistente`, quando o
+     orçamento já está aprovado e não há cobrança gravada (dado inconsistente).
 5. **Timeout curto e 1 retry** nas chamadas ao Mercado Pago (5 s;
    `maxRetries: 1` no SDK, que já faz backoff exponencial em 429, 5xx e falha
    de rede).
@@ -87,8 +92,9 @@ Restrições que pesaram:
    assinatura:
    - validação com o `WebhookSignatureValidator` do SDK, sem criptografia
      própria. O manifesto é `id:{data.id};request-id:{x-request-id};ts:{ts};`,
-     com o **`data.id` da query string** (em minúsculas), como manda a
-     documentação oficial. `data.id` repetido na query → `401`;
+     com o **`data.id` da query string**, como manda a documentação oficial (que
+     pede minúsculas para ids alfanuméricos; os ids de pagamento são numéricos,
+     e o código não converte). `data.id` repetido na query → `401`;
    - chave `MP_WEBHOOK_SECRET` (no `billing-secret`, ADR-0015), gerada no
      painel (Webhooks → Configurar notificação), **separada** do
      `WEBHOOK_SECRET` legado, que continua só para
@@ -272,8 +278,10 @@ painel do vendedor de teste.
 - **Segredos e rota em HML.** `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` e
   `MP_NOTIFICATION_URL` estão nos manifestos do Billing (`billing-secret`,
   `billing-config`), mas ainda faltam no Terraform e nos segredos do GitHub
-  Environment. A rota do webhook ainda não está liberada do authorizer no API
-  Gateway (Feature #317); sem ela o Mercado Pago não alcança o webhook em HML.
+  Environment. A rota do webhook já está declarada sem authorizer no Terraform
+  do `repo-auth-serverless` (`develop`, PR #70, `authorization_type = NONE`),
+  mas ainda não foi aplicada em HML (Feature #317); sem a aplicação, o Mercado
+  Pago não alcança o webhook em HML.
   Também não houve teste ponta a ponta em HML.
 - **Valor divergente retido.** Cobrança pendente com valor diferente do
   orçamento não confirma nem estorna; o dinheiro fica retido até alguém agir.
@@ -290,8 +298,16 @@ painel do vendedor de teste.
 - Publicação dos eventos de pagamento no Kafka e **outbox** (Feature #326), e
   **quem consome** os eventos e quando a OS sai de `AWAITING_APPROVAL`.
 - Limpeza de `webhook_recebido`.
-- Terraform e secrets de HML, rota do webhook sem authorizer no Gateway
-  (#317) e teste ponta a ponta em HML.
+- Terraform e secrets de HML; aplicar em HML a rota do webhook sem authorizer,
+  já declarada no `repo-auth-serverless` (Feature #317), e teste ponta a ponta
+  em HML.
+- **Decisão do grupo: preference órfã em aprovações concorrentes.** O critério
+  da #325 ("o Mercado Pago não recebe duas preferences", inclusive em aprovações
+  concorrentes) não é atendido pela decisão do item 4. Aceitar o desvio ou
+  voltar à reserva do monólito (ver [Alternativas](#alternativas-consideradas))
+  depende de aceite do grupo; o critério da issue deve ser ajustado ou o fluxo
+  revisto antes disso.
+- **Aceite desta ADR** (status Proposta) pelo grupo.
 - Remoção do código de pagamento do monólito (Feature #330).
 
 ## Histórico
