@@ -15,8 +15,20 @@ permissions:
   id-token: write
 
 jobs:
+  # Sem esta guarda, o deploy-eks com environment=prod termina com todos os jobs pulados e o seed aparece verde sem rodar.
+  prod-guard:
+    name: Guard prod seed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse prod seed while PROD_DEPLOY_ENABLED is not true
+        if: ${{ inputs.environment == 'prod' && vars.PROD_DEPLOY_ENABLED != 'true' }}
+        run: |
+          echo "Prod seed requires the PROD_DEPLOY_ENABLED=true variable. The prod path is disabled in Phase 4 (HML only)." >&2
+          exit 1
+
   first-run:
     name: Seed ${{ inputs.environment }} (first run)
+    needs: prod-guard
     uses: ./.github/workflows/deploy-eks.yml
     with:
       environment: ${{ inputs.environment }}

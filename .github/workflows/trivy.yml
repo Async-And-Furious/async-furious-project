@@ -18,7 +18,8 @@ permissions:
 
 jobs:
   docker-image-scan:
-    name: Docker Image Vulnerability Scan
+    # Nome do check de proteção de branch (ver progresso-I-333.md).
+    name: trivy
     if: ${{ github.event_name != 'pull_request' || ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação')) }}
     runs-on: ubuntu-latest
 

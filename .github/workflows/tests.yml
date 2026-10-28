@@ -8,8 +8,13 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
+permissions:
+  contents: read
+
 jobs:
   test:
+    # Nome mantido de propósito: a proteção atual da main exige o check "Run All Tests".
+    # Trocar para "tests" somente junto com a troca dos required checks da main (ver progresso-I-333.md).
     name: Run All Tests
     if: ${{ github.event_name != 'pull_request' || ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação')) }}
     runs-on: ubuntu-latest
@@ -25,6 +30,16 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      # Stand-in do DocumentDB para o read model (API compatível com MongoDB 5.0). O DocumentDB real só é validado em HML.
+      mongo:
+        image: mongo:5.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongo --quiet --eval 'db.runCommand({ ping: 1 })'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -48,10 +63,26 @@ jobs:
       - name: Gerar cliente Prisma
         run: npx prisma generate
 
-      - name: Run unit tests
-        run: pnpm test
+      - name: Lint (sem --fix)
+        run: pnpm exec eslint "{src,test}/**/*.ts"
+
+      - name: Type check
+        run: pnpm run type:check
+
+      - name: Testes unitários com gate de cobertura (80/80/80/80)
+        run: pnpm run test:cov
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
+          MONGODB_TEST_URI: mongodb://127.0.0.1:27017/os_read_model_test
+
+      - name: Publicar relatório de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Push database schema
         run: npx prisma db push --skip-generate
@@ -65,8 +96,32 @@ jobs:
           JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
 
-      - name: Run lint
-        run: pnpm run lint
-
       - name: Run build
         run: pnpm run build
+
+  sonar:
+    name: sonar
+    needs: test
+    # Fork não recebe o SONAR_TOKEN, então o job é pulado. Atenção: check pulado conta como satisfeito na proteção de branch; PR de fork para main não passa pelo Sonar.
+    if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Baixar cobertura gerada pelo job de testes
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+
+      - name: Análise SonarCloud e quality gate
+        uses: SonarSource/sonarqube-scan-action@v8.4.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          # Quality gate bloqueante só no push para main. Em develop e em PR a análise é informativa.
+          args: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '-Dsonar.qualitygate.wait=true' || '' }}
