@@ -11,7 +11,9 @@ function contextWithHeader(value?: string): ExecutionContext {
 describe('WebhookAuthGuard', () => {
   it('accepts the configured secret from x-webhook-secret', () => {
     const config = { get: () => 'test-webhook-secret' } as unknown as ConfigService;
-    expect(new WebhookAuthGuard(config).canActivate(contextWithHeader('test-webhook-secret'))).toBe(true);
+    expect(new WebhookAuthGuard(config).canActivate(contextWithHeader('test-webhook-secret'))).toBe(
+      true
+    );
   });
 
   it('rejects a missing or different secret', () => {

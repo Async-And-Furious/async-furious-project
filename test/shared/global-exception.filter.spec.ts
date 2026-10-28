@@ -4,6 +4,7 @@ import { getLoggerToken } from 'nestjs-pino';
 import { GlobalExceptionFilter } from '../../src/shared/infrastructure/filters/global-exception.filter';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
+import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
@@ -82,6 +83,31 @@ describe('GlobalExceptionFilter', () => {
         message: 'Já existe',
         error: 'Conflict',
       });
+    });
+
+    it('deve tratar EntityNotFoundException como 404', () => {
+      filter.catch(new EntityNotFoundException('OrdemServico', 'os-9'), mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: "OrdemServico with id 'os-9' not found",
+          error: 'Not Found',
+        })
+      );
+    });
+
+    it('deve usar a mensagem da exceção quando a resposta HTTP não traz message', () => {
+      const httpException = new HttpException(
+        { error: 'Payload inválido' },
+        HttpStatus.BAD_REQUEST
+      );
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+      expect(mockResponse.json.mock.calls[0][0].message).toBe(httpException.message);
     });
 
     it('deve tratar erro genérico', () => {
