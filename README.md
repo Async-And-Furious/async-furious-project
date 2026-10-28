@@ -259,13 +259,10 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. |
-| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orçamento. |
+| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Lançar serviços e insumos (OS em `UNDER_DIAGNOSIS`): responde `200` com os totais calculados e publica `OrcamentoCalculado`. O início do diagnóstico e a conclusão da execução agora são do serviço de Execução (`PATCH /execucoes/:id/iniciar-diagnostico` e `/concluir`) e chegam aqui por evento. |
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento; a resposta traz `linkPagamento` (Checkout Pro do Mercado Pago). `502` se o Mercado Pago falhar (orçamento segue pendente). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
@@ -300,15 +297,19 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 
 ```text
 RECEIVED
-  -> UNDER_DIAGNOSIS
+  -> UNDER_DIAGNOSIS  (evento DiagnosticoIniciado, do servico de Execucao)
       -> AWAITING_APPROVAL
           -> CLOSED_WITHOUT_EXECUTION  (orcamento recusado)
-          -> IN_PROGRESS
-              -> AWAITING_PARTS  (pecas indisponiveis)
+          -> IN_PROGRESS  (evento ExecucaoIniciada, do servico de Execucao)
+              -> AWAITING_PARTS  (reserva de pecas pendente, logo apos IN_PROGRESS)
                   -> IN_PROGRESS  (pecas reservadas)
-              -> FINISHED
+              -> FINISHED  (evento ExecucaoConcluida, do servico de Execucao)
                   -> DELIVERED
 ```
+
+As acoes do mecanico (`assumir`/`analisar` e `finalizar-execucao`) deixaram de ser
+rotas deste servico: viram rotas do servico de Execucao e chegam aqui por evento.
+Detalhes em [`docs/architecture/os-service-integracao-execucao.md`](docs/architecture/os-service-integracao-execucao.md).
 
 ---
 

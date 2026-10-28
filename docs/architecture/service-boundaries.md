@@ -107,7 +107,7 @@ serviços/peças e calcular o orçamento — dependem de `Servico` e `Peca`) e
 | `Cliente` | `cadastro` | **OS Service** | — |
 | `Veiculo` | `cadastro` | **OS Service** | — |
 | `Servico` | `cadastro` | **OS Service** | catálogo de serviços oferecidos (não confundir com "serviço" no sentido de microsserviço) |
-| `OrdemServico` | `ordem-servico` | **OS Service** | fonte da verdade (lado de escrita); ganha réplica de leitura em DocumentDB (F4, fora do escopo aqui) e a coluna `pago_em` (`nullable`, gravada ao consumir `PagamentoConfirmado`, sem mudar o status; usada só pelo detector de OS parada) |
+| `OrdemServico` | `ordem-servico` | **OS Service** | fonte da verdade (lado de escrita); ganha réplica de leitura em DocumentDB (F4, fora do escopo aqui) e as colunas `pago_em` (`nullable`, gravada ao consumir `PagamentoConfirmado`, sem mudar o status; usada só pelo detector de OS parada) e `reserva_pecas_pendente` (`boolean`, padrão `false`, gravada ao consumir `PecasIndisponiveis`: guarda que a reserva de peças ficou pendente até `ExecucaoIniciada`; ver [`os-service-integracao-execucao.md`](./os-service-integracao-execucao.md)) |
 | `HistoricoStatusOS` | `ordem-servico` | **OS Service** | FK interna a `OrdemServico`, não cruza fronteira |
 | `OsPeca` | `ordem-servico` × `pecas-insumos` | **OS Service** | módulo-cruzado, mas dentro do mesmo serviço — sem mudança |
 | `OsServico` | `ordem-servico` × `cadastro` | **OS Service** | idem |

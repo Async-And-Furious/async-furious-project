@@ -113,10 +113,10 @@ O modelo de domínio formal está inteiramente em `docs/ddd.md`, seção 4, comp
 
 ### Eventos de Domínio e Comandos (Event Storming, `ddd.md` §5)
 
-Os eventos estão organizados por Bounded Context de código (`src/modules/`), totalizando **29 eventos de domínio** documentados:
+Os eventos estão organizados por Bounded Context de código (`src/modules/`), totalizando **28 eventos de domínio** documentados (29 antes de `VeiculoAnalisado` sair com a Feature #334):
 
 - **`ordem-servico` (9 eventos)**: `OrdemDeServicoRecebida`, `OrdemDeServicoEmDiagnostico`, `OrdemDeServicoAguardandoAprovacao`, `OrdemDeServicoEmExecucao`, `OrdemDeServicoFinalizada`, `OrdemDeServicoEntregue`, `OrcamentoGerado`, `OrcamentoAprovado`, `OrcamentoRejeitado`. Comandos correspondentes cobrem toda a máquina de estados da OS mais ações de consulta (`ConsultarProgressoOS`).
-- **`cadastro` (9 eventos)**: cobre CRUD de Cliente e Veículo (`ClienteCadastrado/Atualizado/Removido`, `VeiculoCadastrado/Atualizado/Removido`) mais três eventos de **Domain Storytelling** que não são CRUD puro — `ClienteIdentificado`, `DadosClienteInformados`, `VeiculoAnalisado` — refletindo o momento de atendimento presencial (recepção) mais do que uma operação de API.
+- **`cadastro` (8 eventos)**: cobre CRUD de Cliente e Veículo (`ClienteCadastrado/Atualizado/Removido`, `VeiculoCadastrado/Atualizado/Removido`) mais dois eventos de **Domain Storytelling** que não são CRUD puro — `ClienteIdentificado`, `DadosClienteInformados` (o terceiro, `VeiculoAnalisado`, foi removido com a rota `analisar`) — refletindo o momento de atendimento presencial (recepção) mais do que uma operação de API.
 - **`pecas-insumos` (8 eventos)**: CRUD de peça mais eventos de estoque (`EstoqueAtualizado`, `PecaComEstoqueBaixo`, `ReposicaoEstoqueSolicitada`) e de uso em OS (`PecasListadasParaOS`, `PecaAdicionadaAOS`).
 - **`financeiro` (3 eventos)**: `PagamentoRegistrado`, `PagamentoProcessado`, `NotaFiscalEmitida`.
 
@@ -144,15 +144,15 @@ Documentado de forma consistente em três artefatos independentes — o Domain S
 1. O **Cliente** informa seus dados e a necessidade de serviço ao **Recepcionista** (presencialmente, fora do sistema).
 2. O Recepcionista cadastra Cliente e Veículo no sistema.
 3. O Recepcionista cria a Ordem de Serviço, que nasce no estado `RECEIVED`.
-4. O Recepcionista atribui/o Mecânico assume a OS (`PATCH /assumir`) → estado muda para `UNDER_DIAGNOSIS`.
-5. O Mecânico registra o diagnóstico do veículo (`PATCH /analisar`) — estado permanece `UNDER_DIAGNOSIS`.
-6. O Mecânico lista os serviços e peças necessários e gera o orçamento (`PATCH /servicos-insumos`, exige `valor_total_servicos > 0`) → estado muda para `AWAITING_APPROVAL`.
+4. O Mecânico assume a OS no serviço de Execução e Produção (`PATCH /api/v1/execucoes/{id}/iniciar-diagnostico`; a antiga rota `PATCH /ordens-servico/:id/assumir` foi removida do OS Service na Feature #334) → o evento `DiagnosticoIniciado` leva a OS a `UNDER_DIAGNOSIS`.
+5. O registro da análise do veículo (antiga rota `PATCH /analisar`, removida do OS Service sem contrapartida) corresponde, na Fase 4, ao mesmo `iniciar-diagnostico` do passo 4 — estado permanece `UNDER_DIAGNOSIS`.
+6. O Mecânico lista os serviços e peças necessários e gera o orçamento (`PATCH /servicos-insumos`, exige a OS em `UNDER_DIAGNOSIS` e valores não negativos; responde com os totais calculados e publica `OrcamentoCalculado`) → estado muda para `AWAITING_APPROVAL`.
 7. O sistema envia o orçamento para aprovação do cliente (fora do sistema — e-mail/telefone, não modelado como integração no código).
 8. O **Cliente** aprova (`PATCH /orcamento/aprovar`, rota pública, sem token) ou recusa (`PATCH /orcamento/recusar`) o orçamento.
-   - Se aprovado → estado muda para `IN_PROGRESS`, e o timestamp `iniciada_em` é preenchido automaticamente.
+   - Se aprovado → a OS permanece em `AWAITING_APPROVAL` (peças reservadas); só `ExecucaoIniciada` (`PATCH /api/v1/execucoes/{id}/iniciar-reparo` no Execução) leva a OS a `IN_PROGRESS` e preenche `iniciada_em`.
    - Se recusado → segundo o README, a OS pode ir para `CLOSED_WITHOUT_EXECUTION` (ver observação de conflito na seção 8, pois esse estado não está listado no enum documentado em `AGENTS.md`).
 9. O Mecânico executa os serviços; se faltarem peças, a OS pode transitar para `AWAITING_PARTS` e retornar a `IN_PROGRESS` quando as peças forem reservadas (fluxo descrito apenas no diagrama textual de ciclo de vida do README, não detalhado em Domain Storytelling).
-10. O Mecânico finaliza a execução (`PATCH /finalizar-execucao`) → estado `FINISHED`, `finalizada_em` preenchido automaticamente.
+10. O Mecânico conclui a execução no Execução e Produção (`PATCH /api/v1/execucoes/{id}/concluir`; a antiga rota `PATCH /ordens-servico/:id/finalizar-execucao` foi removida do OS Service) → o evento `ExecucaoConcluida` leva a OS a `FINISHED`, `finalizada_em` preenchido automaticamente.
 11. O Cliente pode aprovar o serviço prestado (`PATCH /aprovar-servico`, também pública).
 12. O Recepcionista registra a entrega (`PATCH /registrar-entrega`) → estado `DELIVERED`, `entregue_em` preenchido automaticamente.
 13. O ADMIN pode consultar o tempo médio de execução de todas as OS finalizadas/entregues (`GET /ordens-servico/tempo-medio`).

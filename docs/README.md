@@ -17,6 +17,7 @@ de cada documento.
 | [architecture/deployment-diagram.md](./architecture/deployment-diagram.md) | Diagrama de Implantação: ambiente `kind` local e ambiente AWS (hml e prod) |
 | [architecture/authentication-flow.md](./architecture/authentication-flow.md) | Sequências de autenticação de staff e cliente, local e AWS, com fluxos de erro |
 | [architecture/service-order-flow.md](./architecture/service-order-flow.md) | Sequência de abertura e acompanhamento da Ordem de Serviço |
+| [architecture/os-service-integracao-execucao.md](./architecture/os-service-integracao-execucao.md) | Integração do OS Service com o Execução e Produção: rotas removidas, eventos consumidos e publicados, reserva de peças pendente, janela de corte |
 
 ## Infraestrutura
 
