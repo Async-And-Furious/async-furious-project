@@ -62,8 +62,8 @@ consolidada).
 ## 3. Event Storming — revisão
 
 Artefatos existentes: [`event-storming.suggestion.vic.mmd`](../event-storming/suggestions/vic.event_storming.mmd)
-(cobre `pecas-insumos`) e a lista textual completa de 29 eventos/comandos por
-Bounded Context em [`ddd.md`](../ddd.md) §5.
+(cobre `pecas-insumos`) e a lista textual completa de eventos/comandos por
+Bounded Context em [`ddd.md`](../ddd.md) §5 (catálogo vigente).
 
 **Conclusão**: nenhum comando, evento, agregado, política, sistema externo,
 ator ou read model muda por causa da Fase 3. A separação em quatro

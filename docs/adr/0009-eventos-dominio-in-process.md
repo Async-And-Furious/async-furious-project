@@ -19,8 +19,8 @@ Fase 4 — ver nota abaixo)
 
 ## Contexto
 
-O modelo de domínio (`docs/ddd.md` §5) define 29 eventos de domínio
-distribuídos pelos 4 Bounded Contexts de código (`ordem-servico`,
+O modelo de domínio (`docs/ddd.md` §5, catálogo de eventos) define os
+eventos de domínio distribuídos pelos 4 Bounded Contexts de código (`ordem-servico`,
 `cadastro`, `pecas-insumos`, `financeiro`). Precisávamos de um
 mecanismo para emitir e reagir a esses eventos sem acoplar módulos
 diretamente entre si, dentro do escopo acadêmico do projeto (sem
@@ -81,5 +81,4 @@ distintos nas Fases 1/2).
 - `src/shared/infrastructure/emissor-eventos/emissor-eventos.service.ts`
 - [ADR-0006 — Clean Architecture + DDD](./0006-clean-architecture-ddd.md)
 - [`docs/ddd.md`](../ddd.md) §5
-- `docs/contexto-tecnico-consolidado.md` §8
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #6)

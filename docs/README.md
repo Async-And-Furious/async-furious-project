@@ -58,7 +58,6 @@ de cada documento.
 
 | Documento | Conteúdo |
 |---|---|
-| [contexto-tecnico-consolidado.md](./contexto-tecnico-consolidado.md) | Síntese técnica da documentação das Fases 1 e 2 |
 | [reports/relatorio-e2e-orcamento-curl.md](./reports/relatorio-e2e-orcamento-curl.md) | Evidência E2E do fluxo de orçamento via cURL |
 | [http/README.md](./http/README.md), [http/routes.yaml](./http/routes.yaml) | Coleções Postman e Insomnia geradas a partir do manifesto de rotas |
 | [specs/authenticated-route-matrix.md](./specs/authenticated-route-matrix.md) | Contrato da matriz de rotas autenticadas |
@@ -88,6 +87,3 @@ raiz e nos arquivos `.mmd` de `docs/`:
 - **`k8s/overlays/aws/`**: presente no repositório, mas não referenciado por
   nenhum workflow ou script. Ver
   [infrastructure/kubernetes.md](./infrastructure/kubernetes.md).
-
-Ver [contexto-tecnico-consolidado.md](./contexto-tecnico-consolidado.md) para
-o inventário de pendências herdadas das Fases 1 e 2.
