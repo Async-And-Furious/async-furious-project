@@ -39,7 +39,7 @@ seguido pelas próximas ADRs.
 | [ADR-0019](./0019-documentdb-read-model-os-cliente.md) | DocumentDB como banco de leitura de Ordem de Serviço e Cliente | Aceita |
 | [ADR-0020](./0020-bancos-compartilhados-isolamento-credencial.md) | Bancos compartilhados com isolamento por credencial | Aceita |
 | [ADR-0021](./0021-borda-sem-bff.md) | Borda sem BFF: Authorizer na borda, validação local nos serviços e roteamento direto por path | Aceita |
-| [ADR-0022](./0022-integracao-mercado-pago-checkout-pro.md) | Integração com o Mercado Pago: Checkout Pro, webhook assinado e reconsulta | Proposta (implementada no monólito; estorno em aberto) |
+| [ADR-0022](./0022-integracao-mercado-pago-checkout-pro.md) | Integração com o Mercado Pago: Checkout Pro, webhook assinado e reconsulta | Proposta (texto atualizado em 27/10/2026 para o Billing; aguarda aceite do grupo) |
 
 ADRs 0006-0015 registram decisões das Fases 1 e 2 (retroativas — a solução
 já estava construída), a partir do rascunho de descoberta em
