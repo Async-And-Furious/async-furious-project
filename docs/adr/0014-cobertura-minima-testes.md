@@ -55,12 +55,19 @@ métrica cair abaixo de 80%.
   orçamento) de código de infraestrutura/boilerplate — 80% em ambos tem
   peso de risco muito diferente.
 
+## Evidência
+
+- O job `Run All Tests` (`.github/workflows/tests.yml`) roda `pnpm run test:cov`
+  e publica o artifact `coverage` em cada execução (retenção de 7 dias),
+  com `lcov.info`, `clover.xml` e o relatório HTML `lcov-report/`.
+- O job `sonar` analisa o mesmo relatório no SonarCloud.
+- `README.md` e `README-en.md` apontam para essa evidência.
+
 ## Riscos
 
-- **Baixo, mas real**: `README.md` precisa ser corrigido para bater com
-  `jest.config.js` (80/80/80/80, não 85/85/80/80) — fora do escopo desta
-  tarefa de ADRs, mas registrado aqui como pendência a ser corrigida
-  separadamente para não perpetuar a divergência.
+- **Resolvido na etapa 1 da #333**: `README.md` e `README-en.md` passaram a
+  afirmar 80% nas quatro métricas, igual a `jest.config.js`. A divergência
+  de 85% em statements/lines deixou de existir na documentação.
 
 ## Referências
 

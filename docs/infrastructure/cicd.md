@@ -8,23 +8,33 @@
 
 | Workflow | Gatilho | O que faz |
 |---|---|---|
-| `tests.yml` | push em `main`/`develop`, pull request | Postgres 16 de serviço, `pnpm install`, client Prisma, testes unitários, push do schema, testes e2e, lint, build |
+| `tests.yml` | push em `main`/`develop`, pull request | Postgres 16 e `mongo` 5.0 de serviço, `pnpm install`, client Prisma, lint (sem `--fix`), type check, testes unitários com gate de cobertura, push do schema, testes e2e, build. Check: `Run All Tests`. Job `sonar` depois dos testes: análise SonarCloud com o relatório de cobertura, quality gate bloqueante só no push para `main` |
 | `terraform.yml` | pull request e push em `main`/`develop` com paths `infra/**`, `k8s/**`; `workflow_dispatch` | Em PR, apenas `validate` e `plan`. Em push ou manual, sobe um cluster `kind` efêmero no runner, aplica, inspeciona e descarta |
-| `deploy-eks.yml` | push em `main`/`develop` com paths de código, `workflow_dispatch`, `workflow_call` | Publica a imagem no ECR e implanta no EKS. Detalhado abaixo |
+| `deploy-eks.yml` | push em `develop` com paths de código, `workflow_dispatch`, `workflow_call` | Publica a imagem no ECR e implanta no OS Service no EKS de HML. Detalhado abaixo. O caminho de produção só existe com a variável `PROD_DEPLOY_ENABLED=true` |
 | `cleanup-eks.yml` | `workflow_dispatch`, `workflow_call` | Remove os recursos da aplicação do cluster |
 | `up.yml` | `workflow_dispatch` | Atalho: chama `deploy-eks.yml` com `environment: hml` |
 | `down.yml` | `workflow_dispatch` | Atalho: chama `cleanup-eks.yml` com `operation: destroy` |
-| `trivy.yml` | push em `main`/`develop`, pull request, semanal (segunda 04:00), manual | Constrói a imagem, publica relatório em tabela e SARIF, e roda um gate final com `exit-code: 1` para HIGH e CRITICAL |
+| `trivy.yml` | push em `main`/`develop`, pull request, semanal (segunda 04:00), manual | Constrói a imagem, publica relatório em tabela e SARIF, e roda um gate final com `exit-code: 1` para HIGH e CRITICAL. Check: `trivy` (o gate final é informativo) |
 | `zap.yml` | pull request para `main`/`develop`, semanal (segunda 03:00), manual | DAST: baseline em PR, full API scan agendado ou manual, contra a aplicação subida no runner com credenciais descartáveis |
-| `seed-eks.yml` | manual (`hml`/`prod`) | Seed abrangente, reaproveitando os jobs protegidos do `deploy-eks.yml`. Ver [comprehensive-seed.md](../runbooks/comprehensive-seed.md) |
+| `seed-eks.yml` | manual (`hml`/`prod`; `prod` recusa sem `PROD_DEPLOY_ENABLED=true`) | Seed abrangente, reaproveitando os jobs protegidos do `deploy-eks.yml`. Ver [comprehensive-seed.md](../runbooks/comprehensive-seed.md) |
 | `full-acceptance.yml` | manual (`hml`/`prod`) | Aceitação ponta a ponta pelo gateway: token de cliente, rastreamento de OS, login dos três papéis de staff e checagem de permissões |
 | `protected-route-matrix.yml` | manual (`hml`/`prod`) | Executa a matriz não destrutiva de rotas autenticadas definida em `docs/http/routes.yaml` |
 | `observability-alert-scenarios.yml` | manual, só HML | Provoca cenários (indisponibilidade, CPU, memória, crash loop) para validar os alertas da New Relic |
 | `protected-route-diagnostics.yml`, `auth-seed-fingerprint-diagnostics.yml`, `customer-lookup-diagnostics.yml` | manual (o primeiro também em pull request) | Diagnóstico somente leitura de rotas protegidas, fingerprint do seed e consulta de cliente pela Lambda |
 
-A cobertura mínima exigida é 80% em todas as métricas (`jest.config.js`). O
-`README.md` afirma 85% em statements e lines; a divergência está registrada em
-[ADR-0014](../adr/0014-cobertura-minima-testes.md).
+A cobertura mínima exigida é 80% em todas as métricas (`jest.config.js`), e o
+job `Run All Tests` falha se ela não for atingida. O relatório de cada execução
+fica no artifact `coverage` do run; ver [ADR-0014](../adr/0014-cobertura-minima-testes.md).
+
+Limites da proteção de branch que este workflow não resolve sozinho:
+
+- Em PR, os jobs `Run All Tests` e `trivy` são pulados quando o PR tem o label
+  `Documentação`. Check pulado conta como satisfeito na proteção, então um PR
+  para `main` com esse label passa sem testes. O push para `main` roda os testes
+  de novo, mas só depois do merge.
+- O gate de vulnerabilidades do `trivy.yml` tem `continue-on-error: true`: o check
+  `trivy` fica verde mesmo com HIGH/CRITICAL. Tornar o gate bloqueante é decisão
+  pendente (pode travar PRs por CVE de imagem base).
 
 ### `deploy-eks.yml`
 
@@ -32,9 +42,9 @@ Cinco jobs, encadeados por `needs`:
 
 | Job | Ambiente GitHub | Papel |
 |---|---|---|
-| `image` | `hml` ou `production` | Constrói e publica a imagem, produz o digest |
+| `image` | `hml` (e `production` só com `PROD_DEPLOY_ENABLED=true`) | Constrói e publica a imagem, produz o digest |
 | `deploy-hml` | `hml` | Aplica no cluster de homologação |
-| `deploy-prod` | `production` | Aplica no cluster de produção |
+| `deploy-prod` | `production` (só com `PROD_DEPLOY_ENABLED=true`) | Aplica no cluster de produção |
 | `smoke-hml` | `hml` | Verifica alvos saudáveis e rejeição sem token |
 | `smoke-prod` | `production` | Idem, em produção |
 
