@@ -26,6 +26,9 @@ import { ExecucaoIniciada } from '../../src/modules/ordem-servico/domain/events/
 import { ExecucaoConcluida } from '../../src/modules/ordem-servico/domain/events/execucao-concluida.event';
 import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/events/pecas-indisponiveis.event';
 import { PecasReservadas } from '../../src/modules/pecas-insumos/domain/events/pecas-reservadas.event';
+import { EtapaDaSagaFalhou } from '../../src/modules/ordem-servico/domain/events/etapa-da-saga-falhou.event';
+import { HistoricoStatus } from '../../src/modules/ordem-servico/domain/entities/historico-status.entity';
+import { StatusTransitionService } from '../../src/modules/ordem-servico/domain/services/status-transition.service';
 
 /**
  * Exercita a fiação real de @OnEvent: os eventos de integração do Execução e Produção
@@ -40,6 +43,7 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
   let updates: OrdemServicoUpdateData[];
   let notificacoes: string[];
   let historico: jest.Mocked<IStatusHistoryRepository>;
+  const transicao = new StatusTransitionService();
 
   const novaOs = (status: OSStatus): OrdemDeServico =>
     Object.assign(new OrdemDeServico(), {
@@ -83,7 +87,7 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
     osStore = novaOs('RECEIVED');
     historico = {
       create: jest.fn(),
-      findByOrdemServicoId: jest.fn(),
+      findByOrdemServicoId: jest.fn().mockResolvedValue([]),
     } as jest.Mocked<IStatusHistoryRepository>;
 
     moduleRef = await Test.createTestingModule({
@@ -92,7 +96,8 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
         EmissorEventos,
         {
           provide: AtualizarStatusEmDiagnosticoHandler,
-          useFactory: (e: EmissorEventos) => new AtualizarStatusEmDiagnosticoHandler(osRepo, e),
+          useFactory: (e: EmissorEventos) =>
+            new AtualizarStatusEmDiagnosticoHandler(osRepo, e, transicao),
           inject: [EmissorEventos],
         },
         {
@@ -101,17 +106,21 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
         },
         {
           provide: AtualizarStatusExecucaoIniciadaHandler,
-          useFactory: (e: EmissorEventos) => new AtualizarStatusExecucaoIniciadaHandler(osRepo, e),
+          useFactory: (e: EmissorEventos) =>
+            new AtualizarStatusExecucaoIniciadaHandler(osRepo, e, transicao),
           inject: [EmissorEventos],
         },
         {
           provide: AtualizarStatusEmExecucaoHandler,
-          useFactory: (e: EmissorEventos) => new AtualizarStatusEmExecucaoHandler(osRepo, e),
+          useFactory: (e: EmissorEventos) =>
+            new AtualizarStatusEmExecucaoHandler(osRepo, e, transicao),
           inject: [EmissorEventos],
         },
         {
           provide: AtualizarStatusAguardandoPecasHandler,
-          useFactory: () => new AtualizarStatusAguardandoPecasHandler(osRepo),
+          useFactory: (e: EmissorEventos) =>
+            new AtualizarStatusAguardandoPecasHandler(osRepo, e, transicao),
+          inject: [EmissorEventos],
         },
         {
           provide: IniciarMonitoramentoTempoHandler,
@@ -120,7 +129,7 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
         {
           provide: AtualizarStatusFinalizadaHandler,
           useFactory: (e: EmissorEventos) =>
-            new AtualizarStatusFinalizadaHandler(osRepo, historico, e),
+            new AtualizarStatusFinalizadaHandler(osRepo, historico, e, transicao),
           inject: [EmissorEventos],
         },
         {
@@ -212,6 +221,55 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
     expect(osStore.status).toBe('FINISHED');
     expect(osStore.finalizada_em).toBeInstanceOf(Date);
     expect(notificacoes).toEqual(['Seu veículo foi finalizado e está pronto para retirada.']);
+  });
+
+  // In-process, o EventEmitterModule (suppressErrors padrão) registra a FalhaRetentavelException
+  // em log e não propaga: o que se garante aqui é a ausência de gravação. A retentativa é do
+  // consumidor Kafka (ADR-0018), e a unidade de cada handler está coberta em event-handlers.spec.
+  it('ExecucaoIniciada antes da aprovação (OS em UNDER_DIAGNOSIS) não grava nada', async () => {
+    osStore = novaOs('UNDER_DIAGNOSIS');
+
+    await emissor.emitir(new ExecucaoIniciada('os-1'));
+
+    expect(updates).toEqual([]);
+    expect(osStore.status).toBe('UNDER_DIAGNOSIS');
+  });
+
+  it('ExecucaoConcluida antes do reparo (OS em AWAITING_APPROVAL) não grava nem sinaliza falha', async () => {
+    osStore = novaOs('AWAITING_APPROVAL');
+
+    await emissor.emitir(new ExecucaoConcluida('os-1'));
+
+    expect(updates).toEqual([]);
+    expect(historico.create).not.toHaveBeenCalled();
+  });
+
+  it('PecasIndisponiveis tardio (OS já em IN_PROGRESS) leva a AWAITING_PARTS', async () => {
+    osStore = novaOs('IN_PROGRESS');
+
+    await emissor.emitir(new PecasIndisponiveis('os-1', ['peca-1']));
+
+    expect(osStore.status).toBe('AWAITING_PARTS');
+  });
+
+  it('ExecucaoConcluida com a OS em AWAITING_PARTS, reentregue: sinaliza a falha de reparo uma só vez', async () => {
+    osStore = novaOs('AWAITING_PARTS');
+    const linhas: HistoricoStatus[] = [];
+    historico.create.mockImplementation((linha) => {
+      linhas.push(linha);
+      return Promise.resolve(linha);
+    });
+    historico.findByOrdemServicoId.mockImplementation(() => Promise.resolve(linhas));
+    const emitir = jest.spyOn(emissor, 'emitir');
+
+    await emissor.emitir(new ExecucaoConcluida('os-1'));
+    await emissor.emitir(new ExecucaoConcluida('os-1'));
+
+    expect(osStore.status).toBe('AWAITING_PARTS');
+    expect(linhas).toHaveLength(1);
+    expect(
+      emitir.mock.calls.filter(([evento]) => evento instanceof EtapaDaSagaFalhou)
+    ).toHaveLength(1);
   });
 
   it('fluxo completo do mecânico: diagnóstico → execução → conclusão', async () => {

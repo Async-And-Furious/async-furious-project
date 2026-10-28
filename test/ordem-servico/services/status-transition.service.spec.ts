@@ -17,7 +17,7 @@ describe('StatusTransitionService', () => {
   it('deve retornar evento ao transitar de RECEIVED para UNDER_DIAGNOSIS', () => {
     const event = service.validateAndGetEvent('os-123', 'RECEIVED', 'UNDER_DIAGNOSIS');
     expect(event).toBeInstanceOf(OrdemServicoEmDiagnostico);
-    expect((event as any).ordemServicoId).toBe('os-123');
+    expect(event).toEqual(expect.objectContaining({ ordemServicoId: 'os-123' }));
   });
 
   it('deve lançar erro se o status for igual', () => {
@@ -49,6 +49,20 @@ describe('StatusTransitionService', () => {
     ['AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION'],
   ])('%s → %s é válida, mas não tem evento de domínio associado', (de, para) => {
     expect(service.validateAndGetEvent('os-1', de, para)).toBeNull();
+  });
+
+  describe('validarTransicao', () => {
+    it('não lança para transição permitida, mesmo sem evento de domínio', () => {
+      expect(() => service.validarTransicao('IN_PROGRESS', 'AWAITING_PARTS')).not.toThrow();
+      expect(() => service.validarTransicao('AWAITING_PARTS', 'IN_PROGRESS')).not.toThrow();
+    });
+
+    it('lança DomainException para transição inválida ou de mesmo status', () => {
+      expect(() => service.validarTransicao('AWAITING_APPROVAL', 'AWAITING_PARTS')).toThrow(
+        DomainException
+      );
+      expect(() => service.validarTransicao('RECEIVED', 'RECEIVED')).toThrow(DomainException);
+    });
   });
 
   it.each<[OSStatus, OSStatus]>([

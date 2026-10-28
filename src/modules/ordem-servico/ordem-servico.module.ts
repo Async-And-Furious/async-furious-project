@@ -90,9 +90,12 @@ import {
     },
     {
       provide: AtualizarStatusEmDiagnosticoHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEmDiagnosticoHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusEmDiagnosticoHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
     {
       provide: NotificarClienteDiagnosticoHandler,
@@ -122,9 +125,12 @@ import {
     },
     {
       provide: AtualizarStatusAguardandoPecasHandler,
-      useFactory: (osRepo: OrdemServicoRepository) =>
-        new AtualizarStatusAguardandoPecasHandler(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusAguardandoPecasHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
     {
       provide: VerificarNecessidadePecasHandler,
@@ -133,15 +139,21 @@ import {
     },
     {
       provide: AtualizarStatusEmExecucaoHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEmExecucaoHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusEmExecucaoHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
     {
       provide: AtualizarStatusExecucaoIniciadaHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusExecucaoIniciadaHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusExecucaoIniciadaHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
     {
       provide: IniciarMonitoramentoTempoHandler,
@@ -153,9 +165,15 @@ import {
       useFactory: (
         osRepo: OrdemServicoRepository,
         historyRepo: StatusHistoryRepository,
-        barramento: IEmissorEventos
-      ) => new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, barramento),
-      inject: [OrdemServicoRepository, StatusHistoryRepository, EMISSOR_EVENTOS],
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, barramento, transicaoSvc),
+      inject: [
+        OrdemServicoRepository,
+        StatusHistoryRepository,
+        EMISSOR_EVENTOS,
+        StatusTransitionService,
+      ],
     },
     {
       provide: FinalizarMonitoramentoTempoHandler,

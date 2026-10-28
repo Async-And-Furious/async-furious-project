@@ -51,7 +51,7 @@ sequenceDiagram
         Cliente->>API: PATCH /ordens-servico/:id/orcamento/aprovar (rota @Public, sem token)
         API->>API: evento OrcamentoAprovado (reserva as peças)
         Note over API,DB: A OS permanece em AWAITING_APPROVAL.<br/>Peça sem estoque: apenas marca reserva_pecas_pendente.
-        Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/iniciar-reparo (papel MECANICO)
+        Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/iniciar-reparo (papel MECANICO, após PagamentoConfirmado)
         Exec-->>API: evento ExecucaoIniciada
         API->>API: evento OrdemServicoEmExecucao
         API->>DB: status=IN_PROGRESS, iniciada_em=now()

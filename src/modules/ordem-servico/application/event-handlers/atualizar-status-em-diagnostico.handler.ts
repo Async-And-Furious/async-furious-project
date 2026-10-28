@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
+import { StatusTransitionService } from '../../domain/services/status-transition.service';
 import { DiagnosticoIniciado } from '../../domain/events/diagnostico-iniciado.event';
 import { OrdemServicoEmDiagnostico } from '../../domain/events/ordem-servico-em-diagnostico.event';
 
@@ -11,7 +12,8 @@ export class AtualizarStatusEmDiagnosticoHandler {
 
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: IEmissorEventos
+    private readonly emissor: IEmissorEventos,
+    private readonly transicao: StatusTransitionService
   ) {}
 
   @OnEvent('DiagnosticoIniciado')
@@ -23,6 +25,7 @@ export class AtualizarStatusEmDiagnosticoHandler {
       );
       return;
     }
+    this.transicao.validarTransicao('RECEIVED', 'UNDER_DIAGNOSIS');
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'UNDER_DIAGNOSIS',
     });

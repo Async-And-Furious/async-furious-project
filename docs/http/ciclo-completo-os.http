@@ -3,7 +3,10 @@
 #
 # 1. Execute os logins (PASSO 0a e 0b), copie os tokens e cole nas variáveis abaixo.
 # 2. Execute PASSO 1, copie os IDs e cole nas variáveis abaixo.
-# 3. Execute os PASSOs 2-9 na ordem.
+# 3. Execute os PASSOs na ordem. Os PASSOs 3 e 6 acontecem no serviço de Execução e não
+#    têm requisição aqui: sem ele o roteiro para em RECEIVED, o PASSO 4 responde 400 (a OS
+#    não está em UNDER_DIAGNOSIS), e não há como disparar DiagnosticoIniciado,
+#    ExecucaoIniciada ou ExecucaoConcluida por HTTP.
 #
 # Extensão recomendada: REST Client (VS Code) — humao.rest-client
 
@@ -111,10 +114,11 @@ Authorization: Bearer {{recepToken}}
 # ─────────────────────────────────────────────────────────────
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 5 — Mecânico lança serviços e insumos  (MECANICO)
+# PASSO 4 — Mecânico lança serviços e insumos  (MECANICO)
 # Exige a OS em UNDER_DIAGNOSIS (senão 400: aguarde o DiagnosticoIniciado e repita).
 # Responde 200 com os totais calculados e publica OrcamentoCalculado;
-# o orçamento é gerado pelo Billing e a OS passa a AWAITING_APPROVAL.
+# o Orcamento é gerado pelo próprio OS enquanto o Billing não existe
+# (GerarOrcamentoHandler, stand-in) e a OS passa a AWAITING_APPROVAL.
 # Os valores não podem ser negativos (400).
 # ─────────────────────────────────────────────────────────────
 
@@ -130,7 +134,7 @@ Authorization: Bearer {{mecToken}}
 }
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 6 — Cliente aprova o orçamento  (PÚBLICO — sem token)
+# PASSO 5 — Cliente aprova o orçamento  (PÚBLICO — sem token)
 # A OS permanece em AWAITING_APPROVAL: só ExecucaoIniciada (iniciar-reparo
 # no serviço de Execução) leva a OS a IN_PROGRESS e preenche iniciada_em.
 # ─────────────────────────────────────────────────────────────
@@ -139,7 +143,7 @@ Authorization: Bearer {{mecToken}}
 PATCH {{base}}/ordens-servico/{{osId}}/orcamento/aprovar
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 7 — Conclusão da execução  (acontece no serviço de Execução)
+# PASSO 6 — Conclusão da execução  (acontece no serviço de Execução)
 # O mecânico chama PATCH /api/v1/execucoes/{id}/concluir no serviço de
 # Execução e Produção, que publica ExecucaoConcluida. O OS Service
 # consome o evento, grava FINISHED e preenche finalizada_em
@@ -148,7 +152,7 @@ PATCH {{base}}/ordens-servico/{{osId}}/orcamento/aprovar
 # ─────────────────────────────────────────────────────────────
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 8 — Recepcionista registra entrega  (RECEPCIONISTA)
+# PASSO 7 — Recepcionista registra entrega  (RECEPCIONISTA)
 # Status resultante: DELIVERED
 # entregue_em é preenchido automaticamente aqui.
 # ─────────────────────────────────────────────────────────────
@@ -158,7 +162,7 @@ PATCH {{base}}/ordens-servico/{{osId}}/registrar-entrega
 Authorization: Bearer {{recepToken}}
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 9 — Consultar tempo médio  (ADMIN)
+# PASSO 8 — Consultar tempo médio  (ADMIN)
 # Deve retornar totalOrdensConsideradas >= 1 agora.
 # ─────────────────────────────────────────────────────────────
 

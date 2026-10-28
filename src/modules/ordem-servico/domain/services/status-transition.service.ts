@@ -8,7 +8,35 @@ import { OrdemServicoEmExecucao } from '../events/ordem-servico-em-execucao.even
 import { OrdemServicoFinalizada } from '../events/ordem-servico-finalizada.event';
 import { OrdemServicoEntregue } from '../events/ordem-servico-entregue.event';
 
+const TRANSICOES_PERMITIDAS: Record<OSStatus, OSStatus[]> = {
+  RECEIVED: ['UNDER_DIAGNOSIS', 'CLOSED_WITHOUT_EXECUTION'],
+  UNDER_DIAGNOSIS: ['AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION'],
+  AWAITING_APPROVAL: ['IN_PROGRESS', 'CLOSED_WITHOUT_EXECUTION'],
+  IN_PROGRESS: ['AWAITING_PARTS', 'FINISHED'],
+  AWAITING_PARTS: ['IN_PROGRESS'],
+  FINISHED: ['DELIVERED'],
+  DELIVERED: [],
+  CLOSED_WITHOUT_EXECUTION: [],
+};
+
 export class StatusTransitionService {
+  /**
+   * Lança DomainException se a transição não for permitida. Os handlers de eventos usam
+   * este método para validar a transição antes de gravar, sem depender do evento de retorno.
+   */
+  public validarTransicao(currentStatus: OSStatus, newStatus: OSStatus): void {
+    if (currentStatus === newStatus) {
+      throw new DomainException(`A Ordem de Serviço já está no status ${newStatus}.`);
+    }
+
+    const allowed = TRANSICOES_PERMITIDAS[currentStatus] || [];
+    if (!allowed.includes(newStatus)) {
+      throw new DomainException(
+        `Transição inválida: Não é possível mudar de ${currentStatus} para ${newStatus}.`
+      );
+    }
+  }
+
   /**
    * Valida a transição e retorna o evento correspondente.
    */
@@ -16,28 +44,8 @@ export class StatusTransitionService {
     osId: string,
     currentStatus: OSStatus,
     newStatus: OSStatus
-  ): DomainEvent {
-    if (currentStatus === newStatus) {
-      throw new DomainException(`A Ordem de Serviço já está no status ${newStatus}.`);
-    }
-
-    const validTransitions: Record<OSStatus, OSStatus[]> = {
-      RECEIVED: ['UNDER_DIAGNOSIS', 'CLOSED_WITHOUT_EXECUTION'],
-      UNDER_DIAGNOSIS: ['AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION'],
-      AWAITING_APPROVAL: ['IN_PROGRESS', 'CLOSED_WITHOUT_EXECUTION'],
-      IN_PROGRESS: ['AWAITING_PARTS', 'FINISHED'],
-      AWAITING_PARTS: ['IN_PROGRESS'],
-      FINISHED: ['DELIVERED'],
-      DELIVERED: [],
-      CLOSED_WITHOUT_EXECUTION: [],
-    };
-
-    const allowed = validTransitions[currentStatus] || [];
-    if (!allowed.includes(newStatus)) {
-      throw new DomainException(
-        `Transição inválida: Não é possível mudar de ${currentStatus} para ${newStatus}.`
-      );
-    }
+  ): DomainEvent | null {
+    this.validarTransicao(currentStatus, newStatus);
 
     switch (newStatus) {
       case 'RECEIVED':
@@ -57,7 +65,7 @@ export class StatusTransitionService {
         // Pode ser necessário criar eventos adicionais ou usar um genérico.
         // Como o DoD pede apenas aqueles eventos especificamente, vamos retornar nulo ou disparar uma versão base.
         // No escopo deste Tech Challenge, vamos retornar null para evitar erros se a transição não tiver evento.
-        return null as any;
+        return null;
     }
   }
 }

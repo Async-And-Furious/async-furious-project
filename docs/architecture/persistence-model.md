@@ -232,10 +232,10 @@ recriadas:
 - `itens` (peças/serviços) e `historico` da OS, `veiculos` e
   `resumoOrdensServico` do cliente — cortados do escopo inicial
   (30/09/2026); continuam só no Postgres.
-- Colunas de coordenação da saga em `OrdemServico` (`pago_em` e
-  `reserva_pecas_pendente`): existem só para o OS Service decidir a próxima
-  transição e não entram no `os_read_model`. `reserva_pecas_pendente`
-  (`BOOLEAN NOT NULL DEFAULT false`, migration
+- Colunas de coordenação da saga em `OrdemServico`: existem só para o OS Service
+  decidir a próxima transição e não entram no `os_read_model`. `pago_em` ainda não
+  existe no schema (a criar na Feature que consome `PagamentoConfirmado`).
+  `reserva_pecas_pendente` (`BOOLEAN NOT NULL DEFAULT false`, migration
   `20261027120000_os_reserva_pecas_pendente`) é ligada por `PecasIndisponiveis`
   e desligada por `PecasReservadas`; a migration é aditiva e idempotente, sem
   backfill (OS existentes assumem `false`). Detalhe em
