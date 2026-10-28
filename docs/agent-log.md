@@ -1,5 +1,18 @@
 # Log de agentes
 
+## 2026-10-28 — Decisão de isolamento do DocumentDB (#315)
+
+- Mantido o isolamento do DocumentDB por credenciais, preservando as
+  ADRs-0020/0021, sem `NetworkPolicy` nem migração para Security Groups for
+  Pods. No HML atual, pods de outras namespaces podem alcançar TCP 27017 pela
+  rede compartilhada, mas não recebem `tc3-docdb-os-<env>` e não autenticam
+  sem credencial. Credencial-only limita acesso aos dados; não bloqueia TCP.
+- A validação prevista comprova secret ausente em outro namespace, autenticação
+  e leitura/escrita pelo OS Service com TLS e falha de autenticação sem segredo
+  em pod de outra namespace. Risco residual: pod do OS comprometido ou
+  credencial vazada. O requisito original de inacessibilidade TCP foi alterado
+  por decisão aprovada em 28/10/2026.
+
 ## 2026-10-20 — Mercado Pago Checkout Pro no monólito (#325)
 
 - Aprovar o orçamento cria a preference do Checkout Pro (SDK oficial

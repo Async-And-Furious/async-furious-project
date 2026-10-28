@@ -254,6 +254,29 @@ CQRS, write-through síncrono no repository e o escopo "OS + Cliente simples"
   o driver `mongodb`. O `repo-db-infra` deixa de ler o OIDC provider do
   `repo-k8s-infra`.
 
+## Revisão de 28/10/2026 — limite de rede e isolamento por credencial (#315)
+
+Decisão aprovada em 28/10/2026: manter o isolamento do DocumentDB por
+credenciais, preservando as ADRs-0020 e 0021. Não será implementada
+`NetworkPolicy` nem migração para Security Groups for Pods.
+
+No HML atual, pods em outras namespaces ainda podem alcançar o endpoint do
+DocumentDB na porta TCP 27017 pela rede compartilhada. A credencial-only é um
+limite de acesso aos dados, **não** um bloqueio de conectividade TCP. O secret
+`tc3-docdb-os-<env>` é disponibilizado somente no namespace do OS Service; pods
+de outras namespaces não recebem esse secret e, sem credencial, não autenticam.
+O OS Service conecta ao DocumentDB com TLS e a credencial do secret.
+
+O teste de isolamento deve verificar que: (1) o secret não existe no namespace
+de outro serviço; (2) o OS Service autentica e consegue ler e escrever; e (3)
+uma tentativa de autenticação a partir de um pod de outra namespace, sem
+segredo, falha. O teste não deve afirmar que a conexão TCP é bloqueada.
+
+**Risco residual:** um pod comprometido no namespace do OS Service ou o
+vazamento da credencial pode permitir acesso aos dados do DocumentDB. A
+inacessibilidade TCP originalmente requerida foi alterada por decisão aprovada;
+esta decisão não elimina a alcançabilidade de rede descrita acima.
+
 ## Referências
 
 - Tech Challenge — Fase 4 (`12SOAT - Fase 4 - Tech challenge.pdf`), p.3, p.4 e p.6
