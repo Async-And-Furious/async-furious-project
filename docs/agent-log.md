@@ -1,20 +1,20 @@
 # Log de agentes
 
-## 2026-10-28 — Decisão de isolamento do DocumentDB (#315)
+## 2026-10-28 — Ajustes da pipeline Fase 4 (#333)
 
-- Por escolha explícita do solicitante do projeto na sessão de refinamento da
-  #315, mantido o isolamento do DocumentDB por credenciais, preservando as
-  ADRs-0020/0021, sem `NetworkPolicy` nem migração para Security Groups for
-  Pods; o critério de aceite da #315 foi atualizado. Não houve aprovação
-  coletiva. O desenho assume que pods de outras namespaces podem alcançar TCP
-  27017 pela rede compartilhada, mas não recebem `tc3-docdb-os-<env>` e não
-  autenticam sem credencial. Credencial-only limita acesso aos dados; não
-  bloqueia TCP. A verificação em HML permanece pendente.
-- A validação prevista deverá comprovar secret ausente em outro namespace,
-  autenticação e leitura/escrita pelo OS Service com TLS e falha de
-  autenticação sem segredo em pod de outra namespace. Risco residual: pod do
-  OS comprometido ou credencial vazada. O requisito original de
-  inacessibilidade TCP foi alterado por escolha do solicitante em 28/10/2026.
+- A decisão vigente da Fase 4 é HML-only: `deploy-prod` fica inerte, e os
+  disparos manuais de deploy/seed aceitam HML. Os recursos PROD existentes da
+  Fase 3 permanecem intocados. Nenhum deploy, apply ou acesso AWS foi feito.
+- Removido o bypass por label `Documentação` nos workflows `tests`, `trivy`,
+  `zap` e `terraform`; adicionado o agregado `validate` para reprovar quando
+  testes falham ou Sonar é ignorado em `main`. A proteção de branch ainda
+  precisa exigir esse check (passo externo).
+- Removidos casts `any` do teste do filtro global e adicionados contratos de
+  workflow. A action do Sonar foi fixada ao SHA verificado de `v8.4.0`.
+  Coverage permanece 80/80/80/80.
+- SonarCloud HTTP 403 permanece bloqueio externo de autorização; não houve
+  leitura ou alteração de `SONAR_TOKEN`. HML/DocumentDB/CA, Kafka consumer,
+  baseline pós-read-model e itens da etapa 2 seguem pendentes.
 
 ## 2026-10-20 — Mercado Pago Checkout Pro no monólito (#325)
 

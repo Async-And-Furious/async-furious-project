@@ -4,12 +4,13 @@ import { getLoggerToken } from 'nestjs-pino';
 import { GlobalExceptionFilter } from '../../src/shared/infrastructure/filters/global-exception.filter';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
+import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
   let mockLogger: { error: jest.Mock; warn: jest.Mock };
-  let mockResponse: any;
-  let mockRequest: any;
+  let mockResponse: { status: jest.Mock; json: jest.Mock };
+  let mockRequest: { url: string; method: string; id?: string };
   let mockArgumentsHost: ArgumentsHost;
 
   beforeEach(async () => {
@@ -44,7 +45,7 @@ describe('GlobalExceptionFilter', () => {
       switchToRpc: jest.fn(),
       switchToWs: jest.fn(),
       getType: jest.fn(),
-    };
+    } as unknown as ArgumentsHost;
   });
 
   afterEach(() => {
@@ -84,6 +85,31 @@ describe('GlobalExceptionFilter', () => {
       });
     });
 
+    it('deve tratar EntityNotFoundException como 404', () => {
+      filter.catch(new EntityNotFoundException('OrdemServico', 'os-9'), mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+      expect(mockResponse.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          statusCode: HttpStatus.NOT_FOUND,
+          message: "OrdemServico with id 'os-9' not found",
+          error: 'Not Found',
+        })
+      );
+    });
+
+    it('deve usar a mensagem da exceção quando a resposta HTTP não traz message', () => {
+      const httpException = new HttpException(
+        { error: 'Payload inválido' },
+        HttpStatus.BAD_REQUEST
+      );
+
+      filter.catch(httpException, mockArgumentsHost);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+      expect(mockResponse.json.mock.calls[0][0].message).toBe(httpException.message);
+    });
+
     it('deve tratar erro genérico', () => {
       const error = new Error('Erro genérico');
 
@@ -104,7 +130,7 @@ describe('GlobalExceptionFilter', () => {
         name: 'ErrorWithoutMessage',
       };
 
-      filter.catch(errorWithoutMessage as any, mockArgumentsHost);
+      filter.catch(errorWithoutMessage, mockArgumentsHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
       expect(mockResponse.json).toHaveBeenCalledWith({

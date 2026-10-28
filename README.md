@@ -76,7 +76,7 @@ Com o aumento da demanda e a expansão para novas unidades, a oficina precisa ga
 - **Infraestrutura escalável**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 réplicas, escalando por CPU > 70% ou memória > 80%).
 - **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migração documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
 - **Pipeline de CI/CD**: GitHub Actions valida build, testes automatizados e infraestrutura (`terraform validate` + `plan`) a cada Pull Request.
-- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 85%.
+- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 80%.
 
 ### Diagrama de Arquitetura
 
@@ -363,6 +363,8 @@ pnpm test -- --testNamePattern="CreateClienteUseCase"
 | Lines | 80% |
 | Functions | 80% |
 | Branches | 80% |
+
+O mínimo de 80% vale para as quatro métricas e é exigido pelo `pnpm test:cov` (`jest.config.js`) e pelo job `Run All Tests` do workflow `tests.yml`, que falha se o mínimo não for atingido. A evidência de cada execução do CI é o artifact `coverage` do run (aba Actions, retenção de 7 dias), que traz o relatório `lcov` e a versão HTML. Consulte [as execuções do workflow de testes](https://github.com/Async-And-Furious/async-furious-project/actions/workflows/tests.yml) para abrir o artifact de cada run. O job `sonar` analisa o mesmo relatório no SonarCloud. Ver [ADR-0014](docs/adr/0014-cobertura-minima-testes.md).
 
 ---
 

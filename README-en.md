@@ -341,10 +341,12 @@ pnpm test -- --testNamePattern="CreateClienteUseCase"
 
 | Metric | Minimum |
 | ------ | ------- |
-| Statements | 85% |
-| Lines | 85% |
+| Statements | 80% |
+| Lines | 80% |
 | Functions | 80% |
 | Branches | 80% |
+
+The 80% minimum applies to all four metrics and is enforced by `pnpm test:cov` (`jest.config.js`) and by the `Run All Tests` job in the `tests.yml` workflow, which fails when the minimum is not met. The coverage evidence for each CI run is the `coverage` artifact of the run (Actions tab, 7-day retention), containing the `lcov` report and the HTML version. See [the test workflow runs](https://github.com/Async-And-Furious/async-furious-project/actions/workflows/tests.yml) to open each run's artifact. The `sonar` job analyzes the same report in SonarCloud. See [ADR-0014](docs/adr/0014-cobertura-minima-testes.md).
 
 ---
 

@@ -6,6 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.18.3",
+  "engines": {
+    "node": ">=22 <23"
+  },
   "scripts": {
     "prebuild": "prisma generate",
     "build": "nest build",

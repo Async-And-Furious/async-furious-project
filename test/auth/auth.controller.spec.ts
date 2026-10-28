@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import type { Request } from 'express';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthController } from '../../src/auth/auth.controller';
 import { AuthService } from '../../src/auth/services/auth.service';
@@ -83,6 +84,15 @@ describe('AuthController', () => {
       expect(authService.register).toHaveBeenCalledWith(registerDto);
       expect(authService.register).toHaveBeenCalledTimes(1);
       expect(result).toEqual(expectedResult);
+    });
+
+    it('does not forward a correlation id that is not a string', async () => {
+      authService.register.mockResolvedValue(expectedResult);
+      const request = { res: { locals: { correlationId: 42 } } } as unknown as Request;
+
+      await controller.register(registerDto, request);
+
+      expect(authService.register).toHaveBeenCalledWith(registerDto);
     });
 
     it('should register user with default role when role is not provided', async () => {
@@ -187,6 +197,15 @@ describe('AuthController', () => {
       expect(authService.login).toHaveBeenCalledWith(loginDto);
       expect(authService.login).toHaveBeenCalledTimes(1);
       expect(result).toEqual(expectedResult);
+    });
+
+    it('does not forward a login correlation id that is not a string', async () => {
+      authService.login.mockResolvedValue(expectedResult);
+      const request = { res: { locals: { correlationId: undefined } } } as unknown as Request;
+
+      await controller.login(loginDto, request);
+
+      expect(authService.login).toHaveBeenCalledWith(loginDto);
     });
 
     it('should handle login with different email formats', async () => {
