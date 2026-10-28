@@ -1,4 +1,5 @@
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
+import { Logger } from '@nestjs/common';
 import { AtualizarStatusRecebidaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-recebida.handler';
 import { AtualizarStatusEmDiagnosticoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-em-diagnostico.handler';
 import { NotificarClienteDiagnosticoHandler } from '../../src/modules/ordem-servico/application/event-handlers/notificar-cliente-diagnostico.handler';
@@ -6,6 +7,7 @@ import { GerarOrcamentoHandler } from '../../src/modules/ordem-servico/applicati
 import { EnviarOrcamentoHandler } from '../../src/modules/ordem-servico/application/event-handlers/enviar-orcamento.handler';
 import { AtualizarStatusAguardandoAprovacaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-aguardando-aprovacao.handler';
 import { VerificarNecessidadePecasHandler } from '../../src/modules/ordem-servico/application/event-handlers/verificar-necessidade-pecas.handler';
+import { AtualizarStatusExecucaoIniciadaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-execucao-iniciada.handler';
 import { AtualizarStatusEmExecucaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-em-execucao.handler';
 import { IniciarMonitoramentoTempoHandler } from '../../src/modules/ordem-servico/application/event-handlers/iniciar-monitoramento-tempo.handler';
 import { AtualizarStatusFinalizadaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-finalizada.handler';
@@ -15,9 +17,13 @@ import { AtualizarStatusEntregueHandler } from '../../src/modules/ordem-servico/
 import { AtualizarStatusEncerradaSemExecucaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-aguardando-pecas.handler';
 import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-criada.event';
-import { OrdemServicoAssumida } from '../../src/modules/ordem-servico/domain/events/ordem-servico-assumida.event';
+import { DiagnosticoIniciado } from '../../src/modules/ordem-servico/domain/events/diagnostico-iniciado.event';
+import { ExecucaoIniciada } from '../../src/modules/ordem-servico/domain/events/execucao-iniciada.event';
+import { ExecucaoConcluida } from '../../src/modules/ordem-servico/domain/events/execucao-concluida.event';
+import { EtapaDaSagaFalhou } from '../../src/modules/ordem-servico/domain/events/etapa-da-saga-falhou.event';
+import { StatusAtualizadoAguardandoPecas } from '../../src/modules/ordem-servico/domain/events/status-atualizado-aguardando-pecas.event';
 import { StatusAtualizadoEmDiagnostico } from '../../src/modules/ordem-servico/domain/events/status-atualizado-em-diagnostico.event';
-import { ServicosEInsumosListados } from '../../src/modules/ordem-servico/domain/events/servicos-e-insumos-listados.event';
+import { OrcamentoCalculado } from '../../src/modules/ordem-servico/domain/events/orcamento-calculado.event';
 import { OrcamentoGerado } from '../../src/modules/ordem-servico/domain/events/orcamento-gerado.event';
 import { OrcamentoEnviado } from '../../src/modules/ordem-servico/domain/events/orcamento-enviado.event';
 import { OrcamentoAprovado } from '../../src/modules/ordem-servico/domain/events/orcamento-aprovado.event';
@@ -26,12 +32,12 @@ import { OrdemServicoEmExecucao } from '../../src/modules/ordem-servico/domain/e
 import { OrdemServicoFinalizada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-finalizada.event';
 import { OrdemServicoEntregue } from '../../src/modules/ordem-servico/domain/events/ordem-servico-entregue.event';
 import { OsSemPecasConfirmada } from '../../src/modules/ordem-servico/domain/events/os-sem-pecas-confirmada.event';
-import { ServicoConcluidoPeloMecanico } from '../../src/modules/ordem-servico/domain/events/servico-concluido-pelo-mecanico.event';
 // `ServicoAprovadoPeloCliente` removed: not used in tests
 import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
 import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/events/pecas-indisponiveis.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
+import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import {
@@ -54,6 +60,7 @@ const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => {
       iniciada_em: null,
       finalizada_em: null,
       entregue_em: null,
+      reservaPecasPendente: false,
       created_at: new Date(),
       updated_at: new Date(),
     },
@@ -85,20 +92,6 @@ async function shouldNotUpdateWhenStatusIs(
   osRepo.findOne.mockResolvedValue(mockOs({ status: wrongStatus }));
   await (handlerInstance as Record<string, (e: unknown) => Promise<void>>)[methodName](event);
   expect(osRepo.update).not.toHaveBeenCalled();
-}
-
-/** Test helper: verifies handler updates OS to IN_PROGRESS and emits StatusAtualizadoEmExecucao */
-async function shouldUpdateToInProgress(
-  osRepo: jest.Mocked<IOrdemServicoRepository>,
-  emissor: jest.Mocked<EmissorEventos>,
-  status: OSStatus,
-  handler: () => Promise<void>
-): Promise<void> {
-  osRepo.findOne.mockResolvedValue(mockOs({ status }));
-  osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
-  await handler();
-  expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
-  expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmExecucao));
 }
 
 describe('OS Event handlers', () => {
@@ -160,21 +153,20 @@ describe('OS Event handlers', () => {
       osRepo.update.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
       const handler = new AtualizarStatusEmDiagnosticoHandler(osRepo, emissor);
 
-      await handler.handle(new OrdemServicoAssumida('os-1'));
+      await handler.handle(new DiagnosticoIniciado('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'UNDER_DIAGNOSIS' });
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmDiagnostico));
     });
 
-    it('não deve atualizar quando OS não está em RECEIVED', async () => {
-      const handler = new AtualizarStatusEmDiagnosticoHandler(osRepo, emissor);
-      await shouldNotUpdateWhenStatusIs(
-        osRepo,
-        handler,
-        'UNDER_DIAGNOSIS',
-        new OrdemServicoAssumida('os-1')
-      );
-    });
+    it.each<OSStatus>(['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION'])(
+      'ignora DiagnosticoIniciado (ack, sem gravar nem emitir) quando a OS já está em %s',
+      async (status) => {
+        const handler = new AtualizarStatusEmDiagnosticoHandler(osRepo, emissor);
+        await shouldNotUpdateWhenStatusIs(osRepo, handler, status, new DiagnosticoIniciado('os-1'));
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      }
+    );
   });
 
   // ─── P-03 ────────────────────────────────────────────────────────────────
@@ -194,7 +186,7 @@ describe('OS Event handlers', () => {
   // ─── P-04 ────────────────────────────────────────────────────────────────
 
   describe('P-04 GerarOrcamentoHandler', () => {
-    const evento = new ServicosEInsumosListados('os-1', 100, 50);
+    const evento = new OrcamentoCalculado('os-1', 100, 50, 150);
 
     it('deve criar orçamento quando não existe nenhum e emitir OrcamentoGerado', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
@@ -300,38 +292,157 @@ describe('OS Event handlers', () => {
 
   // ─── P-08 ────────────────────────────────────────────────────────────────
 
-  describe('P-08 AtualizarStatusEmExecucaoHandler', () => {
-    it('deve atualizar para IN_PROGRESS e emitir StatusAtualizadoEmExecucao via OsSemPecasConfirmada', async () => {
-      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
-      await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
-        handler.handleSemPecas(new OsSemPecasConfirmada('os-1'))
-      );
+  describe('P-08 AtualizarStatusExecucaoIniciadaHandler', () => {
+    it('leva AWAITING_APPROVAL a IN_PROGRESS e emite OrdemServicoEmExecucao', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+      osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
+      const handler = new AtualizarStatusExecucaoIniciadaHandler(osRepo, emissor);
+
+      await handler.handle(new ExecucaoIniciada('os-1'));
+
+      expect(osRepo.update).toHaveBeenCalledTimes(1);
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
+      expect(emissor.emitir).toHaveBeenCalledTimes(1);
+      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmExecucao));
     });
 
-    it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_APPROVAL', async () => {
-      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
-      await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_APPROVAL', () =>
-        handler.handlePecasReservadas({ ordemServicoId: 'os-1' })
+    it('com reserva de peças pendente faz duas transições: IN_PROGRESS e logo AWAITING_PARTS', async () => {
+      osRepo.findOne.mockResolvedValue(
+        mockOs({ status: 'AWAITING_APPROVAL', reservaPecasPendente: true })
       );
+      osRepo.update.mockResolvedValue(mockOs());
+      const handler = new AtualizarStatusExecucaoIniciadaHandler(osRepo, emissor);
+
+      await handler.handle(new ExecucaoIniciada('os-1'));
+
+      expect(osRepo.update).toHaveBeenCalledTimes(2);
+      expect(osRepo.update).toHaveBeenNthCalledWith(1, 'os-1', { status: 'IN_PROGRESS' });
+      expect(osRepo.update).toHaveBeenNthCalledWith(2, 'os-1', { status: 'AWAITING_PARTS' });
+      expect(emissor.emitir.mock.calls[0][0]).toBeInstanceOf(OrdemServicoEmExecucao);
+      expect(emissor.emitir.mock.calls[1][0]).toBeInstanceOf(StatusAtualizadoAguardandoPecas);
     });
 
-    it('deve atualizar para IN_PROGRESS via PecasReservadas quando OS em AWAITING_PARTS', async () => {
-      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
-      await shouldUpdateToInProgress(osRepo, emissor, 'AWAITING_PARTS', () =>
-        handler.handlePecasReservadas({ ordemServicoId: 'os-1' })
+    it.each<OSStatus>([
+      'RECEIVED',
+      'UNDER_DIAGNOSIS',
+      'IN_PROGRESS',
+      'AWAITING_PARTS',
+      'CLOSED_WITHOUT_EXECUTION',
+    ])('ignora ExecucaoIniciada (ack, com log) quando a OS está em %s', async (status) => {
+      const handler = new AtualizarStatusExecucaoIniciadaHandler(osRepo, emissor);
+      await shouldNotUpdateWhenStatusIs(osRepo, handler, status, new ExecucaoIniciada('os-1'));
+      expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('P-08c níveis de log ao ignorar eventos do Execução', () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    it('ExecucaoIniciada repetida (OS já em IN_PROGRESS) é log informativo, não warn', async () => {
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
+
+      await new AtualizarStatusExecucaoIniciadaHandler(osRepo, emissor).handle(
+        new ExecucaoIniciada('os-1')
       );
+
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
     });
 
-    it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
-      await shouldNotUpdateWhenStatusIs(
+    it('ExecucaoIniciada antes da aprovação (OS em UNDER_DIAGNOSIS) é anomalia: warn', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
+
+      await new AtualizarStatusExecucaoIniciadaHandler(osRepo, emissor).handle(
+        new ExecucaoIniciada('os-1')
+      );
+
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('ExecucaoConcluida repetida (OS já FINISHED) é log informativo, não warn', async () => {
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'FINISHED' }));
+
+      await new AtualizarStatusFinalizadaHandler(
         osRepo,
-        handler,
-        'IN_PROGRESS',
-        new OsSemPecasConfirmada('os-1'),
-        'handleSemPecas'
-      );
+        { create: jest.fn(), findByOrdemServicoId: jest.fn() },
+        emissor
+      ).handle(new ExecucaoConcluida('os-1'));
+
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
     });
+
+    it('ExecucaoConcluida sem o reparo ter começado (OS em AWAITING_APPROVAL) é anomalia: warn', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+
+      await new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        { create: jest.fn(), findByOrdemServicoId: jest.fn() },
+        emissor
+      ).handle(new ExecucaoConcluida('os-1'));
+
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('P-08b AtualizarStatusEmExecucaoHandler (reserva de peças não muda mais o status)', () => {
+    it('PecasReservadas em AWAITING_APPROVAL sem pendência não grava nada', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
+
+      await handler.handlePecasReservadas({ ordemServicoId: 'os-1' });
+
+      expect(osRepo.update).not.toHaveBeenCalled();
+      expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+
+    it('PecasReservadas em AWAITING_APPROVAL com pendência só baixa a pendência (status intacto)', async () => {
+      osRepo.findOne.mockResolvedValue(
+        mockOs({ status: 'AWAITING_APPROVAL', reservaPecasPendente: true })
+      );
+      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
+
+      await handler.handlePecasReservadas({ ordemServicoId: 'os-1' });
+
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', { reserva_pecas_pendente: false });
+      expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+
+    it('PecasReservadas em AWAITING_PARTS retoma IN_PROGRESS e emite OrdemServicoEmExecucao', async () => {
+      osRepo.findOne.mockResolvedValue(
+        mockOs({ status: 'AWAITING_PARTS', reservaPecasPendente: true })
+      );
+      const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
+
+      await handler.handlePecasReservadas({ ordemServicoId: 'os-1' });
+
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'IN_PROGRESS',
+        reserva_pecas_pendente: false,
+      });
+      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmExecucao));
+    });
+
+    it.each<OSStatus>(['RECEIVED', 'IN_PROGRESS', 'FINISHED'])(
+      'PecasReservadas em %s não altera a OS',
+      async (status) => {
+        const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor);
+        await shouldNotUpdateWhenStatusIs(
+          osRepo,
+          handler,
+          status,
+          { ordemServicoId: 'os-1' },
+          'handlePecasReservadas'
+        );
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      }
+    );
   });
 
   // ─── P-09 ────────────────────────────────────────────────────────────────
@@ -350,25 +461,61 @@ describe('OS Event handlers', () => {
   // ─── P-10 ────────────────────────────────────────────────────────────────
 
   describe('P-10 AtualizarStatusFinalizadaHandler', () => {
-    it('deve atualizar para FINISHED e emitir StatusAtualizadoFinalizada', async () => {
+    let historyRepo: jest.Mocked<IStatusHistoryRepository>;
+
+    beforeEach(() => {
+      historyRepo = {
+        create: jest.fn(),
+        findByOrdemServicoId: jest.fn(),
+      } as jest.Mocked<IStatusHistoryRepository>;
+    });
+
+    it('grava FINISHED ao consumir ExecucaoConcluida e emite OrdemServicoFinalizada', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
       osRepo.update.mockResolvedValue(mockOs({ status: 'FINISHED' }));
-      const handler = new AtualizarStatusFinalizadaHandler(osRepo, emissor);
+      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor);
 
-      await handler.handle(new ServicoConcluidoPeloMecanico('os-1'));
+      await handler.handle(new ExecucaoConcluida('os-1'));
 
       expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'FINISHED' });
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoFinalizada));
+      expect(historyRepo.create).not.toHaveBeenCalled();
     });
 
-    it('não deve atualizar quando OS não está em IN_PROGRESS', async () => {
-      const handler = new AtualizarStatusFinalizadaHandler(osRepo, emissor);
-      await shouldNotUpdateWhenStatusIs(
-        osRepo,
-        handler,
-        'RECEIVED',
-        new ServicoConcluidoPeloMecanico('os-1')
+    it.each<OSStatus>(['RECEIVED', 'AWAITING_APPROVAL', 'FINISHED', 'CLOSED_WITHOUT_EXECUTION'])(
+      'ignora ExecucaoConcluida (ack, com log) quando a OS está em %s',
+      async (status) => {
+        const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor);
+        await shouldNotUpdateWhenStatusIs(osRepo, handler, status, new ExecucaoConcluida('os-1'));
+        expect(emissor.emitir).not.toHaveBeenCalled();
+        expect(historyRepo.create).not.toHaveBeenCalled();
+      }
+    );
+
+    it('com a OS em AWAITING_PARTS registra o motivo e emite EtapaDaSagaFalhou (reparo), sem finalizar', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
+      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor);
+
+      await handler.handle(new ExecucaoConcluida('os-1'));
+
+      expect(osRepo.update).not.toHaveBeenCalled();
+      expect(historyRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ordemServicoId: 'os-1',
+          statusAnterior: 'AWAITING_PARTS',
+          statusNovo: 'AWAITING_PARTS',
+          motivo: expect.stringContaining('AWAITING_PARTS'),
+        })
       );
+      const emitido = emissor.emitir.mock.calls[0][0] as EtapaDaSagaFalhou;
+      expect(emitido).toBeInstanceOf(EtapaDaSagaFalhou);
+      expect(emitido).toMatchObject({
+        servicoOrigem: 'os-service',
+        eventTypeOriginal: 'ExecucaoConcluida',
+        ordemServicoId: 'os-1',
+        etapa: 'reparo',
+      });
+      expect(emissor.emitir).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -462,20 +609,18 @@ describe('OS Event handlers', () => {
   // ─── P-15 ────────────────────────────────────────────────────────────────
 
   describe('P-15 AtualizarStatusAguardandoPecasHandler', () => {
-    it('deve atualizar para AWAITING_PARTS quando PecasIndisponiveis ocorrer', async () => {
+    it('PecasIndisponiveis só registra a pendência da reserva, sem mudar o status', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
-      osRepo.update.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
-      const handler = new AtualizarStatusAguardandoPecasHandler(osRepo, emissor);
+      const handler = new AtualizarStatusAguardandoPecasHandler(osRepo);
 
       await handler.handle(new PecasIndisponiveis('os-1', ['peca-1']));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_PARTS' });
-      const emitido = emissor.emitir.mock.calls[0][0];
-      expect(emitido.constructor.name).toBe('StatusAtualizadoAguardandoPecas');
+      expect(osRepo.update).toHaveBeenCalledTimes(1);
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', { reserva_pecas_pendente: true });
     });
 
-    it('não deve atualizar quando OS não está em AWAITING_APPROVAL', async () => {
-      const handler = new AtualizarStatusAguardandoPecasHandler(osRepo, emissor);
+    it('não deve registrar pendência quando OS não está em AWAITING_APPROVAL', async () => {
+      const handler = new AtualizarStatusAguardandoPecasHandler(osRepo);
       await shouldNotUpdateWhenStatusIs(
         osRepo,
         handler,

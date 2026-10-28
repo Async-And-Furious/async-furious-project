@@ -6,6 +6,7 @@ export type OrdemServicoUpdateData = {
   iniciada_em?: Date | null;
   finalizada_em?: Date | null;
   entregue_em?: Date | null;
+  reserva_pecas_pendente?: boolean;
 };
 
 export interface IOrdemServicoRepository {

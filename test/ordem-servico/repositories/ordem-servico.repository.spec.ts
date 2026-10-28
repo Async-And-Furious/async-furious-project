@@ -16,6 +16,7 @@ describe('OrdemServicoRepository', () => {
     iniciada_em: null,
     finalizada_em: null,
     entregue_em: null,
+    reserva_pecas_pendente: false,
     created_at: new Date('2024-01-15'),
     updated_at: new Date('2024-01-15'),
     veiculo: {
@@ -44,6 +45,7 @@ describe('OrdemServicoRepository', () => {
     iniciada_em: null,
     finalizada_em: null,
     entregue_em: null,
+    reservaPecasPendente: false,
     created_at: new Date('2024-01-15'),
     updated_at: new Date('2024-01-15'),
   };
@@ -312,6 +314,22 @@ describe('OrdemServicoRepository', () => {
       expect(result).toEqual(
         expect.objectContaining({ veiculoId: 'veiculo-123', clienteId: 'cliente-123' })
       );
+    });
+
+    it('grava e lê o marcador de reserva de peças pendente', async () => {
+      const id = 'os-123';
+      const updatedOrdem = { ...mockOrdemServico, reserva_pecas_pendente: true };
+
+      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(mockOrdemServico);
+      (prismaService.ordemServico.update as jest.Mock).mockResolvedValue(updatedOrdem);
+
+      const result = await repository.update(id, { reserva_pecas_pendente: true });
+
+      expect(prismaService.ordemServico.update).toHaveBeenCalledWith({
+        where: { id },
+        data: { reserva_pecas_pendente: true },
+      });
+      expect(result.reservaPecasPendente).toBe(true);
     });
 
     it('deve lançar NotFoundException quando ordem não encontrada para atualização', async () => {

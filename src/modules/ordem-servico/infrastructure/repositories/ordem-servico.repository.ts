@@ -29,6 +29,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     iniciada_em: Date | null;
     finalizada_em: Date | null;
     entregue_em: Date | null;
+    reserva_pecas_pendente: boolean;
     created_at: Date;
     updated_at: Date;
     orcamento?: unknown;
@@ -44,6 +45,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     entity.iniciada_em = record.iniciada_em;
     entity.finalizada_em = record.finalizada_em;
     entity.entregue_em = record.entregue_em;
+    entity.reservaPecasPendente = record.reserva_pecas_pendente;
     entity.created_at = record.created_at;
     entity.updated_at = record.updated_at;
     if (record.orcamento !== undefined) {
@@ -146,6 +148,9 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
         ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
         ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
         ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
+        ...(data.reserva_pecas_pendente !== undefined && {
+          reserva_pecas_pendente: data.reserva_pecas_pendente,
+        }),
       },
     });
     return this.mapToEntity(record);

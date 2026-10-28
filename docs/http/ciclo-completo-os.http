@@ -102,31 +102,23 @@ Authorization: Bearer {{recepToken}}
 }
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 3 — Mecânico assume a OS  (MECANICO)
+# PASSO 3 — Início do diagnóstico  (acontece no serviço de Execução)
+# O mecânico chama PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no
+# serviço de Execução e Produção, que publica DiagnosticoIniciado.
+# O OS Service consome o evento e grava UNDER_DIAGNOSIS (as rotas
+# /assumir e /analisar deixaram de existir aqui).
 # Status resultante: UNDER_DIAGNOSIS
 # ─────────────────────────────────────────────────────────────
 
-### Assumir OS
-PATCH {{base}}/ordens-servico/{{osId}}/assumir
-Authorization: Bearer {{mecToken}}
-
-
 # ─────────────────────────────────────────────────────────────
-# PASSO 4 — Mecânico registra análise do veículo  (MECANICO)
-# Status: permanece UNDER_DIAGNOSIS
+# PASSO 5 — Mecânico lança serviços e insumos  (MECANICO)
+# Exige a OS em UNDER_DIAGNOSIS (senão 400: aguarde o DiagnosticoIniciado e repita).
+# Responde 200 com os totais calculados e publica OrcamentoCalculado;
+# o orçamento é gerado pelo Billing e a OS passa a AWAITING_APPROVAL.
+# Os valores não podem ser negativos (400).
 # ─────────────────────────────────────────────────────────────
 
-### Analisar veículo
-PATCH {{base}}/ordens-servico/{{osId}}/analisar
-Authorization: Bearer {{mecToken}}
-
-# ─────────────────────────────────────────────────────────────
-# PASSO 5 — Mecânico gera orçamento  (MECANICO)
-# Status resultante: AWAITING_APPROVAL
-# IMPORTANTE: valor_total_servicos deve ser > 0.
-# ─────────────────────────────────────────────────────────────
-
-### Gerar orçamento (sem peças)
+### Lançar serviços e insumos (sem peças)
 PATCH {{base}}/ordens-servico/{{osId}}/servicos-insumos
 Content-Type: application/json
 Authorization: Bearer {{mecToken}}
@@ -139,22 +131,21 @@ Authorization: Bearer {{mecToken}}
 
 # ─────────────────────────────────────────────────────────────
 # PASSO 6 — Cliente aprova o orçamento  (PÚBLICO — sem token)
-# Status resultante: IN_PROGRESS
-# iniciada_em é preenchido automaticamente aqui.
+# A OS permanece em AWAITING_APPROVAL: só ExecucaoIniciada (iniciar-reparo
+# no serviço de Execução) leva a OS a IN_PROGRESS e preenche iniciada_em.
 # ─────────────────────────────────────────────────────────────
 
 ### Aprovar orçamento
 PATCH {{base}}/ordens-servico/{{osId}}/orcamento/aprovar
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 7 — Mecânico finaliza execução  (MECANICO)
+# PASSO 7 — Conclusão da execução  (acontece no serviço de Execução)
+# O mecânico chama PATCH /api/v1/execucoes/{id}/concluir no serviço de
+# Execução e Produção, que publica ExecucaoConcluida. O OS Service
+# consome o evento, grava FINISHED e preenche finalizada_em
+# (a rota /finalizar-execucao deixou de existir aqui).
 # Status resultante: FINISHED
-# finalizada_em é preenchido automaticamente aqui.
 # ─────────────────────────────────────────────────────────────
-
-### Finalizar execução
-PATCH {{base}}/ordens-servico/{{osId}}/finalizar-execucao
-Authorization: Bearer {{mecToken}}
 
 # ─────────────────────────────────────────────────────────────
 # PASSO 8 — Recepcionista registra entrega  (RECEPCIONISTA)

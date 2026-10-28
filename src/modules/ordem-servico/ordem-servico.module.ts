@@ -17,11 +17,8 @@ import { OrdemServicoBacklogAdapter } from './infrastructure/adapters/ordem-serv
 import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
 import {
   CriarOrdemServicoUseCase,
-  AssumirOrdemServicoUseCase,
-  AnalisarVeiculoUseCase,
   ListarServicosInsumosNaOsUseCase,
   AtualizarOrdemServicoUseCase,
-  FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
   RegistrarEntregaVeiculoUseCase,
   ConsultarStatusOrdemServicoUseCase,
@@ -46,6 +43,7 @@ import { GerarOrcamentoHandler } from './application/event-handlers/gerar-orcame
 import { EnviarOrcamentoHandler } from './application/event-handlers/enviar-orcamento.handler';
 import { AtualizarStatusAguardandoAprovacaoHandler } from './application/event-handlers/atualizar-status-aguardando-aprovacao.handler';
 import { VerificarNecessidadePecasHandler } from './application/event-handlers/verificar-necessidade-pecas.handler';
+import { AtualizarStatusExecucaoIniciadaHandler } from './application/event-handlers/atualizar-status-execucao-iniciada.handler';
 import { AtualizarStatusEmExecucaoHandler } from './application/event-handlers/atualizar-status-em-execucao.handler';
 import { IniciarMonitoramentoTempoHandler } from './application/event-handlers/iniciar-monitoramento-tempo.handler';
 import { AtualizarStatusFinalizadaHandler } from './application/event-handlers/atualizar-status-finalizada.handler';
@@ -124,9 +122,9 @@ import {
     },
     {
       provide: AtualizarStatusAguardandoPecasHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusAguardandoPecasHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (osRepo: OrdemServicoRepository) =>
+        new AtualizarStatusAguardandoPecasHandler(osRepo),
+      inject: [OrdemServicoRepository],
     },
     {
       provide: VerificarNecessidadePecasHandler,
@@ -140,15 +138,24 @@ import {
       inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
+      provide: AtualizarStatusExecucaoIniciadaHandler,
+      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
+        new AtualizarStatusExecucaoIniciadaHandler(osRepo, barramento),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+    },
+    {
       provide: IniciarMonitoramentoTempoHandler,
       useFactory: (osRepo: OrdemServicoRepository) => new IniciarMonitoramentoTempoHandler(osRepo),
       inject: [OrdemServicoRepository],
     },
     {
       provide: AtualizarStatusFinalizadaHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusFinalizadaHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        historyRepo: StatusHistoryRepository,
+        barramento: IEmissorEventos
+      ) => new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, barramento),
+      inject: [OrdemServicoRepository, StatusHistoryRepository, EMISSOR_EVENTOS],
     },
     {
       provide: FinalizarMonitoramentoTempoHandler,
@@ -204,26 +211,13 @@ import {
       ],
     },
     {
-      provide: AssumirOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AssumirOrdemServicoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
-    },
-    {
-      provide: AnalisarVeiculoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AnalisarVeiculoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
-    },
-    {
       provide: ListarServicosInsumosNaOsUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
-        orcRepo: OrcamentoRepository,
         osPecaRepo: OsPecaRepository,
         barramento: IEmissorEventos
-      ) => new ListarServicosInsumosNaOsUseCase(osRepo, orcRepo, osPecaRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, OsPecaRepository, EMISSOR_EVENTOS],
+      ) => new ListarServicosInsumosNaOsUseCase(osRepo, osPecaRepo, barramento),
+      inject: [OrdemServicoRepository, OsPecaRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarOrdemServicoUseCase,
@@ -253,12 +247,6 @@ import {
         barramento: IEmissorEventos
       ) => new RecusarOrcamentoUseCase(osRepo, orcRepo, barramento),
       inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
-    },
-    {
-      provide: FinalizarExecucaoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new FinalizarExecucaoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AprovarServicoPrestadoUseCase,

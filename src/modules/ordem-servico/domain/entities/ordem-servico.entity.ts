@@ -22,32 +22,17 @@ export class OrdemDeServico {
   iniciada_em: Date | null;
   finalizada_em: Date | null;
   entregue_em: Date | null;
+  reservaPecasPendente: boolean;
   created_at: Date;
   updated_at: Date;
   orcamento?: Orcamento;
   osPecas?: OsPeca[];
   osServicos?: OsServico[];
 
-  podeAssumir(): void {
-    if (this.status !== 'RECEIVED') {
-      throw new DomainException(
-        `OS deve estar no status Recebida para ser assumida. Status atual: ${this.status}`
-      );
-    }
-  }
-
-  podeAnalisarVeiculo(): void {
+  podeLancarServicosInsumos(): void {
     if (this.status !== 'UNDER_DIAGNOSIS') {
       throw new DomainException(
-        `OS deve estar Em Diagnóstico para analisar o veículo. Status atual: ${this.status}`
-      );
-    }
-  }
-
-  podeLancarServicosInsumos(): void {
-    if (!['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(this.status)) {
-      throw new DomainException(
-        `OS deve estar Em Diagnóstico ou Aguardando Aprovação. Status atual: ${this.status}`
+        `OS deve estar Em Diagnóstico para lançar serviços e insumos. Status atual: ${this.status}`
       );
     }
   }
@@ -56,14 +41,6 @@ export class OrdemDeServico {
     if (!['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(this.status)) {
       throw new DomainException(
         `A ordem de serviço só pode ser atualizada até Aguardando Aprovação. Status atual: ${this.status}`
-      );
-    }
-  }
-
-  podeFinalizar(): void {
-    if (this.status !== 'IN_PROGRESS') {
-      throw new DomainException(
-        `OS deve estar Em Execução para ser finalizada. Status atual: ${this.status}`
       );
     }
   }

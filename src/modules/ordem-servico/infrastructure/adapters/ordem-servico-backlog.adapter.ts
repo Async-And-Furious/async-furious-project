@@ -11,7 +11,14 @@ export class OrdemServicoBacklogAdapter implements IOrdemServicoBacklogPort {
 
   async findAllAguardandoPecas(): Promise<OrdemServicoBacklogItem[]> {
     const ordens = await this.prisma.ordemServico.findMany({
-      where: { status: 'AWAITING_PARTS' },
+      // AWAITING_APPROVAL com reserva pendente: a OS ainda não recebeu ExecucaoIniciada, mas já
+      // espera peças e deve ser liberada assim que o estoque chegar.
+      where: {
+        OR: [
+          { status: 'AWAITING_PARTS' },
+          { status: 'AWAITING_APPROVAL', reserva_pecas_pendente: true },
+        ],
+      },
       include: {
         osPecas: true,
       },

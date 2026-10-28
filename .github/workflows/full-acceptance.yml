@@ -101,7 +101,7 @@ except (OSError,ValueError): print("invalid-or-empty-json")' "$admin_early_file"
           printf 'staff_logins=3 admin=true recepcionista=true mecanico=true\n' | tee -a "$GITHUB_STEP_SUMMARY"
 
           admin_status=$(request -o /dev/null -w '%{http_code}' -H "authorization: Bearer $admin_token" "$endpoint/api/v1/ordens-servico/tempo-medio")
-          mechanic_status=$(request -o /dev/null -w '%{http_code}' -X PATCH -H "authorization: Bearer $mec_token" -d '{}' "$endpoint/api/v1/ordens-servico/not-a-uuid/assumir")
+          mechanic_status=$(request -o /dev/null -w '%{http_code}' -X PATCH -H "authorization: Bearer $mec_token" -d '{}' "$endpoint/api/v1/ordens-servico/not-a-uuid/servicos-insumos")
           recep_status=$(request -o /dev/null -w '%{http_code}' -X POST -H "authorization: Bearer $recep_token" -d '{}' "$endpoint/api/v1/ordens-servico")
           [[ "$admin_status" == 2* && "$mechanic_status" == 400 && "$recep_status" == 400 ]]
           printf 'role_routes=pass admin_tempo_medio=%s mechanic_guard_passed=%s recepcionista_guard_passed=%s\n' "$admin_status" "$mechanic_status" "$recep_status" | tee -a "$GITHUB_STEP_SUMMARY"

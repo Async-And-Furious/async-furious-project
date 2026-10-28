@@ -2,10 +2,18 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
-import { OsSemPecasConfirmada } from '../../domain/events/os-sem-pecas-confirmada.event';
 import { OrdemServicoEmExecucao } from '../../domain/events/ordem-servico-em-execucao.event';
-import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
 
+/**
+ * A reserva de peças não leva mais a OS a IN_PROGRESS: quem faz isso é ExecucaoIniciada
+ * (AtualizarStatusExecucaoIniciadaHandler). Aqui PecasReservadas apenas baixa a pendência de
+ * reserva e, se a OS já estava aguardando peças, retoma AWAITING_PARTS → IN_PROGRESS.
+ *
+ * PecasReservadas vem de dois lugares:
+ * 1. DebitarEstoqueHandler (peças disponíveis na aprovação) → OS em AWAITING_APPROVAL
+ * 2. LiberarOrdensAguardandoPecasHandler (peças recebidas do fornecedor) → OS em
+ *    AWAITING_APPROVAL (reserva pendente) ou AWAITING_PARTS
+ */
 @Injectable()
 export class AtualizarStatusEmExecucaoHandler {
   private readonly logger = new Logger(AtualizarStatusEmExecucaoHandler.name);
@@ -15,31 +23,30 @@ export class AtualizarStatusEmExecucaoHandler {
     private readonly emissor: IEmissorEventos
   ) {}
 
-  @OnEvent('OsSemPecasConfirmada')
-  async handleSemPecas(evento: OsSemPecasConfirmada): Promise<void> {
-    await this.iniciarExecucao(evento.ordemServicoId, ['AWAITING_APPROVAL']);
-  }
-
-  // PecasReservadas vem de dois lugares:
-  // 1. DebitarEstoqueHandler (peças disponíveis imediatamente) → OS em AWAITING_APPROVAL
-  // 2. LiberarOrdensAguardandoPecasHandler (peças recebidas do fornecedor) → OS em AWAITING_PARTS
   @OnEvent('PecasReservadas')
   async handlePecasReservadas(evento: { ordemServicoId: string }): Promise<void> {
-    await this.iniciarExecucao(evento.ordemServicoId, ['AWAITING_APPROVAL', 'AWAITING_PARTS']);
-  }
+    const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
 
-  private async iniciarExecucao(
-    ordemServicoId: string,
-    expectedStatuses: OSStatus[]
-  ): Promise<void> {
-    const os = await this.ordemServicoRepository.findOne(ordemServicoId);
-    if (!expectedStatuses.includes(os.status)) {
-      this.logger.warn(
-        `[P-08] OS ${ordemServicoId} em status inválido para iniciar execução: ${os.status}`
-      );
+    if (os.status === 'AWAITING_APPROVAL') {
+      if (os.reservaPecasPendente) {
+        await this.ordemServicoRepository.update(evento.ordemServicoId, {
+          reserva_pecas_pendente: false,
+        });
+      }
       return;
     }
-    await this.ordemServicoRepository.update(ordemServicoId, { status: 'IN_PROGRESS' });
-    await this.emissor.emitir(new OrdemServicoEmExecucao(ordemServicoId));
+
+    if (os.status === 'AWAITING_PARTS') {
+      await this.ordemServicoRepository.update(evento.ordemServicoId, {
+        status: 'IN_PROGRESS',
+        reserva_pecas_pendente: false,
+      });
+      await this.emissor.emitir(new OrdemServicoEmExecucao(evento.ordemServicoId));
+      return;
+    }
+
+    this.logger.warn(
+      `[P-08] OS ${evento.ordemServicoId} em status inválido para registrar reserva de peças: ${os.status}`
+    );
   }
 }
