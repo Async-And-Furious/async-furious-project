@@ -9,8 +9,8 @@ import { EntityNotFoundException } from '../../src/shared/domain/exceptions/enti
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
   let mockLogger: { error: jest.Mock; warn: jest.Mock };
-  let mockResponse: any;
-  let mockRequest: any;
+  let mockResponse: { status: jest.Mock; json: jest.Mock };
+  let mockRequest: { url: string; method: string; id?: string };
   let mockArgumentsHost: ArgumentsHost;
 
   beforeEach(async () => {
@@ -45,7 +45,7 @@ describe('GlobalExceptionFilter', () => {
       switchToRpc: jest.fn(),
       switchToWs: jest.fn(),
       getType: jest.fn(),
-    };
+    } as unknown as ArgumentsHost;
   });
 
   afterEach(() => {
@@ -130,7 +130,7 @@ describe('GlobalExceptionFilter', () => {
         name: 'ErrorWithoutMessage',
       };
 
-      filter.catch(errorWithoutMessage as any, mockArgumentsHost);
+      filter.catch(errorWithoutMessage, mockArgumentsHost);
 
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
       expect(mockResponse.json).toHaveBeenCalledWith({

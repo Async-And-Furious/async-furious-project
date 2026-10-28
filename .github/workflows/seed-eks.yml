@@ -7,7 +7,7 @@ on:
         description: Protected target environment
         required: true
         type: choice
-        options: [hml, prod]
+        options: [hml]
         default: hml
 
 permissions:
@@ -15,15 +15,15 @@ permissions:
   id-token: write
 
 jobs:
-  # Sem esta guarda, o deploy-eks com environment=prod termina com todos os jobs pulados e o seed aparece verde sem rodar.
+  # Protege chamadas manuais legadas: a Fase 4 não permite seed em PROD.
   prod-guard:
-    name: Guard prod seed
+    name: Enforce HML-only seed
     runs-on: ubuntu-latest
     steps:
-      - name: Refuse prod seed while PROD_DEPLOY_ENABLED is not true
-        if: ${{ inputs.environment == 'prod' && vars.PROD_DEPLOY_ENABLED != 'true' }}
+      - name: Refuse PROD seed in Phase 4
+        if: ${{ inputs.environment == 'prod' }}
         run: |
-          echo "Prod seed requires the PROD_DEPLOY_ENABLED=true variable. The prod path is disabled in Phase 4 (HML only)." >&2
+          echo "Phase 4 is HML-only; PROD seeding is disabled." >&2
           exit 1
 
   first-run:

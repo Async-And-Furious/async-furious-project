@@ -6,7 +6,7 @@ on:
       - main
       - develop
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
@@ -16,7 +16,6 @@ jobs:
     # Nome mantido de propósito: a proteção atual da main exige o check "Run All Tests".
     # Trocar para "tests" somente junto com a troca dos required checks da main (ver progresso-I-333.md).
     name: Run All Tests
-    if: ${{ github.event_name != 'pull_request' || ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação')) }}
     runs-on: ubuntu-latest
 
     services:
@@ -102,7 +101,7 @@ jobs:
   sonar:
     name: sonar
     needs: test
-    # Fork não recebe o SONAR_TOKEN, então o job é pulado. Atenção: check pulado conta como satisfeito na proteção de branch; PR de fork para main não passa pelo Sonar.
+    # Fork não recebe o SONAR_TOKEN; o job validate reprova se Sonar for exigido em main e for pulado.
     if: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     steps:
@@ -123,5 +122,24 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
         with:
-          # Quality gate bloqueante só no push para main. Em develop e em PR a análise é informativa.
-          args: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && '-Dsonar.qualitygate.wait=true' || '' }}
+          # Quality gate bloqueante em main e em PR para main; em develop é informativo.
+          args: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main')) && '-Dsonar.qualitygate.wait=true' || '' }}
+
+  validate:
+    name: validate
+    if: ${{ always() }}
+    needs: [test, sonar]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce required checks for main
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+          SONAR_RESULT: ${{ needs.sonar.result }}
+          SONAR_REQUIRED: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main') }}
+        run: |
+          set -euo pipefail
+          [[ "$TEST_RESULT" == 'success' ]] || { echo "Run All Tests did not pass: $TEST_RESULT" >&2; exit 1; }
+          if [[ "$SONAR_REQUIRED" == 'true' && "$SONAR_RESULT" != 'success' ]]; then
+            echo "Sonar is required for main but did not pass: $SONAR_RESULT" >&2
+            exit 1
+          fi

@@ -6,7 +6,7 @@ on:
       - main
       - develop
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened]
   schedule:
     - cron: '0 4 * * 1'
   workflow_dispatch:
@@ -20,7 +20,6 @@ jobs:
   docker-image-scan:
     # Nome do check de proteção de branch (ver progresso-I-333.md).
     name: trivy
-    if: ${{ github.event_name != 'pull_request' || ((github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'Documentação') && !contains(github.event.pull_request.labels.*.name, 'Documentação')) }}
     runs-on: ubuntu-latest
 
     env:

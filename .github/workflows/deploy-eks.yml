@@ -18,7 +18,7 @@ on:
         description: Logical Academy environment
         required: true
         type: choice
-        options: [hml, prod]
+        options: [hml]
         default: hml
       seed_prod:
         description: Explicitly allow the production seed job
@@ -68,7 +68,7 @@ concurrency:
 jobs:
   image:
     name: Build and publish immutable image
-    # PROD fica desligado enquanto a variável PROD_DEPLOY_ENABLED não existir (Fase 4 só tem HML, issue #333).
+    # Deploy PROD remains inert below; this job only builds and publishes the image.
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
       (github.event_name == 'workflow_dispatch' && inputs.environment == 'hml') ||
@@ -618,11 +618,8 @@ jobs:
   deploy-prod:
     name: Deploy PROD
     needs: image
-    # Mesma chave do job image: sem a variável PROD_DEPLOY_ENABLED=true, o deploy de produção não roda.
-    if: >-
-      vars.PROD_DEPLOY_ENABLED == 'true' && (
-        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-        (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && github.ref == 'refs/heads/main'))
+    # A Fase 4 é HML-only; manter o job histórico, mas nunca executar deploy em PROD.
+    if: false
     runs-on: ubuntu-latest
     environment: production
     env:
