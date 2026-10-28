@@ -259,15 +259,17 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. |
+| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. (deprecated) |
+| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. (deprecated) |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orçamento. |
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento; a resposta traz `linkPagamento` (Checkout Pro do Mercado Pago). `502` se o Mercado Pago falhar (orçamento segue pendente). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. |
+| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. (deprecated) |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
+
+> **Deprecated (#334):** `assumir` migra para `PATCH /execucoes/:id/iniciar-diagnostico`, que também absorve `analisar` (sem rota equivalente), e `finalizar-execucao` migra para `PATCH /execucoes/:id/concluir`, no serviço de Execução e Produção. Nas rotas novas, o `:id` é o da Execução (listar em `GET /execucoes`), não o da OS. As três continuam funcionando até o fluxo do mecânico funcionar de ponta a ponta em HML pelo Execução, incluindo o transporte dos eventos entre os serviços; depois são removidas.
 
 #### Peças e Insumos (`/api/v1/pecas`)
 
