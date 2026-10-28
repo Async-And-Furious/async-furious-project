@@ -12,9 +12,14 @@ de cada documento.
 
 | Documento | Conteúdo |
 |---|---|
-| [architecture/overview.md](./architecture/overview.md) | Visão geral: os quatro repositórios, diagrama de componentes C4, comunicação entre Bounded Contexts |
+| [architecture/overview.md](./architecture/overview.md) | **Diagrama-mestre da arquitetura-alvo da Fase 4** (três serviços, Kafka, bancos, borda e Mercado Pago), serviços e dados, estado de implementação |
 | [architecture/component-diagram.md](./architecture/component-diagram.md) | Diagrama de Componentes, com tabela de nome, responsabilidade, tecnologia e comunicação |
-| [architecture/deployment-diagram.md](./architecture/deployment-diagram.md) | Diagrama de Implantação: ambiente `kind` local e ambiente AWS (hml e prod) |
+| [architecture/deployment-diagram.md](./architecture/deployment-diagram.md) | Diagrama de Implantação: ambiente `kind` local e ambiente AWS da Fase 4 (hml), com o que muda em relação à Fase 3 |
+| [architecture/edge-topology.md](./architecture/edge-topology.md) | Borda da Fase 4: rotas do API Gateway (públicas e autenticadas), roteamento por path no ALB, autenticação nos serviços |
+| [architecture/saga-flow.md](./architecture/saga-flow.md) | Saga coreografada: diagrama de sequência, mapa de responsabilidade por etapa e matriz `etapa → falha → compensação` |
+| [architecture/event-catalog.md](./architecture/event-catalog.md) | Catálogo dos eventos de integração: tópico, produtor, consumidores e assinaturas por serviço |
+| [architecture/service-boundaries.md](./architecture/service-boundaries.md) | Divisão em três microsserviços e ownership de dados |
+| [architecture/persistence-model.md](./architecture/persistence-model.md) | Read model do OS Service no DocumentDB (coleções, índice da fila, write-through) |
 | [architecture/authentication-flow.md](./architecture/authentication-flow.md) | Sequências de autenticação de staff e cliente, local e AWS, com fluxos de erro |
 | [architecture/service-order-flow.md](./architecture/service-order-flow.md) | Sequência de abertura e acompanhamento da Ordem de Serviço |
 
@@ -41,9 +46,9 @@ de cada documento.
 
 ## Decisões
 
-- **ADRs**: ver [adr/README.md](./adr/README.md). Quinze decisões
-  arquiteturais, da separação em quatro repositórios ao mínimo de cobertura de
-  testes, mais [notas das fases anteriores](./adr/notas-fases-anteriores.md).
+- **ADRs**: ver [adr/README.md](./adr/README.md). Vinte e duas
+  decisões arquiteturais, da separação em quatro repositórios (Fase 3) à
+  integração com o Mercado Pago (Fase 4), mais [notas das fases anteriores](./adr/notas-fases-anteriores.md).
 - **RFCs**: ver [rfcs/README.md](./rfcs/README.md). RFC-003 (integração API
   Gateway e EKS), RFC-004 (ownership de VPC), RFC-006 (segredos e assinatura
   JWT), RFC-007 (exceção de acesso público do RDS em homologação) e a
