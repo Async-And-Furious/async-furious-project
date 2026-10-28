@@ -66,6 +66,5 @@ com concorrentes (ex.: Snyk, Grype, Burp Suite).
 - `.github/workflows/zap.yml`
 - `.github/workflows/trivy.yml`
 - `README.md` (seção "Tecnologias", "Seguranca DAST")
-- `docs/contexto-tecnico-consolidado.md` §8
 - [`docs/infrastructure/cicd.md`](../infrastructure/cicd.md)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #12 — Trivy não estava nas notas originais, adicionado nesta auditoria)

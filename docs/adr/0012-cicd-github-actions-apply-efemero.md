@@ -75,6 +75,5 @@ comportamentos por gatilho:
 - `.github/workflows/terraform.yml`
 - `docs/superpowers/specs/2026-06-22-terraform-kubernetes-design.md`
 - `README.md` (seção "CI/CD")
-- `docs/contexto-tecnico-consolidado.md` §8 ("Conflito documentado: CI/CD aplica ou não aplica infraestrutura automaticamente?")
 - [`docs/infrastructure/cicd.md`](../infrastructure/cicd.md)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #11)
