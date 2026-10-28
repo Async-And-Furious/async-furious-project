@@ -141,7 +141,6 @@ específica vence):
 - `README.md` (tabela de rotas "Ordens de Servico")
 - `docs/reports/relatorio-e2e-orcamento-curl.md`
 - `docs/domain-storytelling/suggestions/domain-storytelling.suggestion.vic.png`
-- `docs/contexto-tecnico-consolidado.md` §4
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #8)
 - [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md) — divisão em microsserviços e ownership de dados
 - [`docs/architecture/service-boundaries.md`](../architecture/service-boundaries.md) — mapa de ownership completo

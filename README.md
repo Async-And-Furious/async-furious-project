@@ -76,45 +76,11 @@ Com o aumento da demanda e a expansão para novas unidades, a oficina precisa ga
 - **Infraestrutura escalável**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 réplicas, escalando por CPU > 70% ou memória > 80%).
 - **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migração documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
 - **Pipeline de CI/CD**: GitHub Actions valida build, testes automatizados e infraestrutura (`terraform validate` + `plan`) a cada Pull Request.
-- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 85%.
+- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 80%.
 
 ### Diagrama de Arquitetura
 
-```mermaid
-flowchart TB
-    C[Cliente HTTP]
-
-    subgraph CI["CI/CD - GitHub Actions"]
-        T1["tests.yml<br/>build + testes automatizados"]
-        T2["terraform.yml<br/>terraform validate + plan"]
-    end
-
-    subgraph IaC["Terraform (/infra)"]
-        KC["modulo kind-cluster<br/>provisiona o cluster"]
-        KA["modulo kubernetes-apps<br/>aplica manifests de /k8s"]
-        KC --> KA
-    end
-
-    subgraph K8s["Cluster Kubernetes (kind local / EKS)"]
-        direction TB
-        SVC["Private ClusterIP Service<br/>:3000"]
-        subgraph DEPLOY["Deployment async-furious-api<br/>2-5 pods via HPA"]
-            API1[Pod API]
-            API2[Pod API]
-        end
-        CM[ConfigMap]
-        SEC[Secret]
-        SVC --> DEPLOY
-        CM -.env.-> DEPLOY
-        SEC -.env.-> DEPLOY
-        RDS[("AWS RDS PostgreSQL")]
-        DEPLOY -->|Prisma via explicit RDS connection secret| RDS
-    end
-
-    C --> SVC
-    T2 -.PR.-> IaC
-    KA -->|kubectl_manifest| K8s
-```
+O diagrama-mestre da arquitetura (três microsserviços, Kafka, bancos, borda com API Gateway e Lambda Authorizer e Mercado Pago) mora em um único lugar: [`docs/architecture/overview.md`](./docs/architecture/overview.md). Este README não mantém cópia dele. A topologia de implantação está em [`docs/architecture/deployment-diagram.md`](./docs/architecture/deployment-diagram.md) e o fluxo da Saga em [`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md).
 
 ### Fluxo de Deploy
 
@@ -124,7 +90,7 @@ flowchart TB
 4. O HPA escala os pods da API de 2 a 5 réplicas conforme o consumo de CPU/memória.
 5. Em Pull Requests que alteram `infra/**` ou `k8s/**`, o GitHub Actions roda `terraform validate` + `terraform plan` e publica o plano como artifact para revisão humana antes de qualquer `apply` real.
 
-Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na seção [Infraestrutura como Código](#infraestrutura-como-codigo-terraform--kubernetes).
+Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na seção [Infraestrutura como Código](#infraestrutura-como-código-terraform--kubernetes).
 
 ---
 
@@ -259,15 +225,17 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. |
+| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. (deprecated) |
+| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. (deprecated) |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orçamento. |
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento; a resposta traz `linkPagamento` (Checkout Pro do Mercado Pago). `502` se o Mercado Pago falhar (orçamento segue pendente). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. |
+| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. (deprecated) |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
+
+> **Deprecated (#334):** `assumir` migra para `PATCH /execucoes/:id/iniciar-diagnostico`, que também absorve `analisar` (sem rota equivalente), e `finalizar-execucao` migra para `PATCH /execucoes/:id/concluir`, no serviço de Execução e Produção. Nas rotas novas, o `:id` é o da Execução (listar em `GET /execucoes`), não o da OS. As três continuam funcionando até o fluxo do mecânico funcionar de ponta a ponta em HML pelo Execução, incluindo o transporte dos eventos entre os serviços; depois são removidas.
 
 #### Peças e Insumos (`/api/v1/pecas`)
 
@@ -395,6 +363,8 @@ pnpm test -- --testNamePattern="CreateClienteUseCase"
 | Lines | 80% |
 | Functions | 80% |
 | Branches | 80% |
+
+O mínimo de 80% vale para as quatro métricas e é exigido pelo `pnpm test:cov` (`jest.config.js`) e pelo job `Run All Tests` do workflow `tests.yml`, que falha se o mínimo não for atingido. A evidência de cada execução do CI é o artifact `coverage` do run (aba Actions, retenção de 7 dias), que traz o relatório `lcov` e a versão HTML. Consulte [as execuções do workflow de testes](https://github.com/Async-And-Furious/async-furious-project/actions/workflows/tests.yml) para abrir o artifact de cada run. O job `sonar` analisa o mesmo relatório no SonarCloud. Ver [ADR-0014](docs/adr/0014-cobertura-minima-testes.md).
 
 ---
 

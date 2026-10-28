@@ -205,15 +205,17 @@ docs/http/insomnia.yaml
 | GET | `/ordens-servico/:id/status` | Authenticated | Check service order status. |
 | PATCH | `/ordens-servico/:id` | ADMIN | Update service order. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Delete service order. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mechanic takes ownership. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Register diagnostic analysis. |
+| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mechanic takes ownership. (deprecated) |
+| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Register diagnostic analysis. (deprecated) |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Generate estimate. |
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Public | Customer approves estimate; the response includes `linkPagamento` (Mercado Pago Checkout Pro). `502` if Mercado Pago fails (estimate stays pending). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Public | Customer rejects estimate. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Public | Customer approves performed service. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mechanic finishes execution. |
+| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mechanic finishes execution. (deprecated) |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Check average execution time. |
+
+> **Deprecated (#334):** `assumir` moves to `PATCH /execucoes/:id/iniciar-diagnostico`, which also absorbs `analisar` (no equivalent route), and `finalizar-execucao` moves to `PATCH /execucoes/:id/concluir`, in the Execution and Production service. In the new routes, `:id` is the Execution id (list with `GET /execucoes`), not the service order id. All three keep working until the mechanic flow works end to end in HML through the Execution service, including event transport between the services; then they are removed.
 
 #### Parts and Supplies (`/api/v1/pecas`)
 
@@ -339,10 +341,12 @@ pnpm test -- --testNamePattern="CreateClienteUseCase"
 
 | Metric | Minimum |
 | ------ | ------- |
-| Statements | 85% |
-| Lines | 85% |
+| Statements | 80% |
+| Lines | 80% |
 | Functions | 80% |
 | Branches | 80% |
+
+The 80% minimum applies to all four metrics and is enforced by `pnpm test:cov` (`jest.config.js`) and by the `Run All Tests` job in the `tests.yml` workflow, which fails when the minimum is not met. The coverage evidence for each CI run is the `coverage` artifact of the run (Actions tab, 7-day retention), containing the `lcov` report and the HTML version. See [the test workflow runs](https://github.com/Async-And-Furious/async-furious-project/actions/workflows/tests.yml) to open each run's artifact. The `sonar` job analyzes the same report in SonarCloud. See [ADR-0014](docs/adr/0014-cobertura-minima-testes.md).
 
 ---
 

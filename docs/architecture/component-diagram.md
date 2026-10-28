@@ -2,6 +2,11 @@
 
 > Convenção C4 (nível Component), em Mermaid. Todos os componentes abaixo estão
 > implementados.
+>
+> **Escopo: monólito da Fase 3 (ainda implantado em `prod`).** A topologia-alvo
+> da Fase 4 (três serviços, Kafka, DocumentDB) está no diagrama-mestre de
+> [overview.md](./overview.md); este diagrama detalha apenas os componentes
+> internos do monólito e não deve ser lido como a arquitetura final.
 
 ```mermaid
 flowchart TB

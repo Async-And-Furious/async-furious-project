@@ -75,5 +75,4 @@ dentro dessa exigência.
   `src/auth/strategies/jwt.strategy.ts`, `src/auth/decorators/public.decorator.ts`
 - `README.md` (seção "Autenticacao e Papeis")
 - `docs/context-map/suggestions/context-map.suggestion.vic.mmd`
-- `docs/contexto-tecnico-consolidado.md` §8
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #5)

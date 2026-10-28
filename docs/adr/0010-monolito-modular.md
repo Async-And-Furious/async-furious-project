@@ -64,5 +64,4 @@ por contexto), não *se* seria monólito.
 
 - `README.md` (seção "Estrutura do Projeto")
 - [`docs/ddd.md`](../ddd.md) §3 (nota de nomenclatura)
-- `docs/contexto-tecnico-consolidado.md` §2 (tabela dos 4 módulos de domínio)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #7)
