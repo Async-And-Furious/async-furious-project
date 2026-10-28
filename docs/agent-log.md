@@ -10,7 +10,8 @@
   testes falham ou Sonar é ignorado em `main`. A proteção de branch ainda
   precisa exigir esse check (passo externo).
 - Removidos casts `any` do teste do filtro global e adicionados contratos de
-  workflow. Coverage permanece 80/80/80/80.
+  workflow. A action do Sonar foi fixada ao SHA verificado de `v8.4.0`.
+  Coverage permanece 80/80/80/80.
 - SonarCloud HTTP 403 permanece bloqueio externo de autorização; não houve
   leitura ou alteração de `SONAR_TOKEN`. HML/DocumentDB/CA, Kafka consumer,
   baseline pós-read-model e itens da etapa 2 seguem pendentes.

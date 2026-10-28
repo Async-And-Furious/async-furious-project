@@ -55,4 +55,12 @@ describe('Phase 4 CI contract', () => {
       /\[\[ "\$SONAR_REQUIRED" == 'true' && "\$SONAR_RESULT" != 'success' \]\]/
     );
   });
+
+  it('pins the SonarCloud action to an immutable release commit', () => {
+    const sonarJob = jobBlock(readWorkflow('tests.yml'), 'sonar');
+
+    expect(sonarJob).toMatch(
+      /uses:\s*SonarSource\/sonarqube-scan-action@[0-9a-f]{40}\s+# v8\.4\.0/
+    );
+  });
 });
