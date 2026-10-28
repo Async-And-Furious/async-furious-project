@@ -61,6 +61,26 @@ com concorrentes (ex.: Snyk, Grype, Burp Suite).
   fora do runner efêmero, então o risco prático é baixo, mas cresce se/
   quando a Fase 3 chegar a produção de verdade).
 
+## Atualização (Fase 4: scanners nos serviços novos)
+
+Revisão da Feature #316. Cada repositório de serviço tem esteira própria
+([template-servico.md](../infrastructure/template-servico.md)), e esta
+seção define quais scanners vão junto na cópia:
+
+- **Trivy viaja.** `trivy.yml` é copiado sem mudança de lógica: o scan é da
+  imagem do próprio serviço e não depende de nada deste repositório.
+- **ZAP viaja.** `zap.yml` é autocontido: sobe um Postgres de serviço, inicia
+  a aplicação no runner e roda o container do ZAP contra
+  `http://localhost:3000/api/docs-json`. A cópia leva junto
+  `.github/zap.conf` e `.zap/rules.tsv`, e o serviço precisa manter o
+  Swagger em `/api/docs-json`. **Não verificado**: se o serviço exigir Kafka
+  para iniciar, o job precisa de um broker de serviço ou a aplicação precisa
+  subir sem ele; isso é ajustado na primeira cópia (#319).
+- **Sonar entra como terceiro olhar**, de qualidade e não de segurança, com
+  workflow criado na #333 e copiado pelos serviços.
+- O `continue-on-error: true` do Trivy viaja como está; o risco descrito
+  acima passa a valer por repositório.
+
 ## Referências
 
 - `.github/workflows/zap.yml`

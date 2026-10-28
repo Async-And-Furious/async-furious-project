@@ -27,6 +27,7 @@ central disparando o deploy dos três.
 | `.github/workflows/tests.yml` | Unit, e2e com Postgres de serviço, lint e build. Na versão da #333, com `pnpm test:cov` (hoje roda `pnpm test`, sem o gate; ver [ADR-0014](../adr/0014-cobertura-minima-testes.md)) |
 | `.github/workflows/deploy-eks.yml` | Adaptado: namespace, ECR e secrets do serviço (ver abaixo) |
 | `.github/workflows/trivy.yml` | Scan de imagem e IaC ([ADR-0013](../adr/0013-seguranca-pipeline-zap-trivy.md)) |
+| `.github/workflows/zap.yml`, `.github/zap.conf`, `.zap/rules.tsv` | DAST contra `/api/docs-json`; ver ressalva do Kafka na ADR-0013 |
 | Workflow do Sonar | Criado na #333; ainda não existe neste repositório |
 | `sonar-project.properties` | Trocar `sonar.projectKey` |
 | `jest.config.js` | `coverageThreshold.global` em 80, sem mudança |
@@ -52,8 +53,6 @@ central disparando o deploy dos três.
   `protected-route-matrix.yml`.
 - **`terraform.yml`** e o cluster `kind` efêmero do CI: continuam só neste
   repositório ([ADR-0012](../adr/0012-cicd-github-actions-apply-efemero.md)).
-- **`zap.yml`**: [ADR-0013](../adr/0013-seguranca-pipeline-zap-trivy.md)
-  define quais scanners vão para os serviços novos.
 
 ## Parâmetros por serviço
 
