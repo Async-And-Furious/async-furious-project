@@ -65,9 +65,44 @@ métrica cair abaixo de 80%.
 
 ## Riscos
 
-- **Resolvido na etapa 1 da #333**: `README.md` e `README-en.md` passaram a
-  afirmar 80% nas quatro métricas, igual a `jest.config.js`. A divergência
-  de 85% em statements/lines deixou de existir na documentação.
+- **Baixo, mas real**: `README.md` precisa ser corrigido para bater com
+  `jest.config.js` (80/80/80/80, não 85/85/80/80) — fora do escopo desta
+  tarefa de ADRs, mas registrado aqui como pendência a ser corrigida
+  separadamente para não perpetuar a divergência. A correção é da Feature
+  #333 (ver Atualização abaixo).
+
+## Atualização (Fase 4: cobertura por serviço)
+
+**Revisão de 27/10/2026, Feature #316.** A decisão de 80% uniforme nas
+quatro métricas **continua valendo**. Mudam três coisas:
+
+- **O threshold passa a valer por serviço.** O enunciado da Fase 4 exige
+  "cobertura mínima de 80% por serviço" (p.4). Cada repositório de serviço
+  nasce com o mesmo `coverageThreshold.global` em 80 no seu próprio
+  `jest.config.js`, e é esse threshold o gate primário do pipeline do
+  serviço (falha em segundos, sem depender de serviço externo). O Quality
+  Gate do SonarQube Cloud entra como segundo olhar sobre o mesmo relatório
+  `lcov`. A cobertura de um serviço não compensa a de outro: não existe
+  número agregado entre repositórios.
+- **O gate precisa rodar no CI de fato.** Hoje o `tests.yml` executa
+  `pnpm test` (`jest` sem `--coverage`), e sem coleta de cobertura o Jest
+  não avalia o `coverageThreshold`: o gate só falha para quem roda
+  `pnpm test:cov` localmente. A troca para `pnpm test:cov` é da Feature
+  #333, e é essa versão do `tests.yml` que os serviços copiam. Medição de
+  27/10/2026 na `develop` (`acacd5e`): `pnpm test:cov` passa nos testes
+  (810/810), mas falha no gate de branches com **79,27%** (statements
+  94,97%, functions 90,28%, lines 94,96%). Quando a #333 ligar o
+  `test:cov` no CI, o pipeline fica vermelho até a cobertura de branches
+  chegar a 80%.
+- **A divergência do README é corrigida antes da cópia.** O `README.md`
+  (linha de funcionalidades: 85%) e o `README-en.md` (tabela 85/85/80/80)
+  ainda divergem do `jest.config.js`. A correção para 80 uniforme é da
+  Feature #333 e precisa entrar **antes** de o `README.md` virar template,
+  para a divergência não ser replicada justamente no arquivo que o
+  enunciado da Fase 4 (p.5) pede como evidência de cobertura.
+
+Continua valendo a consequência negativa do threshold único: dentro de
+cada serviço, código de domínio crítico e boilerplate pesam igual.
 
 ## Referências
 

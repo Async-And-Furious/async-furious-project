@@ -1,8 +1,70 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { Writable } from 'node:stream';
+import pino from 'pino';
 import {
   pinoHttpOptions,
   resolveCorrelationId,
+  runWithLogContext,
 } from '@/shared/infrastructure/logging/pino-logger.config';
+
+function captureLogger() {
+  const lines: Record<string, unknown>[] = [];
+  const stream = new Writable({
+    write(chunk: Buffer, _encoding, callback) {
+      lines.push(JSON.parse(chunk.toString()) as Record<string, unknown>);
+      callback();
+    },
+  });
+  const logger = pino({ mixin: pinoHttpOptions.mixin, redact: pinoHttpOptions.redact }, stream);
+  return { logger, lines };
+}
+
+describe('contexto de log fora do HTTP (consumidor de mensagem)', () => {
+  const ordemServicoId = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
+  const eventId = '0b2b6f0a-9b8b-4c1e-8a2b-7e6f6b2c9e11';
+
+  it('anexa ordemServicoId, eventId e correlationId = ordemServicoId a todo log do handler', async () => {
+    const { logger, lines } = captureLogger();
+
+    await runWithLogContext({ ordemServicoId, eventId }, async () => {
+      await Promise.resolve();
+      logger.info('evento consumido');
+    });
+
+    expect(lines[0]).toMatchObject({
+      msg: 'evento consumido',
+      service: 'os-service',
+      correlationId: ordemServicoId,
+      ordemServicoId,
+      eventId,
+    });
+  });
+
+  it('não vaza o contexto para logs fora do handler', async () => {
+    const { logger, lines } = captureLogger();
+
+    await runWithLogContext({ ordemServicoId, eventId }, () => Promise.resolve());
+    logger.info('fora do handler');
+
+    expect(lines[0]).not.toHaveProperty('correlationId');
+    expect(lines[0]).not.toHaveProperty('ordemServicoId');
+    expect(lines[0]).toHaveProperty('service', 'os-service');
+  });
+
+  it('mantém o redact de authorization, cookie e set-cookie', () => {
+    const { logger, lines } = captureLogger();
+
+    logger.info({
+      req: { headers: { authorization: 'Bearer segredo', cookie: 'sessao=1' } },
+      res: { headers: { 'set-cookie': 'sessao=2' } },
+    });
+
+    expect(lines[0]).toMatchObject({
+      req: { headers: { authorization: '[REDACTED]', cookie: '[REDACTED]' } },
+      res: { headers: { 'set-cookie': '[REDACTED]' } },
+    });
+  });
+});
 
 describe('resolveCorrelationId', () => {
   it('reaproveita um x-correlation-id válido enviado pelo cliente', () => {

@@ -70,6 +70,16 @@ comportamentos por gatilho:
   ler só o spec original sem saber que ele está desatualizado neste ponto —
   mitigado por este ADR e por `docs/infrastructure/cicd.md`.
 
+## Atualização (Fase 4: escopo restrito ao `terraform.yml`)
+
+Revisão da Feature #316. Esta ADR descreve **só** o `terraform.yml` deste
+repositório. O template de esteira dos serviços da Fase 4
+([template-servico.md](../infrastructure/template-servico.md)) **não**
+reproduz o cluster `kind` efêmero do CI: cada serviço copia `tests.yml`,
+`deploy-eks.yml`, `trivy.yml`, `zap.yml` e o workflow do Sonar, e o deploy
+dele vai direto para o EKS pelo `deploy-eks.yml`. O `terraform.yml` e o
+`infra/environments/local/` ficam só aqui.
+
 ## Referências
 
 - `.github/workflows/terraform.yml`
