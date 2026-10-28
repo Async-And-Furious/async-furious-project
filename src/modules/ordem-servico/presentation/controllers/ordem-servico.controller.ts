@@ -234,7 +234,7 @@ export class OrdemServicoController {
   @ApiOperation({
     summary: 'Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)',
     description:
-      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334).',
+      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334). Lá o {id} é o da Execução (listar em GET /api/v1/execucoes), não o da OS.',
     deprecated: true,
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -251,7 +251,7 @@ export class OrdemServicoController {
   @ApiOperation({
     summary: 'Registrar análise do veículo (UNDER_DIAGNOSIS)',
     description:
-      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334).',
+      'Deprecated: sem rota equivalente; o registro da análise é absorvido por PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334), onde o {id} é o da Execução, não o da OS.',
     deprecated: true,
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
@@ -325,7 +325,7 @@ export class OrdemServicoController {
   @ApiOperation({
     summary: 'Mecânico finaliza execução do serviço (IN_PROGRESS → FINISHED)',
     description:
-      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/concluir no serviço de Execução e Produção (#334).',
+      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/concluir no serviço de Execução e Produção (#334). Lá o {id} é o da Execução, não o da OS.',
     deprecated: true,
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
