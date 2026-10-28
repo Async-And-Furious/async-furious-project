@@ -40,7 +40,7 @@ flowchart TB
         os["OS Service<br/>ns async-furious<br/>(async-furious-project)"]
     end
 
-    subgraph KAFKA["Kafka KRaft (ns kafka)<br/>3 partições por tópico, chave = ordemServicoId, retry e DLT por serviço"]
+    subgraph KAFKA["Kafka KRaft (ns kafka, no mesmo cluster EKS)<br/>3 partições por tópico, chave = ordemServicoId, retry e DLT por serviço"]
         direction LR
         tOs["os.eventos.v1<br/>OrdemServicoRecebida<br/>OrcamentoCalculado<br/>EtapaDaSagaFalhou"]
         tBill["billing.eventos.v1<br/>OrcamentoGerado, OrcamentoAprovado<br/>OrcamentoRecusado<br/>PagamentoConfirmado, PagamentoRecusado<br/>EtapaDaSagaFalhou"]
@@ -207,7 +207,7 @@ O repositório `async-furious-front` (privado) não faz parte desta arquitetura.
 > `HANDOFF.md` como lista mestra de decisões, que não foi encontrado em
 > nenhuma branch. O racional verificável está em [`docs/rfcs/`](../rfcs/README.md).
 
-## 6. Estado de implementação (27/10/2026, preliminar)
+## 6. Estado de implementação (28/10/2026, preliminar)
 
 O diagrama mostra o **estado-alvo**. O que já existe no código hoje, por
 componente, para o revisor não confundir desenho com entrega:
@@ -215,9 +215,9 @@ componente, para o revisor não confundir desenho com entrega:
 | Componente | Situação |
 |---|---|
 | OS Service | Ainda com os módulos e eventos in-process do monólito: sem produtor/consumidor Kafka, sem DocumentDB, sem a coluna `pago_em` e sem o detector de OS parada. As rotas do mecânico migram para o Execução na Feature #334 (em curso) |
-| Billing Service | Orçamento, aprovação com Checkout Pro e webhook do Mercado Pago (HMAC e reconsulta) implementados na #325, ainda em revisão; falta `GET /pagamentos/{ordemServicoId}`; publicação e consumo no Kafka na Feature #326 (hoje os eventos só vão para o log) |
-| Execução e Produção | Fila, ciclo da `Execucao` e as rotas `/api/v1/execucoes*` implementados (#320); consumidores e publicação no Kafka ainda não (os marcos só vão para o log) |
-| Borda (`repo-auth-serverless`) | `POST /auth`, health público e rotas autenticadas prontos, mas ainda no desenho anterior à revisão de 30/09 (`ANY /api/v1/{proxy+}`, `/billing/{proxy+}` e `/execucao/{proxy+}`, em vez da `ANY /{proxy+}` da ADR-0021); as rotas públicas de status, aprovação/recusa e webhook, sem authorizer, ainda não existem |
+| Billing Service | Orçamento, aprovação com Checkout Pro, webhook do Mercado Pago (HMAC e reconsulta), `GET /pagamentos/{ordemServicoId}` e estorno de pagamento atrasado ou duplicado implementados na #325, no PR repo-billing#1 (aberto, em revisão); publicação e consumo no Kafka, inclusive o handler de `EtapaDaSagaFalhou`, na Feature #326 (hoje os eventos só vão para o log) |
+| Execução e Produção | Fila, ciclo da `Execucao` e as rotas `/api/v1/execucoes*` implementados na #320, no PR repo-execucao-service#2 (aberto); consumidores e publicação no Kafka ainda não (os marcos só vão para o log) |
+| Borda (`repo-auth-serverless`) | Em `infra/hml/main.tf` do `develop` (PR #70, mergeado em 27/10): `POST /auth`, health público, rotas públicas de status, aprovação/recusa e webhook (`authorization_type = NONE`) e `ANY /{proxy+}` com authorizer `CUSTOM`, a da ADR-0021. Falta aplicar essa configuração em HML e validar (Feature #317); o desenho anterior (`ANY /api/v1/{proxy+}`, `/billing/{proxy+}`, `/execucao/{proxy+}`) não existe mais no código |
 | `repo-k8s-infra` | ALB com regras por path e um target group por serviço, namespaces, ECR por serviço e Kafka com os tópicos `*.eventos.v1`, `*.retry.v1` e `*.dlt.v1` provisionados |
 | `repo-db-infra` | RDS com os três bancos lógicos (credenciais por serviço) e DocumentDB provisionados |
 

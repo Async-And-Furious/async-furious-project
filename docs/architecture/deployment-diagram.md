@@ -262,12 +262,11 @@ serviços passam pelo Kafka e estão detalhados em [overview.md](./overview.md) 
   `repo-auth-serverless` usam `alarm_actions = []`; os do RDS dependem dos
   secrets `*_ALARM_ACTIONS` do pipeline. A notificação por e-mail existe apenas
   nos alertas da New Relic, que cobrem aplicação e cluster.
-- **Rotas da borda**: as rotas sem authorizer (status, aprovar/recusar
-  orçamento e webhook do Mercado Pago) ainda não existem em
-  `repo-auth-serverless` (`infra/hml`): hoje só `POST /auth`, o health público e
-  as rotas autenticadas do desenho anterior à revisão de 30/09
-  (`ANY /api/v1/{proxy+}`, `/billing/{proxy+}` e `/execucao/{proxy+}`), a
-  substituir pela `ANY /{proxy+}` da ADR-0021.
+- **Rotas da borda**: `repo-auth-serverless` já declara no `develop`
+  (`infra/hml/main.tf`, PR #70) as rotas sem authorizer (status, aprovar/recusar
+  orçamento e webhook do Mercado Pago, com `authorization_type = NONE`) e a
+  `ANY /{proxy+}` com authorizer `CUSTOM` da ADR-0021. Falta aplicar essa
+  configuração em HML e validar a entrega (Feature #317).
 - **Billing e Execução ainda sem entrega no cluster**: seus repositórios não têm
   `TargetGroupBinding` nem workflow de build, push no ECR e deploy (o Billing só
   tem `ci.yml`); o diagrama mostra o alvo.

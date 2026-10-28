@@ -12,6 +12,12 @@
 
 ## 1. Topologia
 
+> **Escopo: borda da Fase 3 (um único serviço atrás do ALB).** O diagrama
+> mostra a borda como está provisionada hoje. Não reflete as rotas públicas sem
+> authorizer nem o roteamento por path para os três serviços da Fase 4: a
+> topologia-alvo está no diagrama-mestre de [overview.md](../architecture/overview.md)
+> e em [edge-topology.md](../architecture/edge-topology.md).
+
 O API Gateway é o único ponto de entrada público do sistema. Nem o ALB, nem o
 cluster, nem o banco são alcançáveis diretamente da internet.
 
