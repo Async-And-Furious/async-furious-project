@@ -215,6 +215,8 @@ docs/http/insomnia.yaml
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Check average execution time. |
 
+> **Deprecated (#334):** `assumir` and `analisar` move to `PATCH /execucoes/:id/iniciar-diagnostico` and `finalizar-execucao` moves to `PATCH /execucoes/:id/concluir`, in the Execution and Production service. All three keep working until the Execution service is up in HML; then they are removed.
+
 #### Parts and Supplies (`/api/v1/pecas`)
 
 | Method | Endpoint | Access | Description |

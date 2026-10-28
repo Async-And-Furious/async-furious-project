@@ -269,6 +269,8 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
+> **Deprecated (#334):** `assumir` e `analisar` migram para `PATCH /execucoes/:id/iniciar-diagnostico` e `finalizar-execucao` migra para `PATCH /execucoes/:id/concluir`, no serviço de Execução e Produção. As três continuam funcionando até o Execução estar de pé em HML; depois são removidas.
+
 #### Peças e Insumos (`/api/v1/pecas`)
 
 | Método | Endpoint | Acesso | Descrição |

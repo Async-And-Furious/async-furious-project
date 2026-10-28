@@ -233,6 +233,9 @@ export class OrdemServicoController {
   @Roles(Role.MECANICO)
   @ApiOperation({
     summary: 'Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)',
+    description:
+      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334).',
+    deprecated: true,
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'OS assumida. Status → Em Diagnóstico' })
@@ -245,7 +248,12 @@ export class OrdemServicoController {
   @Patch(':id/analisar')
   @UseGuards(RolesGuard)
   @Roles(Role.MECANICO)
-  @ApiOperation({ summary: 'Registrar análise do veículo (UNDER_DIAGNOSIS)' })
+  @ApiOperation({
+    summary: 'Registrar análise do veículo (UNDER_DIAGNOSIS)',
+    description:
+      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334).',
+    deprecated: true,
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Análise registrada' })
   @ApiResponse({ status: 400, description: 'OS não está Em Diagnóstico' })
@@ -316,6 +324,9 @@ export class OrdemServicoController {
   @Roles(Role.MECANICO)
   @ApiOperation({
     summary: 'Mecânico finaliza execução do serviço (IN_PROGRESS → FINISHED)',
+    description:
+      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/concluir no serviço de Execução e Produção (#334).',
+    deprecated: true,
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Execução finalizada. OS → Finalizada' })
