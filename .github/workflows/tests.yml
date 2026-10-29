@@ -94,6 +94,8 @@ jobs:
           JWT_SECRET: ci-disposable-jwt-secret
           JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
+          DOCDB_URI: mongodb://127.0.0.1:27017
+          DOCDB_NAME: os_read_model_e2e
 
       - name: Run build
         run: pnpm run build

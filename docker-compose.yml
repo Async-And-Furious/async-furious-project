@@ -4,6 +4,11 @@ services:
       file: ./docker-compose.dependencies.yml
       service: database
 
+  read-model:
+    extends:
+      file: ./docker-compose.dependencies.yml
+      service: read-model
+
   app:
     build:
       context: .
@@ -17,8 +22,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       NODE_ENV: development
       PORT: 3000
+      DOCDB_URI: mongodb://read-model:27017
+      DOCDB_NAME: os_read_model
     depends_on:
       database:
+        condition: service_healthy
+      read-model:
         condition: service_healthy
 
 volumes:

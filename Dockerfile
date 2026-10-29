@@ -55,6 +55,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update -y && \
     apt-get install -y --no-install-recommends openssl
 
+# CA bundle da AWS para o TLS obrigatório do DocumentDB (read model, ADR-0019)
+ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem /app/certs/global-bundle.pem
+
 # Create non-root user (Debian syntax, not Alpine)
 RUN groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs nodejs
