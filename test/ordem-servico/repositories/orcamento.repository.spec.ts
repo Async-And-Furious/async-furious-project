@@ -9,6 +9,7 @@ describe('OrcamentoRepository', () => {
     create: jest.Mock;
     findUnique: jest.Mock;
     update: jest.Mock;
+    updateMany: jest.Mock;
   };
 
   const mockOrcamento = {
@@ -28,6 +29,7 @@ describe('OrcamentoRepository', () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
 
@@ -184,6 +186,28 @@ describe('OrcamentoRepository', () => {
 
       expect(orcamento.findUnique).toHaveBeenCalledWith({ where: { id } });
       expect(orcamento.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('aprovarSePendente', () => {
+    it('deve aprovar e devolver o orçamento quando ele ainda está pendente', async () => {
+      orcamento.updateMany.mockResolvedValue({ count: 1 });
+      orcamento.findUnique.mockResolvedValue({ ...mockOrcamento, status: 'APPROVED' });
+
+      const result = await repository.aprovarSePendente('orc-123');
+
+      expect(orcamento.updateMany).toHaveBeenCalledWith({
+        where: { id: 'orc-123', status: 'PENDING' },
+        data: { status: 'APPROVED' },
+      });
+      expect(result).toMatchObject({ id: 'orc-123', status: 'APPROVED' });
+    });
+
+    it('deve devolver null quando o orçamento já não está pendente', async () => {
+      orcamento.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(repository.aprovarSePendente('orc-123')).resolves.toBeNull();
+      expect(orcamento.findUnique).not.toHaveBeenCalled();
     });
   });
 

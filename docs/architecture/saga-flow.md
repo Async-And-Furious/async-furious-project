@@ -125,8 +125,23 @@ sequenceDiagram
         Exec->>Exec: Execucao=CANCELADA
     end
 
+    opt Falha técnica em qualquer etapa (retry esgotado na DLT ou detector de OS parada)
+        Note over OS,Exec: o serviço que falhou publica EtapaDaSagaFalhou (etapa, motivo) no próprio tópico
+        Kafka->>OS: consome EtapaDaSagaFalhou
+        OS->>OS: fecha a OS (CLOSED_WITHOUT_EXECUTION) se RECEIVED, UNDER_DIAGNOSIS ou AWAITING_APPROVAL, e libera a reserva de pecas, se houver
+        Kafka->>Billing: consome EtapaDaSagaFalhou
+        Billing->>MP: estorna só se houver pagamento confirmado (etapas aprovacao-pagamento e inicio-execucao)
+        Billing->>Billing: Pagamento=ESTORNADO ou CANCELADO
+        Kafka->>Exec: consome EtapaDaSagaFalhou
+        Exec->>Exec: Execucao=CANCELADA (exceto etapa=reparo, sem compensação automática)
+    end
+
     Note over Cliente,Exec: Entrega (PATCH /ordens-servico/:id/registrar-entrega)<br/>fica fora do escopo da saga - ver secao 4
 ```
+
+O bloco `opt` final resume o caminho de compensação por falha técnica; os
+detalhes por etapa (quem compensa o quê, estorno, idempotência) estão na
+matriz da §3.
 
 **Aprovação e cobrança (detalhe da rota pública).** Todas as rotas seguem o
 prefixo `/api/v1/<recurso>` (ver

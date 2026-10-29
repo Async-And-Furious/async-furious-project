@@ -203,6 +203,18 @@ Authorizer, validação local, sem BFF) **continua valendo**. Mudou:
   eles: só JWT e HMAC do webhook (mais o `WebhookAuthGuard` legado só em
   `webhooks/service-orders`).
 
+## Revisão de 28/10/2026 — pipeline de aplicação da Fase 4 HML-only
+
+A decisão vigente da Fase 4 é **HML-only**. No workflow `deploy-eks.yml`, o
+job histórico `deploy-prod` fica explicitamente inerte (`if: false`), e os
+disparos manuais do deploy e do seed aceitam apenas HML. A configuração e os
+recursos PROD já existentes da Fase 3 não são alterados por esta decisão; não
+houve deploy, apply ou mudança de estado em PROD.
+
+Esta revisão elimina qualquer interpretação de que uma variável de
+repositório poderia reativar o deploy PROD pelo pipeline da Fase 4. Qualquer
+mudança futura no ambiente PROD exige decisão e procedimento separados.
+
 ## Referências
 
 - Tech Challenge — Fase 4 (`12SOAT - Fase 4 - Tech challenge.pdf`), p.5

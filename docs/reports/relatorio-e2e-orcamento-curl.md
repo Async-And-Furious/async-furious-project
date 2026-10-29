@@ -1,5 +1,7 @@
 # Relatorio E2E via cURL - Fluxo Ate Aprovacao de Orcamento
 
+> **Evidência histórica (25/04/2026).** Este relatório reflete o fluxo do monólito da Fase 3: o orçamento era gerado e aprovado dentro do próprio `async-furious-project`, com a OS indo para `IN_PROGRESS` na aprovação. Na Fase 4 a aprovação passa a ser do Billing Service, que devolve o link de pagamento do Mercado Pago (ver [`architecture/saga-flow.md`](../architecture/saga-flow.md) e [ADR-0022](../adr/0022-integracao-mercado-pago-checkout-pro.md)). As rotas e respostas abaixo não valem para a arquitetura atual e o conteúdo original foi preservado sem alteração.
+
 Data/Hora: 2026-04-25T12:39:36.920Z
 Base URL: http://localhost:3000/api/v1
 

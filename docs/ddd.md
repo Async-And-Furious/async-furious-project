@@ -60,6 +60,8 @@ Trata da autenticação de usuários administrativos e da validação de dados s
 
 ### 4.1. Contexto: Gestão de Ordem de Serviço
 
+> **Fase 4 (#320):** diagnóstico e reparo saem deste contexto e vão para o contexto de Execução e Produção (§4.5), em serviço próprio. A `OrdemDeServico` continua dona do status canônico (`StatusOS`) e só muda para Em Diagnóstico, Em Execução e Finalizada ao consumir os marcos publicados por aquele contexto.
+
 #### Agregados:
 
 *   **OrdemDeServico**
@@ -206,6 +208,31 @@ Trata da autenticação de usuários administrativos e da validação de dados s
     *   Token JWT
     *   Data de Expiração
 
+### 4.5. Contexto: Execução e Produção
+
+Serviço próprio (`repo-execucao-service`, banco `execucao_producao`). Referencia a OS só pelo id, sem FK e sem réplica de cliente, veículo, orçamento ou valores.
+
+#### Agregados:
+
+*   **Execucao**
+    *   **Raiz do Agregado:** Execucao
+    *   **Value Objects:** StatusExecucao
+
+#### Entidades:
+
+*   **Execucao**
+    *   ID da Execução
+    *   ID da OS (referência sem FK, única por execução)
+    *   Status (Value Object: StatusExecucao)
+    *   Responsável (`sub` do JWT de quem iniciou o diagnóstico; sem cadastro de mecânicos)
+    *   Início do Diagnóstico, Início do Reparo e Conclusão (marcos de tempo)
+
+#### Value Objects:
+
+*   **StatusExecucao**
+    *   Ciclo: Aguardando Diagnóstico, Em Diagnóstico, Aguardando Reparo, Em Reparo e Concluída. Cancelada só a partir de Aguardando Diagnóstico, Em Diagnóstico ou Aguardando Reparo; reparo iniciado não é cancelado. Concluída e Cancelada são terminais.
+    *   A fila de execução é a lista de execuções em Aguardando Diagnóstico e Aguardando Reparo, por ordem de entrada.
+
 ## 5. Event Storming — Eventos por Bounded Context
 
 Os eventos de domínio estão organizados por BC, refletindo a estrutura de módulos definida em `src/modules/`.
@@ -213,6 +240,8 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 ---
 
 ### 5.1. BC: Criação e Acompanhamento da OS (`ordem-servico`)
+
+> **Fase 4 (#320):** `OrdemDeServicoEmDiagnostico`, `OrdemDeServicoEmExecucao` e `OrdemDeServicoFinalizada` continuam neste BC, mas os comandos `MudarStatusParaEmDiagnostico`, `MudarStatusParaEmExecucao` e `MudarStatusParaFinalizada` passam a ser disparados pelo consumo dos eventos do BC de Execução e Produção (§5.5), não por rota do mecânico neste serviço.
 
 #### Eventos de Domínio (9):
 
@@ -324,6 +353,23 @@ Hoje trafegam pelo `EmissorEventos` in-process, com o mesmo nome.
 *   `RegistrarPagamento`
 *   `ProcessarPagamento`
 *   `EmitirNotaFiscal`
+
+---
+
+### 5.5. BC: Execução e Produção (`repo-execucao-service`)
+
+#### Eventos de Domínio (3):
+
+*   `DiagnosticoIniciado`: o mecânico iniciou o diagnóstico; o OS Service leva a OS a Em Diagnóstico.
+*   `ExecucaoIniciada`: o mecânico iniciou o reparo; o OS Service leva a OS a Em Execução (ou Aguardando Peças).
+*   `ExecucaoConcluida`: o mecânico concluiu o reparo; o OS Service leva a OS a Finalizada.
+
+#### Comandos:
+
+*   `IniciarDiagnostico`
+*   `IniciarReparo`
+*   `ConcluirExecucao`
+*   `ListarFilaExecucao`
 
 ## 6. Diagramas
 

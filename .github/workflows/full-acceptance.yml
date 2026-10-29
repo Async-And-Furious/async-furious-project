@@ -62,10 +62,14 @@ jobs:
           admin_early_status=$(request -o "$admin_early_file" -w '%{http_code}' -H "authorization: Bearer $customer_token" -d "$(EMAIL="$SEED_ADMIN_EMAIL" PASSWORD="$SEED_ADMIN_PASSWORD" python3 -c 'import json,os; print(json.dumps({"email":os.environ["EMAIL"],"password":os.environ["PASSWORD"]}))')" "$endpoint/api/v1/auth/login")
           if [[ "$admin_early_status" != 2* || ! -s "$admin_early_file" ]]; then
             printf 'admin_login_status=%s response_keys=' "$admin_early_status"
-            python3 -c 'import json,sys
-try:
- d=json.load(open(sys.argv[1],encoding="utf-8")); print(",".join(sorted(d)) if isinstance(d,dict) else "array")
-except (OSError,ValueError): print("invalid-or-empty-json")' "$admin_early_file"
+            python3 - "$admin_early_file" <<'PY'
+          import json, sys
+          try:
+              d = json.load(open(sys.argv[1], encoding="utf-8"))
+              print(",".join(sorted(d)) if isinstance(d, dict) else "array")
+          except (OSError, ValueError):
+              print("invalid-or-empty-json")
+          PY
             exit 1
           fi
           admin_early_token=$(json_status "$admin_early_file" access_token)

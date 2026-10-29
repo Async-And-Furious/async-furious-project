@@ -75,6 +75,16 @@ Nomes e responsabilidades fechados pela
 | `ExecucaoConcluida` | `execucao.eventos.v1` | Execução e Produção | OS Service | Publicado quando o mecânico chama `PATCH /api/v1/execucoes/{id}/concluir` (`Execucao` vai a `CONCLUIDA`). OS Service leva a OS a `FINISHED`. |
 | `EtapaDaSagaFalhou` | `os.eventos.v1` / `billing.eventos.v1` / `execucao.eventos.v1` (o do serviço cujo consumo falhou ou que detectou a OS parada) | Consumidor da dead-letter topic do serviço que falhou (`<servico>.dlt.v1`) **ou** detector de OS parada (OS Service, CronJob do Kubernetes; na Fase 4 só OS em `AWAITING_APPROVAL`, `etapa=aprovacao-pagamento`) | OS Service, Billing Service, Execução e Produção (cada um reage conforme a `etapa`, ver matriz em `saga-flow.md` §3) | Único evento de falha **técnica** da saga: exceção que esgotou as 3 tentativas de retry (ADR-0018, "Estratégia de retry e dead-letter") ou OS parada além do prazo. Payload mínimo: `servicoOrigem`, `eventTypeOriginal`, `ordemServicoId`, `etapa`, `motivo`. `etapa` ∈ {`diagnostico`, `orcamento`, `aprovacao-pagamento`, `inicio-execucao`, `reparo`}; a `etapa` da DLT sai do `eventType` da mensagem que falhou (tabela "evento original → etapa" em `saga-flow.md` §3). Quando publicado pelo **detector**, `eventTypeOriginal = null` (não há mensagem original) e `servicoOrigem = "os-service"`. Diferente de `OrcamentoRecusado` e `PagamentoRecusado`, que são resultados de negócio válidos e não passam pelo ciclo de retry. |
 
+## Payload (`data`) dos eventos do Execução e Produção
+
+Proposta da Feature #320, a validar pelo grupo antes da Feature de Eventos. Envelope conforme a ADR-0018 (`correlationId` = `ordemServicoId`). Datas em ISO-8601 UTC.
+
+| Evento | Campos de `data` |
+|---|---|
+| `DiagnosticoIniciado` | `execucaoId`, `ordemServicoId`, `responsavelId`, `diagnosticoIniciadoEm` |
+| `ExecucaoIniciada` | `execucaoId`, `ordemServicoId`, `responsavelId`, `reparoIniciadoEm` |
+| `ExecucaoConcluida` | `execucaoId`, `ordemServicoId`, `responsavelId`, `concluidaEm` |
+
 ## Assinaturas por serviço
 
 Derivada das colunas "Consumidor(es)" acima e da matriz de

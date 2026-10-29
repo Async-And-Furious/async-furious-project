@@ -12,9 +12,14 @@ de cada documento.
 
 | Documento | Conteúdo |
 |---|---|
-| [architecture/overview.md](./architecture/overview.md) | Visão geral: os quatro repositórios, diagrama de componentes C4, comunicação entre Bounded Contexts |
+| [architecture/overview.md](./architecture/overview.md) | **Diagrama-mestre da arquitetura-alvo da Fase 4** (três serviços, Kafka, bancos, borda e Mercado Pago), serviços e dados, estado de implementação |
 | [architecture/component-diagram.md](./architecture/component-diagram.md) | Diagrama de Componentes, com tabela de nome, responsabilidade, tecnologia e comunicação |
-| [architecture/deployment-diagram.md](./architecture/deployment-diagram.md) | Diagrama de Implantação: ambiente `kind` local e ambiente AWS (hml e prod) |
+| [architecture/deployment-diagram.md](./architecture/deployment-diagram.md) | Diagrama de Implantação: ambiente `kind` local e ambiente AWS da Fase 4 (hml), com o que muda em relação à Fase 3 |
+| [architecture/edge-topology.md](./architecture/edge-topology.md) | Borda da Fase 4: rotas do API Gateway (públicas e autenticadas), roteamento por path no ALB, autenticação nos serviços |
+| [architecture/saga-flow.md](./architecture/saga-flow.md) | Saga coreografada: diagrama de sequência, mapa de responsabilidade por etapa e matriz `etapa → falha → compensação` |
+| [architecture/event-catalog.md](./architecture/event-catalog.md) | Catálogo dos eventos de integração: tópico, produtor, consumidores e assinaturas por serviço |
+| [architecture/service-boundaries.md](./architecture/service-boundaries.md) | Divisão em três microsserviços e ownership de dados |
+| [architecture/persistence-model.md](./architecture/persistence-model.md) | Read model do OS Service no DocumentDB (coleções, índice da fila, write-through) |
 | [architecture/authentication-flow.md](./architecture/authentication-flow.md) | Sequências de autenticação de staff e cliente, local e AWS, com fluxos de erro |
 | [architecture/service-order-flow.md](./architecture/service-order-flow.md) | Sequência de abertura e acompanhamento da Ordem de Serviço |
 | [architecture/os-service-integracao-execucao.md](./architecture/os-service-integracao-execucao.md) | Integração do OS Service com o Execução e Produção: rotas removidas, eventos consumidos e publicados, reserva de peças pendente, janela de corte |
@@ -42,9 +47,9 @@ de cada documento.
 
 ## Decisões
 
-- **ADRs**: ver [adr/README.md](./adr/README.md). Quinze decisões
-  arquiteturais, da separação em quatro repositórios ao mínimo de cobertura de
-  testes, mais [notas das fases anteriores](./adr/notas-fases-anteriores.md).
+- **ADRs**: ver [adr/README.md](./adr/README.md). Vinte e duas
+  decisões arquiteturais, da separação em quatro repositórios (Fase 3) à
+  integração com o Mercado Pago (Fase 4), mais [notas das fases anteriores](./adr/notas-fases-anteriores.md).
 - **RFCs**: ver [rfcs/README.md](./rfcs/README.md). RFC-003 (integração API
   Gateway e EKS), RFC-004 (ownership de VPC), RFC-006 (segredos e assinatura
   JWT), RFC-007 (exceção de acesso público do RDS em homologação) e a
@@ -54,7 +59,6 @@ de cada documento.
 
 | Documento | Conteúdo |
 |---|---|
-| [contexto-tecnico-consolidado.md](./contexto-tecnico-consolidado.md) | Síntese técnica da documentação das Fases 1 e 2 |
 | [reports/relatorio-e2e-orcamento-curl.md](./reports/relatorio-e2e-orcamento-curl.md) | Evidência E2E do fluxo de orçamento via cURL |
 | [http/README.md](./http/README.md), [http/routes.yaml](./http/routes.yaml) | Coleções Postman e Insomnia geradas a partir do manifesto de rotas |
 | [specs/authenticated-route-matrix.md](./specs/authenticated-route-matrix.md) | Contrato da matriz de rotas autenticadas |
@@ -84,6 +88,3 @@ raiz e nos arquivos `.mmd` de `docs/`:
 - **`k8s/overlays/aws/`**: presente no repositório, mas não referenciado por
   nenhum workflow ou script. Ver
   [infrastructure/kubernetes.md](./infrastructure/kubernetes.md).
-
-Ver [contexto-tecnico-consolidado.md](./contexto-tecnico-consolidado.md) para
-o inventário de pendências herdadas das Fases 1 e 2.
