@@ -61,12 +61,22 @@ têm ouvinte in-process: esperam o publicador de integração. O payload de
 `EtapaDaSagaFalhou` segue a ADR-0018 (`servicoOrigem`, `eventTypeOriginal`,
 `ordemServicoId`, `etapa`, `motivo`).
 
+**Exceção a ADR-0018 em `eventTypeOriginal`.** A ADR define `eventTypeOriginal`
+como o `eventType` da mensagem que foi para a dead-letter topic. O caso de
+`ExecucaoConcluida` com a OS em `AWAITING_PARTS` não passa por retry nem por DLT:
+é uma regra de negócio (o reparo terminou sem a peça). Aqui o campo recebe o
+`eventType` do evento que disparou a regra (`ExecucaoConcluida`), e
+`servicoOrigem` é `os-service`. Assim o consumidor do `EtapaDaSagaFalhou` recebe o
+mesmo payload nos dois casos. Essa exceção vale até a ADR-0018 decidir se a falha
+de negócio também deve sair como `EtapaDaSagaFalhou`, já que ela define o evento
+como falha técnica.
+
 ## 3. Eventos do Execução consumidos pelo OS Service
 
 | Evento | Handler | Guarda | Efeito | Se a guarda falhar |
 |---|---|---|---|---|
 | `DiagnosticoIniciado` | `AtualizarStatusEmDiagnosticoHandler` | OS em `RECEIVED` | grava `UNDER_DIAGNOSIS`, emite `OrdemServicoEmDiagnostico` (notifica o cliente) | ack, log informativo (reentrega ou OS já além) |
-| `ExecucaoIniciada` | `AtualizarStatusExecucaoIniciadaHandler` | OS em `AWAITING_APPROVAL` (ou `IN_PROGRESS` com `reserva_pecas_pendente`, retomada) | grava `IN_PROGRESS` e emite `OrdemServicoEmExecucao` (marca `iniciada_em`); se `reserva_pecas_pendente`, grava em seguida `AWAITING_PARTS` | **falha retentável** se a OS está em `RECEIVED` ou `UNDER_DIAGNOSIS` (nada gravado); ack, log informativo nos demais estados (`IN_PROGRESS` sem pendência, `AWAITING_PARTS`, `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`) |
+| `ExecucaoIniciada` | `AtualizarStatusExecucaoIniciadaHandler` | OS em `AWAITING_APPROVAL` (ou `IN_PROGRESS` com `reserva_pecas_pendente`, retomada) | grava `IN_PROGRESS` condicionado a `AWAITING_APPROVAL` (se não casar, relê a OS e segue pelo estado atual) e emite `OrdemServicoEmExecucao` (marca `iniciada_em`); se `reserva_pecas_pendente`, grava em seguida `AWAITING_PARTS`. Na reentrega com a OS em `IN_PROGRESS` sem `iniciada_em`, emite `OrdemServicoEmExecucao` de novo | **falha retentável** se a OS está em `RECEIVED` ou `UNDER_DIAGNOSIS` (nada gravado); ack, log informativo nos demais estados (`IN_PROGRESS` sem pendência, `AWAITING_PARTS`, `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`) |
 | `ExecucaoConcluida` | `AtualizarStatusFinalizadaHandler` | OS em `IN_PROGRESS` | grava `FINISHED` e emite `OrdemServicoFinalizada` (tempo médio e notificação de conclusão seguem como estavam) | em `AWAITING_PARTS`: emite `EtapaDaSagaFalhou` (`reparo`) e registra o motivo em `HistoricoStatusOS`, uma vez só (reentrega com a linha já gravada: só log); em `RECEIVED`, `UNDER_DIAGNOSIS` ou `AWAITING_APPROVAL`: **falha retentável**; em `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`: ack, log informativo |
 
 As transições são validadas por `StatusTransitionService.validarTransicao`, a
@@ -86,13 +96,26 @@ registrado em log pelo Nest e não sai do `emitAsync`. Até o consumidor Kafka
 existir, a falha retentável não é retentada; ela só não grava. O consumidor Kafka
 tem de receber a rejeição do handler, sem passar pelo wrapper que a suprime.
 
+**Desvio do critério de ack em `ExecucaoIniciada`.** O critério original manda
+ack, com log, para `ExecucaoIniciada` com a OS além de `AWAITING_APPROVAL`. Em
+`IN_PROGRESS` o handler não só faz ack: ele retoma. Se a reserva de peças está
+pendente, leva a OS a `AWAITING_PARTS` (a segunda gravação da seção acima). Se
+`iniciada_em` está nulo, reemite `OrdemServicoEmExecucao`. Motivo: uma reentrega
+precisa poder completar o que a entrega anterior não terminou. O ack vale para
+`AWAITING_PARTS`, `FINISHED`, `DELIVERED` e `CLOSED_WITHOUT_EXECUTION`, como na
+tabela.
+
 ## 4. A reserva de peças deixou de mudar o status na aprovação
 
 Pela [`saga-flow.md`](./saga-flow.md) §2, a OS só vai a `IN_PROGRESS` quando o
 mecânico inicia o reparo (`ExecucaoIniciada`). Por isso:
 
 - `PecasIndisponiveis` (`AtualizarStatusAguardandoPecasHandler`):
-  - com a OS em `AWAITING_APPROVAL`, só liga `OrdemServico.reserva_pecas_pendente`;
+  - com a OS em `AWAITING_APPROVAL`, liga `OrdemServico.reserva_pecas_pendente`
+    com gravação condicionada a `status = AWAITING_APPROVAL` (`atualizarSeCondicao`).
+    Se `ExecucaoIniciada` levar a OS a `IN_PROGRESS` entre a leitura e essa
+    gravação, a pendência não entra: o handler relê a OS e segue o ramo de
+    `IN_PROGRESS` abaixo, sem deixar `IN_PROGRESS` com a pendência ligada;
   - com a OS em `IN_PROGRESS` (**reserva tardia**: `ExecucaoIniciada` foi
     processado antes da reserva, porque eventos de tópicos diferentes não têm
     ordem entre si), grava `reserva_pecas_pendente = true` e depois leva a
@@ -103,11 +126,13 @@ mecânico inicia o reparo (`ExecucaoIniciada`). Por isso:
 - `PecasReservadas` (`AtualizarStatusEmExecucaoHandler`), nesta ordem:
   1. desliga `reserva_pecas_pendente` em qualquer status com reserva (a gravação
      só casa se a pendência estiver ligada);
-  2. tenta voltar `AWAITING_PARTS` → `IN_PROGRESS`, condicionado ao status no
-     momento da gravação, e só então emite `OrdemServicoEmExecucao`.
-  Com a OS em `AWAITING_APPROVAL` ou `IN_PROGRESS` a volta não casa e só a
-  pendência muda. Com a OS em `IN_PROGRESS`, é reserva confirmada depois do início
-  do reparo: log informativo.
+  2. relê a OS. Se ela estiver em `AWAITING_PARTS`, tenta voltar a `IN_PROGRESS`,
+     condicionado ao status no momento da gravação, e só então emite
+     `OrdemServicoEmExecucao`. A leitura é feita depois do passo 1 de propósito: a
+     partir daí `ExecucaoIniciada` não consegue mais gravar `AWAITING_PARTS` para
+     essa reserva, então a leitura mostra o estado final.
+  Com a OS em `AWAITING_APPROVAL` só a pendência muda. Com a OS em `IN_PROGRESS`,
+  é reserva confirmada depois do início do reparo: log informativo.
   `OsSemPecasConfirmada` deixou de ter ouvinte.
 - `OrdemServicoBacklogAdapter.findAllAguardandoPecas` passou a devolver também
   as OS em `AWAITING_APPROVAL` com `reserva_pecas_pendente = true`: elas ainda
@@ -153,21 +178,51 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
   `OrcamentoGerado`). Deve ser removido junto com o corte do `Orcamento` para o
   Billing, para não haver dois criadores de orçamento.
 - **Condição de merge.** As rotas do mecânico só saem de `develop` quando o fluxo
-  estiver ligado de ponta a ponta. Não mergear antes de:
-  1. **Execução e Produção em HML**, publicando `DiagnosticoIniciado`,
-     `ExecucaoIniciada` e `ExecucaoConcluida` em `execucao.eventos.v1` pelo
-     publicador Kafka, com as rotas `iniciar-diagnostico`, `iniciar-reparo` e
-     `concluir` de pé;
-  2. **OS Service com transporte Kafka**: o consumidor `os-consumer` de
-     `execucao.eventos.v1`, com a classificação de falha da ADR-0018, e o
-     publicador de `os.eventos.v1` (`OrdemServicoRecebida`, `OrcamentoCalculado`,
-     `EtapaDaSagaFalhou`). Hoje esses eventos saem só in-process;
-  3. **`full-acceptance.yml` passando pelo fluxo do mecânico em HML**: a OS sai de
+  estiver ligado de ponta a ponta. A condição é o conjunto abaixo, por repositório.
+  O estado descrito foi conferido no código de cada repo em 28/10; antes do merge,
+  refazer a checagem contra a branch base de cada um.
+  1. **Execução e Produção em HML** (#321, com a plataforma da #314):
+     - publicador Kafka de `execucao.eventos.v1` (`DiagnosticoIniciado`,
+       `ExecucaoIniciada`, `ExecucaoConcluida`). Hoje o publicador é o
+       `LogExecucaoEventPublisher`;
+     - consumidor de `os.eventos.v1` para `OrdemServicoRecebida`, que cria a
+       `Execucao` na fila de diagnóstico. Hoje não existe `@OnEvent`,
+       `EventPattern` nem subscriber, então nenhuma `Execucao` nasce e
+       `iniciar-diagnostico` não tem o que alterar;
+     - consumidor de `billing.eventos.v1` para `PagamentoConfirmado` (leva a
+       `Execucao` a `AGUARDANDO_REPARO` via `liberarParaReparo()`). Hoje o método
+       não tem chamador e não há consumidor;
+     - consumidor de `billing.eventos.v1` para `OrcamentoRecusado` e
+       `PagamentoRecusado` (cancelamento, `CANCELADA`), exigido pelo
+       `event-catalog.md`;
+     - as rotas `iniciar-diagnostico`, `iniciar-reparo` e `concluir` de pé.
+  2. **Billing Service em HML** (#326, já citada no código do Billing):
+     - publicador real de `billing.eventos.v1` (`OrcamentoGerado`,
+       `OrcamentoAprovado`, `OrcamentoRecusado`, `PagamentoConfirmado`,
+       `PagamentoRecusado`). Hoje o publicador é o
+       `log-publicador-eventos.ts`, marcado como provisório, que só grava em log;
+     - consumidor de `os.eventos.v1` para `OrcamentoCalculado`. Sem ele, o orçamento
+       não chega ao Billing e `OrcamentoGerado` não volta, e a OS não sai de
+       `UNDER_DIAGNOSIS`.
+  3. **OS Service com transporte Kafka** (#331, migrar os eventos de domínio para
+     o broker):
+     - consumidor `os-consumer` de `execucao.eventos.v1` (`DiagnosticoIniciado`,
+       `ExecucaoIniciada`, `ExecucaoConcluida`, `EtapaDaSagaFalhou`), com a
+       classificação de falha da ADR-0018 e sem o wrapper que suprime a rejeição
+       (§3);
+     - consumidor `os-consumer` de `billing.eventos.v1` (`OrcamentoGerado`,
+       `OrcamentoAprovado`, `OrcamentoRecusado`, `PagamentoConfirmado`,
+       `PagamentoRecusado`, `EtapaDaSagaFalhou`). Hoje o OS não consome o tópico.
+       Sem ele, `OrcamentoGerado` não leva a OS a `AWAITING_APPROVAL` e
+       `OrcamentoAprovado` não reserva peças;
+     - publicador de `os.eventos.v1` (`OrdemServicoRecebida`, `OrcamentoCalculado`,
+       `EtapaDaSagaFalhou`). Hoje esses eventos saem só in-process.
+  4. **`full-acceptance.yml` passando pelo fluxo do mecânico em HML**: a OS sai de
      `RECEIVED` e chega a `FINISHED`, e o tempo médio é consultado com dado real.
 
-  A #314 cobre a plataforma de mensageria (broker, tópicos e credenciais). O
-  transporte no OS Service é da #331 (migrar os eventos de domínio para o
-  broker), e no Execução é da #321 (integrar o serviço ao fluxo por eventos).
+  A #314 cobre a plataforma de mensageria (broker, tópicos e credenciais). Este PR
+  não fecha nenhum item acima: ele só remove as rotas e religa os handlers ao
+  Execução. Enquanto qualquer item não estiver feito, o PR segue em draft.
 - **Ordem de corte.** A remoção das rotas e a religação dos handlers saem juntas
   neste PR, e por isso a condição acima é do merge, não só da implantação.
 
@@ -177,14 +232,14 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
   `HistoricoStatusOS` (Feature #335). Hoje só o caminho de falha
   `ExecucaoConcluida` em `AWAITING_PARTS` grava uma linha (com
   `statusAnterior = statusNovo`, porque não há transição).
-- **Duas gravações não atômicas, retomáveis.** `IN_PROGRESS → AWAITING_PARTS` são
-  duas chamadas a `update`. Se a segunda falhar, a OS fica em `IN_PROGRESS` com
+- **Duas gravações não atômicas, retomáveis.** `AWAITING_APPROVAL → IN_PROGRESS` e
+  `IN_PROGRESS → AWAITING_PARTS` são duas gravações condicionadas. Se a segunda falhar, a OS fica em `IN_PROGRESS` com
   `reserva_pecas_pendente = true`, e a reentrega de `ExecucaoIniciada` faz só o
   segundo passo. O segundo passo é condicionado (§4): se a reserva chegar antes
-  dele, a OS segue em `IN_PROGRESS` em vez de ficar presa em `AWAITING_PARTS`. Resíduo: se a falha ocorrer depois de `update(IN_PROGRESS)` e na
-  emissão de `OrdemServicoEmExecucao` (que inicia o monitoramento de tempo), a
-  reentrega não a repete e `iniciada_em` pode ficar sem valor, o que afeta o tempo
-  médio. Sem transação única, isso fica como risco aceito até o consumidor Kafka.
+  dele, a OS segue em `IN_PROGRESS` em vez de ficar presa em `AWAITING_PARTS`. Se a falha ocorrer depois de `IN_PROGRESS` e antes
+  de `OrdemServicoEmExecucao` (que inicia o monitoramento de tempo), a reentrega vê a
+  OS em `IN_PROGRESS` com `iniciada_em` nulo e emite de novo (§3). O tempo médio não
+  fica com essa lacuna.
 - **Sinalização da falha de reparo (at-least-once).** `EtapaDaSagaFalhou` sai antes
   da linha de `HistoricoStatusOS`. Se a gravação do histórico falhar, a reentrega
   emite a falha de novo; a compensação é idempotente (ADR-0018). Na reentrega
@@ -195,11 +250,13 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
 - **`PecasIndisponiveis` antes da aprovação.** Com a OS antes de
   `AWAITING_APPROVAL`, o evento é ignorado com `warn` e não grava nada. Ele só nasce
   na aprovação do orçamento, então o caso é anomalia.
-- **`PecasIndisponiveis` em `AWAITING_APPROVAL` (cosmético).** A pendência é
-  gravada sem condição. Se `ExecucaoIniciada` já tiver levado a OS a `IN_PROGRESS`
-  antes dessa gravação, a OS fica em `IN_PROGRESS` com a pendência ligada até a
-  reserva chegar, sem passar por `AWAITING_PARTS`. Não fica presa: a reserva
-  baixa a pendência. Fica documentado, sem mudança.
+- **`PecasIndisponiveis` em `AWAITING_APPROVAL` (corrida fechada).** A pendência é
+  gravada com `atualizarSeCondicao` (`status = AWAITING_APPROVAL`). Se
+  `ExecucaoIniciada` levar a OS a `IN_PROGRESS` entre a leitura e essa gravação, a
+  condição não casa, a OS é relida e o evento segue pelo ramo de reserva tardia
+  (§4): a OS vai a `AWAITING_PARTS` e depois é liberada por `PecasReservadas`. Não
+  sobra `IN_PROGRESS` com a pendência ligada sem quem a libere. Coberto pelo teste de
+  intercalação em `test/ordem-servico/event-handlers.spec.ts` (P-08d).
 - **Inversão entre `PecasReservadas` e `PecasIndisponiveis` da mesma OS (aberto).**
   `PecasReservadas` sem pendência ligada não faz nada. Se ele for processado antes
   de `PecasIndisponiveis` da mesma OS, a pendência gravada depois não tem quem a
