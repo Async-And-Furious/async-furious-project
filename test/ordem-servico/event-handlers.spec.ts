@@ -97,7 +97,10 @@ async function shouldUpdateToInProgress(
   osRepo.findOne.mockResolvedValue(mockOs({ status }));
   osRepo.update.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
   await handler();
-  expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'IN_PROGRESS' });
+  expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+    status: 'IN_PROGRESS',
+    motivo: expect.any(String),
+  });
   expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmExecucao));
 }
 
@@ -148,7 +151,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'RECEIVED' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'RECEIVED',
+        motivo: expect.any(String),
+      });
     });
   });
 
@@ -162,7 +168,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new OrdemServicoAssumida('os-1'));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'UNDER_DIAGNOSIS' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'UNDER_DIAGNOSIS',
+        motivo: expect.any(String),
+      });
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoEmDiagnostico));
     });
 
@@ -262,7 +271,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new OrcamentoEnviado('os-1', 'orc-1'));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_APPROVAL' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'AWAITING_APPROVAL',
+        motivo: expect.any(String),
+      });
     });
 
     it('não deve atualizar quando OS já não está UNDER_DIAGNOSIS', async () => {
@@ -357,7 +369,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new ServicoConcluidoPeloMecanico('os-1'));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'FINISHED' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'FINISHED',
+        motivo: expect.any(String),
+      });
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoFinalizada));
     });
 
@@ -428,6 +443,7 @@ describe('OS Event handlers', () => {
       expect(osRepo.update).toHaveBeenCalledWith('os-1', {
         status: 'DELIVERED',
         entregue_em: expect.any(Date),
+        motivo: expect.any(String),
       });
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido).toBeInstanceOf(OrdemServicoEntregue);
@@ -453,7 +469,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new OrcamentoRecusado('os-1', 'orc-1'));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'CLOSED_WITHOUT_EXECUTION' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'CLOSED_WITHOUT_EXECUTION',
+        motivo: expect.any(String),
+      });
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('StatusAtualizadoEncerradaSemExecucao');
     });
@@ -469,7 +488,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new PecasIndisponiveis('os-1', ['peca-1']));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_PARTS' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'AWAITING_PARTS',
+        motivo: expect.any(String),
+      });
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('StatusAtualizadoAguardandoPecas');
     });

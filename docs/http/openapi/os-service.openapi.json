@@ -1141,43 +1141,32 @@
         ]
       },
       "get": {
-        "description": "Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.",
+        "description": "Servida pelo read model (DocumentDB). Exclui FINISHED, DELIVERED e CLOSED_WITHOUT_EXECUTION e ordena por prioridade de status (IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED → AWAITING_PARTS); dentro do mesmo status, as mais antigas primeiro. Paginação por cursor: envie pagination.nextCursor no parâmetro cursor para a próxima página.",
         "operationId": "OrdemServicoController_listar",
         "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "description": "Número da página",
-            "schema": {
-              "example": 1,
-              "type": "number"
-            }
-          },
           {
             "name": "limit",
             "required": false,
             "in": "query",
-            "description": "Quantidade por página",
+            "description": "Quantidade por página (1 a 100)",
             "schema": {
               "example": 10,
               "type": "number"
             }
           },
           {
-            "name": "search",
+            "name": "cursor",
             "required": false,
             "in": "query",
-            "description": "Buscar por descrição",
+            "description": "Cursor opaco devolvido em pagination.nextCursor da página anterior",
             "schema": {
-              "example": "troca",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "Lista de OS ativas ordenadas por prioridade",
+            "description": "Página da fila de OS ativas",
             "content": {
               "application/json": {
                 "schema": {
@@ -1185,23 +1174,39 @@
                     "data": [
                       {
                         "id": "uuid",
-                        "veiculoId": "uuid",
                         "clienteId": "uuid",
+                        "veiculoId": "uuid",
                         "status": "IN_PROGRESS",
                         "descricao": "Troca de óleo",
-                        "created_at": "2024-01-01T00:00:00.000Z"
+                        "iniciada_em": "2024-01-01T01:00:00.000Z",
+                        "finalizada_em": null,
+                        "entregue_em": null,
+                        "created_at": "2024-01-01T00:00:00.000Z",
+                        "updated_at": "2024-01-01T01:00:00.000Z",
+                        "cliente": {
+                          "id": "uuid",
+                          "nome": "João Silva",
+                          "documento": "12345678909"
+                        },
+                        "veiculo": {
+                          "id": "uuid",
+                          "placa": "ABC1D23",
+                          "marca": "Honda",
+                          "modelo": "Fit"
+                        }
                       }
                     ],
                     "pagination": {
-                      "page": 1,
                       "limit": 10,
-                      "total": 5,
-                      "totalPages": 1
+                      "nextCursor": "eyJwIjoxLCJjIjoi..."
                     }
                   }
                 }
               }
             }
+          },
+          "400": {
+            "description": "Cursor ou limite inválido"
           },
           "401": {
             "description": "Não autorizado"
@@ -1212,7 +1217,7 @@
             "bearer": []
           }
         ],
-        "summary": "Listar ordens de serviço ativas por prioridade",
+        "summary": "Fila de ordens de serviço ativas por prioridade (read model)",
         "tags": [
           "Ordens Servico"
         ]
@@ -1257,6 +1262,7 @@
     },
     "/api/v1/ordens-servico/{id}": {
       "get": {
+        "description": "Servida pelo read model: status, marcos, cliente e veículo embutidos. Não inclui orçamento, itens nem histórico.",
         "operationId": "OrdemServicoController_detalhar",
         "parameters": [
           {
@@ -1285,7 +1291,7 @@
             "bearer": []
           }
         ],
-        "summary": "Detalhar ordem de serviço",
+        "summary": "Detalhar ordem de serviço (read model)",
         "tags": [
           "Ordens Servico"
         ]
@@ -1381,7 +1387,7 @@
     },
     "/api/v1/ordens-servico/{id}/status": {
       "get": {
-        "description": "Única rota pública do OS Service. Resposta mínima: id e status da OS, sem dados do cliente.",
+        "description": "Única rota pública do OS Service, servida pelo read model. Resposta mínima: id, status e marcos de tempo da OS, sem dados do cliente.",
         "operationId": "OrdemServicoController_consultarStatus",
         "parameters": [
           {

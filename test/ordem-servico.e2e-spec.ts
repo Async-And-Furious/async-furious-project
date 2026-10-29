@@ -212,6 +212,12 @@ describe('OrdemServico Happy Flow (e2e)', () => {
     expect(statusResponse.body).toEqual({
       ordemServicoId,
       status: 'DELIVERED',
+      marcos: {
+        createdAt: expect.any(String),
+        iniciadaEm: expect.any(String),
+        finalizadaEm: expect.any(String),
+        entregueEm: expect.any(String),
+      },
     });
   });
 });

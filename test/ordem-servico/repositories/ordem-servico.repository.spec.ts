@@ -1,13 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { OrdemServicoRepository } from '@/modules/ordem-servico/infrastructure/repositories/ordem-servico.repository';
-import { PrismaService } from '@/shared/infrastructure/database/prisma.service';
 import { EntityNotFoundException } from '@/shared/domain/exceptions/entity-not-found.exception';
+import type { PrismaService } from '@/shared/infrastructure/database/prisma.service';
+import type { IOsReadModelProjector } from '@/modules/ordem-servico/domain/interfaces/os-read-model.interface';
 
+// O repository é o ponto único de escrita da OS: cada método de escrita grava
+// no Postgres (com HistoricoStatusOS quando o status muda) e depois projeta.
 describe('OrdemServicoRepository', () => {
-  let repository: OrdemServicoRepository;
-  let prismaService: PrismaService;
-
-  const mockOrdemServico = {
+  const registro = {
     id: 'os-123',
     id_veiculo: 'veiculo-123',
     id_cliente: 'cliente-123',
@@ -18,366 +17,208 @@ describe('OrdemServicoRepository', () => {
     entregue_em: null,
     created_at: new Date('2024-01-15'),
     updated_at: new Date('2024-01-15'),
-    veiculo: {
-      id: 'veiculo-123',
-      placa: 'ABC-1234',
-      marca: 'Toyota',
-      modelo: 'Corolla',
-      ano: 2020,
-    },
-    cliente: {
-      id: 'cliente-123',
-      nome: 'João Silva',
-      documento: '12345678901',
-      tipo_documento: 'CPF',
-    },
-    orcamento: null,
   };
 
-  // Entity-shaped object (mapped by mapToEntity)
-  const mappedOrdemServico = {
-    id: 'os-123',
-    veiculoId: 'veiculo-123',
-    clienteId: 'cliente-123',
-    descricao: 'Troca de óleo',
-    status: 'RECEIVED',
-    iniciada_em: null,
-    finalizada_em: null,
-    entregue_em: null,
-    created_at: new Date('2024-01-15'),
-    updated_at: new Date('2024-01-15'),
+  let tx: {
+    ordemServico: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+    historicoStatusOS: { create: jest.Mock };
   };
+  let prisma: {
+    $transaction: jest.Mock;
+    ordemServico: { findUnique: jest.Mock; findMany: jest.Mock; delete: jest.Mock };
+  };
+  let projector: jest.Mocked<IOsReadModelProjector>;
+  let repository: OrdemServicoRepository;
+  let ordem: string[];
 
-  beforeEach(async () => {
-    const mockPrismaService = {
+  beforeEach(() => {
+    ordem = [];
+    tx = {
       ordemServico: {
-        create: jest.fn(),
-        findMany: jest.fn(),
-        findUnique: jest.fn(),
-        update: jest.fn(),
-        delete: jest.fn(),
-        count: jest.fn(),
+        create: jest.fn().mockResolvedValue(registro),
+        findUnique: jest.fn().mockResolvedValue({ status: 'RECEIVED' }),
+        update: jest.fn((args: { data: Record<string, unknown> }) =>
+          Promise.resolve({ ...registro, ...args.data })
+        ),
+      },
+      historicoStatusOS: {
+        create: jest.fn(() => {
+          ordem.push('historico');
+          return Promise.resolve({});
+        }),
       },
     };
-
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        OrdemServicoRepository,
-        {
-          provide: PrismaService,
-          useValue: mockPrismaService,
-        },
-      ],
-    }).compile();
-
-    repository = module.get<OrdemServicoRepository>(OrdemServicoRepository);
-    prismaService = module.get<PrismaService>(PrismaService);
+    prisma = {
+      $transaction: jest.fn(async (fn: (client: typeof tx) => Promise<unknown>) => {
+        const result = await fn(tx);
+        ordem.push('commit');
+        return result;
+      }),
+      ordemServico: {
+        findUnique: jest.fn().mockResolvedValue(registro),
+        findMany: jest.fn(),
+        delete: jest.fn().mockResolvedValue(registro),
+      },
+    };
+    projector = {
+      project: jest.fn((_id: string) => {
+        ordem.push('projecao');
+        return Promise.resolve();
+      }),
+    };
+    repository = new OrdemServicoRepository(prisma as unknown as PrismaService, projector);
   });
 
   describe('create', () => {
-    it('deve criar uma nova ordem de serviço', async () => {
-      const createData = {
+    it('grava a OS e o histórico RECEIVED na transação e projeta depois do commit', async () => {
+      const result = await repository.create({
         veiculoId: 'veiculo-123',
         clienteId: 'cliente-123',
         descricao: 'Troca de óleo',
-      };
+      });
 
-      (prismaService.ordemServico.create as jest.Mock).mockResolvedValue(mockOrdemServico);
-
-      const result = await repository.create(createData);
-
-      expect(prismaService.ordemServico.create).toHaveBeenCalledWith({
-        data: {
-          id: expect.any(String),
-          id_veiculo: createData.veiculoId,
-          id_cliente: createData.clienteId,
-          descricao: createData.descricao,
+      expect(tx.ordemServico.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          id_veiculo: 'veiculo-123',
+          id_cliente: 'cliente-123',
+          descricao: 'Troca de óleo',
           status: 'RECEIVED',
-        },
+        }),
       });
-      expect(result).toEqual(expect.objectContaining(mappedOrdemServico));
-    });
-
-    it('deve criar ordem de serviço sem descrição', async () => {
-      const createData = {
-        veiculoId: 'veiculo-123',
-        clienteId: 'cliente-123',
-      };
-
-      const ordemSemDescricao = { ...mockOrdemServico, descricao: null };
-      (prismaService.ordemServico.create as jest.Mock).mockResolvedValue(ordemSemDescricao);
-
-      const result = await repository.create(createData);
-
-      expect(prismaService.ordemServico.create).toHaveBeenCalledWith({
-        data: {
-          id: expect.any(String),
-          id_veiculo: createData.veiculoId,
-          id_cliente: createData.clienteId,
-          descricao: undefined,
-          status: 'RECEIVED',
-        },
+      expect(tx.historicoStatusOS.create).toHaveBeenCalledWith({
+        data: { ordem_servico_id: 'os-123', status_novo: 'RECEIVED' },
       });
-      expect(result).toEqual(expect.objectContaining({ ...mappedOrdemServico, descricao: null }));
-    });
-  });
-
-  describe('findAll', () => {
-    it('deve retornar lista paginada de ordens de serviço', async () => {
-      const mockOrdens = [mockOrdemServico];
-      const mockTotal = 1;
-
-      (prismaService.ordemServico.findMany as jest.Mock).mockResolvedValue(mockOrdens);
-      (prismaService.ordemServico.count as jest.Mock).mockResolvedValue(mockTotal);
-
-      const result = await repository.findAll(1, 10);
-
-      expect(prismaService.ordemServico.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 0,
-        take: 10,
-        orderBy: { created_at: 'desc' },
-        include: {
-          veiculo: true,
-          cliente: true,
-          orcamento: true,
-        },
-      });
-      expect(prismaService.ordemServico.count).toHaveBeenCalledWith({ where: {} });
-      expect(result).toEqual({
-        data: [expect.objectContaining(mappedOrdemServico)],
-        pagination: {
-          page: 1,
-          limit: 10,
-          total: 1,
-          totalPages: 1,
-        },
-      });
-    });
-
-    it('deve retornar lista filtrada por busca', async () => {
-      const mockOrdens = [mockOrdemServico];
-      const mockTotal = 1;
-      const searchTerm = 'óleo';
-
-      (prismaService.ordemServico.findMany as jest.Mock).mockResolvedValue(mockOrdens);
-      (prismaService.ordemServico.count as jest.Mock).mockResolvedValue(mockTotal);
-
-      const result = await repository.findAll(1, 10, searchTerm);
-
-      expect(prismaService.ordemServico.findMany).toHaveBeenCalledWith({
-        where: {
-          OR: [{ descricao: { contains: searchTerm, mode: 'insensitive' } }],
-        },
-        skip: 0,
-        take: 10,
-        orderBy: { created_at: 'desc' },
-        include: {
-          veiculo: true,
-          cliente: true,
-          orcamento: true,
-        },
-      });
-      expect(result.data).toEqual([expect.objectContaining(mappedOrdemServico)]);
-    });
-
-    it('deve calcular paginação corretamente', async () => {
-      const mockOrdens = [mockOrdemServico];
-      const mockTotal = 25;
-
-      (prismaService.ordemServico.findMany as jest.Mock).mockResolvedValue(mockOrdens);
-      (prismaService.ordemServico.count as jest.Mock).mockResolvedValue(mockTotal);
-
-      const result = await repository.findAll(3, 5);
-
-      expect(prismaService.ordemServico.findMany).toHaveBeenCalledWith({
-        where: {},
-        skip: 10,
-        take: 5,
-        orderBy: { created_at: 'desc' },
-        include: {
-          veiculo: true,
-          cliente: true,
-          orcamento: true,
-        },
-      });
-      expect(result.pagination).toEqual({
-        page: 3,
-        limit: 5,
-        total: 25,
-        totalPages: 5,
-      });
-    });
-  });
-
-  describe('findOne', () => {
-    it('deve retornar uma ordem de serviço por ID', async () => {
-      const id = 'os-123';
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(mockOrdemServico);
-
-      const result = await repository.findOne(id);
-
-      expect(prismaService.ordemServico.findUnique).toHaveBeenCalledWith({
-        where: { id },
-        include: { veiculo: true, cliente: true, orcamento: true },
-      });
-      expect(result).toEqual(expect.objectContaining(mappedOrdemServico));
-    });
-
-    it('deve lançar NotFoundException quando ordem não encontrada', async () => {
-      const id = 'os-inexistente';
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(null);
-
-      await expect(repository.findOne(id)).rejects.toThrow(EntityNotFoundException);
+      expect(projector.project).toHaveBeenCalledWith('os-123');
+      expect(ordem).toEqual(['historico', 'commit', 'projecao']);
+      expect(result).toEqual(expect.objectContaining({ id: 'os-123', clienteId: 'cliente-123' }));
     });
   });
 
   describe('update', () => {
-    it('deve atualizar uma ordem de serviço', async () => {
-      const id = 'os-123';
-      const updateData = {
-        status: 'IN_PROGRESS' as const,
-        descricao: 'Troca de óleo e filtro',
-        iniciada_em: new Date('2024-01-16'),
+    it('grava histórico com status anterior e motivo quando o status muda, e projeta', async () => {
+      await repository.update('os-123', {
+        status: 'CLOSED_WITHOUT_EXECUTION',
+        motivo: 'Orçamento recusado pelo cliente',
+      });
+
+      expect(tx.ordemServico.update).toHaveBeenCalledWith({
+        where: { id: 'os-123' },
+        data: { status: 'CLOSED_WITHOUT_EXECUTION' },
+      });
+      expect(tx.historicoStatusOS.create).toHaveBeenCalledWith({
+        data: {
+          ordem_servico_id: 'os-123',
+          status_anterior: 'RECEIVED',
+          status_novo: 'CLOSED_WITHOUT_EXECUTION',
+          motivo: 'Orçamento recusado pelo cliente',
+        },
+      });
+      expect(ordem).toEqual(['historico', 'commit', 'projecao']);
+    });
+
+    it('não grava histórico quando o status não muda', async () => {
+      await repository.update('os-123', { status: 'RECEIVED' });
+
+      expect(tx.historicoStatusOS.create).not.toHaveBeenCalled();
+      expect(projector.project).toHaveBeenCalledWith('os-123');
+    });
+
+    it('projeta marcos de tempo sem histórico (escrita sem status)', async () => {
+      const iniciada = new Date('2024-01-16T10:00:00Z');
+
+      const result = await repository.update('os-123', { iniciada_em: iniciada });
+
+      expect(tx.ordemServico.update).toHaveBeenCalledWith({
+        where: { id: 'os-123' },
+        data: { iniciada_em: iniciada },
+      });
+      expect(tx.historicoStatusOS.create).not.toHaveBeenCalled();
+      expect(projector.project).toHaveBeenCalledWith('os-123');
+      expect(result.iniciada_em).toEqual(iniciada);
+    });
+
+    it('repassa todos os campos informados para o Postgres', async () => {
+      const data = {
+        descricao: 'Nova descrição',
+        finalizada_em: new Date('2024-01-17'),
+        entregue_em: null,
       };
 
-      const updatedOrdem = { ...mockOrdemServico, ...updateData };
+      await repository.update('os-123', data);
 
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(mockOrdemServico);
-      (prismaService.ordemServico.update as jest.Mock).mockResolvedValue(updatedOrdem);
-
-      const result = await repository.update(id, updateData);
-
-      expect(prismaService.ordemServico.update).toHaveBeenCalledWith({
-        where: { id },
-        data: {
-          status: updateData.status,
-          descricao: updateData.descricao,
-          iniciada_em: updateData.iniciada_em,
-        },
-      });
-      expect(result).toEqual(
-        expect.objectContaining({
-          veiculoId: 'veiculo-123',
-          clienteId: 'cliente-123',
-          status: 'IN_PROGRESS',
-          descricao: 'Troca de óleo e filtro',
-        })
-      );
+      expect(tx.ordemServico.update).toHaveBeenCalledWith({ where: { id: 'os-123' }, data });
     });
 
-    it('deve atualizar apenas campos fornecidos', async () => {
-      const id = 'os-123';
-      const updateData = { status: 'FINISHED' as const };
+    it('lança EntityNotFoundException e não projeta quando a OS não existe', async () => {
+      tx.ordemServico.findUnique.mockResolvedValue(null);
 
-      const updatedOrdem = { ...mockOrdemServico, status: 'FINISHED' };
-
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(mockOrdemServico);
-      (prismaService.ordemServico.update as jest.Mock).mockResolvedValue(updatedOrdem);
-
-      const result = await repository.update(id, updateData);
-
-      expect(prismaService.ordemServico.update).toHaveBeenCalledWith({
-        where: { id },
-        data: {
-          status: updateData.status,
-        },
-      });
-      expect(result).toEqual(
-        expect.objectContaining({ ...mappedOrdemServico, status: 'FINISHED' })
+      await expect(repository.update('x', { status: 'UNDER_DIAGNOSIS' })).rejects.toThrow(
+        EntityNotFoundException
       );
-    });
-
-    it('deve permitir definir campos como undefined', async () => {
-      const id = 'os-123';
-      const updateData = {
-        descricao: undefined,
-        finalizada_em: undefined,
-      };
-
-      const updatedOrdem = { ...mockOrdemServico, ...updateData };
-
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(mockOrdemServico);
-      (prismaService.ordemServico.update as jest.Mock).mockResolvedValue(updatedOrdem);
-
-      const result = await repository.update(id, updateData);
-
-      expect(prismaService.ordemServico.update).toHaveBeenCalledWith({
-        where: { id },
-        data: {
-          descricao: undefined,
-          finalizada_em: undefined,
-        },
-      });
-      expect(result).toEqual(
-        expect.objectContaining({ veiculoId: 'veiculo-123', clienteId: 'cliente-123' })
-      );
-    });
-
-    it('deve lançar NotFoundException quando ordem não encontrada para atualização', async () => {
-      const id = 'os-inexistente';
-      const updateData = { status: 'FINISHED' as const };
-
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(null);
-
-      await expect(repository.update(id, updateData)).rejects.toThrow(EntityNotFoundException);
+      expect(tx.ordemServico.update).not.toHaveBeenCalled();
+      expect(projector.project).not.toHaveBeenCalled();
     });
   });
 
   describe('remove', () => {
-    it('deve remover uma ordem de serviço', async () => {
-      const id = 'os-123';
+    it('remove a OS e projeta (o projetor apaga o documento)', async () => {
+      const result = await repository.remove('os-123');
 
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(mockOrdemServico);
-      (prismaService.ordemServico.delete as jest.Mock).mockResolvedValue(mockOrdemServico);
-
-      const result = await repository.remove(id);
-
-      expect(prismaService.ordemServico.delete).toHaveBeenCalledWith({
-        where: { id },
-      });
-      expect(result).toEqual(expect.objectContaining(mappedOrdemServico));
+      expect(prisma.ordemServico.delete).toHaveBeenCalledWith({ where: { id: 'os-123' } });
+      expect(projector.project).toHaveBeenCalledWith('os-123');
+      expect(result.id).toBe('os-123');
     });
 
-    it('deve lançar NotFoundException quando ordem não encontrada para remoção', async () => {
-      const id = 'os-inexistente';
+    it('lança EntityNotFoundException quando a OS não existe', async () => {
+      prisma.ordemServico.findUnique.mockResolvedValue(null);
 
-      (prismaService.ordemServico.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(repository.remove('x')).rejects.toThrow(EntityNotFoundException);
+      expect(projector.project).not.toHaveBeenCalled();
+    });
+  });
 
-      await expect(repository.remove(id)).rejects.toThrow(EntityNotFoundException);
+  describe('findOne', () => {
+    it('lê do Postgres (leitura interna de casos de uso de escrita)', async () => {
+      const result = await repository.findOne('os-123');
+
+      expect(prisma.ordemServico.findUnique).toHaveBeenCalledWith({
+        where: { id: 'os-123' },
+        include: { veiculo: true, cliente: true, orcamento: true },
+      });
+      expect(result).toEqual(expect.objectContaining({ id: 'os-123', veiculoId: 'veiculo-123' }));
+    });
+
+    it('lança EntityNotFoundException quando a OS não existe', async () => {
+      prisma.ordemServico.findUnique.mockResolvedValue(null);
+
+      await expect(repository.findOne('x')).rejects.toThrow(EntityNotFoundException);
     });
   });
 
   describe('calcularTempoMedioExecucao', () => {
-    it('deve calcular a média corretamente com múltiplas ordens', async () => {
+    it('calcula a média com múltiplas ordens', async () => {
       const inicio = new Date('2024-01-01T08:00:00Z');
-      const fim1 = new Date('2024-01-01T10:00:00Z'); // 120 min
-      const fim2 = new Date('2024-01-01T09:00:00Z'); // 60 min
-
-      (prismaService.ordemServico.findMany as jest.Mock).mockResolvedValue([
-        { iniciada_em: inicio, finalizada_em: fim1 },
-        { iniciada_em: inicio, finalizada_em: fim2 },
+      prisma.ordemServico.findMany.mockResolvedValue([
+        { iniciada_em: inicio, finalizada_em: new Date('2024-01-01T10:00:00Z') },
+        { iniciada_em: inicio, finalizada_em: new Date('2024-01-01T09:00:00Z') },
       ]);
 
       const result = await repository.calcularTempoMedioExecucao();
 
-      expect(prismaService.ordemServico.findMany).toHaveBeenCalledWith({
-        where: {
-          status: 'DELIVERED',
-          iniciada_em: { not: null },
-          finalizada_em: { not: null },
-        },
+      expect(prisma.ordemServico.findMany).toHaveBeenCalledWith({
+        where: { status: 'DELIVERED', iniciada_em: { not: null }, finalizada_em: { not: null } },
         select: { iniciada_em: true, finalizada_em: true },
       });
       expect(result).toEqual({ totalMinutos: 180, total: 2 });
     });
 
-    it('deve retornar zero quando não há ordens entregues', async () => {
-      (prismaService.ordemServico.findMany as jest.Mock).mockResolvedValue([]);
+    it('retorna zero quando não há ordens entregues', async () => {
+      prisma.ordemServico.findMany.mockResolvedValue([]);
 
-      const result = await repository.calcularTempoMedioExecucao();
-
-      expect(result).toEqual({ totalMinutos: 0, total: 0 });
+      await expect(repository.calcularTempoMedioExecucao()).resolves.toEqual({
+        totalMinutos: 0,
+        total: 0,
+      });
     });
   });
 });

@@ -6,6 +6,8 @@ import {
   DeleteClienteUseCase,
 } from '@/modules/cadastro/application/use-cases/cliente.use-cases';
 import { IClienteRepository } from '@/modules/cadastro/domain/interfaces/cliente.interface';
+import type { IClienteReadModelQuery } from '@/modules/cadastro/domain/interfaces/cliente-read-model.interface';
+import { EntityNotFoundException } from '@/shared/domain/exceptions/entity-not-found.exception';
 import { TipoDocumento } from '@/modules/cadastro/domain/value-objects/cpf-cnpj.vo';
 import { makeCliente, makePagination } from '../../support/test-factories';
 
@@ -156,29 +158,36 @@ describe('Cliente Use Cases', () => {
 
   describe('GetClienteUseCase', () => {
     let useCase: GetClienteUseCase;
+    let readModel: jest.Mocked<IClienteReadModelQuery>;
 
     beforeEach(() => {
-      useCase = new GetClienteUseCase(mockRepository);
+      readModel = { findById: jest.fn() };
+      useCase = new GetClienteUseCase(readModel);
     });
 
-    it('deve buscar cliente por ID com sucesso', async () => {
+    it('deve buscar cliente por ID no read model', async () => {
       const clienteId = '123e4567-e89b-12d3-a456-426614174000';
-      const cliente = makeCliente({ id: clienteId });
-      mockRepository.findById.mockResolvedValue(cliente);
+      readModel.findById.mockResolvedValue({
+        id: clienteId,
+        nome: 'João Silva',
+        email: 'joao@example.com',
+        telefone: null,
+        documento: '529.982.247-25',
+        tipoDocumento: 'CPF',
+      });
 
       const resultado = await useCase.execute(clienteId);
 
-      expect(mockRepository.findById).toHaveBeenCalledWith(clienteId);
+      expect(readModel.findById).toHaveBeenCalledWith(clienteId);
+      expect(mockRepository.findById).not.toHaveBeenCalled();
       expect(resultado.id).toBe(clienteId);
       expect(resultado.nome).toBe('João Silva');
     });
 
-    it('deve propagar erro quando cliente não encontrado', async () => {
-      const clienteId = 'id-inexistente';
-      mockRepository.findById.mockRejectedValue(new Error('Cliente não encontrado'));
+    it('deve lançar EntityNotFoundException quando não há documento', async () => {
+      readModel.findById.mockResolvedValue(null);
 
-      await expect(useCase.execute(clienteId)).rejects.toThrow('Cliente não encontrado');
-      expect(mockRepository.findById).toHaveBeenCalledWith(clienteId);
+      await expect(useCase.execute('id-inexistente')).rejects.toThrow(EntityNotFoundException);
     });
   });
 
