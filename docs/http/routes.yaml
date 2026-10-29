@@ -425,16 +425,6 @@
   - 404
   mutating: false
   mock_body: {}
-- id: route-036
-  method: GET
-  path: /api/v1/ordens-servico/{{ordem_id}}/rastreamento
-  auth: customer
-  role: null
-  allowed_status:
-  - 200
-  - 404
-  mutating: false
-  mock_body: {}
 - id: route-037
   method: PATCH
   path: /api/v1/ordens-servico/{{ordem_id}}
@@ -552,20 +542,6 @@
   - 409
   mutating: true
   mock_body: {}
-- id: route-046
-  method: POST
-  path: /api/v1/ordens-servico/{{ordem_id}}/aprovar-servico
-  auth: customer
-  role: null
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body:
-    decisao: APROVADO
 - id: route-047
   method: PATCH
   path: /api/v1/ordens-servico/{{ordem_id}}/registrar-entrega

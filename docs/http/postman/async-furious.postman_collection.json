@@ -1696,45 +1696,6 @@
           }
         },
         {
-          "name": "GET /ordens-servico/{{ordem_id}}/rastreamento",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/rastreamento",
-              "host": [
-                "{{base_url}}/api/v1",
-                "/ordens-servico/{{ordem_id}}/rastreamento"
-              ]
-            },
-            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{customer_token}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
           "name": "PATCH /ordens-servico/{{ordem_id}}",
           "request": {
             "method": "PATCH",
@@ -2067,45 +2028,6 @@
             "body": {
               "mode": "raw",
               "raw": "{}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{customer_token}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "POST /ordens-servico/{{ordem_id}}/aprovar-servico",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
-              "host": [
-                "{{base_url}}/api/v1",
-                "/ordens-servico/{{ordem_id}}/aprovar-servico"
-              ]
-            },
-            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\"decisao\": \"APROVADO\"}",
               "options": {
                 "raw": {
                   "language": "json"
