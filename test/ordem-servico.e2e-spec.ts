@@ -3,9 +3,13 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import type { Application } from 'express';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { GATEWAY_PAGAMENTO } from '../src/modules/financeiro/domain/interfaces/pagamento.interface';
+import { DiagnosticoIniciado } from '../src/modules/ordem-servico/domain/events/diagnostico-iniciado.event';
+import { ExecucaoIniciada } from '../src/modules/ordem-servico/domain/events/execucao-iniciada.event';
+import { ExecucaoConcluida } from '../src/modules/ordem-servico/domain/events/execucao-concluida.event';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
 import { randomInt } from 'node:crypto';
 
@@ -14,6 +18,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
   let server: ReturnType<typeof request>;
   let prismaService: PrismaService;
   let jwtService: JwtService;
+  let eventEmitter: EventEmitter2;
 
   let recepcionistaToken: string;
   let mecanicoToken: string;
@@ -58,6 +63,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
     server = request(app.getHttpServer() as unknown as Application);
     prismaService = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
+    eventEmitter = app.get(EventEmitter2);
 
     await prismaService.ordemServico.deleteMany({});
     await prismaService.veiculo.deleteMany({});
@@ -165,17 +171,31 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     ordemServicoId = osResponse.body.id;
 
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/assumir`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(200);
+    const statusDaOs = async (): Promise<string> => {
+      const resposta = await server
+        .get(`/ordens-servico/${ordemServicoId}/status`)
+        .set('Authorization', `Bearer ${recepcionistaToken}`)
+        .expect(200);
+      return resposta.body.status as string;
+    };
 
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/analisar`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(200);
+    // Os eventos do Execução e Produção são injetados in-process (EventEmitter2), no lugar do
+    // serviço real, que não sobe neste teste. Por isso o fluxo do mecânico não chama mais
+    // assumir/analisar/finalizar-execucao: essas rotas saíram do OS Service (ver
+    // test/ordem-servico/controllers/ordem-servico.controller.spec.ts, "rotas migradas").
 
+    // Sem DiagnosticoIniciado a OS segue RECEIVED e servicos-insumos responde erro de estado.
     await server
+      .patch(`/ordens-servico/${ordemServicoId}/servicos-insumos`)
+      .set('Authorization', `Bearer ${mecanicoToken}`)
+      .send({ valor_total_servicos: 300, valor_total_pecas: 0 })
+      .expect(400);
+
+    await eventEmitter.emitAsync('DiagnosticoIniciado', new DiagnosticoIniciado(ordemServicoId));
+    expect(await statusDaOs()).toBe('UNDER_DIAGNOSIS');
+
+    // A resposta devolve só os totais; o Orcamento passa a ser do Billing (OrcamentoCalculado).
+    const totais = await server
       .patch(`/ordens-servico/${ordemServicoId}/servicos-insumos`)
       .set('Authorization', `Bearer ${mecanicoToken}`)
       .send({
@@ -183,16 +203,27 @@ describe('OrdemServico Happy Flow (e2e)', () => {
         valor_total_pecas: 0,
       })
       .expect(200);
+    expect(totais.body).toEqual({
+      ordemServicoId,
+      valorTotalServicos: 300,
+      valorTotalPecas: 0,
+      valorTotalGeral: 300,
+    });
+    expect(await statusDaOs()).toBe('AWAITING_APPROVAL');
 
     const aprovacao = await server
       .patch(`/ordens-servico/${ordemServicoId}/orcamento/aprovar`)
       .expect(200);
     expect(aprovacao.body.linkPagamento).toBe(`https://mp.test/checkout/${ordemServicoId}`);
+    // Aprovar/reservar peças não leva mais a OS a IN_PROGRESS: só ExecucaoIniciada.
+    expect(await statusDaOs()).toBe('AWAITING_APPROVAL');
 
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/finalizar-execucao`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(200);
+    await eventEmitter.emitAsync('ExecucaoIniciada', new ExecucaoIniciada(ordemServicoId));
+    expect(await statusDaOs()).toBe('IN_PROGRESS');
+
+    // A conclusão vem do Execução (PATCH /execucoes/{id}/concluir -> ExecucaoConcluida).
+    await eventEmitter.emitAsync('ExecucaoConcluida', new ExecucaoConcluida(ordemServicoId));
+    expect(await statusDaOs()).toBe('FINISHED');
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/aprovar-servico`)

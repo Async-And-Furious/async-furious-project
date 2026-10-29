@@ -1813,84 +1813,6 @@
           }
         },
         {
-          "name": "PATCH /ordens-servico/{{ordem_id}}/assumir",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/assumir",
-              "host": [
-                "{{base_url}}/api/v1",
-                "/ordens-servico/{{ordem_id}}/assumir"
-              ]
-            },
-            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{mechanic_token}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "PATCH /ordens-servico/{{ordem_id}}/analisar",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/analisar",
-              "host": [
-                "{{base_url}}/api/v1",
-                "/ordens-servico/{{ordem_id}}/analisar"
-              ]
-            },
-            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{mechanic_token}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
           "name": "PATCH /ordens-servico/{{ordem_id}}/servicos-insumos",
           "request": {
             "method": "PATCH",
@@ -2001,45 +1923,6 @@
                 {
                   "key": "token",
                   "value": "{{customer_token}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
-          "name": "PATCH /ordens-servico/{{ordem_id}}/finalizar-execucao",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao",
-              "host": [
-                "{{base_url}}/api/v1",
-                "/ordens-servico/{{ordem_id}}/finalizar-execucao"
-              ]
-            },
-            "description": "Role: mechanic; 400 is allowed for an intentionally invalid/state-incompatible mock.",
-            "body": {
-              "mode": "raw",
-              "raw": "{}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{mechanic_token}}",
                   "type": "string"
                 }
               ]

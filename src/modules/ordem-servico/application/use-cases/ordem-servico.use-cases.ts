@@ -1,16 +1,13 @@
-import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
-import type { Orcamento } from '../../domain/entities/orcamento.entity';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOsPecaRepository } from '../../domain/interfaces/os-peca.interface';
 import { OrdemServicoCriada } from '../../domain/events/ordem-servico-criada.event';
-import { OrdemServicoAssumida } from '../../domain/events/ordem-servico-assumida.event';
-import { VeiculoAnalisado } from '../../domain/events/veiculo-analisado.event';
-import { ServicosEInsumosListados } from '../../domain/events/servicos-e-insumos-listados.event';
-import { ServicoConcluidoPeloMecanico } from '../../domain/events/servico-concluido-pelo-mecanico.event';
+import { OrdemServicoRecebida } from '../../domain/events/ordem-servico-recebida.event';
+import { OrcamentoCalculado } from '../../domain/events/orcamento-calculado.event';
 import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado-pelo-cliente.event';
+import { OrcamentoVo } from '../../domain/value-objects/orcamento.vo';
 import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.event';
 import type { IClienteRepository } from '../../../cadastro/domain/interfaces/cliente.interface';
 import type { IVeiculoRepository } from '../../../cadastro/domain/interfaces/veiculo.interface';
@@ -129,45 +126,22 @@ export class CriarOrdemServicoUseCase {
     });
 
     await this.emissor.emitir(new OrdemServicoCriada(os.id, os.clienteId, os.veiculoId));
+    await this.emissor.emitir(new OrdemServicoRecebida(os.id));
     return this.ordemServicoRepository.findOne(os.id);
   }
 }
 
-// UC-02
-export class AssumirOrdemServicoUseCase {
-  constructor(
-    private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: IEmissorEventos
-  ) {}
-
-  async execute(id: string): Promise<OrdemDeServico> {
-    const os = await this.ordemServicoRepository.findOne(id);
-    os.podeAssumir();
-    await this.emissor.emitir(new OrdemServicoAssumida(id));
-    return this.ordemServicoRepository.findOne(id);
-  }
-}
-
-// UC-03
-export class AnalisarVeiculoUseCase {
-  constructor(
-    private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: IEmissorEventos
-  ) {}
-
-  async execute(id: string): Promise<OrdemDeServico> {
-    const os = await this.ordemServicoRepository.findOne(id);
-    os.podeAnalisarVeiculo();
-    await this.emissor.emitir(new VeiculoAnalisado(id));
-    return this.ordemServicoRepository.findOne(id);
-  }
+export interface TotaisOrcamentoCalculado {
+  ordemServicoId: string;
+  valorTotalServicos: number;
+  valorTotalPecas: number;
+  valorTotalGeral: number;
 }
 
 // UC-04
 export class ListarServicosInsumosNaOsUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly orcamentoRepository: IOrcamentoRepository,
     private readonly osPecaRepository: IOsPecaRepository,
     private readonly emissor: IEmissorEventos
   ) {}
@@ -179,9 +153,21 @@ export class ListarServicosInsumosNaOsUseCase {
       valor_total_pecas: number;
       pecas?: Array<{ id_peca: string; quantidade: number; preco_unitario: number }>;
     }
-  ): Promise<Orcamento> {
+  ): Promise<TotaisOrcamentoCalculado> {
     const os = await this.ordemServicoRepository.findOne(id);
     os.podeLancarServicosInsumos();
+
+    // Calcula (e valida) os totais antes de gravar OsPeca: valor inválido não deixa efeito colateral.
+    const totais = OrcamentoVo.create({
+      valor_total_servicos: data.valor_total_servicos,
+      valor_total_pecas: data.valor_total_pecas,
+    });
+    const resultado: TotaisOrcamentoCalculado = {
+      ordemServicoId: id,
+      valorTotalServicos: totais.getValorTotalServicos().toNumber(),
+      valorTotalPecas: totais.getValorTotalPecas().toNumber(),
+      valorTotalGeral: totais.getValorTotalGeral().toNumber(),
+    };
 
     if (data.pecas && data.pecas.length > 0) {
       await this.osPecaRepository.replaceAll(
@@ -196,13 +182,14 @@ export class ListarServicosInsumosNaOsUseCase {
     }
 
     await this.emissor.emitir(
-      new ServicosEInsumosListados(id, data.valor_total_servicos, data.valor_total_pecas)
+      new OrcamentoCalculado(
+        id,
+        resultado.valorTotalServicos,
+        resultado.valorTotalPecas,
+        resultado.valorTotalGeral
+      )
     );
-    const orcamento = await this.orcamentoRepository.findByOrdemServicoId(id);
-    if (!orcamento) {
-      throw new EntityNotFoundException('Orcamento', id);
-    }
-    return orcamento;
+    return resultado;
   }
 }
 
@@ -224,21 +211,6 @@ export class AtualizarOrdemServicoUseCase {
       ...(data.status && { status: data.status }),
       ...(data.descricao !== undefined && { descricao: data.descricao }),
     });
-  }
-}
-
-// UC-07
-export class FinalizarExecucaoUseCase {
-  constructor(
-    private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: IEmissorEventos
-  ) {}
-
-  async execute(id: string): Promise<OrdemDeServico> {
-    const os = await this.ordemServicoRepository.findOne(id);
-    os.podeFinalizar();
-    await this.emissor.emitir(new ServicoConcluidoPeloMecanico(id));
-    return this.ordemServicoRepository.findOne(id);
   }
 }
 

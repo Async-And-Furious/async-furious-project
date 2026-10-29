@@ -4,6 +4,7 @@ import { getLoggerToken } from 'nestjs-pino';
 import { GlobalExceptionFilter } from '../../src/shared/infrastructure/filters/global-exception.filter';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
+import { FalhaRetentavelException } from '../../src/shared/domain/exceptions/falha-retentavel.exception';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 
 describe('GlobalExceptionFilter', () => {
@@ -70,6 +71,15 @@ describe('GlobalExceptionFilter', () => {
         message: 'Erro de domínio',
         error: 'Bad Request',
       });
+    });
+
+    it('não deve tratar FalhaRetentavelException como erro de negócio (400): responde 500', () => {
+      filter.catch(
+        new FalhaRetentavelException('ExecucaoIniciada antes da aprovação'),
+        mockArgumentsHost
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
     });
 
     it('deve tratar ConflitoException como 409', () => {

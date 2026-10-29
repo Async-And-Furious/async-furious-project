@@ -9,10 +9,14 @@
 > ([`relatorio-e2e-orcamento-curl.md`](../reports/relatorio-e2e-orcamento-curl.md)).
 > Este documento **formaliza** essa sequência já existente, anotando-a com
 > endpoints reais, papéis exigidos, estados (`SOStatus`) e eventos de domínio
-> documentados em [`ddd.md`](../ddd.md) §5.1 — sem inventar eventos ou passos
-> novos. Nenhuma parte deste fluxo muda entre o estado atual e a proposta
-> Fase 3, exceto o mecanismo de autenticação/autorização de borda (ver
-> [authentication-flow.md](./authentication-flow.md)).
+> documentados em [`ddd.md`](../ddd.md) §5.1. Entre a Fase 3 e a Fase 4 o
+> fluxo muda em um ponto: as ações do mecânico `assumir`, `analisar` e
+> `finalizar-execucao` saíram do OS Service para o Execução e Produção
+> (Feature #334) e chegam aqui por evento — o diagrama abaixo já reflete isso;
+> o detalhe está em
+> [`os-service-integracao-execucao.md`](./os-service-integracao-execucao.md).
+> O mecanismo de autenticação/autorização de borda segue em
+> [authentication-flow.md](./authentication-flow.md).
 
 ```mermaid
 sequenceDiagram
@@ -20,6 +24,7 @@ sequenceDiagram
     actor Recepcionista
     actor Mecanico
     participant API as Aplicação (ordem-servico BC)
+    participant Exec as Execução e Produção
     participant DB as PostgreSQL
     participant Obs as Observabilidade [PENDENTE]
 
@@ -27,24 +32,28 @@ sequenceDiagram
     Recepcionista->>API: POST /clientes, POST /veiculos (papel RECEPCIONISTA)
     API->>DB: persiste Cliente/Veículo
     Recepcionista->>API: POST /ordens-servico (papel RECEPCIONISTA)
-    API->>API: evento OrdemDeServicoRecebida
     API->>DB: cria OS (status=RECEIVED)
+    API->>API: eventos OrdemServicoCriada + OrdemServicoRecebida<br/>(esta última coloca a OS na fila de diagnóstico do Execução)
     API-->>Recepcionista: 201 { id da OS }
 
-    Mecanico->>API: PATCH /ordens-servico/:id/assumir (papel MECANICO)
-    API->>API: evento OrdemDeServicoEmDiagnostico
-    API->>DB: status=UNDER_DIAGNOSIS
-    Mecanico->>API: PATCH /ordens-servico/:id/analisar (papel MECANICO)
-    API->>DB: registra diagnóstico (status permanece UNDER_DIAGNOSIS)
+    Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/iniciar-diagnostico (papel MECANICO)
+    Exec-->>API: evento DiagnosticoIniciado
+    API->>DB: status=UNDER_DIAGNOSIS (ignora se a OS já não está em RECEIVED)
+    API->>API: evento OrdemServicoEmDiagnostico (notifica o cliente)
 
-    Mecanico->>API: PATCH /ordens-servico/:id/servicos-insumos<br/>(lista serviços + peças, papel MECANICO)
-    API->>API: evento OrcamentoGerado + OrdemDeServicoAguardandoAprovacao
-    API->>DB: calcula Orçamento, status=AWAITING_APPROVAL
+    Mecanico->>API: PATCH /ordens-servico/:id/servicos-insumos<br/>(lista serviços + peças, papel MECANICO; exige UNDER_DIAGNOSIS)
+    API-->>Mecanico: 200 { totais calculados }
+    API->>API: evento OrcamentoCalculado → OrcamentoGerado + OrdemDeServicoAguardandoAprovacao
+    API->>DB: persiste Orçamento, status=AWAITING_APPROVAL
     API-->>Cliente: notifica orçamento (fora do sistema — e-mail/telefone, não modelado como integração)
 
     alt Cliente aprova
         Cliente->>API: PATCH /ordens-servico/:id/orcamento/aprovar (rota @Public, sem token)
-        API->>API: evento OrcamentoAprovado + OrdemDeServicoEmExecucao
+        API->>API: evento OrcamentoAprovado (reserva as peças)
+        Note over API,DB: A OS permanece em AWAITING_APPROVAL.<br/>Peça sem estoque: apenas marca reserva_pecas_pendente.
+        Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/iniciar-reparo (papel MECANICO, após PagamentoConfirmado)
+        Exec-->>API: evento ExecucaoIniciada
+        API->>API: evento OrdemServicoEmExecucao
         API->>DB: status=IN_PROGRESS, iniciada_em=now()
     else Cliente recusa
         Cliente->>API: PATCH /ordens-servico/:id/orcamento/recusar (rota @Public, sem token)
@@ -53,14 +62,14 @@ sequenceDiagram
         Note over API,DB: Nenhum evento de domínio nomeado para esta<br/>transição em ddd.md §5.1 — gap já registrado<br/>na auditoria (Fase 3 não introduz nem resolve isso)
     end
 
-    opt Peças indisponíveis durante a execução
-        Mecanico->>API: atualização de estoque insuficiente
-        API->>DB: status=AWAITING_PARTS
-        Note over API,DB: Estado documentado no ciclo de vida do README/ddd.md,<br/>mas sem evento de domínio nomeado — gap pré-existente
-        API->>DB: peças repostas → status=IN_PROGRESS
+    opt Reserva de peças pendente (peça sem estoque)
+        API->>DB: logo após IN_PROGRESS, status=AWAITING_PARTS
+        Note over API,DB: Duas gravações: não existe transição direta<br/>AWAITING_APPROVAL → AWAITING_PARTS
+        API->>DB: peças repostas (PecasReservadas) → status=IN_PROGRESS
     end
 
-    Mecanico->>API: PATCH /ordens-servico/:id/finalizar-execucao (papel MECANICO)
+    Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/concluir (papel MECANICO)
+    Exec-->>API: evento ExecucaoConcluida
     API->>API: evento OrdemDeServicoFinalizada
     API->>DB: status=FINISHED, finalizada_em=now()
 
@@ -107,9 +116,10 @@ Service existir, a cobrança já roda no módulo `financeiro`:
 - `POST /pagamentos/registrar` não cria nem marca pagamento: só dispara a
   entrega (`PagamentoRegistrado`) se o `Pagamento` da OS estiver `CONFIRMADO`;
   caso contrário, `409`.
-- Diferenças em relação ao fluxo da Fase 4 descrito abaixo: a OS ainda vai
-  para `IN_PROGRESS` logo na aprovação (não espera o pagamento) e nada consome
-  os eventos de pagamento por enquanto.
+- Diferenças em relação ao fluxo da Fase 4 descrito abaixo: a OS não espera o
+  pagamento para sair de `AWAITING_APPROVAL` (só `ExecucaoIniciada` a leva a
+  `IN_PROGRESS`, e ela só chega do Execução) e nada consome os eventos de
+  pagamento por enquanto.
 
 ### Integração com o contexto Financeiro (Fase 4) {#integração-com-o-contexto-financeiro-fase-4}
 
@@ -140,9 +150,10 @@ confirmado antes de aceitar `DELIVERED`) foi **cortada**.
 
 | Situação | Comportamento |
 |---|---|
-| Papel sem permissão (ex.: RECEPCIONISTA tentando `finalizar-execucao`) | 403 Forbidden (`RolesGuard`) |
+| Papel sem permissão (ex.: RECEPCIONISTA tentando `servicos-insumos`) | 403 Forbidden (`RolesGuard`) |
 | Token ausente/expirado/inválido em rota não-`@Public()` | 401 Unauthorized (`JwtAuthGuard`) |
-| Orçamento sem `valor_total_servicos > 0` | Validação de negócio rejeita a geração do orçamento (regra citada na síntese técnica consolidada; não confirmada linha a linha nesta auditoria — `TODO` verificar no use case) |
+| `servicos-insumos` com a OS fora de `UNDER_DIAGNOSIS` (ex.: `DiagnosticoIniciado` ainda não processado) | 400 (`DomainException`); o mecânico repete depois |
+| `servicos-insumos` com valor negativo | 400 (`GerarOrcamentoDto`: `valor_total_servicos` e `valor_total_pecas` com `@Min(0)`) |
 
 ## Consulta de status
 
@@ -179,12 +190,17 @@ Também migram para o Execução e Produção as ações do mecânico: `assumir`
 `analisar` viram `PATCH /api/v1/execucoes/{id}/iniciar-diagnostico` e
 `finalizar-execucao` vira `PATCH /api/v1/execucoes/{id}/concluir`, com a
 nova `iniciar-reparo` entre elas; `servicos-insumos` e `registrar-entrega`
-ficam no OS Service ([`saga-flow.md` §2](./saga-flow.md)).
+ficam no OS Service ([`saga-flow.md` §2](./saga-flow.md)). No código do OS
+Service (Feature #334) as três rotas já foram removidas e o diagrama acima
+mostra o fluxo resultante; enquanto o Execução não existe, nada emite
+`DiagnosticoIniciado`, `ExecucaoIniciada` nem `ExecucaoConcluida` e a OS não
+avança além de `RECEIVED`/`AWAITING_APPROVAL` — ver
+[`os-service-integracao-execucao.md`](./os-service-integracao-execucao.md) §5.
 
 > **Revisão de 30/09/2026 (`rev/Epic_1`).** Atualizadas apenas as seções de
 > integração com o Financeiro e de arquitetura da Fase 4, alinhadas a
 > [`saga-flow.md`](./saga-flow.md) (fonte única do fluxo distribuído). O
-> diagrama e as demais seções descrevem o monólito atual e não foram
-> alterados. Observação: o diagrama mostra `PATCH .../aprovar-servico` como
+> diagrama descrevia o monólito antes da Feature #334 e foi atualizado por
+> ela (ações do mecânico via Execução e Produção). Observação: o diagrama mostra `PATCH .../aprovar-servico` como
 > `@Public`, mas no código esse `PATCH` é autenticado (a rota pública é o
 > `POST` de mesmo path).
