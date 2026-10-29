@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { ClienteRepository } from './cliente.repository';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import { CLIENTE_READ_MODEL_PROJECTOR } from '../../domain/interfaces/cliente-read-model.interface';
 
 interface MockPrismaCliente {
   create: jest.Mock;
@@ -19,6 +20,7 @@ interface MockPrismaService {
 describe('ClienteRepository', () => {
   let repository: ClienteRepository;
   let mockPrismaService: MockPrismaService;
+  const projector = { project: jest.fn().mockResolvedValue(undefined) };
 
   const validCpf = '11144477735';
   const validCnpj = '11222333000181';
@@ -53,6 +55,7 @@ describe('ClienteRepository', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        { provide: CLIENTE_READ_MODEL_PROJECTOR, useValue: projector },
       ],
     }).compile();
 
@@ -412,6 +415,47 @@ describe('ClienteRepository', () => {
       mockPrismaService.cliente.findUnique.mockResolvedValue(null);
 
       await expect(repository.remove('nonexistent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('write-through no read model', () => {
+    it('projeta o cliente criado', async () => {
+      mockPrismaService.cliente.create.mockResolvedValue(mockOrmCliente);
+
+      await repository.create({
+        nome: 'Test Client',
+        email: 'test@test.com',
+        telefone: '11999999999',
+        documento: validCpf,
+        tipoDocumento: 'CPF',
+      });
+
+      expect(projector.project).toHaveBeenCalledWith('123');
+    });
+
+    it('projeta o cliente atualizado', async () => {
+      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.update.mockResolvedValue({ ...mockOrmCliente, nome: 'Novo' });
+
+      await repository.update('123', { nome: 'Novo' });
+
+      expect(projector.project).toHaveBeenCalledWith('123');
+    });
+
+    it('projeta a remoção (o projetor apaga o documento)', async () => {
+      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.delete.mockResolvedValue(mockOrmCliente);
+
+      await repository.remove('123');
+
+      expect(projector.project).toHaveBeenCalledWith('123');
+    });
+
+    it('não projeta quando a escrita falha no Postgres', async () => {
+      mockPrismaService.cliente.findUnique.mockResolvedValue(null);
+
+      await expect(repository.update('x', { nome: 'Novo' })).rejects.toThrow(NotFoundException);
+      expect(projector.project).not.toHaveBeenCalled();
     });
   });
 });

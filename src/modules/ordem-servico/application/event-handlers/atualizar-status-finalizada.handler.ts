@@ -23,7 +23,10 @@ export class AtualizarStatusFinalizadaHandler {
       );
       return;
     }
-    await this.ordemServicoRepository.update(evento.ordemServicoId, { status: 'FINISHED' });
+    await this.ordemServicoRepository.update(evento.ordemServicoId, {
+      status: 'FINISHED',
+      motivo: 'Serviço concluído pelo mecânico',
+    });
     await this.emissor.emitir(new OrdemServicoFinalizada(evento.ordemServicoId));
   }
 }

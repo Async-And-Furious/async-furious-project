@@ -1,11 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import { OS_READ_MODEL_PROJECTOR } from '../../domain/interfaces/os-read-model.interface';
+import type { IOsReadModelProjector } from '../../domain/interfaces/os-read-model.interface';
 import { IOsServicoRepository } from '../../domain/interfaces/os-servico.interface';
 import { OsServico } from '../../domain/entities/os-servico.entity';
 
 @Injectable()
 export class OsServicoRepository implements IOsServicoRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(OS_READ_MODEL_PROJECTOR) private readonly projector: IOsReadModelProjector
+  ) {}
 
   async replaceAll(
     ordemServicoId: string,
@@ -33,6 +38,8 @@ export class OsServicoRepository implements IOsServicoRepository {
         });
       }
     });
+    // Itens não entram no documento, mas toda escrita da OS reprojeta (ADR-0019).
+    await this.projector.project(ordemServicoId);
   }
 
   async findByOrdemServicoId(ordemServicoId: string): Promise<OsServico[]> {

@@ -25,6 +25,7 @@ export class AtualizarStatusEmDiagnosticoHandler {
     }
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'UNDER_DIAGNOSIS',
+      motivo: 'OS assumida pelo mecânico',
     });
     await this.emissor.emitir(new OrdemServicoEmDiagnostico(evento.ordemServicoId));
   }

@@ -23,7 +23,10 @@ export class AtualizarStatusAguardandoPecasHandler {
       );
       return;
     }
-    await this.ordemServicoRepository.update(evento.ordemServicoId, { status: 'AWAITING_PARTS' });
+    await this.ordemServicoRepository.update(evento.ordemServicoId, {
+      status: 'AWAITING_PARTS',
+      motivo: 'Peças indisponíveis no estoque',
+    });
     await this.emissor.emitir(new StatusAtualizadoAguardandoPecas(evento.ordemServicoId));
   }
 }

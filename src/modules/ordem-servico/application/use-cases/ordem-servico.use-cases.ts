@@ -17,6 +17,12 @@ import type { IVeiculoRepository } from '../../../cadastro/domain/interfaces/vei
 import type { IServicoRepository } from '../../../cadastro/domain/interfaces/servico.interface';
 import type { IPecaInsumoRepository } from '../../../pecas-insumos/domain/interfaces/peca-insumo.interface';
 import type { IOsServicoRepository } from '../../domain/interfaces/os-servico.interface';
+import type {
+  FilaOrdensServicoPagina,
+  IOsReadModelQuery,
+  OrdemServicoLeitura,
+  StatusOrdemServicoLeitura,
+} from '../../domain/interfaces/os-read-model.interface';
 
 // UC-01
 export class CriarOrdemServicoUseCase {
@@ -274,36 +280,34 @@ export class RegistrarEntregaVeiculoUseCase {
 }
 
 // UC-10
+// Leituras abaixo (status, fila e detalhe) vêm do read model (DocumentDB).
 export class ConsultarStatusOrdemServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
+  constructor(private readonly readModel: IOsReadModelQuery) {}
 
-  async execute(id: string): Promise<{ ordemServicoId: string; status: string }> {
-    const os = await this.ordemServicoRepository.findOne(id);
-    return { ordemServicoId: os.id, status: os.status };
+  async execute(id: string): Promise<StatusOrdemServicoLeitura> {
+    const status = await this.readModel.consultarStatus(id);
+    if (!status) throw new EntityNotFoundException('OrdemDeServico', id);
+    return status;
   }
 }
 
 // UC-11
 export class ListarOrdensServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
+  constructor(private readonly readModel: IOsReadModelQuery) {}
 
-  async execute(
-    page?: number,
-    limit?: number
-  ): Promise<{
-    data: OrdemDeServico[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
-  }> {
-    return this.ordemServicoRepository.findAllAtivas(page, limit);
+  async execute(limit: number, cursor?: string): Promise<FilaOrdensServicoPagina> {
+    return this.readModel.listarFila(limit, cursor);
   }
 }
 
 // UC-12
 export class DetalharOrdemServicoUseCase {
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
+  constructor(private readonly readModel: IOsReadModelQuery) {}
 
-  async execute(id: string): Promise<OrdemDeServico> {
-    return this.ordemServicoRepository.findOne(id);
+  async execute(id: string): Promise<OrdemServicoLeitura> {
+    const os = await this.readModel.detalhar(id);
+    if (!os) throw new EntityNotFoundException('OrdemDeServico', id);
+    return os;
   }
 }
 

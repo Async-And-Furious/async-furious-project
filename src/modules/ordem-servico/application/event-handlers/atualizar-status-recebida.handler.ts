@@ -12,7 +12,10 @@ export class AtualizarStatusRecebidaHandler {
     const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
     // OS is created with RECEIVED by default; this handler confirms the state
     if (os.status !== 'RECEIVED') {
-      await this.ordemServicoRepository.update(evento.ordemServicoId, { status: 'RECEIVED' });
+      await this.ordemServicoRepository.update(evento.ordemServicoId, {
+        status: 'RECEIVED',
+        motivo: 'OS criada',
+      });
     }
   }
 }

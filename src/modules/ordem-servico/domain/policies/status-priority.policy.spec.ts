@@ -35,9 +35,10 @@ describe('StatusPriorityPolicy', () => {
   });
 
   describe('STATUS_EXCLUIDOS_DA_LISTAGEM', () => {
-    it('deve excluir FINISHED e DELIVERED', () => {
+    it('deve excluir FINISHED, DELIVERED e CLOSED_WITHOUT_EXECUTION', () => {
       expect(STATUS_EXCLUIDOS_DA_LISTAGEM).toContain('FINISHED');
       expect(STATUS_EXCLUIDOS_DA_LISTAGEM).toContain('DELIVERED');
+      expect(STATUS_EXCLUIDOS_DA_LISTAGEM).toContain('CLOSED_WITHOUT_EXECUTION');
     });
 
     it('não deve excluir os status operacionais', () => {

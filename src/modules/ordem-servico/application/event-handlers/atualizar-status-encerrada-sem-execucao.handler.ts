@@ -16,6 +16,7 @@ export class AtualizarStatusEncerradaSemExecucaoHandler {
   async handle(evento: OrcamentoRecusado): Promise<void> {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'CLOSED_WITHOUT_EXECUTION',
+      motivo: `Orçamento ${evento.orcamentoId} recusado pelo cliente`,
     });
     await this.emissor.emitir(new StatusAtualizadoEncerradaSemExecucao(evento.ordemServicoId));
   }
