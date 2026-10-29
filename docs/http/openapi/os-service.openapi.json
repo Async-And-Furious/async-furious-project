@@ -1,0 +1,2557 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/auth/register": {
+      "post": {
+        "description": "Cria um novo usuário no sistema. Apenas ADMIN pode criar usuários.",
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Dados do novo usuário",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuário registrado com sucesso"
+          },
+          "400": {
+            "description": "Validação falhou - email já existe ou dados inválidos"
+          },
+          "401": {
+            "description": "Token inválido ou expirado"
+          },
+          "403": {
+            "description": "Apenas ADMIN pode criar usuários"
+          },
+          "429": {
+            "description": "Muitas tentativas - aguarde antes de tentar novamente"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar novo usuário (ADMIN only)",
+        "tags": [
+          "Autenticação"
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "description": "Autentica um usuário e retorna um token JWT",
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Credenciais do usuário",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login realizado com sucesso - token retornado"
+          },
+          "400": {
+            "description": "Credenciais inválidas ou formato incorreto"
+          },
+          "401": {
+            "description": "Email ou senha incorretos"
+          },
+          "429": {
+            "description": "Muitas tentativas de login - aguarde antes de tentar novamente"
+          }
+        },
+        "summary": "Fazer login",
+        "tags": [
+          "Autenticação"
+        ]
+      }
+    },
+    "/api/v1/clientes": {
+      "post": {
+        "description": "Cria um novo cliente no sistema. Requer role de RECEPCIONISTA.",
+        "operationId": "ClienteController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Dados do cliente a ser criado",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClienteDto"
+              },
+              "examples": {
+                "Exemplo com CPF": {
+                  "value": {
+                    "nome": "João Silva",
+                    "email": "joao@example.com",
+                    "telefone": "11999999999",
+                    "documento": "12345678901",
+                    "tipoDocumento": "CPF"
+                  }
+                },
+                "Exemplo com CNPJ": {
+                  "value": {
+                    "nome": "Empresa XYZ",
+                    "email": "contato@empresa.com",
+                    "telefone": "1133333333",
+                    "documento": "12345678000190",
+                    "tipoDocumento": "CNPJ"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Cliente criado com sucesso"
+          },
+          "400": {
+            "description": "Validação falhou - dados inválidos"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role RECEPCIONISTA"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Criar novo cliente",
+        "tags": [
+          "Clientes"
+        ]
+      },
+      "get": {
+        "description": "Retorna lista paginada de clientes",
+        "operationId": "ClienteController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Número da página",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Quantidade de registros por página",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Buscar por nome do cliente",
+            "schema": {
+              "example": "João",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de clientes retornada com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar todos os clientes",
+        "tags": [
+          "Clientes"
+        ]
+      }
+    },
+    "/api/v1/clientes/{id}": {
+      "get": {
+        "operationId": "ClienteController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente encontrado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "404": {
+            "description": "Cliente não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obter cliente por ID",
+        "tags": [
+          "Clientes"
+        ]
+      },
+      "patch": {
+        "operationId": "ClienteController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateClienteDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cliente atualizado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role RECEPCIONISTA"
+          },
+          "404": {
+            "description": "Cliente não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar cliente",
+        "tags": [
+          "Clientes"
+        ]
+      },
+      "delete": {
+        "operationId": "ClienteController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cliente deletado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Cliente não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deletar cliente",
+        "tags": [
+          "Clientes"
+        ]
+      }
+    },
+    "/api/v1/veiculos": {
+      "post": {
+        "description": "Cria um novo veículo no sistema. Requer role de RECEPCIONISTA.",
+        "operationId": "VeiculoController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVeiculoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Veículo criado com sucesso"
+          },
+          "400": {
+            "description": "Validação falhou - dados inválidos ou placa duplicada"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role RECEPCIONISTA"
+          },
+          "404": {
+            "description": "Cliente não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Criar novo veículo",
+        "tags": [
+          "Veiculos"
+        ]
+      },
+      "get": {
+        "description": "Retorna lista paginada de veículos",
+        "operationId": "VeiculoController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Número da página",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Quantidade por página",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Buscar por placa, marca ou modelo",
+            "schema": {
+              "example": "Toyota",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de veículos retornada com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar todos os veículos",
+        "tags": [
+          "Veiculos"
+        ]
+      }
+    },
+    "/api/v1/veiculos/{id}": {
+      "get": {
+        "operationId": "VeiculoController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Veículo encontrado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "404": {
+            "description": "Veículo não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obter veículo por ID",
+        "tags": [
+          "Veiculos"
+        ]
+      },
+      "patch": {
+        "operationId": "VeiculoController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVeiculoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Veículo atualizado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role RECEPCIONISTA"
+          },
+          "404": {
+            "description": "Veículo não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar veículo",
+        "tags": [
+          "Veiculos"
+        ]
+      },
+      "delete": {
+        "operationId": "VeiculoController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Veículo deletado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Veículo não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deletar veículo",
+        "tags": [
+          "Veiculos"
+        ]
+      }
+    },
+    "/api/v1/servicos": {
+      "post": {
+        "description": "Cria um novo servico no sistema. Requer role de ADMIN.",
+        "operationId": "ServicoController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "description": "Dados do servico a ser criado",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServicoDto"
+              },
+              "examples": {
+                "Exemplo basico": {
+                  "value": {
+                    "nome": "Lavagem completa",
+                    "descricao": "Lavagem interna e externa",
+                    "preco": 120.5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Servico criado com sucesso"
+          },
+          "400": {
+            "description": "Validacao falhou - dados invalidos"
+          },
+          "401": {
+            "description": "Nao autorizado - token invalido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Criar novo servico",
+        "tags": [
+          "Servicos"
+        ]
+      },
+      "get": {
+        "description": "Retorna lista paginada de servicos",
+        "operationId": "ServicoController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Numero da pagina",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Quantidade de registros por pagina",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Buscar por nome ou descricao do servico",
+            "schema": {
+              "example": "Lavagem",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de servicos retornada com sucesso"
+          },
+          "401": {
+            "description": "Nao autorizado - token invalido ou expirado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar todos os servicos",
+        "tags": [
+          "Servicos"
+        ]
+      }
+    },
+    "/api/v1/servicos/{id}": {
+      "get": {
+        "operationId": "ServicoController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servico encontrado com sucesso"
+          },
+          "401": {
+            "description": "Nao autorizado - token invalido ou expirado"
+          },
+          "404": {
+            "description": "Servico nao encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obter servico por ID",
+        "tags": [
+          "Servicos"
+        ]
+      },
+      "patch": {
+        "operationId": "ServicoController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateServicoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Servico atualizado com sucesso"
+          },
+          "401": {
+            "description": "Nao autorizado - token invalido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Servico nao encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar servico",
+        "tags": [
+          "Servicos"
+        ]
+      },
+      "delete": {
+        "operationId": "ServicoController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servico deletado com sucesso"
+          },
+          "401": {
+            "description": "Nao autorizado - token invalido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Servico nao encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deletar servico",
+        "tags": [
+          "Servicos"
+        ]
+      }
+    },
+    "/api/v1/pecas": {
+      "post": {
+        "description": "Cria uma nova peça ou insumo no sistema. Requer role de ADMIN.",
+        "operationId": "PecaInsumoController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePecaInsumoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Peça/insumo criado com sucesso"
+          },
+          "400": {
+            "description": "Validação falhou - dados inválidos"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Criar nova peça/insumo",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      },
+      "get": {
+        "description": "Retorna lista paginada de peças e insumos",
+        "operationId": "PecaInsumoController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Número da página",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Quantidade por página",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Buscar por nome ou código",
+            "schema": {
+              "example": "Filtro",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de peças/insumos retornada com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar todas as peças/insumos",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      }
+    },
+    "/api/v1/pecas/{id}": {
+      "get": {
+        "operationId": "PecaInsumoController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Peça/insumo encontrado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "404": {
+            "description": "Peça/insumo não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obter peça/insumo por ID",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      },
+      "patch": {
+        "operationId": "PecaInsumoController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePecaInsumoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Peça/insumo atualizado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Peça/insumo não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar peça/insumo",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      },
+      "delete": {
+        "operationId": "PecaInsumoController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Peça/insumo deletado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Peça/insumo não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deletar peça/insumo",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      }
+    },
+    "/api/v1/pecas/{id}/estoque": {
+      "patch": {
+        "description": "Atualiza apenas a quantidade em estoque",
+        "operationId": "PecaInsumoController_updateEstoque",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEstoquePecaInsumoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estoque atualizado com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Peça/insumo não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar estoque de peça/insumo",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      }
+    },
+    "/api/v1/pecas/fornecedor/solicitar": {
+      "post": {
+        "operationId": "PecaInsumoController_solicitarReposicao",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitarReposicaoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pedido enviado ao fornecedor"
+          },
+          "400": {
+            "description": "Lista de peças vazia"
+          },
+          "401": {
+            "description": "Não autorizado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role admin"
+          },
+          "404": {
+            "description": "Peça não encontrada no catálogo"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Solicitar peças a fornecedor (P-22)",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      }
+    },
+    "/api/v1/pecas/fornecedor/pedidos/{pedidoId}/receber": {
+      "patch": {
+        "operationId": "PecaInsumoController_receberPecas",
+        "parameters": [
+          {
+            "name": "pedidoId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estoque atualizado após recebimento"
+          },
+          "401": {
+            "description": "Não autorizado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role admin"
+          },
+          "404": {
+            "description": "Pedido não encontrado"
+          },
+          "409": {
+            "description": "Pedido já foi recebido"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Confirmar recebimento de peças do fornecedor (P-23)",
+        "tags": [
+          "Pecas Insumos"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico": {
+      "post": {
+        "description": "Cria uma nova ordem de serviço recebendo cliente, veículo, serviços e peças. Calcula o orçamento e cria OS com status RECEIVED.",
+        "operationId": "OrdemServicoController_criar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrdemServicoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ordem de serviço criada com sucesso, retorna o ID."
+          },
+          "400": {
+            "description": "Validação falhou - dados inválidos"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role RECEPCIONISTA"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Criar nova ordem de serviço",
+        "tags": [
+          "Ordens Servico"
+        ]
+      },
+      "get": {
+        "description": "Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.",
+        "operationId": "OrdemServicoController_listar",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "Número da página",
+            "schema": {
+              "example": 1,
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Quantidade por página",
+            "schema": {
+              "example": 10,
+              "type": "number"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Buscar por descrição",
+            "schema": {
+              "example": "troca",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de OS ativas ordenadas por prioridade",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "data": [
+                      {
+                        "id": "uuid",
+                        "veiculoId": "uuid",
+                        "clienteId": "uuid",
+                        "status": "IN_PROGRESS",
+                        "descricao": "Troca de óleo",
+                        "created_at": "2024-01-01T00:00:00.000Z"
+                      }
+                    ],
+                    "pagination": {
+                      "page": 1,
+                      "limit": 10,
+                      "total": 5,
+                      "totalPages": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autorizado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar ordens de serviço ativas por prioridade",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/tempo-medio": {
+      "get": {
+        "description": "Retorna o tempo médio em minutos entre iniciada_em e finalizada_em de todas as OS entregues. Requer role ADMIN.",
+        "operationId": "OrdemServicoController_tempoMedioExecucao",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Tempo médio retornado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "tempoMedioMinutos": 87,
+                    "totalOrdensConsideradas": 12
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Não autorizado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Tempo médio de execução das ordens de serviço (gestão administrativa)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}": {
+      "get": {
+        "operationId": "OrdemServicoController_detalhar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ordem de serviço encontrada"
+          },
+          "401": {
+            "description": "Não autorizado"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Detalhar ordem de serviço",
+        "tags": [
+          "Ordens Servico"
+        ]
+      },
+      "patch": {
+        "description": "Atualiza status ou descrição somente enquanto a OS estiver em Recebida, Em Diagnóstico ou Aguardando Aprovação. Requer role de ADMIN.",
+        "operationId": "OrdemServicoController_atualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrdemServicoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ordem de serviço atualizada com sucesso"
+          },
+          "400": {
+            "description": "OS já entrou em execução ou o status informado não é permitido"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Atualizar ordem de serviço antes da execução",
+        "tags": [
+          "Ordens Servico"
+        ]
+      },
+      "delete": {
+        "operationId": "OrdemServicoController_deletar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ordem de serviço deletada com sucesso"
+          },
+          "401": {
+            "description": "Não autorizado - token inválido ou expirado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Deletar ordem de serviço",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/status": {
+      "get": {
+        "description": "Única rota pública do OS Service. Resposta mínima: id e status da OS, sem dados do cliente.",
+        "operationId": "OrdemServicoController_consultarStatus",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status retornado com sucesso"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [],
+        "summary": "Consultar status da OS (rota pública, sem token)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/assumir": {
+      "patch": {
+        "deprecated": true,
+        "description": "Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334). Lá o {id} é o da Execução (listar em GET /api/v1/execucoes), não o da OS.",
+        "operationId": "OrdemServicoController_assumir",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OS assumida. Status → Em Diagnóstico"
+          },
+          "400": {
+            "description": "OS não está no status Recebida"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/analisar": {
+      "patch": {
+        "deprecated": true,
+        "description": "Deprecated: sem rota equivalente; o registro da análise é absorvido por PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334), onde o {id} é o da Execução, não o da OS.",
+        "operationId": "OrdemServicoController_analisarVeiculo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Análise registrada"
+          },
+          "400": {
+            "description": "OS não está Em Diagnóstico"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar análise do veículo (UNDER_DIAGNOSIS)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/servicos-insumos": {
+      "patch": {
+        "description": "Registra valores de serviços e peças. Gera orçamento e atualiza OS para Aguardando Aprovação.",
+        "operationId": "OrdemServicoController_listarServicosInsumos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GerarOrcamentoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Orçamento gerado. OS → Aguardando Aprovação"
+          },
+          "400": {
+            "description": "OS não está em status válido ou orçamento já aprovado"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar serviços e insumos — gera orçamento (UNDER_DIAGNOSIS → AWAITING_APPROVAL)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/orcamento/aprovar": {
+      "patch": {
+        "description": "Aprova o orçamento da ordem de serviço. Público.",
+        "operationId": "OrdemServicoController_aprovarOrcamento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orçamento aprovado. OS → Em Execução. Resposta inclui linkPagamento (Checkout Pro)"
+          },
+          "400": {
+            "description": "Orçamento não está pendente ou sem valores"
+          },
+          "404": {
+            "description": "OS ou orçamento não encontrado"
+          },
+          "502": {
+            "description": "Falha ao gerar o link no Mercado Pago. Orçamento continua pendente"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/orcamento/recusar": {
+      "patch": {
+        "description": "Recusa o orçamento da ordem de serviço. Público.",
+        "operationId": "OrdemServicoController_recusarOrcamento",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orçamento recusado. OS → Encerrada Sem Execução"
+          },
+          "400": {
+            "description": "Orçamento não está pendente"
+          },
+          "404": {
+            "description": "OS ou orçamento não encontrado"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/finalizar-execucao": {
+      "patch": {
+        "deprecated": true,
+        "description": "Deprecated: migra para PATCH /api/v1/execucoes/{id}/concluir no serviço de Execução e Produção (#334). Lá o {id} é o da Execução, não o da OS.",
+        "operationId": "OrdemServicoController_finalizarExecucao",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Execução finalizada. OS → Finalizada"
+          },
+          "400": {
+            "description": "OS não está Em Execução"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mecânico finaliza execução do serviço (IN_PROGRESS → FINISHED)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/aprovar-servico": {
+      "patch": {
+        "description": "Confirma que o serviço finalizado está de acordo. A OS permanece Finalizada; a entrega é registrada separadamente pela recepção.",
+        "operationId": "OrdemServicoController_aprovarServicoPrestado",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Serviço aprovado. OS permanece Finalizada"
+          },
+          "400": {
+            "description": "OS não está Finalizada"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aprovar o serviço prestado (requer JWT)",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/ordens-servico/{id}/registrar-entrega": {
+      "patch": {
+        "description": "Registra a entrega do veículo e move a OS para Entregue.",
+        "operationId": "OrdemServicoController_registrarEntrega",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entrega registrada. OS → Entregue"
+          },
+          "400": {
+            "description": "OS não está Finalizada"
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar entrega do veículo",
+        "tags": [
+          "Ordens Servico"
+        ]
+      }
+    },
+    "/api/v1/webhooks/service-orders/status": {
+      "post": {
+        "description": "Canal de reprocesso manual. O caminho normal de mudança de status são os eventos da saga. Exige o header x-webhook-secret e passa pelo authorizer da borda. A transição é validada pela mesma máquina de estados dos consumidores de evento; DELIVERED é rejeitado.",
+        "operationId": "ServiceOrderStatusWebhookController_handleStatusUpdate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateServiceOrderStatusWebhookDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status da OS atualizado com sucesso."
+          },
+          "400": {
+            "description": "Transição de status inválida (inclui DELIVERED) ou dados incorretos."
+          },
+          "401": {
+            "description": "Header x-webhook-secret ausente ou inválido."
+          },
+          "404": {
+            "description": "Ordem de serviço não encontrada."
+          }
+        },
+        "security": [
+          {
+            "webhook-secret": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reprocessar manualmente o status da OS (canal de exceção)",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/api/v1/pagamentos/registrar": {
+      "post": {
+        "operationId": "PagamentoController_registrar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrarPagamentoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Pagamento"
+        ]
+      }
+    },
+    "/api/v1/webhooks/mercado-pago": {
+      "post": {
+        "description": "Público, autenticado pela assinatura x-signature. O status do pagamento vem da reconsulta ao Mercado Pago, nunca do corpo da notificação.",
+        "operationId": "MercadoPagoWebhookController_receber",
+        "parameters": [
+          {
+            "name": "data.id",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notificação recebida."
+          },
+          "401": {
+            "description": "Assinatura ausente ou inválida."
+          },
+          "502": {
+            "description": "Falha ao reconsultar o Mercado Pago (o Mercado Pago reenvia a notificação)."
+          }
+        },
+        "summary": "Receber notificação do Mercado Pago (Checkout Pro)",
+        "tags": [
+          "Webhooks"
+        ]
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "description": "Returns the health status of the API",
+        "operationId": "HealthController_check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Health check",
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Async Furious - OS Service",
+    "description": "API do OS Service: ordens de serviço, clientes, veículos, serviços e peças/insumos. Todas as rotas exigem JWT, exceto GET /ordens-servico/{id}/status. Nenhuma rota é consumida por outro serviço: Billing e Execução integram por eventos.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      },
+      "webhook-secret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-webhook-secret"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "novousuario@example.com",
+            "description": "Email único do novo usuário"
+          },
+          "password": {
+            "type": "string",
+            "example": "senha123456",
+            "description": "Senha segura (mínimo 8 caracteres)",
+            "minLength": 8,
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "example": "João Silva",
+            "description": "Nome completo do novo usuário",
+            "maxLength": 100
+          },
+          "role": {
+            "type": "string",
+            "example": "RECEPCIONISTA",
+            "description": "Papel do usuário (ADMIN, RECEPCIONISTA, MECANICO)",
+            "enum": [
+              "ADMIN",
+              "RECEPCIONISTA",
+              "MECANICO",
+              "CLIENTE"
+            ]
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "name"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "admin@example.com",
+            "description": "Email do usuário registrado"
+          },
+          "password": {
+            "type": "string",
+            "example": "senha123456",
+            "description": "Senha do usuário (mínimo 8 caracteres)",
+            "minLength": 8,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "CreateClienteDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "João Silva",
+            "description": "Nome completo do cliente",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "example": "joao@example.com",
+            "description": "Email do cliente (único)"
+          },
+          "telefone": {
+            "type": "string",
+            "example": "11999999999",
+            "description": "Telefone do cliente"
+          },
+          "documento": {
+            "type": "string",
+            "example": "12345678901",
+            "description": "CPF ou CNPJ",
+            "minLength": 11,
+            "maxLength": 14
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "example": "CPF",
+            "enum": [
+              "CPF",
+              "CNPJ"
+            ],
+            "description": "Tipo de documento fiscal"
+          }
+        },
+        "required": [
+          "nome",
+          "email",
+          "documento",
+          "tipoDocumento"
+        ]
+      },
+      "UpdateClienteDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "João Silva Updated",
+            "description": "Novo nome do cliente"
+          },
+          "email": {
+            "type": "string",
+            "example": "newemail@example.com",
+            "description": "Novo email do cliente"
+          },
+          "telefone": {
+            "type": "string",
+            "example": "11988888888",
+            "description": "Novo telefone do cliente"
+          }
+        }
+      },
+      "CreateVeiculoDto": {
+        "type": "object",
+        "properties": {
+          "placa": {
+            "type": "string",
+            "example": "ABC-1234",
+            "description": "Placa do veículo (formato ABC-1234 ou ABC1D23)"
+          },
+          "marca": {
+            "type": "string",
+            "example": "Toyota",
+            "description": "Marca do veículo"
+          },
+          "modelo": {
+            "type": "string",
+            "example": "Corolla",
+            "description": "Modelo do veículo"
+          },
+          "ano": {
+            "type": "number",
+            "example": 2024,
+            "description": "Ano de fabricação"
+          },
+          "cor": {
+            "type": "string",
+            "example": "Prata",
+            "description": "Cor do veículo"
+          },
+          "clienteId": {
+            "type": "string",
+            "example": "uuid-do-cliente",
+            "description": "ID do cliente proprietario"
+          }
+        },
+        "required": [
+          "placa",
+          "marca",
+          "modelo",
+          "ano",
+          "clienteId"
+        ]
+      },
+      "UpdateVeiculoDto": {
+        "type": "object",
+        "properties": {
+          "marca": {
+            "type": "string",
+            "example": "Honda",
+            "description": "Nova marca"
+          },
+          "modelo": {
+            "type": "string",
+            "example": "Civic",
+            "description": "Novo modelo"
+          },
+          "ano": {
+            "type": "number",
+            "example": 2025,
+            "description": "Novo ano de fabricação"
+          },
+          "cor": {
+            "type": "string",
+            "example": "Preto",
+            "description": "Nova cor"
+          }
+        }
+      },
+      "CreateServicoDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Lavagem completa",
+            "description": "Nome do servico",
+            "minLength": 3,
+            "maxLength": 120
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Lavagem interna e externa com aspiracao",
+            "description": "Descricao detalhada do servico"
+          },
+          "preco": {
+            "type": "number",
+            "example": 120.5,
+            "description": "Preco do servico",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "nome",
+          "preco"
+        ]
+      },
+      "UpdateServicoDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Lavagem premium",
+            "description": "Novo nome do servico"
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Lavagem completa com cera e higienizacao interna",
+            "description": "Nova descricao do servico"
+          },
+          "preco": {
+            "type": "number",
+            "example": 250,
+            "description": "Novo preco do servico",
+            "minimum": 0
+          }
+        }
+      },
+      "CreatePecaInsumoDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Filtro de Óleo",
+            "description": "Nome da peça/insumo"
+          },
+          "codigo": {
+            "type": "string",
+            "example": "FO-001",
+            "description": "Código único da peça"
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Filtro de óleo para motor 1.0",
+            "description": "Descrição detalhada"
+          },
+          "preco": {
+            "type": "number",
+            "example": 45.9,
+            "description": "Preço unitário"
+          },
+          "quantidade_estoque": {
+            "type": "number",
+            "example": 100,
+            "description": "Quantidade em estoque"
+          },
+          "quantidade_minima": {
+            "type": "number",
+            "example": 10,
+            "description": "Quantidade mínima para alerta"
+          }
+        },
+        "required": [
+          "nome",
+          "codigo",
+          "preco"
+        ]
+      },
+      "UpdatePecaInsumoDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Filtro de Óleo Premium",
+            "description": "Nome da peça"
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Filtro de óleo sintético",
+            "description": "Descrição detalhada"
+          },
+          "preco": {
+            "type": "number",
+            "example": 59.9,
+            "description": "Preço unitário"
+          },
+          "quantidade_minima": {
+            "type": "number",
+            "example": 15,
+            "description": "Quantidade mínima para alerta"
+          }
+        }
+      },
+      "UpdateEstoquePecaInsumoDto": {
+        "type": "object",
+        "properties": {
+          "quantidade": {
+            "type": "number",
+            "example": 50,
+            "description": "Nova quantidade em estoque"
+          }
+        },
+        "required": [
+          "quantidade"
+        ]
+      },
+      "ItemSolicitacaoReposicaoDto": {
+        "type": "object",
+        "properties": {
+          "pecaId": {
+            "type": "string",
+            "example": "uuid-da-peca",
+            "description": "ID da peça"
+          },
+          "quantidadeSolicitada": {
+            "type": "number",
+            "example": 50,
+            "description": "Quantidade solicitada ao fornecedor"
+          }
+        },
+        "required": [
+          "pecaId",
+          "quantidadeSolicitada"
+        ]
+      },
+      "SolicitarReposicaoDto": {
+        "type": "object",
+        "properties": {
+          "fornecedorId": {
+            "type": "string",
+            "example": "uuid-do-fornecedor",
+            "description": "ID do fornecedor"
+          },
+          "pecas": {
+            "description": "Lista de peças para solicitar",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemSolicitacaoReposicaoDto"
+            }
+          }
+        },
+        "required": [
+          "fornecedorId",
+          "pecas"
+        ]
+      },
+      "OsClienteDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "João Silva"
+          },
+          "email": {
+            "type": "string",
+            "example": "joao@example.com"
+          },
+          "telefone": {
+            "type": "string",
+            "example": "11999999999"
+          },
+          "documento": {
+            "type": "string",
+            "example": "12345678901"
+          },
+          "tipoDocumento": {
+            "type": "string",
+            "enum": [
+              "CPF",
+              "CNPJ"
+            ]
+          }
+        },
+        "required": [
+          "nome",
+          "email",
+          "documento",
+          "tipoDocumento"
+        ]
+      },
+      "OsVeiculoDto": {
+        "type": "object",
+        "properties": {
+          "placa": {
+            "type": "string",
+            "example": "ABC-1234"
+          },
+          "marca": {
+            "type": "string",
+            "example": "Toyota"
+          },
+          "modelo": {
+            "type": "string",
+            "example": "Corolla"
+          },
+          "ano": {
+            "type": "number",
+            "example": 2024
+          },
+          "cor": {
+            "type": "string",
+            "example": "Prata"
+          }
+        },
+        "required": [
+          "placa",
+          "marca",
+          "modelo",
+          "ano"
+        ]
+      },
+      "OsServicoItemDto": {
+        "type": "object",
+        "properties": {
+          "id_servico": {
+            "type": "string",
+            "example": "uuid-do-servico"
+          },
+          "quantidade": {
+            "type": "number",
+            "example": 1
+          }
+        },
+        "required": [
+          "id_servico",
+          "quantidade"
+        ]
+      },
+      "OsPecaItemDto": {
+        "type": "object",
+        "properties": {
+          "id_peca": {
+            "type": "string",
+            "example": "uuid-da-peca"
+          },
+          "quantidade": {
+            "type": "number",
+            "example": 2
+          }
+        },
+        "required": [
+          "id_peca",
+          "quantidade"
+        ]
+      },
+      "CreateOrdemServicoDto": {
+        "type": "object",
+        "properties": {
+          "cliente": {
+            "description": "Dados do cliente",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OsClienteDto"
+              }
+            ]
+          },
+          "veiculo": {
+            "description": "Dados do veículo",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OsVeiculoDto"
+              }
+            ]
+          },
+          "servicos": {
+            "description": "Serviços solicitados",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OsServicoItemDto"
+            }
+          },
+          "pecas": {
+            "description": "Peças e insumos utilizados",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OsPecaItemDto"
+            }
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Troca de óleo e revisão completa",
+            "description": "Descrição do serviço"
+          }
+        },
+        "required": [
+          "cliente",
+          "veiculo",
+          "servicos",
+          "pecas"
+        ]
+      },
+      "UpdateOrdemServicoDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "RECEIVED",
+              "UNDER_DIAGNOSIS",
+              "AWAITING_APPROVAL"
+            ],
+            "example": "AWAITING_APPROVAL",
+            "description": "Novo status da ordem de serviço"
+          },
+          "descricao": {
+            "type": "string",
+            "example": "Serviço iniciado - troca de óleo em andamento",
+            "description": "Nova descrição"
+          }
+        }
+      },
+      "ItemPecaDto": {
+        "type": "object",
+        "properties": {
+          "id_peca": {
+            "type": "string",
+            "example": "uuid-da-peca",
+            "description": "ID da peça"
+          },
+          "quantidade": {
+            "type": "number",
+            "example": 2,
+            "description": "Quantidade utilizada"
+          },
+          "preco_unitario": {
+            "type": "number",
+            "example": 150,
+            "description": "Preço unitário da peça"
+          }
+        },
+        "required": [
+          "id_peca",
+          "quantidade",
+          "preco_unitario"
+        ]
+      },
+      "GerarOrcamentoDto": {
+        "type": "object",
+        "properties": {
+          "valor_total_servicos": {
+            "type": "number",
+            "example": 300,
+            "description": "Valor total dos serviços"
+          },
+          "valor_total_pecas": {
+            "type": "number",
+            "example": 150,
+            "description": "Valor total das peças"
+          },
+          "pecas": {
+            "description": "Peças utilizadas na OS",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemPecaDto"
+            }
+          }
+        },
+        "required": [
+          "valor_total_servicos",
+          "valor_total_pecas"
+        ]
+      },
+      "UpdateServiceOrderStatusWebhookDto": {
+        "type": "object",
+        "properties": {
+          "osId": {
+            "type": "string",
+            "description": "ID da Ordem de Serviço (UUID)",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "status": {
+            "type": "string",
+            "description": "Novo status da Ordem de Serviço",
+            "enum": [
+              "RECEIVED",
+              "UNDER_DIAGNOSIS",
+              "AWAITING_APPROVAL",
+              "IN_PROGRESS",
+              "AWAITING_PARTS",
+              "FINISHED",
+              "DELIVERED",
+              "CLOSED_WITHOUT_EXECUTION"
+            ],
+            "example": "UNDER_DIAGNOSIS"
+          },
+          "motivo": {
+            "type": "string",
+            "description": "Motivo ou observação da alteração de status",
+            "example": "Veículo chegou na oficina e iniciou a triagem."
+          }
+        },
+        "required": [
+          "osId",
+          "status"
+        ]
+      },
+      "RegistrarPagamentoDto": {
+        "type": "object",
+        "properties": {
+          "ordemServicoId": {
+            "type": "string",
+            "example": "uuid-da-ordem-de-servico",
+            "description": "ID da Ordem de Serviço vinculada ao pagamento"
+          },
+          "valor": {
+            "type": "number",
+            "example": 150.5,
+            "description": "Ignorado: o valor vem da cobrança do Mercado Pago. Mantido opcional por compatibilidade.",
+            "deprecated": true
+          }
+        },
+        "required": [
+          "ordemServicoId"
+        ]
+      },
+      "HealthResponseDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Health status",
+            "example": "ok"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Current server timestamp in ISO format",
+            "example": "2025-01-01T00:00:00.000Z"
+          },
+          "version": {
+            "type": "string",
+            "description": "API version",
+            "example": "1.0.0"
+          }
+        },
+        "required": [
+          "status",
+          "timestamp",
+          "version"
+        ]
+      }
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import { StatusTransitionService } from '../../domain/services/status-transition.service';
@@ -6,6 +7,8 @@ import { IStatusHistoryRepository } from '../../domain/interfaces/status-history
 import { OSStatus, OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 
+// Usado só pelo webhook de status (canal de reprocesso manual). A entrega tem
+// caminho próprio (registrar-entrega), por isso DELIVERED é rejeitado aqui.
 export class UpdateServiceOrderStatusUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
@@ -15,6 +18,12 @@ export class UpdateServiceOrderStatusUseCase {
   ) {}
 
   async execute(osId: string, newStatus: OSStatus, motivo?: string): Promise<OrdemDeServico> {
+    if (newStatus === 'DELIVERED') {
+      throw new DomainException(
+        'A transição para DELIVERED não é permitida pelo webhook. Use o registro de entrega.'
+      );
+    }
+
     // 1. Busca a OS
     const os = await this.ordemServicoRepository.findOne(osId);
     if (!os) {
@@ -30,12 +39,10 @@ export class UpdateServiceOrderStatusUseCase {
     os.status = newStatus;
     // (Pode ser necessário gravar a data de finalização ou outras coisas se for FINISHED)
     if (newStatus === 'FINISHED') os.finalizada_em = new Date();
-    if (newStatus === 'DELIVERED') os.entregue_em = new Date();
 
     const updatedOs = await this.ordemServicoRepository.update(os.id, {
       status: newStatus,
       ...(newStatus === 'FINISHED' ? { finalizada_em: os.finalizada_em } : {}),
-      ...(newStatus === 'DELIVERED' ? { entregue_em: os.entregue_em } : {}),
     });
 
     // 4. Salva o histórico

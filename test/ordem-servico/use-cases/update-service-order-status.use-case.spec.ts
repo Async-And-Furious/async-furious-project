@@ -5,6 +5,7 @@ import { IEmissorEventos } from '../../../src/shared/domain/interfaces/emissor-e
 import { StatusTransitionService } from '../../../src/modules/ordem-servico/domain/services/status-transition.service';
 import { OrdemDeServico } from '../../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import { EntityNotFoundException } from '../../../src/shared/domain/exceptions/entity-not-found.exception';
+import { DomainException } from '../../../src/shared/domain/exceptions/domain.exception';
 
 describe('UpdateServiceOrderStatusUseCase', () => {
   let useCase: UpdateServiceOrderStatusUseCase;
@@ -61,5 +62,14 @@ describe('UpdateServiceOrderStatusUseCase', () => {
     expect(historyRepo.create).toHaveBeenCalled();
     expect(emissor.emitir).toHaveBeenCalled();
     expect(result.status).toBe('UNDER_DIAGNOSIS');
+  });
+
+  it('deve rejeitar a transição para DELIVERED sem gravar nada', async () => {
+    await expect(useCase.execute('os-1', 'DELIVERED')).rejects.toThrow(DomainException);
+
+    expect(osRepo.findOne).not.toHaveBeenCalled();
+    expect(osRepo.update).not.toHaveBeenCalled();
+    expect(historyRepo.create).not.toHaveBeenCalled();
+    expect(emissor.emitir).not.toHaveBeenCalled();
   });
 });

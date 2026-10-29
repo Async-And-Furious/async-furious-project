@@ -1028,31 +1028,6 @@
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/rastreamento",
-      "name": "GET /ordens-servico/{{ordem_id}}/rastreamento",
-      "description": "Role: customer",
-      "method": "GET",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_037",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}",
       "name": "PATCH /ordens-servico/{{ordem_id}}",
       "description": "Role: admin",
@@ -1074,7 +1049,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_038",
+      "_id": "req_037",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1099,7 +1074,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_039",
+      "_id": "req_038",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1124,7 +1099,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_040",
+      "_id": "req_039",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1149,7 +1124,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_041",
+      "_id": "req_040",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1174,7 +1149,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_042",
+      "_id": "req_041",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1199,7 +1174,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_043",
+      "_id": "req_042",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1224,7 +1199,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_044",
+      "_id": "req_043",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1249,7 +1224,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_045",
+      "_id": "req_044",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1274,32 +1249,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_046",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
-      "name": "POST /ordens-servico/{{ordem_id}}/aprovar-servico",
-      "description": "Role: customer",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\"decisao\": \"APROVADO\"}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_047",
+      "_id": "req_045",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
