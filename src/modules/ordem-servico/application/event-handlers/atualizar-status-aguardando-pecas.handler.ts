@@ -26,13 +26,20 @@ export class AtualizarStatusAguardandoPecasHandler {
 
   @OnEvent('PecasIndisponiveis')
   async handle(evento: PecasIndisponiveis): Promise<void> {
-    const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
+    let os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
 
     if (os.status === 'AWAITING_APPROVAL') {
-      await this.ordemServicoRepository.update(evento.ordemServicoId, {
-        reserva_pecas_pendente: true,
-      });
-      return;
+      // Condicionada ao status no UPDATE: se ExecucaoIniciada levou a OS a IN_PROGRESS entre a
+      // leitura acima e esta gravação, a pendência não entra e a OS é relida abaixo.
+      const registrou = await this.ordemServicoRepository.atualizarSeCondicao(
+        evento.ordemServicoId,
+        { status: 'AWAITING_APPROVAL' },
+        { reserva_pecas_pendente: true }
+      );
+      if (registrou) {
+        return;
+      }
+      os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
     }
 
     if (os.status === 'IN_PROGRESS') {

@@ -42,26 +42,30 @@ export class AtualizarStatusEmExecucaoHandler {
     }
 
     // Ordem fixa: baixar a pendência antes da retomada. ExecucaoIniciada só grava AWAITING_PARTS
-    // com a pendência ligada no momento da gravação. Se ele gravou antes deste passo, a retomada
-    // abaixo a enxerga; se gravar depois, a condição não casa e a OS segue em IN_PROGRESS.
+    // com a pendência ligada no momento da gravação. Depois deste passo ele não consegue mais
+    // gravar AWAITING_PARTS para esta reserva, então a releitura abaixo mostra o estado final
+    // que a retomada pode encontrar (a leitura do início pode estar defasada).
     await this.ordemServicoRepository.atualizarSeCondicao(
       ordemServicoId,
       { reserva_pecas_pendente: true },
       { reserva_pecas_pendente: false }
     );
 
-    this.transicao.validarTransicao('AWAITING_PARTS', 'IN_PROGRESS');
-    const retomou = await this.ordemServicoRepository.atualizarSeCondicao(
-      ordemServicoId,
-      { status: 'AWAITING_PARTS' },
-      { status: 'IN_PROGRESS' }
-    );
-    if (retomou) {
-      await this.emissor.emitir(new OrdemServicoEmExecucao(ordemServicoId));
+    const atual = await this.ordemServicoRepository.findOne(ordemServicoId);
+    if (atual.status === 'AWAITING_PARTS') {
+      this.transicao.validarTransicao('AWAITING_PARTS', 'IN_PROGRESS');
+      const retomou = await this.ordemServicoRepository.atualizarSeCondicao(
+        ordemServicoId,
+        { status: 'AWAITING_PARTS' },
+        { status: 'IN_PROGRESS' }
+      );
+      if (retomou) {
+        await this.emissor.emitir(new OrdemServicoEmExecucao(ordemServicoId));
+      }
       return;
     }
 
-    if (os.status === 'IN_PROGRESS') {
+    if (atual.status === 'IN_PROGRESS') {
       this.logger.log(
         `[P-08] PecasReservadas tardia: OS ${ordemServicoId} já está em IN_PROGRESS, pendência baixada`
       );
