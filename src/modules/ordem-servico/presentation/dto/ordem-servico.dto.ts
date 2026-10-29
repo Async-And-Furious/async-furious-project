@@ -193,14 +193,3 @@ export class GerarOrcamentoDto {
   @Type(() => ItemPecaDto)
   pecas?: ItemPecaDto[];
 }
-
-export class NotificacaoAprovacaoOrcamentoDto {
-  @ApiProperty({
-    enum: ['APROVADO', 'RECUSADO'],
-    example: 'APROVADO',
-    description: 'Decisão do cliente sobre o orçamento',
-  })
-  @IsIn(['APROVADO', 'RECUSADO'])
-  @IsNotEmpty()
-  decisao: 'APROVADO' | 'RECUSADO';
-}
