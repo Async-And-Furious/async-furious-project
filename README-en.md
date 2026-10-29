@@ -155,12 +155,13 @@ Swagger describes only the OS Service (title `Async Furious - OS Service`). The 
 ### OS Service HTTP surface (#332)
 
 - **No REST between services.** Billing and Execution consume no route of this service; everything they need arrives as events ([`saga-flow.md`](docs/architecture/saga-flow.md)).
-- **Single public route:** `GET /api/v1/ordens-servico/{id}/status`, no Bearer, minimal response (`ordemServicoId` and `status`, no customer data). Any other route without a token returns `401`.
+- **Single public route:** `GET /api/v1/ordens-servico/{id}/status`, no Bearer, minimal response (`ordemServicoId`, `status` and time `marcos`, no customer data). Any other route without a token returns `401`.
 - **Removed, no proxy:** `GET /ordens-servico/:id/rastreamento` (alias of `/status`) and `POST /ordens-servico/:id/aprovar-servico` (duplicate public budget approval) return `404`. `PATCH /ordens-servico/:id/aprovar-servico` stays, authenticated.
 - **RBAC unchanged:** `JwtAuthGuard` and `RolesGuard` keep validating the token locally, as the second layer after the edge Lambda Authorizer (ADR-0021).
 - **Status webhook as an exception:** `POST /webhooks/service-orders/status` is a manual reprocessing channel (JWT + `x-webhook-secret`). Transitions are validated by the same `StatusTransitionService` used by the event consumers, and `DELIVERED` is rejected with `400`: delivery only happens through `registrar-entrega`.
 - **Versioning:** the prefix stays `api/v1`. During Phase 4 breaking changes are accepted inside `v1`, with no parallel `v2`: every consumer is born in this phase and there is no external client to preserve. Each break is recorded in this section and in the related ADR.
-- **Pending on other features:** `pagamentos`, the budget approve/reject routes and the `orcamento` field in the OS response leave the service with the financial extraction (#330); reading `/status`, `GET /ordens-servico/:id` and `GET /clientes/:id` from the DocumentDB read model comes with #335.
+- **Read model (#335, ADR-0019):** `GET /ordens-servico` (queue), `GET /ordens-servico/:id`, `/status` and `GET /clientes/:id` read from DocumentDB (MongoDB locally and in CI), fed by a synchronous write-through in the repositories; `tempo-medio`, `GET /clientes` and `GET /veiculos/:id` stay on Postgres. The queue uses cursor pagination (`?limit=&cursor=`, response `{ data, pagination: { limit, nextCursor } }`) and excludes `CLOSED_WITHOUT_EXECUTION`; the OS read from the read model has no `orcamento`. Rebuild: `pnpm read-model:rebuild` (on deploy, a Job right after the migration). Model in [`persistence-model.md`](docs/architecture/persistence-model.md).
+- **Pending on other features:** `pagamentos` and the budget approve/reject routes leave the service with the financial extraction (#330).
 
 The Insomnia collection with configured routes is available at:
 
@@ -183,7 +184,7 @@ docs/http/insomnia.yaml
 | ------ | -------- | ------ | ----------- |
 | POST | `/clientes` | RECEPCIONISTA | Create customer. |
 | GET | `/clientes` | Authenticated | List customers. |
-| GET | `/clientes/:id` | Authenticated | Get customer details. |
+| GET | `/clientes/:id` | Authenticated | Get customer details (read model). |
 | PATCH | `/clientes/:id` | RECEPCIONISTA | Update customer. |
 | DELETE | `/clientes/:id` | ADMIN | Delete customer. |
 
@@ -212,8 +213,8 @@ docs/http/insomnia.yaml
 | Method | Endpoint | Access | Description |
 | ------ | -------- | ------ | ----------- |
 | POST | `/ordens-servico` | RECEPCIONISTA | Create service order. |
-| GET | `/ordens-servico` | Authenticated | List service orders. |
-| GET | `/ordens-servico/:id` | Authenticated | Get service order details. |
+| GET | `/ordens-servico` | Authenticated | Active service order queue by priority (read model, cursor). |
+| GET | `/ordens-servico/:id` | Authenticated | Get service order details (read model, no budget). |
 | GET | `/ordens-servico/:id/status` | Public | Check service order status (minimal response, no customer data). |
 | PATCH | `/ordens-servico/:id` | ADMIN | Update service order. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Delete service order. |
