@@ -14,6 +14,7 @@ export class AtualizarStatusAguardandoAprovacaoHandler {
     if (os.status === 'UNDER_DIAGNOSIS') {
       await this.ordemServicoRepository.update(evento.ordemServicoId, {
         status: 'AWAITING_APPROVAL',
+        motivo: 'Orçamento enviado ao cliente',
       });
     }
   }

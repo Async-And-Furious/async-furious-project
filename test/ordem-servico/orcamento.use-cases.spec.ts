@@ -27,6 +27,7 @@ import type { IVeiculoRepository } from '../../src/modules/cadastro/domain/inter
 import type { IServicoRepository } from '../../src/modules/cadastro/domain/interfaces/servico.interface';
 import type { IPecaInsumoRepository } from '../../src/modules/pecas-insumos/domain/interfaces/peca-insumo.interface';
 import type { IOsServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/os-servico.interface';
+import type { IOsReadModelQuery } from '../../src/modules/ordem-servico/domain/interfaces/os-read-model.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { ICobrancaPagamentoPort } from '../../src/shared/domain/interfaces/cobranca-pagamento.port';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
@@ -80,8 +81,6 @@ describe('OS + Orçamento Use Cases', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-      findAll: jest.fn(),
-      findAllAtivas: jest.fn(),
       remove: jest.fn(),
       calcularTempoMedioExecucao: jest.fn(),
     } as jest.Mocked<IOrdemServicoRepository>;
@@ -621,65 +620,79 @@ describe('OS + Orçamento Use Cases', () => {
     });
   });
 
-  describe('ConsultarStatusOrdemServicoUseCase', () => {
-    it('deve retornar id e status da OS', async () => {
-      mockOsRepository.findOne.mockResolvedValue(mockOs);
+  describe('leituras pelo read model', () => {
+    const leitura = {
+      id: 'os-1',
+      clienteId: 'cli-1',
+      veiculoId: 'vei-1',
+      status: 'RECEIVED' as const,
+      descricao: null,
+      iniciada_em: null,
+      finalizada_em: null,
+      entregue_em: null,
+      created_at: new Date('2026-01-01T00:00:00Z'),
+      updated_at: new Date('2026-01-01T00:00:00Z'),
+      cliente: { id: 'cli-1', nome: 'Cliente', documento: '12345678909' },
+      veiculo: { id: 'vei-1', placa: 'ABC1D23', marca: 'Honda', modelo: 'Fit' },
+    };
+    let readModel: jest.Mocked<IOsReadModelQuery>;
 
-      const uc = new ConsultarStatusOrdemServicoUseCase(mockOsRepository);
-      const result = await uc.execute('os-1');
-
-      expect(result).toEqual({ ordemServicoId: 'os-1', status: 'RECEIVED' });
+    beforeEach(() => {
+      readModel = { listarFila: jest.fn(), detalhar: jest.fn(), consultarStatus: jest.fn() };
     });
 
-    it('deve lançar EntityNotFoundException quando OS não existe', async () => {
-      mockOsRepository.findOne.mockRejectedValue(
-        new EntityNotFoundException('OrdemDeServico', 'invalid')
+    it('ConsultarStatus devolve status e marcos do read model', async () => {
+      const status = {
+        ordemServicoId: 'os-1',
+        status: 'RECEIVED' as const,
+        marcos: {
+          createdAt: leitura.created_at,
+          iniciadaEm: null,
+          finalizadaEm: null,
+          entregueEm: null,
+        },
+      };
+      readModel.consultarStatus.mockResolvedValue(status);
+
+      const result = await new ConsultarStatusOrdemServicoUseCase(readModel).execute('os-1');
+
+      expect(result).toBe(status);
+      expect(mockOsRepository.findOne).not.toHaveBeenCalled();
+    });
+
+    it('ConsultarStatus lança EntityNotFoundException quando não há documento', async () => {
+      readModel.consultarStatus.mockResolvedValue(null);
+
+      await expect(
+        new ConsultarStatusOrdemServicoUseCase(readModel).execute('invalid')
+      ).rejects.toThrow(EntityNotFoundException);
+    });
+
+    it('Listar delega a fila paginada por cursor ao read model', async () => {
+      const pagina = { data: [leitura], pagination: { limit: 10, nextCursor: null } };
+      readModel.listarFila.mockResolvedValue(pagina);
+
+      const result = await new ListarOrdensServicoUseCase(readModel).execute(10, 'cursor-1');
+
+      expect(readModel.listarFila).toHaveBeenCalledWith(10, 'cursor-1');
+      expect(result).toBe(pagina);
+    });
+
+    it('Detalhar devolve o documento do read model', async () => {
+      readModel.detalhar.mockResolvedValue(leitura);
+
+      const result = await new DetalharOrdemServicoUseCase(readModel).execute('os-1');
+
+      expect(readModel.detalhar).toHaveBeenCalledWith('os-1');
+      expect(result).toBe(leitura);
+    });
+
+    it('Detalhar lança EntityNotFoundException quando não há documento', async () => {
+      readModel.detalhar.mockResolvedValue(null);
+
+      await expect(new DetalharOrdemServicoUseCase(readModel).execute('x')).rejects.toThrow(
+        EntityNotFoundException
       );
-
-      const uc = new ConsultarStatusOrdemServicoUseCase(mockOsRepository);
-      await expect(uc.execute('invalid')).rejects.toThrow(EntityNotFoundException);
-    });
-  });
-
-  describe('ListarOrdensServicoUseCase', () => {
-    it('deve delegar para findAllAtivas e retornar lista paginada', async () => {
-      const paginado = {
-        data: [mockOs],
-        pagination: { page: 1, limit: 10, total: 1, totalPages: 1 },
-      };
-      mockOsRepository.findAllAtivas.mockResolvedValue(paginado);
-
-      const uc = new ListarOrdensServicoUseCase(mockOsRepository);
-      const result = await uc.execute(1, 10);
-
-      expect(mockOsRepository.findAllAtivas).toHaveBeenCalledWith(1, 10);
-      expect(result).toBe(paginado);
-    });
-
-    it('deve excluir CLOSED_WITHOUT_EXECUTION da listagem ativa', async () => {
-      const paginado = {
-        data: [],
-        pagination: { page: 1, limit: 10, total: 0, totalPages: 0 },
-      };
-      mockOsRepository.findAllAtivas.mockResolvedValue(paginado);
-
-      const uc = new ListarOrdensServicoUseCase(mockOsRepository);
-      const result = await uc.execute(1, 10);
-
-      expect(mockOsRepository.findAllAtivas).toHaveBeenCalledWith(1, 10);
-      expect(result.data).toHaveLength(0);
-    });
-  });
-
-  describe('DetalharOrdemServicoUseCase', () => {
-    it('deve retornar OS pelo ID', async () => {
-      mockOsRepository.findOne.mockResolvedValue(mockOs);
-
-      const uc = new DetalharOrdemServicoUseCase(mockOsRepository);
-      const result = await uc.execute('os-1');
-
-      expect(mockOsRepository.findOne).toHaveBeenCalledWith('os-1');
-      expect(result).toBe(mockOs);
     });
   });
 

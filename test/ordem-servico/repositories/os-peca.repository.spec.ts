@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OsPecaRepository } from '../../../src/modules/ordem-servico/infrastructure/repositories/os-peca.repository';
 import { PrismaService } from '../../../src/shared/infrastructure/database/prisma.service';
+import { OS_READ_MODEL_PROJECTOR } from '../../../src/modules/ordem-servico/domain/interfaces/os-read-model.interface';
 
 interface MockPrismaOsPeca {
   deleteMany: jest.Mock;
@@ -16,6 +17,7 @@ interface MockPrismaService {
 describe('OsPecaRepository', () => {
   let repository: OsPecaRepository;
   let mockPrismaService: MockPrismaService;
+  const projector = { project: jest.fn().mockResolvedValue(undefined) };
 
   const mockOsPecaData = [
     {
@@ -61,6 +63,7 @@ describe('OsPecaRepository', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        { provide: OS_READ_MODEL_PROJECTOR, useValue: projector },
       ],
     }).compile();
 
@@ -72,6 +75,12 @@ describe('OsPecaRepository', () => {
   });
 
   describe('replaceAll', () => {
+    it('should project the order after replacing its pecas (write-through)', async () => {
+      await repository.replaceAll('os-123', []);
+
+      expect(projector.project).toHaveBeenCalledWith('os-123');
+    });
+
     it('should delete existing pecas and create new ones', async () => {
       const pecas = [
         { id_peca: 'peca-1', quantidade: 2, preco_unitario: 50.0, valor_total: 100.0 },

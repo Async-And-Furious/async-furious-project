@@ -1,24 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
-import {
-  formatPaginatedResponse,
-  buildSearchWhere,
-} from '../../../../shared/infrastructure/database/repository.utils';
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import {
   IOrdemServicoRepository,
   OrdemServicoUpdateData,
 } from '../../domain/interfaces/ordem-servico.interface';
+import { OS_READ_MODEL_PROJECTOR } from '../../domain/interfaces/os-read-model.interface';
+import type { IOsReadModelProjector } from '../../domain/interfaces/os-read-model.interface';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
-import {
-  STATUS_EXCLUIDOS_DA_LISTAGEM,
-  getPrioridadeStatus,
-} from '../../domain/policies/status-priority.policy';
 
+// Ponto único de escrita da OS: grava no Postgres (com HistoricoStatusOS
+// sempre que o status muda) numa transação e, depois dela, projeta no read
+// model (write-through síncrono, ADR-0019).
 @Injectable()
 export class OrdemServicoRepository implements IOrdemServicoRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(OS_READ_MODEL_PROJECTOR) private readonly projector: IOsReadModelProjector
+  ) {}
 
   private mapToEntity(record: {
     id: string;
@@ -57,74 +57,23 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     clienteId: string;
     descricao?: string;
   }): Promise<OrdemDeServico> {
-    const record = await this.prisma.ordemServico.create({
-      data: {
-        id: randomUUID(),
-        id_veiculo: data.veiculoId,
-        id_cliente: data.clienteId,
-        descricao: data.descricao,
-        status: 'RECEIVED',
-      },
+    const record = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.ordemServico.create({
+        data: {
+          id: randomUUID(),
+          id_veiculo: data.veiculoId,
+          id_cliente: data.clienteId,
+          descricao: data.descricao,
+          status: 'RECEIVED',
+        },
+      });
+      await tx.historicoStatusOS.create({
+        data: { ordem_servico_id: created.id, status_novo: 'RECEIVED' },
+      });
+      return created;
     });
-    await this.prisma.historicoStatusOS?.create({
-      data: { ordem_servico_id: record.id, status_novo: 'RECEIVED' },
-    });
+    await this.projector.project(record.id);
     return this.mapToEntity(record);
-  }
-
-  async findAll(
-    page = 1,
-    limit = 10,
-    search?: string
-  ): Promise<{
-    data: OrdemDeServico[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
-  }> {
-    const where = buildSearchWhere(['descricao'], search) || {};
-
-    const [data, total] = await Promise.all([
-      this.prisma.ordemServico.findMany({
-        where,
-        skip: (page - 1) * limit,
-        take: limit,
-        orderBy: { created_at: 'desc' },
-        include: { veiculo: true, cliente: true, orcamento: true },
-      }),
-      this.prisma.ordemServico.count({ where }),
-    ]);
-
-    return formatPaginatedResponse(
-      data.map((r) => this.mapToEntity(r)),
-      page,
-      limit,
-      total
-    );
-  }
-
-  async findAllAtivas(
-    page = 1,
-    limit = 10
-  ): Promise<{
-    data: OrdemDeServico[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
-  }> {
-    const where = { status: { notIn: STATUS_EXCLUIDOS_DA_LISTAGEM } };
-
-    const [records, total] = await Promise.all([
-      this.prisma.ordemServico.findMany({
-        where,
-        orderBy: { created_at: 'asc' },
-        include: { orcamento: true },
-      }),
-      this.prisma.ordemServico.count({ where }),
-    ]);
-
-    const sorted = records
-      .map((r) => this.mapToEntity(r))
-      .sort((a, b) => getPrioridadeStatus(a.status) - getPrioridadeStatus(b.status));
-
-    const paginated = sorted.slice((page - 1) * limit, page * limit);
-    return formatPaginatedResponse(paginated, page, limit, total);
   }
 
   async findOne(id: string): Promise<OrdemDeServico> {
@@ -137,23 +86,41 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   }
 
   async update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico> {
-    await this.findOne(id);
-    const record = await this.prisma.ordemServico.update({
-      where: { id },
-      data: {
-        ...(data.status && { status: data.status }),
-        ...(data.descricao !== undefined && { descricao: data.descricao }),
-        ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
-        ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
-        ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
-      },
+    const record = await this.prisma.$transaction(async (tx) => {
+      const atual = await tx.ordemServico.findUnique({ where: { id }, select: { status: true } });
+      if (!atual) throw new EntityNotFoundException('OrdemDeServico', id);
+
+      const updated = await tx.ordemServico.update({
+        where: { id },
+        data: {
+          ...(data.status && { status: data.status }),
+          ...(data.descricao !== undefined && { descricao: data.descricao }),
+          ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
+          ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
+          ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
+        },
+      });
+
+      if (data.status && data.status !== atual.status) {
+        await tx.historicoStatusOS.create({
+          data: {
+            ordem_servico_id: id,
+            status_anterior: atual.status,
+            status_novo: data.status,
+            motivo: data.motivo,
+          },
+        });
+      }
+      return updated;
     });
+    await this.projector.project(id);
     return this.mapToEntity(record);
   }
 
   async remove(id: string): Promise<OrdemDeServico> {
     await this.findOne(id);
     const record = await this.prisma.ordemServico.delete({ where: { id } });
+    await this.projector.project(id);
     return this.mapToEntity(record);
   }
 

@@ -491,6 +491,44 @@ jobs:
             exit 1
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+      - name: Rebuild read model (DocumentDB)
+        # Reconstrói os_read_model e cliente_read_model a partir do Postgres (ADR-0019).
+        # Sob demanda: o mesmo job pode ser recriado com kubectl a partir deste manifesto.
+        run: |
+          set -euo pipefail
+          job="async-furious-read-model-rebuild-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $job
+            namespace: $K8S_NAMESPACE
+            labels:
+              app.kubernetes.io/part-of: async-furious
+              app.kubernetes.io/component: read-model-rebuild
+          spec:
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 86400
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: rebuild
+                    image: $IMAGE
+                    imagePullPolicy: IfNotPresent
+                    command: ["node", "dist/jobs/rebuild-read-model.job.js"]
+                    envFrom:
+                      - configMapRef:
+                          name: async-furious-config
+                      - secretRef:
+                          name: async-furious-secret
+          EOF
+          kubectl wait --for=condition=complete "job/$job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
+            kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true --ignore-errors=true || true
+            kubectl describe job "$job" --namespace "$K8S_NAMESPACE" || true
+            exit 1
+          }
+          kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
       - name: Require controlled CPF seed input
         if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && (inputs.seed_customer == true || inputs.seed_comprehensive == true) }}
         run: |

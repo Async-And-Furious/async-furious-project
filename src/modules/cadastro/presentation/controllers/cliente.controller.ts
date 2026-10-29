@@ -120,7 +120,7 @@ export class ClienteController {
     @CurrentUser() _user: AuthUser
   ): Promise<ClienteResponseDto> {
     const cliente = await this.getUseCase.execute(id);
-    return ClienteResponseDto.fromDomain(cliente);
+    return ClienteResponseDto.fromLeitura(cliente);
   }
 
   @Patch(':id')

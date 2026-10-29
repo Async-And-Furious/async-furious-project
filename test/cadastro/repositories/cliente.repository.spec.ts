@@ -4,7 +4,9 @@ import { PrismaService } from '../../../src/shared/infrastructure/database/prism
 describe('ClienteRepository', () => {
   it('returns null when no customer has the given document', async () => {
     const prisma = { cliente: { findUnique: jest.fn().mockResolvedValue(null) } };
-    const repository = new ClienteRepository(prisma as unknown as PrismaService);
+    const repository = new ClienteRepository(prisma as unknown as PrismaService, {
+      project: jest.fn(),
+    });
 
     await expect(repository.findByDocumento('00000000000')).resolves.toBeNull();
     expect(prisma.cliente.findUnique).toHaveBeenCalledWith({

@@ -2,13 +2,11 @@ import { UpdateServiceOrderStatusUseCase } from '../../../src/modules/ordem-serv
 import { StatusTransitionService } from '../../../src/modules/ordem-servico/domain/services/status-transition.service';
 import type { OrdemDeServico } from '../../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { IOrdemServicoRepository } from '../../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
-import type { IStatusHistoryRepository } from '../../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import type { IEmissorEventos } from '../../../src/shared/domain/interfaces/emissor-eventos.interface';
 import { DomainException } from '../../../src/shared/domain/exceptions/domain.exception';
 
 describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
   let repository: { findOne: jest.Mock; update: jest.Mock };
-  let historyRepository: { create: jest.Mock };
   let emissor: { emitir: jest.Mock };
   let useCase: UpdateServiceOrderStatusUseCase;
 
@@ -28,11 +26,9 @@ describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
         Promise.resolve({ id: 'os-1', ...data })
       ),
     };
-    historyRepository = { create: jest.fn((historico: unknown) => Promise.resolve(historico)) };
     emissor = { emitir: jest.fn().mockResolvedValue(undefined) };
     useCase = new UpdateServiceOrderStatusUseCase(
       repository as unknown as IOrdemServicoRepository,
-      historyRepository as unknown as IStatusHistoryRepository,
       emissor as unknown as IEmissorEventos,
       new StatusTransitionService()
     );
@@ -44,7 +40,11 @@ describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
     await useCase.execute('os-1', 'FINISHED');
 
     const [, payload] = repository.update.mock.calls[0];
-    expect(payload).toEqual({ status: 'FINISHED', finalizada_em: expect.any(Date) });
+    expect(payload).toEqual({
+      status: 'FINISHED',
+      motivo: undefined,
+      finalizada_em: expect.any(Date),
+    });
     expect(payload).not.toHaveProperty('entregue_em');
     expect(emissor.emitir).toHaveBeenCalledTimes(1);
   });
@@ -62,12 +62,9 @@ describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
 
     await useCase.execute('os-1', 'AWAITING_APPROVAL');
 
-    expect(repository.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_APPROVAL' });
-    expect(historyRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        statusAnterior: 'UNDER_DIAGNOSIS',
-        statusNovo: 'AWAITING_APPROVAL',
-      })
-    );
+    expect(repository.update).toHaveBeenCalledWith('os-1', {
+      status: 'AWAITING_APPROVAL',
+      motivo: undefined,
+    });
   });
 });

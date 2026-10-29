@@ -22,7 +22,10 @@
 > Nomes de banco fechados e bootstrap definidos (§8). **Revisão de
 > 02/10/2026:** o motor do read model passou de DynamoDB para DocumentDB
 > (ADR-0019); tabela vira coleção, item vira documento e o índice secundário global vira índice
-> parcial. Detalhe em
+> parcial. **Implementação de 29/10/2026 (#335):** o índice ficou composto
+> e **não parcial** em (`prioridade`, `createdAt`, `_id`), com o filtro
+> `status $nin` na query e paginação por cursor keyset (§3); cliente e veículo
+> viraram subdocumentos. Detalhe em
 > [ADR-0019](../adr/0019-documentdb-read-model-os-cliente.md) e
 > [ADR-0020](../adr/0020-bancos-compartilhados-isolamento-credencial.md).
 
@@ -50,16 +53,14 @@ pelo OS Service na subida.
 
 | Atributo | Tipo | Papel | Observação |
 |---|---|---|---|
-| `ordemServicoId` | `S` | Chave primária (`_id`) | Mesmo `id` (UUID) do Postgres — chave natural, sem tradução |
-| `clienteId` | `S` | Atributo | — |
-| `clienteNome`, `clienteDocumento` | `S` | Atributos embutidos | Foto do cliente no momento do refresh — evita join de leitura |
-| `veiculoId` | `S` | Atributo | — |
-| `veiculoPlaca`, `veiculoMarca`, `veiculoModelo` | `S` | Atributos embutidos | Idem |
+| `_id` | `S` | Chave primária | Mesmo `id` (UUID) da OS no Postgres — chave natural, sem gerar id novo |
+| `cliente` | `M` | Subdocumento | `{ id, nome, documento }` — foto do cliente no momento da projeção, evita join de leitura |
+| `veiculo` | `M` | Subdocumento | `{ id, placa, marca, modelo }` — idem |
 | `status` | `S` | Atributo (`SOStatus`) | Espelha `OrdemServico.status` |
 | `descricao` | `S` (opcional) | Atributo | — |
-| `marcos` | `M` | Atributo embutido | `{ createdAt, iniciadaEm, finalizadaEm, entregueEm }` — espelha os quatro timestamps do Prisma (`created_at`, `iniciada_em`, `finalizada_em`, `entregue_em`) |
-| `filaGrupo` | `S` (parcial) | Primeiro campo do índice da fila | Ver §3 — **ausente** quando `status` é `FINISHED`, `DELIVERED` ou `CLOSED_WITHOUT_EXECUTION` |
-| `filaOrdem` | `S` (parcial) | Segundo campo do índice da fila | Ver §3 — ausente nas mesmas condições que `filaGrupo` |
+| `prioridade` | `N` | Primeiro campo do índice da fila | `STATUS_PRIORIDADE` do status atual (`status-priority.policy.ts`) |
+| `createdAt`, `updatedAt` | `Date` | Segundo campo do índice da fila / auditoria | `created_at` e `updated_at` do Postgres |
+| `marcos` | `M` | Subdocumento | `{ createdAt, iniciadaEm, finalizadaEm, entregueEm }` — espelha os quatro timestamps do Prisma |
 
 **Fora do documento (decisão de 30/09/2026):** `itens` (peças/serviços) e
 `historico` não são embutidos — a resposta atual da OS não os devolve, e o
@@ -69,7 +70,7 @@ ADR-0017): **quebra de contrato aceita** em `GET /ordens-servico` e
 `GET /ordens-servico/:id`. O documento tem tamanho pequeno e fixo, muito abaixo
 do limite de 400 KB.
 
-**Limite aceito:** `clienteNome`/`veiculo*` são foto do refresh da OS;
+**Limite aceito:** `cliente`/`veiculo` são foto do refresh da OS;
 editar cliente ou veículo não reprojeta as OS existentes até a próxima
 escrita na OS ou um rebuild (§6).
 
@@ -77,7 +78,7 @@ escrita na OS ou um rebuild (§6).
 
 | Atributo | Tipo | Papel | Observação |
 |---|---|---|---|
-| `clienteId` | `S` | Chave primária (`_id`) | Mesmo `id` (UUID) do Postgres |
+| `_id` | `S` | Chave primária | Mesmo `id` (UUID) do Cliente no Postgres |
 | `nome`, `email`, `telefone`, `documento`, `tipoDocumento` | `S` | Atributos | Mesmo formato do `ClienteResponseDto` atual (`id` é `clienteId`) |
 
 Documento **plano**: **sem** `veiculos` (a resposta atual não os inclui) e
@@ -86,53 +87,38 @@ apenas `GET /clientes/:id`, por chave primária.
 
 ## 3. Índice da fila por prioridade
 
-**Nome:** `idx_fila_prioridade`, na coleção `os_read_model`: índice composto
-ascendente em (`filaGrupo`, `filaOrdem`), **parcial**
-(`partialFilterExpression: { filaGrupo: "ATIVA" }`).
+**Nome:** `fila_prioridade_createdAt_id`, na coleção `os_read_model`: índice
+composto ascendente em (`prioridade`, `createdAt`, `_id`), **não parcial**,
+criado com `createIndex` na subida do OS Service
+(`read-model-bootstrap.service.ts`).
 
-- **Campo de agrupamento (`filaGrupo`):** valor fixo `"ATIVA"` para toda OS cujo
-  `status` não seja `FINISHED`, `DELIVERED` nem `CLOSED_WITHOUT_EXECUTION`
-  (conjunto de `STATUS_EXCLUIDOS_DA_LISTAGEM` em
-  `status-priority.policy.ts`, **a ser ampliado** com
-  `CLOSED_WITHOUT_EXECUTION`: **mudança de comportamento** — hoje essa OS
-  aparece na fila com prioridade 6; é mudança de código, ainda pendente).
-  Uma partição única funciona neste projeto porque o volume de OS ativas simultâneas é baixo (escala acadêmica); se o
-  volume crescesse a ponto de uma partição única virar gargalo de
-  throughput, a revisão (ex.: particionar por oficina/unidade) fica fora do
-  escopo desta Feature.
-- **Campo de ordenação (`filaOrdem`):** string composta
-  `"{prioridade}#{createdAt}"`, onde:
-  - `prioridade` é o valor numérico de `STATUS_PRIORIDADE` (já existente em
-    `status-priority.policy.ts`: `IN_PROGRESS=1`, `AWAITING_APPROVAL=2`,
-    `UNDER_DIAGNOSIS=3`, `RECEIVED=4`, `AWAITING_PARTS=5`), **zero-padded**
-    para 3 dígitos (`"001"`, `"002"`, ...) — necessário para que a ordenação
-    lexicográfica do índice coincida com a ordenação numérica.
-  - `createdAt` é o timestamp ISO-8601 (`OrdemServico.created_at`), que já
-    ordena corretamente como string.
-  - Exemplo: uma OS `IN_PROGRESS` criada em `2026-09-21T10:00:00.000Z` gera
-    `filaOrdem = "001#2026-09-21T10:00:00.000Z"`.
-- **Índice parcial:** quando o `status` é `FINISHED`, `DELIVERED` ou
-  `CLOSED_WITHOUT_EXECUTION`, o builder do documento **não grava** os campos
-  `filaGrupo`/`filaOrdem` — como o refresh é um `replaceOne` do documento inteiro,
-  os campos somem ao transitar para um desses status. Um documento sem
-  `filaGrupo = "ATIVA"` não entra no índice parcial, o que resolve, no próprio
-  armazenamento, a exclusão dessas OS da fila, sem filtro adicional na
-  query.
-- **Query que o índice atende:** `find({ filaGrupo: "ATIVA" })` com
-  `sort({ filaOrdem: 1 })` (ordem ascendente de
-  `filaOrdem` = maior prioridade primeiro, mais antiga primeiro dentro da
-  mesma prioridade) — exatamente o contrato hoje descrito na
-  documentação da rota `GET /ordens-servico`
-  (`ordem-servico.controller.ts`): "ordenadas por prioridade de status
-  [...] dentro do mesmo status, as mais antigas aparecem primeiro".
-  Paginação da API feita com `limit` e cursor por `filaOrdem`
-  (`filaOrdem > último`), substituindo o `slice()` em memória atual.
+- **Saída da fila por filtro na query:** `find({ status: { $nin:
+  STATUS_EXCLUIDOS_DA_LISTAGEM } })`, com `FINISHED`, `DELIVERED` e
+  `CLOSED_WITHOUT_EXECUTION`. **Mudança de comportamento aplicada:**
+  `CLOSED_WITHOUT_EXECUTION` (antes na fila com prioridade 6) só aparece em
+  `GET /ordens-servico/:id`. O índice parcial do desenho anterior
+  (`filaGrupo`/`filaOrdem`) foi descartado para usar só operadores
+  suportados por DocumentDB e MongoDB e não depender de `partialFilterExpression`.
+- **Ordenação:** `sort({ prioridade: 1, createdAt: 1, _id: 1 })`: maior
+  prioridade primeiro, mais antiga primeiro dentro da mesma prioridade, e
+  `_id` como desempate estável. É a mesma ordem do `findMany` + `sort()` em
+  memória que existia antes.
+- **Paginação por cursor keyset** (não por `skip`): a API recebe `limit`
+  (1 a 100, padrão 10) e `cursor`, e responde
+  `{ data, pagination: { limit, nextCursor } }`. O cursor é opaco (base64url de
+  `prioridade`, `createdAt` e `_id` do último documento da página), e a próxima
+  página filtra com `$or` sobre essa tupla. **Quebra de contrato aceita:**
+  `page`, `total` e `totalPages` saem da resposta de `GET /ordens-servico`.
+- **Evidência:** `test/read-model/os-read-model.query.integration.spec.ts`
+  roda contra o container `mongo` do CI e confere a ordem da fila paginada e,
+  pelo `explain`, que a consulta usa o índice. A mesma conferência contra o
+  DocumentDB real fica para HML.
 
 ## 4. Rotas de leitura servidas pelo read model
 
 | Rota | Acesso DocumentDB | Observação |
 |---|---|---|
-| `GET /ordens-servico` | `find` + `sort` no índice `idx_fila_prioridade` (`os_read_model`) | Substitui o `findMany` + `sort()` em memória atual |
+| `GET /ordens-servico` | `find` + `sort` no índice `fila_prioridade_createdAt_id` (`os_read_model`), cursor keyset | Substitui o `findMany` + `sort()` em memória |
 | `GET /ordens-servico/:id` | `findOne` por `_id` (`ordemServicoId`) (`os_read_model`) | Resposta sem `orcamento` (quebra de contrato aceita) |
 | `GET /ordens-servico/:id/status` | `findOne` por `_id` (`ordemServicoId`), projeção apenas de `status`/`marcos` | Consulta pública do cliente. Nenhum serviço a consome: a Fase 4 não tem chamada REST entre serviços (`saga-flow.md`) |
 | `GET /clientes/:id` | `findOne` por `_id` (`clienteId`) (`cliente_read_model`) | — |
@@ -181,19 +167,22 @@ mesmo use case de `/status`).
   `UpdateServiceOrderStatusUseCase` **deixa de gravar** o histórico por conta
   própria (senão a linha duplicaria) e só repassa o `motivo`. O
   `new PrismaClient()` extra de `status-history.repository.ts` é removido.
-  Exceção deliberada: ao consumir `PagamentoConfirmado`, o OS Service grava
-  `pago_em` e uma linha de histórico (motivo "pagamento confirmado") **sem
-  mudar o status**; `pago_em` não entra no `os_read_model`.
+  Exceção deliberada (quando o consumidor Kafka existir): ao consumir
+  `PagamentoConfirmado`, o OS Service grava `pago_em` e uma linha de histórico
+  (motivo "pagamento confirmado") **sem mudar o status**; `pago_em` não entra no
+  `os_read_model`. Em 29/10/2026 os eventos ainda são in-process e não existe
+  `pago_em` no schema.
 - **Ponto exato:** **depois** da transação do repository (OS + histórico) —
   nunca antes, para nunca projetar um estado que pode ainda ser revertido.
-  Hoje não existe `prisma.$transaction` no código; "após o commit" significa
-  "após a transação do repository".
+  "Após o commit" significa "após a `$transaction` do repository".
 - **Atualização desde `RECEIVED`:** a criação da OS (`POST
   /ordens-servico`) já escreve o primeiro documento em `os_read_model`.
 - **Comportamento em caso de falha na escrita do read model:** o Postgres
   já commitou antes da chamada ao DocumentDB (write-through, não 2PC) — não
   há rollback possível nesse ponto. A falha no DocumentDB é **capturada,
-  logada e emite métrica/evento custom (#335)**, e **não derruba a requisição**: o
+  logada em nível de erro e emite o evento custom `ReadModelProjectionFailure`
+  no New Relic** (atributos `collection`, `documentId`, `message`; sem alerta
+  dedicado), e **não derruba a requisição**: o
   comando de negócio teve sucesso (é o Postgres quem define isso). O documento
   fica desatualizado até a próxima escrita bem-sucedida naquele id ou até um
   rebuild (§6). Trade-off aceito de CQRS com write-through: disponibilidade
@@ -208,12 +197,17 @@ recriadas:
 
 1. Recriar o cluster DocumentDB (Terraform, Feature #315); o OS Service recria
    as coleções `os_read_model` e `cliente_read_model` e seus índices na subida.
-2. Rotina de reconstrução (a implementar no Epic #329, fora do escopo desta
-   Feature) itera o Postgres em páginas — todos os `Cliente` e todas as
+2. O job `src/jobs/rebuild-read-model.job.ts` (imagem: `node
+   dist/jobs/rebuild-read-model.job.js`; local: `pnpm read-model:rebuild`)
+   itera o Postgres em páginas de 500 por id: todos os `Cliente` e todas as
    `OrdemServico` (com `Veiculo` e `Cliente` para os campos embutidos;
-   **sem `Orcamento`**, que não faz parte do read model) — e executa um
-   `replaceOne` com `upsert` idempotente por documento nas duas coleções, reusando o **mesmo
-   builder** do write-through (§5), no formato descrito em §2.
+   **sem `Orcamento`**, que não faz parte do read model). Grava em lote com
+   `bulkWrite` de `replaceOne` com `upsert`, reusando o **mesmo builder** do
+   write-through (§5), e no fim remove os documentos cujo id não existe mais
+   no Postgres. O `deploy-eks.yml` roda o job logo depois do job de
+   migration; sob demanda, basta recriar o mesmo Job no namespace. O e2e
+   `test/read-model.e2e-spec.ts` demonstra o conserto de um documento
+   propositalmente defasado.
 3. Não há ordem de execução obrigatória entre as duas coleções — são
    independentes uma da outra.
 4. Enquanto a reconstrução roda, o read model pode responder com dado

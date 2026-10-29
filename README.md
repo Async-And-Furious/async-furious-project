@@ -175,12 +175,13 @@ O Swagger descreve só o OS Service (título `Async Furious - OS Service`). O es
 ### Superfície HTTP do OS Service (#332)
 
 - **Sem REST entre serviços.** Nenhuma rota deste serviço é consumida por Billing ou Execução; tudo o que eles precisam chega por evento ([`saga-flow.md`](docs/architecture/saga-flow.md)).
-- **Única rota pública:** `GET /api/v1/ordens-servico/{id}/status`, sem Bearer, com resposta mínima (`ordemServicoId` e `status`, sem dados do cliente). Qualquer outra rota sem token responde `401`.
+- **Única rota pública:** `GET /api/v1/ordens-servico/{id}/status`, sem Bearer, com resposta mínima (`ordemServicoId`, `status` e `marcos` de tempo, sem dados do cliente). Qualquer outra rota sem token responde `401`.
 - **Removidas, sem proxy:** `GET /ordens-servico/:id/rastreamento` (alias de `/status`) e `POST /ordens-servico/:id/aprovar-servico` (aprovação pública duplicada do orçamento) respondem `404`. `PATCH /ordens-servico/:id/aprovar-servico` continua, autenticada.
 - **RBAC inalterado:** `JwtAuthGuard` e `RolesGuard` seguem validando o token localmente, como segunda camada depois do Lambda Authorizer da borda (ADR-0021).
 - **Webhook de status como exceção:** `POST /webhooks/service-orders/status` é um canal de reprocesso manual (JWT + `x-webhook-secret`). A transição é validada pelo mesmo `StatusTransitionService` dos consumidores de evento, e `DELIVERED` é rejeitado com `400`: a entrega só acontece por `registrar-entrega`.
 - **Versionamento:** o prefixo continua `api/v1`. Durante a Fase 4 quebras de contrato são aceitas dentro de `v1`, sem `v2` em paralelo: todos os consumidores nascem nesta fase e não há cliente externo a preservar. Cada quebra é registrada nesta seção e na ADR correspondente.
-- **Pendências de outras features:** `pagamentos`, as rotas de aprovação/recusa de orçamento e o campo `orcamento` na resposta da OS saem do serviço na extração do financeiro (#330); a leitura de `/status`, `GET /ordens-servico/:id` e `GET /clientes/:id` pelo read model em DocumentDB vem com a #335.
+- **Read model (#335, ADR-0019):** `GET /ordens-servico` (fila), `GET /ordens-servico/:id`, `/status` e `GET /clientes/:id` leem do DocumentDB (MongoDB local e no CI), alimentado por write-through síncrono nos repositories; `tempo-medio`, `GET /clientes` e `GET /veiculos/:id` seguem no Postgres. A fila pagina por cursor (`?limit=&cursor=`, resposta `{ data, pagination: { limit, nextCursor } }`) e não inclui `CLOSED_WITHOUT_EXECUTION`; a OS lida do read model não traz `orcamento`. Rebuild: `pnpm read-model:rebuild` (no deploy, um Job depois da migration). Modelo em [`persistence-model.md`](docs/architecture/persistence-model.md).
+- **Pendências de outras features:** `pagamentos` e as rotas de aprovação/recusa de orçamento saem do serviço na extração do financeiro (#330).
 
 A coleção completa das APIs (formato Insomnia v5) fica versionada no repositório e pode ser importada diretamente pelo link:
 
@@ -203,7 +204,7 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | ------ | -------- | ------ | --------- |
 | POST | `/clientes` | RECEPCIONISTA | Criar cliente. |
 | GET | `/clientes` | Autenticado | Listar clientes. |
-| GET | `/clientes/:id` | Autenticado | Detalhar cliente. |
+| GET | `/clientes/:id` | Autenticado | Detalhar cliente (read model). |
 | PATCH | `/clientes/:id` | RECEPCIONISTA | Atualizar cliente. |
 | DELETE | `/clientes/:id` | ADMIN | Deletar cliente. |
 
@@ -232,8 +233,8 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
 | POST | `/ordens-servico` | RECEPCIONISTA | Criar OS. |
-| GET | `/ordens-servico` | Autenticado | Listar OSs. |
-| GET | `/ordens-servico/:id` | Autenticado | Detalhar OS. |
+| GET | `/ordens-servico` | Autenticado | Fila de OS ativas por prioridade (read model, cursor). |
+| GET | `/ordens-servico/:id` | Autenticado | Detalhar OS (read model, sem orçamento). |
 | GET | `/ordens-servico/:id/status` | Público | Consultar status da OS (resposta mínima, sem dados do cliente). |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |

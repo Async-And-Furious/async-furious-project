@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import {
@@ -12,10 +12,15 @@ import {
   UpdateClienteInput,
 } from '../../domain/interfaces/cliente.interface';
 import { ClienteMapper, ClienteORMEntity } from '../persistence/cliente.orm-entity';
+import { CLIENTE_READ_MODEL_PROJECTOR } from '../../domain/interfaces/cliente-read-model.interface';
+import type { IClienteReadModelProjector } from '../../domain/interfaces/cliente-read-model.interface';
 
 @Injectable()
 export class ClienteRepository implements IClienteRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CLIENTE_READ_MODEL_PROJECTOR) private readonly projector: IClienteReadModelProjector
+  ) {}
 
   async create(data: CreateClienteInput): Promise<Cliente> {
     const cliente = Cliente.criar({
@@ -37,6 +42,7 @@ export class ClienteRepository implements IClienteRepository {
         tipo_documento: ormData.tipo_documento,
       },
     });
+    await this.projector.project(ormEntity.id);
 
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -104,6 +110,7 @@ export class ClienteRepository implements IClienteRepository {
         telefone: data.telefone,
       },
     });
+    await this.projector.project(id);
 
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -114,6 +121,7 @@ export class ClienteRepository implements IClienteRepository {
     const ormEntity = await this.prisma.cliente.delete({
       where: { id },
     });
+    await this.projector.project(id);
 
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }

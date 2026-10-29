@@ -32,6 +32,15 @@ import {
 import { UpdateServiceOrderStatusUseCase } from './application/use-cases/update-service-order-status.use-case';
 import { StatusTransitionService } from './domain/services/status-transition.service';
 import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
+import { OsReadModelProjector } from './infrastructure/read-model/os-read-model.projector';
+import { OsReadModelQuery } from './infrastructure/read-model/os-read-model.query';
+import {
+  IOsReadModelQuery,
+  OS_READ_MODEL_PROJECTOR,
+  OS_READ_MODEL_QUERY,
+} from './domain/interfaces/os-read-model.interface';
+import { ClienteReadModelProjector } from '../cadastro/infrastructure/read-model/cliente-read-model.projector';
+import { CLIENTE_READ_MODEL_PROJECTOR } from '../cadastro/domain/interfaces/cliente-read-model.interface';
 import { ServiceOrderStatusWebhookController } from './presentation/controllers/service-order-status-webhook.controller';
 import {
   AprovarOrcamentoUseCase,
@@ -67,6 +76,10 @@ import {
   imports: [FinanceiroModule],
   controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
   providers: [
+    // Read model (ADR-0019): write-through pelos repositories, leituras pela query
+    { provide: OS_READ_MODEL_PROJECTOR, useClass: OsReadModelProjector },
+    { provide: OS_READ_MODEL_QUERY, useClass: OsReadModelQuery },
+    { provide: CLIENTE_READ_MODEL_PROJECTOR, useClass: ClienteReadModelProjector },
     OrdemServicoRepository,
     OrcamentoRepository,
     OsPecaRepository,
@@ -274,19 +287,19 @@ import {
     },
     {
       provide: ConsultarStatusOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository) =>
-        new ConsultarStatusOrdemServicoUseCase(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (readModel: IOsReadModelQuery) =>
+        new ConsultarStatusOrdemServicoUseCase(readModel),
+      inject: [OS_READ_MODEL_QUERY],
     },
     {
       provide: ListarOrdensServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository) => new ListarOrdensServicoUseCase(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (readModel: IOsReadModelQuery) => new ListarOrdensServicoUseCase(readModel),
+      inject: [OS_READ_MODEL_QUERY],
     },
     {
       provide: DetalharOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository) => new DetalharOrdemServicoUseCase(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (readModel: IOsReadModelQuery) => new DetalharOrdemServicoUseCase(readModel),
+      inject: [OS_READ_MODEL_QUERY],
     },
     {
       provide: DeletarOrdemServicoUseCase,
@@ -303,16 +316,10 @@ import {
       provide: UpdateServiceOrderStatusUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
-        historyRepo: StatusHistoryRepository,
         barramento: IEmissorEventos,
         transitionSvc: StatusTransitionService
-      ) => new UpdateServiceOrderStatusUseCase(osRepo, historyRepo, barramento, transitionSvc),
-      inject: [
-        OrdemServicoRepository,
-        StatusHistoryRepository,
-        EMISSOR_EVENTOS,
-        StatusTransitionService,
-      ],
+      ) => new UpdateServiceOrderStatusUseCase(osRepo, barramento, transitionSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
 
     // ACL Adapter for pecas-insumos

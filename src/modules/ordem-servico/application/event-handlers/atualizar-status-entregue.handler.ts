@@ -26,6 +26,7 @@ export class AtualizarStatusEntregueHandler {
     await this.ordemServicoRepository.update(evento.ordemServicoId, {
       status: 'DELIVERED',
       entregue_em: new Date(),
+      motivo: 'Entrega do veículo registrada',
     });
     await this.emissor.emitir(new OrdemServicoEntregue(evento.ordemServicoId));
   }

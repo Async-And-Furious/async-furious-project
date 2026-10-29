@@ -17,7 +17,11 @@ export class AtualizarStatusEmExecucaoHandler {
 
   @OnEvent('OsSemPecasConfirmada')
   async handleSemPecas(evento: OsSemPecasConfirmada): Promise<void> {
-    await this.iniciarExecucao(evento.ordemServicoId, ['AWAITING_APPROVAL']);
+    await this.iniciarExecucao(
+      evento.ordemServicoId,
+      ['AWAITING_APPROVAL'],
+      'Orçamento aprovado sem necessidade de peças'
+    );
   }
 
   // PecasReservadas vem de dois lugares:
@@ -25,12 +29,17 @@ export class AtualizarStatusEmExecucaoHandler {
   // 2. LiberarOrdensAguardandoPecasHandler (peças recebidas do fornecedor) → OS em AWAITING_PARTS
   @OnEvent('PecasReservadas')
   async handlePecasReservadas(evento: { ordemServicoId: string }): Promise<void> {
-    await this.iniciarExecucao(evento.ordemServicoId, ['AWAITING_APPROVAL', 'AWAITING_PARTS']);
+    await this.iniciarExecucao(
+      evento.ordemServicoId,
+      ['AWAITING_APPROVAL', 'AWAITING_PARTS'],
+      'Peças reservadas'
+    );
   }
 
   private async iniciarExecucao(
     ordemServicoId: string,
-    expectedStatuses: OSStatus[]
+    expectedStatuses: OSStatus[],
+    motivo: string
   ): Promise<void> {
     const os = await this.ordemServicoRepository.findOne(ordemServicoId);
     if (!expectedStatuses.includes(os.status)) {
@@ -39,7 +48,7 @@ export class AtualizarStatusEmExecucaoHandler {
       );
       return;
     }
-    await this.ordemServicoRepository.update(ordemServicoId, { status: 'IN_PROGRESS' });
+    await this.ordemServicoRepository.update(ordemServicoId, { status: 'IN_PROGRESS', motivo });
     await this.emissor.emitir(new OrdemServicoEmExecucao(ordemServicoId));
   }
 }

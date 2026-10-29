@@ -1,6 +1,5 @@
 import { UpdateServiceOrderStatusUseCase } from '../../../src/modules/ordem-servico/application/use-cases/update-service-order-status.use-case';
 import { IOrdemServicoRepository } from '../../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
-import { IStatusHistoryRepository } from '../../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import { IEmissorEventos } from '../../../src/shared/domain/interfaces/emissor-eventos.interface';
 import { StatusTransitionService } from '../../../src/modules/ordem-servico/domain/services/status-transition.service';
 import { OrdemDeServico } from '../../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
@@ -10,7 +9,6 @@ import { DomainException } from '../../../src/shared/domain/exceptions/domain.ex
 describe('UpdateServiceOrderStatusUseCase', () => {
   let useCase: UpdateServiceOrderStatusUseCase;
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
-  let historyRepo: jest.Mocked<IStatusHistoryRepository>;
   let emissor: jest.Mocked<IEmissorEventos>;
   let transitionService: StatusTransitionService;
 
@@ -20,17 +18,13 @@ describe('UpdateServiceOrderStatusUseCase', () => {
       update: jest.fn(),
     } as unknown as jest.Mocked<IOrdemServicoRepository>;
 
-    historyRepo = {
-      create: jest.fn(),
-    } as unknown as jest.Mocked<IStatusHistoryRepository>;
-
     emissor = {
       emitir: jest.fn(),
     } as unknown as jest.Mocked<IEmissorEventos>;
 
     transitionService = new StatusTransitionService();
 
-    useCase = new UpdateServiceOrderStatusUseCase(osRepo, historyRepo, emissor, transitionService);
+    useCase = new UpdateServiceOrderStatusUseCase(osRepo, emissor, transitionService);
   });
 
   it('deve lançar EntityNotFoundException se OS não existir', async () => {
@@ -40,7 +34,7 @@ describe('UpdateServiceOrderStatusUseCase', () => {
     );
   });
 
-  it('deve atualizar o status, salvar histórico e emitir evento', async () => {
+  it('deve atualizar o status com o motivo (o histórico é do repository) e emitir evento', async () => {
     const mockOs = {
       id: 'os-1',
       status: 'RECEIVED',
@@ -55,11 +49,10 @@ describe('UpdateServiceOrderStatusUseCase', () => {
       'Iniciando diagnóstico via webhook'
     );
 
-    expect(osRepo.update).toHaveBeenCalledWith(
-      'os-1',
-      expect.objectContaining({ status: 'UNDER_DIAGNOSIS' })
-    );
-    expect(historyRepo.create).toHaveBeenCalled();
+    expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+      status: 'UNDER_DIAGNOSIS',
+      motivo: 'Iniciando diagnóstico via webhook',
+    });
     expect(emissor.emitir).toHaveBeenCalled();
     expect(result.status).toBe('UNDER_DIAGNOSIS');
   });
@@ -69,7 +62,6 @@ describe('UpdateServiceOrderStatusUseCase', () => {
 
     expect(osRepo.findOne).not.toHaveBeenCalled();
     expect(osRepo.update).not.toHaveBeenCalled();
-    expect(historyRepo.create).not.toHaveBeenCalled();
     expect(emissor.emitir).not.toHaveBeenCalled();
   });
 });

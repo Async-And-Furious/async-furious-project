@@ -281,6 +281,56 @@ inacessibilidade TCP originalmente requerida foi alterada por decisão do
 solicitante; esta decisão não elimina a alcançabilidade de rede descrita acima.
 A verificação dessas condições em HML permanece pendente.
 
+## Revisão de 29/10/2026 — implementação no OS Service (#335)
+
+Implementação do read model no OS Service. Fonte da verdade, CQRS,
+write-through síncrono no repository e escopo "OS + Cliente simples"
+**continuam valendo**; os pontos abaixo ajustam o desenho ao código.
+
+- **Índice da fila.** Composto e **não parcial** em (`prioridade`,
+  `createdAt`, `_id`), nome `fila_prioridade_createdAt_id`. As OS fora da
+  fila (`FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`) saem por
+  `status $nin` na própria query, e não por `filaGrupo`/`filaOrdem` num índice
+  parcial. Motivo: usar só operadores suportados pelo DocumentDB e pelo
+  MongoDB do CI (`find`, `sort`, `replaceOne`, `bulkWrite`, `createIndex`,
+  `$nin`, `$in`, mais `$or`/`$gt` no cursor). A paginação é por cursor
+  keyset sobre a tupla do índice. **Quebra aceita:** `GET /ordens-servico`
+  devolve `{ data, pagination: { limit, nextCursor } }`, sem `page`, `total` e
+  `totalPages`.
+- **Portas e adaptadores.** As portas de domínio são `IOsReadModelProjector`
+  e `IClienteReadModelProjector` (escrita) e `IOsReadModelQuery` e
+  `IClienteReadModelQuery` (leitura). Os adaptadores com o driver `mongodb`
+  ficam em `infrastructure/read-model/` de cada módulo, e nenhum repository
+  importa o driver. O projetor relê o agregado no Postgres e faz
+  `replaceOne({ _id }, doc, { upsert: true })`, ou `deleteOne` quando o
+  registro não existe mais (remoção).
+- **Pontos de escrita.** `OrdemServicoRepository.create/update/remove`,
+  `OsPecaRepository.replaceAll`, `OsServicoRepository.replaceAll` e
+  `ClienteRepository.create/update/remove` projetam depois da escrita. O
+  `HistoricoStatusOS` é gravado na mesma `$transaction` da OS sempre que o
+  status muda, com `statusAnterior` lido dentro da transação e `motivo`
+  vindo de cada handler. O `UpdateServiceOrderStatusUseCase` só valida a
+  transição, e o `StatusHistoryRepository` usa o `PrismaService`.
+- **Falha.** O `try/catch` fica no adaptador: loga em nível de erro e emite o
+  evento custom `ReadModelProjectionFailure` no New Relic, sem derrubar o
+  request. O documento se corrige na próxima escrita ou no rebuild.
+- **Conexão.** Local e CI usam `DOCDB_URI` (container `mongo:5.0`). Em
+  HML/PROD a URI é montada a partir de `DOCDB_HOST`, `DOCDB_PORT`,
+  `DOCDB_USER`, `DOCDB_PASSWORD` e `DOCDB_NAME`, já materializados pelo
+  pipeline a partir do secret `tc3-docdb-os-<env>`, com `tls=true`,
+  `tlsCAFile=/app/certs/global-bundle.pem` (baixado no `Dockerfile`),
+  `replicaSet=rs0`, `readPreference=secondaryPreferred`, `retryWrites=false` e
+  `maxPoolSize=5`. As coleções e o índice são criados de forma idempotente na
+  subida (`ReadModelBootstrapService`).
+- **Status público.** `GET /ordens-servico/{id}/status` devolve
+  `{ ordemServicoId, status, marcos }`, sem dados do cliente.
+- **Rebuild.** O job `dist/jobs/rebuild-read-model.job.js` usa os mesmos
+  builders do write-through, grava em lote por `bulkWrite` e remove os
+  documentos órfãos. O `deploy-eks.yml` o roda depois da migration.
+- **Pendente de HML:** validação contra o DocumentDB real (conexão TLS,
+  `explain` da fila, segmentos de datastore MongoDB no New Relic). Os runners
+  do GitHub não alcançam a subnet privada do cluster.
+
 ## Referências
 
 - Tech Challenge — Fase 4 (`12SOAT - Fase 4 - Tech challenge.pdf`), p.3, p.4 e p.6
@@ -293,4 +343,5 @@ A verificação dessas condições em HML permanece pendente.
 - [`docs/architecture/event-catalog.md`](../architecture/event-catalog.md), [`docs/architecture/saga-flow.md`](../architecture/saga-flow.md)
 - `src/modules/ordem-servico/domain/policies/status-priority.policy.ts`
 - `prisma/schema.prisma`
-- Documentação oficial do Amazon DocumentDB (índices, índices parciais, TLS) e do driver `mongodb`
+- Documentação oficial do Amazon DocumentDB (índices, compatibilidade com a API do MongoDB, TLS) e do driver `mongodb`
+- Issue [#335](https://github.com/Async-And-Furious/async-furious-project/issues/335) — Read Model de Ordem de Serviço e Cliente em DocumentDB

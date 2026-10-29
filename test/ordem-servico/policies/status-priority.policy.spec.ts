@@ -29,7 +29,11 @@ describe('status-priority policy', () => {
     );
   });
 
-  it('hides finished and delivered orders from the work list', () => {
-    expect(STATUS_EXCLUIDOS_DA_LISTAGEM).toEqual(['FINISHED', 'DELIVERED']);
+  it('hides finished, delivered and closed-without-execution orders from the work list', () => {
+    expect(STATUS_EXCLUIDOS_DA_LISTAGEM).toEqual([
+      'FINISHED',
+      'DELIVERED',
+      'CLOSED_WITHOUT_EXECUTION',
+    ]);
   });
 });

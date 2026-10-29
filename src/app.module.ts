@@ -5,6 +5,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { DatabaseModule } from './shared/infrastructure/database/database.module';
+import { ReadModelModule } from './shared/infrastructure/read-model/read-model.module';
 import { AuthModule } from './auth/auth.module';
 import { CadastroModule } from './modules/cadastro/cadastro.module';
 import { PecasInsumosModule } from './modules/pecas-insumos/pecas-insumos.module';
@@ -23,6 +24,7 @@ import { pinoHttpOptions } from './shared/infrastructure/logging/pino-logger.con
     EventEmitterModule.forRoot(),
     ThrottlerModule.forRoot([{ name: 'short', ttl: 60000, limit: 100 }]),
     DatabaseModule,
+    ReadModelModule,
     AuthModule,
     CadastroModule,
     PecasInsumosModule,

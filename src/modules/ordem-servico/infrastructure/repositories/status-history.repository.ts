@@ -1,10 +1,14 @@
-import { PrismaClient } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { IStatusHistoryRepository } from '../../domain/interfaces/status-history.interface';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 import { OSStatus } from '../../domain/entities/ordem-servico.entity';
 
+// As linhas de mudança de status são gravadas pelo OrdemServicoRepository,
+// na mesma transação da OS; este repository usa o PrismaService compartilhado.
+@Injectable()
 export class StatusHistoryRepository implements IStatusHistoryRepository {
-  private readonly prisma = new PrismaClient();
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(historico: HistoricoStatus): Promise<HistoricoStatus> {
     const created = await this.prisma.historicoStatusOS.create({

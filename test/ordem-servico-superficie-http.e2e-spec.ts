@@ -97,7 +97,17 @@ describe('OrdemServico superfície HTTP (e2e)', () => {
   it('GET /ordens-servico/:id/status responde sem Bearer, com resposta mínima', async () => {
     const response = await server.get(`/ordens-servico/${ordemServicoId}/status`).expect(200);
 
-    expect(response.body).toEqual({ ordemServicoId, status: 'RECEIVED' });
+    expect(response.body).toEqual({
+      ordemServicoId,
+      status: 'RECEIVED',
+      marcos: {
+        createdAt: expect.any(String),
+        iniciadaEm: null,
+        finalizadaEm: null,
+        entregueEm: null,
+      },
+    });
+    expect(response.body).not.toHaveProperty('cliente');
   });
 
   it('GET /ordens-servico sem Bearer responde 401', async () => {

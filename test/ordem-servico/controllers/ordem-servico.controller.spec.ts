@@ -3,7 +3,7 @@ import { OrdemServicoController } from '../../../src/modules/ordem-servico/prese
 import {
   CreateOrdemServicoDto,
   UpdateOrdemServicoDto,
-  ListQueryDto,
+  FilaQueryDto,
   GerarOrcamentoDto,
 } from '../../../src/modules/ordem-servico/presentation/dto/ordem-servico.dto';
 import { Role } from '../../../src/auth/enums/role.enum';
@@ -190,32 +190,27 @@ describe('OrdemServicoController', () => {
   });
 
   describe('listar', () => {
-    const query: ListQueryDto = { page: 1, limit: 10, search: 'troca' };
+    const query: FilaQueryDto = { limit: 5, cursor: 'cursor-anterior' };
     const resultadoEsperado: any = {
       data: [{ id: 'os-1', descricao: 'Troca de óleo' }],
-      pagination: {
-        total: 1,
-        page: 1,
-        limit: 10,
-        totalPages: 1,
-      },
+      pagination: { limit: 5, nextCursor: null },
     };
 
-    it('deve listar ordens de serviço ativas com paginação', async () => {
+    it('deve repassar limite e cursor da fila', async () => {
       listarUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.listar(query);
 
-      expect(listarUseCase.execute).toHaveBeenCalledWith(1, 10);
+      expect(listarUseCase.execute).toHaveBeenCalledWith(5, 'cursor-anterior');
       expect(resultado).toEqual(resultadoEsperado);
     });
 
-    it('deve usar valores padrão de paginação', async () => {
+    it('deve usar limite padrão 10 sem cursor', async () => {
       listarUseCase.execute.mockResolvedValue(resultadoEsperado);
 
       const resultado = await controller.listar({});
 
-      expect(listarUseCase.execute).toHaveBeenCalledWith(1, 10);
+      expect(listarUseCase.execute).toHaveBeenCalledWith(10, undefined);
       expect(resultado).toEqual(resultadoEsperado);
     });
   });
