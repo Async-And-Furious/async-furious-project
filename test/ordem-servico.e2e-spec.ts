@@ -179,16 +179,10 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       return resposta.body.status as string;
     };
 
-    // assumir/analisar saíram do OS Service: o início do diagnóstico acontece no Execução e
-    // Produção (PATCH /execucoes/{id}/iniciar-diagnostico), que publica DiagnosticoIniciado.
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/assumir`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(404);
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/analisar`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(404);
+    // Os eventos do Execução e Produção são injetados in-process (EventEmitter2), no lugar do
+    // serviço real, que não sobe neste teste. Por isso o fluxo do mecânico não chama mais
+    // assumir/analisar/finalizar-execucao: essas rotas saíram do OS Service (ver
+    // test/ordem-servico/controllers/ordem-servico.controller.spec.ts, "rotas migradas").
 
     // Sem DiagnosticoIniciado a OS segue RECEIVED e servicos-insumos responde erro de estado.
     await server
@@ -227,11 +221,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
     await eventEmitter.emitAsync('ExecucaoIniciada', new ExecucaoIniciada(ordemServicoId));
     expect(await statusDaOs()).toBe('IN_PROGRESS');
 
-    // finalizar-execucao saiu do OS Service (PATCH /execucoes/{id}/concluir -> ExecucaoConcluida).
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/finalizar-execucao`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(404);
+    // A conclusão vem do Execução (PATCH /execucoes/{id}/concluir -> ExecucaoConcluida).
     await eventEmitter.emitAsync('ExecucaoConcluida', new ExecucaoConcluida(ordemServicoId));
     expect(await statusDaOs()).toBe('FINISHED');
 
