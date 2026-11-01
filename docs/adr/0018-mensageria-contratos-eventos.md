@@ -307,6 +307,26 @@ na #314, implementado no épico do OS Service):
   etapas, um evento perdido é **risco aceito** em HML, recuperado por
   replay manual.
 
+**Limite da recuperação no Billing.** A publicação após commit deixa uma
+janela de perda: o Billing não usa outbox nem republish automático. O
+detector do OS Service só recupera o caso de OS em `AWAITING_APPROVAL` com
+`pago_em` nulo; não cobre as demais etapas. Além disso, se a confirmação do
+webhook já foi commitada no banco do Billing, uma redelivery é reconhecida
+como já processada e não publica novamente `PagamentoConfirmado`.
+
+**Eventos e compensações do Billing.** O Billing publica somente
+`OrcamentoGerado`, `OrcamentoAprovado`, `OrcamentoRecusado`,
+`PagamentoConfirmado` e `PagamentoRecusado`; consome `OrcamentoCalculado` e
+`EtapaDaSagaFalhou`. Na compensação, atua apenas em `etapa=aprovacao-pagamento`
+ou `etapa=inicio-execucao`; ignora pagamento ausente e outras etapas. Um
+pagamento ainda pendente é marcado `CANCELADO`, sem chamada ao Mercado Pago;
+um pagamento confirmado é estornado de forma idempotente e marcado
+`ESTORNADO`, sem publicar evento de estorno. Não são eventos Kafka
+`OrcamentoAprovadoComPecas`, `SagaCompleted` nem `PagamentoEstornado`.
+`SagaStep` é evento customizado do New Relic, não evento Kafka. Nenhum evento
+do Billing altera o status da OS: isso é responsabilidade do OS Service ao
+consumir os eventos.
+
 ### Duplicação de tipos de evento por serviço (sem pacote npm compartilhado)
 
 Os tipos de evento (schemas/DTOs de `data` por `eventType`) são

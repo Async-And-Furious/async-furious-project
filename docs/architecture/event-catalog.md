@@ -85,6 +85,33 @@ Proposta da Feature #320, a validar pelo grupo antes da Feature de Eventos. Enve
 | `ExecucaoIniciada` | `execucaoId`, `ordemServicoId`, `responsavelId`, `reparoIniciadoEm` |
 | `ExecucaoConcluida` | `execucaoId`, `ordemServicoId`, `responsavelId`, `concluidaEm` |
 
+## Payloads (`data`) do Billing Service
+
+Os campos de `data` correspondem às classes atuais dos eventos de domínio do
+Billing:
+
+| Evento | Campos de `data` |
+|---|---|
+| `OrcamentoGerado` | `ordemServicoId`, `orcamentoId` |
+| `OrcamentoAprovado` | `ordemServicoId`, `orcamentoId`, `valorTotalPecas` |
+| `OrcamentoRecusado` | `ordemServicoId`, `orcamentoId` |
+| `PagamentoConfirmado` | `ordemServicoId`, `pagamentoId` |
+| `PagamentoRecusado` | `ordemServicoId`, `pagamentoId` |
+
+O Billing consome `OrcamentoCalculado` (com `ordemServicoId`,
+`valorTotalServicos`, `valorTotalPecas` e `valorTotalGeral`) e
+`EtapaDaSagaFalhou` (payload descrito na ADR-0018). Não publica
+`OrcamentoAprovadoComPecas`, `SagaCompleted` ou `PagamentoEstornado`.
+`SagaStep` é evento customizado do New Relic, não evento Kafka. A publicação
+ocorre após o commit, sem outbox; webhook redelivered após o commit do
+processamento é considerado já processado e não república o evento. A única
+recuperação por detector é no OS Service para `AWAITING_APPROVAL` com
+`pago_em` nulo. O Billing não altera status da OS. Na compensação,
+`EtapaDaSagaFalhou` só é tratado em `aprovacao-pagamento` e
+`inicio-execucao`: ausência de pagamento e outras etapas são ignoradas;
+pagamento pendente fica `CANCELADO` sem Mercado Pago, e pagamento confirmado
+é estornado idempotentemente e fica `ESTORNADO`, sem evento de estorno.
+
 ## Assinaturas por serviço
 
 Derivada das colunas "Consumidor(es)" acima e da matriz de
