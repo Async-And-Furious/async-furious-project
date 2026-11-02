@@ -28,3 +28,55 @@ export function montarEnvelope(evento: EventoIntegracao, eventVersion = 1): Enve
     data: { ...data },
   };
 }
+
+export interface BlocoRetry {
+  attempt: number;
+  firstFailedAt: string;
+  notBefore: string;
+}
+
+export interface EnvelopeRecebido extends EnvelopeEvento {
+  data: Record<string, unknown> & { ordemServicoId: string };
+  retry?: BlocoRetry;
+  lastError?: string;
+}
+
+function blocoRetryValido(retry: unknown): retry is BlocoRetry {
+  if (!retry || typeof retry !== 'object') return false;
+  const { attempt, firstFailedAt, notBefore } = retry as Record<string, unknown>;
+  return (
+    Number.isInteger(attempt) &&
+    typeof firstFailedAt === 'string' &&
+    Number.isFinite(Date.parse(firstFailedAt)) &&
+    typeof notBefore === 'string' &&
+    Number.isFinite(Date.parse(notBefore))
+  );
+}
+
+/**
+ * Valida o envelope de uma mensagem consumida. Exige `correlationId`, `data.ordemServicoId`
+ * e a chave do registro iguais (ADR-0018). Devolve `null` se o envelope não serve.
+ */
+export function lerEnvelope(valor: unknown, chave: string | null): EnvelopeRecebido | null {
+  if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return null;
+  const candidato = valor as Record<string, unknown>;
+  const data = candidato.data as Record<string, unknown> | undefined;
+  const ordemServicoId = data?.ordemServicoId;
+  const camposOk =
+    typeof candidato.eventId === 'string' &&
+    candidato.eventId.length > 0 &&
+    typeof candidato.eventType === 'string' &&
+    candidato.eventType.length > 0 &&
+    Number.isInteger(candidato.eventVersion) &&
+    typeof candidato.occurredAt === 'string' &&
+    typeof candidato.producer === 'string' &&
+    !!data &&
+    typeof data === 'object' &&
+    !Array.isArray(data) &&
+    typeof ordemServicoId === 'string' &&
+    ordemServicoId.length > 0 &&
+    candidato.correlationId === ordemServicoId &&
+    chave === ordemServicoId &&
+    (candidato.retry === undefined || blocoRetryValido(candidato.retry));
+  return camposOk ? (candidato as unknown as EnvelopeRecebido) : null;
+}

@@ -53,6 +53,8 @@ import { AtualizarStatusEntregueHandler } from './application/event-handlers/atu
 import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
 import { PonteEventosIntegracaoListener } from './infrastructure/messaging/ponte-eventos-integracao.listener';
+import { KafkaConsumidorSaga } from './infrastructure/messaging/kafka-consumidor-saga';
+import { despachantesExecucao } from './infrastructure/messaging/despachantes-saga';
 import {
   PUBLICADOR_INTEGRACAO,
   IPublicadorIntegracao,
@@ -90,6 +92,25 @@ import {
       useFactory: (publicador: IPublicadorIntegracao) =>
         new PonteEventosIntegracaoListener(publicador),
       inject: [PUBLICADOR_INTEGRACAO],
+    },
+    {
+      provide: KafkaConsumidorSaga,
+      useFactory: (
+        emDiagnostico: AtualizarStatusEmDiagnosticoHandler,
+        execucaoIniciada: AtualizarStatusExecucaoIniciadaHandler,
+        finalizada: AtualizarStatusFinalizadaHandler,
+        publicador: IPublicadorIntegracao
+      ) =>
+        new KafkaConsumidorSaga(
+          despachantesExecucao({ emDiagnostico, execucaoIniciada, finalizada }),
+          publicador
+        ),
+      inject: [
+        AtualizarStatusEmDiagnosticoHandler,
+        AtualizarStatusExecucaoIniciadaHandler,
+        AtualizarStatusFinalizadaHandler,
+        PUBLICADOR_INTEGRACAO,
+      ],
     },
     { provide: NOTIFICACAO_CLIENTE_GATEWAY, useClass: NotificacaoClienteStub },
 
