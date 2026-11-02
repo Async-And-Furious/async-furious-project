@@ -4,6 +4,10 @@
 
 Versao em portugues: [README.md](./README.md)
 
+> **Frozen at Phase 3.** This English mirror is historical and does not describe
+> the current Phase 4 microservice architecture. Use the Portuguese README and
+> [`docs/README.md`](./docs/README.md) for current Phase 4 documentation.
+
 ## Project Goal
 
 Backend for **integrated auto repair shop management**, built as the FIAP Software Architecture graduate Tech Challenge (15SOAT). The architecture combines Clean Architecture and DDD.
