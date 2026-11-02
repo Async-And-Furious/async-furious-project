@@ -121,6 +121,8 @@ MP_NOTIFICATION_URL=""    # optional: public webhook URL, sent with each prefere
 
 Without `MP_ACCESS_TOKEN`, approving an estimate fails; without `MP_WEBHOOK_SECRET`, the Mercado Pago webhook rejects every notification with `401`.
 
+Without `KAFKA_BROKERS`, the OS Service starts without publishing the integration events (`OrdemServicoRecebida`, `OrcamentoCalculado` and `EtapaDaSagaFalhou` on `os.eventos.v1`) and only logs a warning. In HML, `deploy-eks.yml` fills in the broker and the SASL credentials.
+
 ### 3. Start with Docker for development
 
 ```bash
