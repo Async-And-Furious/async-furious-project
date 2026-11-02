@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
+import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
 import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
@@ -142,7 +143,10 @@ describe('OS + Orçamento Use Cases', () => {
   describe('CriarOrdemServicoUseCase', () => {
     it('deve criar OS e emitir OrdemServicoCriada', async () => {
       mockClienteRepository.findByDocumento.mockResolvedValue({ id: 'cli-1' } as any);
-      mockVeiculoRepository.findByPlaca.mockResolvedValue({ id: 'veh-1' } as any);
+      mockVeiculoRepository.findByPlaca.mockResolvedValue({
+        id: 'veh-1',
+        clienteId: 'cli-1',
+      } as any);
       mockOsRepository.create.mockResolvedValue(mockOs);
       mockOsRepository.findOne.mockResolvedValue(mockOs);
 
@@ -181,6 +185,37 @@ describe('OS + Orçamento Use Cases', () => {
       expect(mockOrcamentoRepository.create).toHaveBeenCalled();
       expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
       expect(result.id).toBe('os-1');
+    });
+
+    it('recusa com ConflitoException a placa de um veículo de outro cliente (#378, item 6)', async () => {
+      mockClienteRepository.findByDocumento.mockResolvedValue({ id: 'cli-1' } as any);
+      mockVeiculoRepository.findByPlaca.mockResolvedValue({
+        id: 'veh-9',
+        clienteId: 'cli-9',
+      } as any);
+
+      const uc = new CriarOrdemServicoUseCase(
+        mockOsRepository,
+        mockClienteRepository,
+        mockVeiculoRepository,
+        mockServicoRepository,
+        mockPecaInsumoRepository,
+        mockOsServicoRepository,
+        mockOsPecaRepository,
+        mockOrcamentoRepository,
+        mockBarramento
+      );
+
+      await expect(
+        uc.execute({
+          cliente: { nome: 'Joao', email: 'joao@a.com', documento: '123', tipoDocumento: 'CPF' },
+          veiculo: { placa: 'ABC1234', marca: 'Ford', modelo: 'Ka', ano: 2020 },
+          servicos: [],
+          pecas: [],
+        })
+      ).rejects.toThrow(ConflitoException);
+      expect(mockOsRepository.create).not.toHaveBeenCalled();
+      expect(mockBarramento.emitir).not.toHaveBeenCalled();
     });
   });
 
