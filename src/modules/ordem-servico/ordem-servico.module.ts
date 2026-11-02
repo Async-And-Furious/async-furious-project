@@ -52,6 +52,11 @@ import { NotificarClienteConclusaoHandler } from './application/event-handlers/n
 import { AtualizarStatusEntregueHandler } from './application/event-handlers/atualizar-status-entregue.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
+import { PonteEventosIntegracaoListener } from './infrastructure/messaging/ponte-eventos-integracao.listener';
+import {
+  PUBLICADOR_INTEGRACAO,
+  IPublicadorIntegracao,
+} from '../../shared/domain/interfaces/publicador-integracao.interface';
 import { NotificacaoClienteStub } from './infrastructure/gateways/notificacao-cliente.stub';
 import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cliente.gateway';
 import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
@@ -80,6 +85,12 @@ import {
     OsPecaRepository,
     EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
+    {
+      provide: PonteEventosIntegracaoListener,
+      useFactory: (publicador: IPublicadorIntegracao) =>
+        new PonteEventosIntegracaoListener(publicador),
+      inject: [PUBLICADOR_INTEGRACAO],
+    },
     { provide: NOTIFICACAO_CLIENTE_GATEWAY, useClass: NotificacaoClienteStub },
 
     // Event handlers (registered as NestJS providers — @OnEvent listeners)
