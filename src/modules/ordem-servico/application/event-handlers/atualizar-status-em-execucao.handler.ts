@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
+import { FalhaRetentavelException } from '../../../../shared/domain/exceptions/falha-retentavel.exception';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
 import { StatusTransitionService } from '../../domain/services/status-transition.service';
@@ -18,6 +19,8 @@ import { OrdemServicoEmExecucao } from '../../domain/events/ordem-servico-em-exe
  *    confirmada depois de o reparo já ter começado: só baixa a pendência, se houver)
  */
 const STATUS_COM_RESERVA: OSStatus[] = ['AWAITING_APPROVAL', 'AWAITING_PARTS', 'IN_PROGRESS'];
+// Fora de ordem (ADR-0018): antes da aprovação, falha retentável; com o reparo encerrado, ack.
+const ANTES_DA_APROVACAO: OSStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS'];
 
 @Injectable()
 export class AtualizarStatusEmExecucaoHandler {
@@ -34,9 +37,15 @@ export class AtualizarStatusEmExecucaoHandler {
     const ordemServicoId = evento.ordemServicoId;
     const os = await this.ordemServicoRepository.findOne(ordemServicoId);
 
+    if (ANTES_DA_APROVACAO.includes(os.status)) {
+      throw new FalhaRetentavelException(
+        `[P-08] PecasReservadas antes da aprovação: OS ${ordemServicoId} em ${os.status}, esperado AWAITING_APPROVAL`
+      );
+    }
+
     if (!STATUS_COM_RESERVA.includes(os.status)) {
-      this.logger.warn(
-        `[P-08] OS ${ordemServicoId} em status inválido para registrar reserva de peças: ${os.status}`
+      this.logger.log(
+        `[P-08] PecasReservadas ignorada: OS ${ordemServicoId} já encerrou o reparo (${os.status})`
       );
       return;
     }

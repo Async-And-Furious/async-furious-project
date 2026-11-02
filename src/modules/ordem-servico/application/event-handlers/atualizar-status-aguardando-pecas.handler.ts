@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
+import { FalhaRetentavelException } from '../../../../shared/domain/exceptions/falha-retentavel.exception';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
+import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
 import { StatusTransitionService } from '../../domain/services/status-transition.service';
 import { StatusAtualizadoAguardandoPecas } from '../../domain/events/status-atualizado-aguardando-pecas.event';
 import { PecasIndisponiveis } from '../../../pecas-insumos/domain/events/pecas-indisponiveis.event';
@@ -13,7 +15,11 @@ import { PecasIndisponiveis } from '../../../pecas-insumos/domain/events/pecas-i
  * Reserva tardia: se o reparo já começou (ExecucaoIniciada processado antes desta reserva,
  * possível porque os eventos de tópicos diferentes não têm ordem entre si), a OS está em
  * IN_PROGRESS e vai para AWAITING_PARTS, sem esperar a próxima gravação de ExecucaoIniciada.
+ *
+ * Fora de ordem (ADR-0018): antes da aprovação, falha retentável; com o reparo encerrado, ack.
  */
+const ANTES_DA_APROVACAO: OSStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS'];
+
 @Injectable()
 export class AtualizarStatusAguardandoPecasHandler {
   private readonly logger = new Logger(AtualizarStatusAguardandoPecasHandler.name);
@@ -71,8 +77,14 @@ export class AtualizarStatusAguardandoPecasHandler {
       return;
     }
 
-    this.logger.warn(
-      `[P-15] OS ${evento.ordemServicoId} em status inválido para registrar reserva pendente: ${os.status}`
+    if (ANTES_DA_APROVACAO.includes(os.status)) {
+      throw new FalhaRetentavelException(
+        `[P-15] PecasIndisponiveis antes da aprovação: OS ${evento.ordemServicoId} em ${os.status}, esperado AWAITING_APPROVAL`
+      );
+    }
+
+    this.logger.log(
+      `[P-15] PecasIndisponiveis ignorada: OS ${evento.ordemServicoId} já encerrou o reparo (${os.status})`
     );
   }
 }

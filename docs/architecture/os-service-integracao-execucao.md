@@ -122,7 +122,8 @@ mecânico inicia o reparo (`ExecucaoIniciada`). Por isso:
     `AWAITING_PARTS`, condicionado a status `IN_PROGRESS` e à pendência
     (`atualizarSeCondicao`). Se `PecasReservadas` baixar a pendência antes dessa
     gravação, a condição não casa: a OS segue em `IN_PROGRESS`, sem emitir;
-  - com a OS em `AWAITING_PARTS`, é reentrega: log, nada gravado.
+  - com a OS em `AWAITING_PARTS`, é reentrega: log, nada gravado;
+  - antes da aprovação, falha retentável; com o reparo encerrado, ack (§6).
 - `PecasReservadas` (`AtualizarStatusEmExecucaoHandler`), nesta ordem:
   1. desliga `reserva_pecas_pendente` em qualquer status com reserva (a gravação
      só casa se a pendência estiver ligada);
@@ -132,7 +133,8 @@ mecânico inicia o reparo (`ExecucaoIniciada`). Por isso:
      partir daí `ExecucaoIniciada` não consegue mais gravar `AWAITING_PARTS` para
      essa reserva, então a leitura mostra o estado final.
   Com a OS em `AWAITING_APPROVAL` só a pendência muda. Com a OS em `IN_PROGRESS`,
-  é reserva confirmada depois do início do reparo: log informativo.
+  é reserva confirmada depois do início do reparo: log informativo. Antes da
+  aprovação, falha retentável; com o reparo encerrado, ack (§6).
   `OsSemPecasConfirmada` deixou de ter ouvinte.
 - `OrdemServicoBacklogAdapter.findAllAguardandoPecas` passou a devolver também
   as OS em `AWAITING_APPROVAL` com `reserva_pecas_pendente = true`: elas ainda
@@ -247,9 +249,11 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
 - **`iniciada_em` na retomada.** Ao voltar de `AWAITING_PARTS` para `IN_PROGRESS`,
   `OrdemServicoEmExecucao` reinicia `iniciada_em` (comportamento já existente do
   `IniciarMonitoramentoTempoHandler`): o tempo médio exclui a espera por peça.
-- **`PecasIndisponiveis` antes da aprovação.** Com a OS antes de
-  `AWAITING_APPROVAL`, o evento é ignorado com `warn` e não grava nada. Ele só nasce
-  na aprovação do orçamento, então o caso é anomalia.
+- **`PecasIndisponiveis` e `PecasReservadas` fora de ordem.** Com a OS antes de
+  `AWAITING_APPROVAL` (`RECEIVED`, `UNDER_DIAGNOSIS`), os dois handlers lançam
+  `FalhaRetentavelException` sem gravar nada: o evento chegou antes da hora e é
+  retentado (ADR-0018, "ainda-não"). Com o reparo encerrado (`FINISHED`, `DELIVERED`,
+  `CLOSED_WITHOUT_EXECUTION`), é ack com log informativo ("já-passou").
 - **`PecasIndisponiveis` em `AWAITING_APPROVAL` (corrida fechada).** A pendência é
   gravada com `atualizarSeCondicao` (`status = AWAITING_APPROVAL`). Se
   `ExecucaoIniciada` levar a OS a `IN_PROGRESS` entre a leitura e essa gravação, a

@@ -648,7 +648,22 @@ describe('OS Event handlers', () => {
       expect(emissor.emitir).not.toHaveBeenCalled();
     });
 
-    it.each<OSStatus>(['RECEIVED', 'FINISHED'])(
+    it.each<OSStatus>(['RECEIVED', 'UNDER_DIAGNOSIS'])(
+      'PecasReservadas antes da aprovação (%s) lança FalhaRetentavelException sem gravar',
+      async (status) => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status }));
+        const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor, transicao);
+
+        await expect(
+          handler.handlePecasReservadas({ ordemServicoId: 'os-1' })
+        ).rejects.toBeInstanceOf(FalhaRetentavelException);
+        expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+        expect(osRepo.update).not.toHaveBeenCalled();
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each<OSStatus>(['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'])(
       'PecasReservadas em %s não altera a OS',
       async (status) => {
         const handler = new AtualizarStatusEmExecucaoHandler(osRepo, emissor, transicao);
@@ -1111,16 +1126,35 @@ describe('OS Event handlers', () => {
       expect(emissor.emitir).not.toHaveBeenCalled();
     });
 
-    it('não registra pendência nem muda o status quando a OS está em FINISHED', async () => {
-      const handler = new AtualizarStatusAguardandoPecasHandler(osRepo, emissor, transicao);
+    it.each<OSStatus>(['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'])(
+      'não registra pendência nem muda o status quando a OS está em %s',
+      async (status) => {
+        const handler = new AtualizarStatusAguardandoPecasHandler(osRepo, emissor, transicao);
 
-      await shouldNotUpdateWhenStatusIs(
-        osRepo,
-        handler,
-        'FINISHED',
-        new PecasIndisponiveis('os-1', ['peca-1'])
-      );
-      expect(emissor.emitir).not.toHaveBeenCalled();
-    });
+        await shouldNotUpdateWhenStatusIs(
+          osRepo,
+          handler,
+          status,
+          new PecasIndisponiveis('os-1', ['peca-1'])
+        );
+        expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each<OSStatus>(['RECEIVED', 'UNDER_DIAGNOSIS'])(
+      'PecasIndisponiveis antes da aprovação (%s) lança FalhaRetentavelException sem gravar',
+      async (status) => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status }));
+        const handler = new AtualizarStatusAguardandoPecasHandler(osRepo, emissor, transicao);
+
+        await expect(
+          handler.handle(new PecasIndisponiveis('os-1', ['peca-1']))
+        ).rejects.toBeInstanceOf(FalhaRetentavelException);
+        expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+        expect(osRepo.update).not.toHaveBeenCalled();
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      }
+    );
   });
 });
