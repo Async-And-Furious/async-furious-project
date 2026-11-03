@@ -38,5 +38,13 @@ export interface IPecaInsumoRepository {
     }
   ): Promise<PecaInsumo>;
   updateEstoque(id: string, quantidade: number): Promise<PecaInsumo>;
+  /**
+   * Debita todos os itens numa transação, cada um só se houver saldo
+   * (`quantidade_estoque >= quantidade`). Se algum item faltar, nada é debitado
+   * e a lista traz os ids sem saldo.
+   */
+  debitarEstoqueAtomico(
+    itens: Array<{ id_peca: string; quantidade: number }>
+  ): Promise<{ indisponiveis: string[] }>;
   remove(id: string): Promise<PecaInsumo>;
 }

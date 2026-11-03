@@ -68,6 +68,7 @@ describe('PecasInsumos Event handlers', () => {
       findByOrdemServicoId: jest.fn(),
       update: jest.fn(),
       updateEstoque: jest.fn(),
+      debitarEstoqueAtomico: jest.fn(),
       remove: jest.fn(),
     } as unknown as jest.Mocked<IPecaInsumoRepository>;
 
@@ -137,19 +138,22 @@ describe('PecasInsumos Event handlers', () => {
   });
 
   describe('DebitarEstoqueHandler (P-19)', () => {
-    it('deve debitar estoque e emitir EstoqueDebitado e PecasReservadas', async () => {
+    it('debita tudo numa operação atômica e emite EstoqueDebitado e PecasReservadas', async () => {
       const handler = new DebitarEstoqueHandler(repo, emissor);
-      repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 10 }));
-      repo.updateEstoque.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 7 }));
+      repo.debitarEstoqueAtomico.mockResolvedValue({ indisponiveis: [] });
 
-      const evento = new PecasEmEstoqueConfirmadas('os-1', [
-        { id_peca: 'peca-1', quantidade: 3, preco_unitario: 50 },
+      await handler.handle(
+        new PecasEmEstoqueConfirmadas('os-1', [
+          { id_peca: 'peca-1', quantidade: 3, preco_unitario: 50 },
+          { id_peca: 'peca-2', quantidade: 1, preco_unitario: 20 },
+        ])
+      );
+
+      expect(repo.debitarEstoqueAtomico).toHaveBeenCalledWith([
+        { id_peca: 'peca-1', quantidade: 3 },
+        { id_peca: 'peca-2', quantidade: 1 },
       ]);
-
-      await handler.handle(evento);
-
-      expect(repo.findOne).toHaveBeenCalledWith('peca-1');
-      expect(repo.updateEstoque).toHaveBeenCalledWith('peca-1', 7);
+      expect(repo.updateEstoque).not.toHaveBeenCalled();
       expect(emissor.emitir).toHaveBeenCalledTimes(2);
       expect(emissor.emitir).toHaveBeenNthCalledWith(
         1,
@@ -159,6 +163,40 @@ describe('PecasInsumos Event handlers', () => {
         2,
         expect.objectContaining({ constructor: PecasReservadas, ordemServicoId: 'os-1' })
       );
+    });
+
+    it('com o saldo levado por outra OS, não reserva nada e segue como peça indisponível (#378, item 9)', async () => {
+      const handler = new DebitarEstoqueHandler(repo, emissor);
+      repo.debitarEstoqueAtomico.mockResolvedValue({ indisponiveis: ['peca-2'] });
+
+      await handler.handle(
+        new PecasEmEstoqueConfirmadas('os-1', [
+          { id_peca: 'peca-1', quantidade: 3, preco_unitario: 50 },
+          { id_peca: 'peca-2', quantidade: 9, preco_unitario: 20 },
+        ])
+      );
+
+      expect(emissor.emitir).toHaveBeenCalledTimes(1);
+      expect(emissor.emitir).toHaveBeenCalledWith(
+        expect.objectContaining({
+          constructor: PecasNaoExistem,
+          ordemServicoId: 'os-1',
+          idsPecasIndisponiveis: ['peca-2'],
+        })
+      );
+    });
+
+    it('rejeita quantidade não positiva sem tocar no estoque', async () => {
+      const handler = new DebitarEstoqueHandler(repo, emissor);
+
+      await expect(
+        handler.handle(
+          new PecasEmEstoqueConfirmadas('os-1', [
+            { id_peca: 'peca-1', quantidade: 0, preco_unitario: 50 },
+          ])
+        )
+      ).rejects.toThrow(DomainException);
+      expect(repo.debitarEstoqueAtomico).not.toHaveBeenCalled();
     });
   });
 
@@ -486,38 +524,36 @@ describe('PecasInsumos Event handlers', () => {
       atualizado_em: new Date(),
     };
 
-    const pedidoFornecedorSalvo: PedidoFornecedor = {
-      id: 'pedido-1',
-      fornecedor_id: 'fornecedor-1',
-      itens: [],
-      status: 'PENDENTE',
-      criado_em: new Date(),
-      atualizado_em: new Date(),
-    };
-
     beforeEach(() => {
       pedidoFornecedorRepo = {
         create: jest.fn(),
         findById: jest.fn(),
         save: jest.fn(),
+        receberECreditarEstoque: jest.fn(),
       } as unknown as jest.Mocked<PedidoFornecedorRepository>;
     });
 
-    it('deve atualizar estoque e emitir evento quando pedido valido', async () => {
-      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+    it('recebe o pedido e credita o estoque na mesma operação, e emite o evento', async () => {
+      const useCase = new ReceberPecasDoFornecedorUseCase(pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue(pedidoFornecedorPendente);
-      repo.findOne.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 10 }));
-      repo.updateEstoque.mockResolvedValue(mockPeca({ id: 'peca-1', quantidade_estoque: 15 }));
-      pedidoFornecedorRepo.save.mockResolvedValue(pedidoFornecedorSalvo);
+      pedidoFornecedorRepo.receberECreditarEstoque.mockResolvedValue([
+        { pecaId: 'peca-1', novaQuantidade: 15 },
+      ]);
 
       await useCase.execute({ pedidoId: 'pedido-1' });
 
-      expect(repo.updateEstoque).toHaveBeenCalled();
-      expect(emissor.emitir).toHaveBeenCalled();
+      expect(pedidoFornecedorRepo.receberECreditarEstoque).toHaveBeenCalledWith('pedido-1');
+      expect(pedidoFornecedorRepo.save).not.toHaveBeenCalled();
+      expect(emissor.emitir).toHaveBeenCalledWith(
+        expect.objectContaining({
+          constructor: EstoqueAtualizadoAposRecebimento,
+          pecasAtualizadas: [{ pecaId: 'peca-1', novaQuantidade: 15 }],
+        })
+      );
     });
 
     it('deve lancar NotFoundException quando pedido nao existe', async () => {
-      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+      const useCase = new ReceberPecasDoFornecedorUseCase(pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue(null);
 
       await expect(useCase.execute({ pedidoId: 'pedido-inexistente' })).rejects.toThrow(
@@ -525,37 +561,23 @@ describe('PecasInsumos Event handlers', () => {
       );
     });
 
-    it('deve lancar ConflictException quando pedido ja foi recebido', async () => {
-      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
+    it('deve lancar DomainException quando pedido ja foi recebido', async () => {
+      const useCase = new ReceberPecasDoFornecedorUseCase(pedidoFornecedorRepo, emissor);
       pedidoFornecedorRepo.findById.mockResolvedValue(pedidoFornecedorRecebido);
 
       await expect(useCase.execute({ pedidoId: 'pedido-1' })).rejects.toThrow(DomainException);
+      expect(pedidoFornecedorRepo.receberECreditarEstoque).not.toHaveBeenCalled();
     });
 
-    it('deve continuar quando peca nao existe no catalogo (skip)', async () => {
-      const useCase = new ReceberPecasDoFornecedorUseCase(repo, pedidoFornecedorRepo, emissor);
-      pedidoFornecedorRepo.findById.mockResolvedValue({
-        ...pedidoFornecedorPendente,
-        status: 'PENDENTE',
-        itens: [
-          {
-            id: 'item-1',
-            id_pedido_fornecedor: 'pedido-1',
-            id_peca: 'peca-inexistente',
-            quantidade_solicitada: 5,
-            quantidade_recebida: 0,
-          },
-        ],
-      });
-      repo.findOne.mockResolvedValue(null as unknown as PecaInsumo);
+    it('uma chamada concorrente que perde a corrida não soma de novo nem emite evento (#378, item 9)', async () => {
+      const useCase = new ReceberPecasDoFornecedorUseCase(pedidoFornecedorRepo, emissor);
+      pedidoFornecedorRepo.findById.mockResolvedValue(pedidoFornecedorPendente);
+      pedidoFornecedorRepo.receberECreditarEstoque.mockResolvedValue(null);
 
-      await useCase.execute({ pedidoId: 'pedido-1' });
-
-      expect(emissor.emitir).toHaveBeenCalledWith(
-        expect.objectContaining({
-          constructor: EstoqueAtualizadoAposRecebimento,
-        })
+      await expect(useCase.execute({ pedidoId: 'pedido-1' })).rejects.toThrow(
+        'Pedido já foi recebido'
       );
+      expect(emissor.emitir).not.toHaveBeenCalled();
     });
   });
 

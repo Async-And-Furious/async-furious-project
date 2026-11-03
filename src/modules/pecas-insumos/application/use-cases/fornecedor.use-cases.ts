@@ -61,7 +61,6 @@ export class SolicitarPecasAoFornecedorUseCase {
 
 export class ReceberPecasDoFornecedorUseCase {
   constructor(
-    private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly pedidoFornecedorRepository: IPedidoFornecedorRepository,
     private readonly emissor: IEmissorEventos
   ) {}
@@ -75,19 +74,11 @@ export class ReceberPecasDoFornecedorUseCase {
       throw new DomainException('Pedido já foi recebido');
     }
 
-    const atualizadas: Array<{ pecaId: string; novaQuantidade: number }> = [];
-
-    for (const item of pedido.itens) {
-      const peca = await this.pecaInsumoRepository.findOne(item.id_peca);
-      if (!peca) continue;
-
-      peca.receberDoFornecedor(item.quantidade_solicitada);
-      await this.pecaInsumoRepository.updateEstoque(peca.id, peca.quantidade_estoque);
-      atualizadas.push({ pecaId: peca.id, novaQuantidade: peca.quantidade_estoque });
+    // Status e estoque mudam juntos numa transação; só a primeira chamada recebe.
+    const atualizadas = await this.pedidoFornecedorRepository.receberECreditarEstoque(pedido.id);
+    if (!atualizadas) {
+      throw new DomainException('Pedido já foi recebido');
     }
-
-    pedido.status = 'RECEBIDO';
-    await this.pedidoFornecedorRepository.save(pedido);
 
     await this.emissor.emitir(new EstoqueAtualizadoAposRecebimento(atualizadas));
   }
