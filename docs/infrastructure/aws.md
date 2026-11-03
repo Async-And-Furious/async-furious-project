@@ -124,10 +124,22 @@ Três add-ons são instalados por Helm, direto do Terraform
 
 O endpoint privado tem uma consequência direta no pipeline: o runner do GitHub
 Actions não alcança a API do cluster. O `deploy-eks.yml` resolve isso abrindo o
-endpoint temporariamente apenas para o IP do runner, com `/32`, e restaurando a
-configuração original em um passo `if: always()`
+endpoint temporariamente apenas para o IP do runner, com `/32`, e removendo esse
+`/32` num passo `if: always()`
 (passos "Allow HML runner to reach Academy EKS", nome legado, e "Restore original HML EKS endpoint access" do `.github/workflows/deploy-eks.yml`). O mesmo padrão existe no
-`cleanup-eks.yml`.
+`cleanup-eks.yml`. As duas operações ficam em `scripts/eks_endpoint_access.py`,
+coberto por `test/deploy/eks-endpoint-access.spec.ts`:
+
+- **Abertura:** com o acesso público já ligado, o `/32` é acrescentado à lista
+  atual. Com o endpoint só privado, abre apenas para o runner. Nesse caso o EKS
+  devolve `publicAccessCidrs = ["0.0.0.0/0"]`, e acrescentar o `/32` a essa lista
+  abriria o endpoint para a internet inteira.
+- **Restauração:** relê a configuração atual e tira só o `/32` deste run. O OS,
+  o Billing e o Execução usam o mesmo cluster, e o `concurrency` de cada workflow
+  só vale dentro do repositório, então reaplicar a foto do início derrubaria o
+  acesso de um deploy em andamento em outro repositório. Se não sobra nenhum CIDR,
+  o acesso público é desligado. Se sobra algum de outro run, o acesso fica ligado
+  para ele. Caso contrário, volta ao valor original.
 
 ## 6. Registry: ECR
 
