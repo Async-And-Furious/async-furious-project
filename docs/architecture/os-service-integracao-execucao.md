@@ -75,9 +75,9 @@ como falha técnica.
 
 | Evento | Handler | Guarda | Efeito | Se a guarda falhar |
 |---|---|---|---|---|
-| `DiagnosticoIniciado` | `AtualizarStatusEmDiagnosticoHandler` | OS em `RECEIVED` | grava `UNDER_DIAGNOSIS`, emite `OrdemServicoEmDiagnostico` (notifica o cliente) | ack, log informativo (reentrega ou OS já além) |
+| `DiagnosticoIniciado` | `AtualizarStatusEmDiagnosticoHandler` | OS em `RECEIVED` | grava `UNDER_DIAGNOSIS` condicionado a `RECEIVED` e, só se a gravação casou, emite `OrdemServicoEmDiagnostico` (notifica o cliente uma vez, mesmo com entregas concorrentes) | ack, log informativo (reentrega ou OS já além) |
 | `ExecucaoIniciada` | `AtualizarStatusExecucaoIniciadaHandler` | OS em `AWAITING_APPROVAL` (ou `IN_PROGRESS` com `reserva_pecas_pendente`, retomada) | grava `IN_PROGRESS` condicionado a `AWAITING_APPROVAL` (se não casar, relê a OS e segue pelo estado atual) e emite `OrdemServicoEmExecucao` (marca `iniciada_em`); se `reserva_pecas_pendente`, grava em seguida `AWAITING_PARTS`. Na reentrega com a OS em `IN_PROGRESS` sem `iniciada_em`, emite `OrdemServicoEmExecucao` de novo | **falha retentável** se a OS está em `RECEIVED` ou `UNDER_DIAGNOSIS` (nada gravado); ack, log informativo nos demais estados (`IN_PROGRESS` sem pendência, `AWAITING_PARTS`, `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`) |
-| `ExecucaoConcluida` | `AtualizarStatusFinalizadaHandler` | OS em `IN_PROGRESS` | grava `FINISHED` e emite `OrdemServicoFinalizada` (tempo médio e notificação de conclusão seguem como estavam) | em `AWAITING_PARTS`: emite `EtapaDaSagaFalhou` (`reparo`) e registra o motivo em `HistoricoStatusOS`, uma vez só (reentrega com a linha já gravada: só log); em `RECEIVED`, `UNDER_DIAGNOSIS` ou `AWAITING_APPROVAL`: **falha retentável**; em `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`: ack, log informativo |
+| `ExecucaoConcluida` | `AtualizarStatusFinalizadaHandler` | OS em `IN_PROGRESS` | grava `FINISHED` condicionado a `IN_PROGRESS` e, só se a gravação casou, emite `OrdemServicoFinalizada` (tempo médio e notificação de conclusão seguem como estavam). Se não casar, relê a OS e segue pelo estado atual (ex.: `PecasIndisponiveis` tardia levou a `AWAITING_PARTS`); se a releitura ainda mostrar `IN_PROGRESS`, **falha retentável** | em `AWAITING_PARTS`: emite `EtapaDaSagaFalhou` (`reparo`) e registra o motivo em `HistoricoStatusOS`, uma vez só (reentrega com a linha já gravada: só log); em `RECEIVED`, `UNDER_DIAGNOSIS` ou `AWAITING_APPROVAL`: **falha retentável**; em `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`: ack, log informativo |
 
 As transições são validadas por `StatusTransitionService.validarTransicao`, a
 mesma tabela usada pelo `PATCH .../status`, antes de cada gravação.
@@ -251,6 +251,28 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
   da linha de `HistoricoStatusOS`. Se a gravação do histórico falhar, a reentrega
   emite a falha de novo; a compensação é idempotente (ADR-0018). Na reentrega
   normal, a linha já gravada evita a duplicata.
+- **OS em `IN_PROGRESS` depois da falha de reparo (intervenção manual, #338).** Se
+  `ExecucaoConcluida` chegou com a OS em `AWAITING_PARTS` (falha de reparo sinalizada)
+  e depois a peça chega, `PecasReservadas` retoma a OS para `IN_PROGRESS` e reinicia
+  `iniciada_em`. O Execução já concluiu e não envia outra `ExecucaoConcluida`, então a
+  OS fica em `IN_PROGRESS` sem prazo para sair. Esse estado exige intervenção manual
+  (ou a compensação da etapa `reparo`), e a dona é a Feature #338 (Compensações e
+  Rollback). Relacionado: a idempotência da falha de reparo usa o `motivo` fixo do
+  histórico, então uma segunda falha legítima da mesma OS (novo ciclo
+  `AWAITING_PARTS` → `ExecucaoConcluida`) seria tratada como reentrega e não
+  sinalizada. Também fica para a #338, que deve trocar a chave por algo do evento
+  (ex.: `eventId` do envelope).
+- **Gravações de status condicionadas.** Todos os handlers do Execução gravam o status
+  com `atualizarSeCondicao` e só emitem o evento seguinte se a gravação casou.
+  `ExecucaoConcluida` e `DiagnosticoIniciado` duplicados (at-least-once) não emitem
+  `OrdemServicoFinalizada` ou `OrdemServicoEmDiagnostico` duas vezes, e uma
+  `PecasIndisponiveis` tardia entre a leitura e a gravação de `FINISHED` não é
+  sobrescrita: a OS fica em `AWAITING_PARTS` e a falha de reparo é sinalizada. Coberto
+  pelos testes de intercalação P-08d em `test/ordem-servico/event-handlers.spec.ts`.
+  Limite: se a entrega que gravou `FINISHED` falhar antes de emitir
+  `OrdemServicoFinalizada`, a reentrega vê `FINISHED` e só faz ack, então
+  `finalizada_em` fica nulo e o cliente não é notificado. É o mesmo trade-off do
+  outbox ausente (dual-write, #331).
 - **`iniciada_em` na retomada.** Ao voltar de `AWAITING_PARTS` para `IN_PROGRESS`,
   `OrdemServicoEmExecucao` reinicia `iniciada_em` (comportamento já existente do
   `IniciarMonitoramentoTempoHandler`): o tempo médio exclui a espera por peça.

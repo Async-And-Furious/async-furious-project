@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Partitioners, type PartitionMetadata, type ProducerRecord } from 'kafkajs';
 import { KafkaPublicadorIntegracao } from '../../../src/shared/infrastructure/mensageria/kafka-publicador-integracao';
 import { montarEnvelope } from '../../../src/shared/infrastructure/mensageria/envelope';
@@ -46,6 +47,8 @@ describe('Configuração do Kafka do OS Service', () => {
 
   it('publica com acks=-1 e produtor idempotente, sem criar tópico', () => {
     expect(OS_PRODUCER_OPTIONS).toMatchObject({ idempotent: true, allowAutoTopicCreation: false });
+    // Retry finito: sem ele o kafkajs idempotente tenta para sempre e o `send` nunca rejeita.
+    expect(OS_PRODUCER_OPTIONS.retry?.retries).toBe(5);
     expect(osKafkaSendRequest(OS_TOPIC, OS_ID, { a: 1 })).toEqual({
       topic: 'os.eventos.v1',
       acks: -1,
@@ -103,7 +106,7 @@ describe('KafkaPublicadorIntegracao', () => {
   it('publica em os.eventos.v1 com chave e correlationId iguais ao ordemServicoId', async () => {
     const { producer, kafka } = kafkaFake();
     const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
-    await publicador.onModuleInit();
+    publicador.onModuleInit();
 
     await publicador.publicar(new OrdemServicoRecebida(OS_ID));
 
@@ -125,7 +128,7 @@ describe('KafkaPublicadorIntegracao', () => {
   it('mantém a ordem dos eventos da mesma OS: mesma chave, mesma partição, envio na ordem emitida', async () => {
     const { producer, kafka } = kafkaFake();
     const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
-    await publicador.onModuleInit();
+    publicador.onModuleInit();
 
     await publicador.publicar(new OrdemServicoRecebida(OS_ID));
     await publicador.publicar(new OrcamentoCalculado(OS_ID, 100, 50, 150));
@@ -160,12 +163,40 @@ describe('KafkaPublicadorIntegracao', () => {
     const { producer, kafka } = kafkaFake();
     const publicador = new KafkaPublicadorIntegracao({}, kafka);
 
-    await publicador.onModuleInit();
+    publicador.onModuleInit();
     await publicador.publicar(new OrdemServicoRecebida(OS_ID));
     await publicador.onModuleDestroy();
 
     expect(kafka.producer).not.toHaveBeenCalled();
     expect(producer.connect).not.toHaveBeenCalled();
+    expect(producer.send).not.toHaveBeenCalled();
+  });
+
+  it('broker fora na subida: onModuleInit não lança, loga, e a próxima publicação reconecta', async () => {
+    const { producer, kafka } = kafkaFake();
+    producer.connect.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    const erro = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
+
+    expect(() => publicador.onModuleInit()).not.toThrow();
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(erro).toHaveBeenCalledWith(expect.stringContaining('ECONNREFUSED'));
+
+    await publicador.publicar(new OrdemServicoRecebida(OS_ID));
+
+    expect(producer.connect).toHaveBeenCalledTimes(2);
+    expect(producer.send).toHaveBeenCalledTimes(1);
+    erro.mockRestore();
+  });
+
+  it('broker ainda fora na publicação: rejeita sem enviar (a ponte loga, o detector não fecha a OS)', async () => {
+    const { producer, kafka } = kafkaFake();
+    producer.connect.mockRejectedValue(new Error('ECONNREFUSED'));
+    const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
+
+    await expect(publicador.publicar(new OrdemServicoRecebida(OS_ID))).rejects.toThrow(
+      'ECONNREFUSED'
+    );
     expect(producer.send).not.toHaveBeenCalled();
   });
 
@@ -176,7 +207,7 @@ describe('KafkaPublicadorIntegracao', () => {
     await publicador.onModuleDestroy();
     expect(producer.disconnect).not.toHaveBeenCalled();
 
-    await publicador.onModuleInit();
+    publicador.onModuleInit();
     await publicador.onModuleDestroy();
     expect(producer.disconnect).toHaveBeenCalledTimes(1);
   });

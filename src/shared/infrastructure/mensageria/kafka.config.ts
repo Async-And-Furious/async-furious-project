@@ -6,10 +6,18 @@ export const OS_PRODUCER = 'os-service';
 // acks=all e produtor idempotente (ADR-0018, "Garantias de publicação"). Sem outbox:
 // a publicação sai depois do commit da transação local. O particionador por hash da chave
 // (murmur2, compatível com o cliente Java) põe todos os eventos da mesma OS na mesma partição.
+//
+// Retry finito: com `idempotent` e sem `retry`, o kafkajs usa `retries = MAX_SAFE_INTEGER` e,
+// com o broker fora, o `send` nunca rejeita. Com 5 tentativas (backoff padrão de 300 ms a 30 s),
+// a falha chega ao chamador em segundos e vai para o log. O kafkajs avisa que limitar o retry do
+// produtor idempotente pode invalidar a garantia de exatamente-uma-vez; a ADR-0018 já aceita
+// perder o evento (sem outbox), e a deduplicação no consumidor é por `eventId`.
+export const OS_PRODUCER_RETRIES = 5;
 export const OS_PRODUCER_OPTIONS: ProducerConfig = {
   idempotent: true,
   allowAutoTopicCreation: false,
   createPartitioner: Partitioners.DefaultPartitioner,
+  retry: { retries: OS_PRODUCER_RETRIES },
 };
 
 /** Sem `KAFKA_BROKERS` (dev local, e2e) o publicador fica desligado. Em HML o deploy sempre define. */
