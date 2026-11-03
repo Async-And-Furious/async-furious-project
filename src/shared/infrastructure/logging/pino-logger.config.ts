@@ -51,8 +51,16 @@ export const pinoHttpOptions: Options = {
     if (response.statusCode >= 400) return 'warn';
     return 'info';
   },
+  // Segredos de webhook (status da OS e Mercado Pago) também saem do log: quem
+  // lê o log não pode reusar o header para alterar status ou forjar notificação.
   redact: {
-    paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'req.headers["x-webhook-secret"]',
+      'req.headers["x-signature"]',
+      'res.headers["set-cookie"]',
+    ],
     censor: '[REDACTED]',
   },
 };

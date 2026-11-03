@@ -51,4 +51,12 @@ describe('PlacaVeiculoVo', () => {
       expect(p1.equals(p2)).toBe(false);
     });
   });
+
+  describe('normalizar', () => {
+    it('remove hífen e espaço e passa para maiúscula, a mesma forma usada no criar', () => {
+      expect(PlacaVeiculoVo.normalizar('abc-1d23')).toBe('ABC1D23');
+      expect(PlacaVeiculoVo.normalizar(' xyz 5678 ')).toBe('XYZ5678');
+      expect(PlacaVeiculoVo.criar('abc-1d23').valor).toBe(PlacaVeiculoVo.normalizar('abc-1d23'));
+    });
+  });
 });

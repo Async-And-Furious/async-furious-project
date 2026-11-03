@@ -64,6 +64,21 @@ describe('contexto de log fora do HTTP (consumidor de mensagem)', () => {
       res: { headers: { 'set-cookie': '[REDACTED]' } },
     });
   });
+
+  it('não grava os segredos de webhook (x-webhook-secret e x-signature)', () => {
+    const { logger, lines } = captureLogger();
+
+    logger.warn({
+      req: {
+        headers: { 'x-webhook-secret': 'segredo-do-webhook', 'x-signature': 'ts=1,v1=abc' },
+      },
+    });
+
+    expect(lines[0]).toMatchObject({
+      req: { headers: { 'x-webhook-secret': '[REDACTED]', 'x-signature': '[REDACTED]' } },
+    });
+    expect(JSON.stringify(lines[0])).not.toContain('segredo-do-webhook');
+  });
 });
 
 describe('resolveCorrelationId', () => {
