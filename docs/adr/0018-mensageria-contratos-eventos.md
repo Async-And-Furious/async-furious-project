@@ -487,15 +487,25 @@ precisou decidir.
   não mudou. Uma ponte em `infrastructure/messaging` leva os três eventos ao broker. Ela
   só republica a `EtapaDaSagaFalhou` com `servicoOrigem = "os-service"`, para não
   devolver ao broker a falha recebida de outro serviço.
+- **Broker fora não derruba a API.** A ponte dispara a publicação sem aguardá-la (a
+  falha vai para o log), e o produtor tem retry finito (5): com o produtor idempotente
+  sem `retry`, o kafkajs tentaria indefinidamente. O custo é o aviso do kafkajs de que
+  limitar o retry pode quebrar o exatamente-uma-vez, coerente com a perda já aceita sem
+  outbox. O publicador e o consumidor conectam em segundo plano; o consumidor tenta de
+  novo a cada 15 s e reconecta no `CRASH` sem restart. O `main.ts` liga
+  `enableShutdownHooks` para o consumidor sair do grupo no SIGTERM.
 - **Consumidor.** O `os-consumer` chama os handlers de aplicação **diretamente**. O
   `@OnEvent` do `@nestjs/event-emitter` suprime a rejeição do listener, e o consumidor
   precisa dela para escolher entre ack, retry e DLT. A classificação ficou assim:
   - **"Já-passou":** o handler termina sem erro, e a mensagem recebe ack.
   - **"Ainda-não":** `FalhaRetentavelException` ou erro técnico vai para `os.retry.v1`.
-    - São 3 entregas no total, com backoff de 1 s e 2 s.
-    - A espera fica dentro do `eachMessage` e é limitada a 5 s, abaixo do
-      `sessionTimeout` do grupo. Esperas de 30 s ou mais derrubariam o consumidor do
-      grupo.
+    - São 3 entregas no total, com backoff de 30 s e 60 s.
+    - A espera **não** fica dentro do `eachMessage` (esperas longas derrubariam o
+      consumidor do grupo). Antes do `notBefore`, o consumidor pausa só a partição de
+      `os.retry.v1`, faz `seek` para a própria mensagem e retoma por timer; o
+      `execucao.eventos.v1` e o `billing.eventos.v1` seguem consumindo. Se o pod cair
+      entre o `seek` e o próximo fetch, a mensagem pode se perder (risco aceito, como o
+      outbox ausente).
   - **Erro de negócio:** `DomainException` (inclusive OS inexistente e payload sem campo
     do contrato) vai direto para `os.dlt.v1`.
   - **Na DLT:** a mensagem vira `EtapaDaSagaFalhou`, com a `etapa` da tabela de
