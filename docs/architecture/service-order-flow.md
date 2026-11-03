@@ -150,7 +150,7 @@ confirmado antes de aceitar `DELIVERED`) foi **cortada**.
 ADMIN) são consultas, não alteram o fluxo principal — incluídas para
 completude do mapeamento endpoint↔estado.
 
-## Relação com a arquitetura da Fase 3
+## Relação com a arquitetura da Fase 3 (monólito)
 
 Este fluxo roda **inteiramente dentro do Bounded Context `ordem-servico`, no
 mesmo monólito**, hoje e na arquitetura da Fase 3 — a separação em quatro
@@ -180,6 +180,35 @@ Também migram para o Execução e Produção as ações do mecânico: `assumir`
 `finalizar-execucao` vira `PATCH /api/v1/execucoes/{id}/concluir`, com a
 nova `iniciar-reparo` entre elas; `servicos-insumos` e `registrar-entrega`
 ficam no OS Service ([`saga-flow.md` §2](./saga-flow.md)).
+
+### Coreografia do serviço Execução e Produção
+
+O diagrama acima permanece como sequência do monólito; não representa a
+execução distribuída da Fase 4. Nesta, o Execução e Produção consome
+`OrdemServicoRecebida` e cria a `Execucao` na fila
+`AGUARDANDO_DIAGNOSTICO`; reentrega para a mesma OS não cria outra execução.
+Quando o mecânico inicia o diagnóstico, publica `DiagnosticoIniciado`. Depois
+disso, `PagamentoConfirmado` move `EM_DIAGNOSTICO` para
+`AGUARDANDO_REPARO`, sem publicar evento; execução ausente ou ainda em
+`AGUARDANDO_DIAGNOSTICO` é retentável, e estado já alcançado ou posterior é
+ignorado. O início do reparo pelo mecânico publica `ExecucaoIniciada`, e a
+conclusão publica `ExecucaoConcluida`.
+
+`OrcamentoRecusado` e `PagamentoRecusado` cancelam a execução, assim como
+`EtapaDaSagaFalhou` exceto quando `etapa=reparo`. O cancelamento só se aplica
+antes de `EM_REPARO`; eventos para execução inexistente, terminal ou já em
+reparo são reconhecidos e ignorados. As transições protegidas pelo estado
+atual tornam o consumo idempotente, sem criar ou depender de uma tabela de
+mensagens processadas; o model `ProcessedEvent` herdado do scaffold não é
+usado por este fluxo. Logs de consumo registram `eventId` e
+`ordemServicoId` (`correlationId`), conforme contrato da
+[ADR-0018](../adr/0018-mensageria-contratos-eventos.md).
+
+O webhook existente `POST /api/v1/webhooks/service-orders/status` permanece
+como fallback documentado. A publicação após commit tem a janela aceita de
+perda entre persistência e publicação; não há garantia de outbox. O fluxo
+completo, a matriz de falhas e os contratos de eventos estão em
+[`saga-flow.md`](./saga-flow.md) e [`event-catalog.md`](./event-catalog.md).
 
 > **Revisão de 30/09/2026 (`rev/Epic_1`).** Atualizadas apenas as seções de
 > integração com o Financeiro e de arquitetura da Fase 4, alinhadas a
