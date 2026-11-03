@@ -1,12 +1,13 @@
 import 'newrelic';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
+import { buildSwaggerDocument, SWAGGER_PATH } from './shared/infrastructure/swagger/swagger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -66,14 +67,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // Swagger Documentation
-  const config = new DocumentBuilder()
-    .setTitle('Async Furious API')
-    .setDescription('RESTful API for managing service orders, customers, vehicles, and parts')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup(SWAGGER_PATH, app, buildSwaggerDocument(app));
 
   app.useGlobalPipes(
     new ValidationPipe({

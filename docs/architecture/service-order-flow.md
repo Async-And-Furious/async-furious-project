@@ -64,7 +64,7 @@ sequenceDiagram
     API->>API: evento OrdemDeServicoFinalizada
     API->>DB: status=FINISHED, finalizada_em=now()
 
-    Cliente->>API: PATCH /ordens-servico/:id/aprovar-servico (rota @Public, sem token)
+    Cliente->>API: PATCH /ordens-servico/:id/aprovar-servico (autenticada, JWT)
 
     Cliente->>Recepcionista: Retira o veículo (fora do sistema)
     Recepcionista->>API: PATCH /ordens-servico/:id/registrar-entrega (papel RECEPCIONISTA)
@@ -185,6 +185,5 @@ ficam no OS Service ([`saga-flow.md` §2](./saga-flow.md)).
 > integração com o Financeiro e de arquitetura da Fase 4, alinhadas a
 > [`saga-flow.md`](./saga-flow.md) (fonte única do fluxo distribuído). O
 > diagrama e as demais seções descrevem o monólito atual e não foram
-> alterados. Observação: o diagrama mostra `PATCH .../aprovar-servico` como
-> `@Public`, mas no código esse `PATCH` é autenticado (a rota pública é o
-> `POST` de mesmo path).
+> alterados. O `PATCH .../aprovar-servico` do diagrama é autenticado; o
+> `POST` público de mesmo path foi removido na #332.

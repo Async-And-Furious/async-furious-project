@@ -456,10 +456,12 @@ collection:
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "PUBLIC - No auth required (client approval)"
+          description: "Requires JWT - approves the finished service (OS stays FINISHED)"
           sortKey: -1745628000062
         method: PATCH
-        authentication: {}
+        authentication:
+          type: bearer
+          token: "{{ receptionist_token }}"
         settings:
           renderRequestBody: true
           encodeUrl: true

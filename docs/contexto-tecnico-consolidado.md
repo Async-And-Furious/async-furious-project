@@ -153,7 +153,7 @@ Documentado de forma consistente em três artefatos independentes — o Domain S
    - Se recusado → segundo o README, a OS pode ir para `CLOSED_WITHOUT_EXECUTION` (ver observação de conflito na seção 8, pois esse estado não está listado no enum documentado em `AGENTS.md`).
 9. O Mecânico executa os serviços; se faltarem peças, a OS pode transitar para `AWAITING_PARTS` e retornar a `IN_PROGRESS` quando as peças forem reservadas (fluxo descrito apenas no diagrama textual de ciclo de vida do README, não detalhado em Domain Storytelling).
 10. O Mecânico finaliza a execução (`PATCH /finalizar-execucao`) → estado `FINISHED`, `finalizada_em` preenchido automaticamente.
-11. O Cliente pode aprovar o serviço prestado (`PATCH /aprovar-servico`, também pública).
+11. O serviço prestado pode ser aprovado (`PATCH /aprovar-servico`, autenticada com JWT; a OS segue `FINISHED`).
 12. O Recepcionista registra a entrega (`PATCH /registrar-entrega`) → estado `DELIVERED`, `entregue_em` preenchido automaticamente.
 13. O ADMIN pode consultar o tempo médio de execução de todas as OS finalizadas/entregues (`GET /ordens-servico/tempo-medio`).
 
