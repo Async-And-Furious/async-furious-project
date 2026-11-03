@@ -30,7 +30,31 @@ export class AtualizarStatusFinalizadaHandler {
 
   @OnEvent('ExecucaoConcluida')
   async handle(evento: ExecucaoConcluida): Promise<void> {
-    const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
+    let os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
+
+    if (os.status === 'IN_PROGRESS') {
+      this.transicao.validarTransicao('IN_PROGRESS', 'FINISHED');
+      // Condicionada ao status no UPDATE: uma PecasIndisponiveis tardia (OS a AWAITING_PARTS) ou
+      // uma entrega concorrente do mesmo evento entre a leitura e esta gravação faz a condição
+      // não casar. Só a entrega que gravou emite OrdemServicoFinalizada.
+      const finalizou = await this.ordemServicoRepository.atualizarSeCondicao(
+        evento.ordemServicoId,
+        { status: 'IN_PROGRESS' },
+        { status: 'FINISHED' }
+      );
+      if (finalizou) {
+        await this.emissor.emitir(new OrdemServicoFinalizada(evento.ordemServicoId));
+        return;
+      }
+      os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
+      if (os.status === 'IN_PROGRESS') {
+        // A OS saiu e voltou a IN_PROGRESS (AWAITING_PARTS e PecasReservadas) durante a
+        // gravação: retenta, para a reentrega decidir com o estado estável.
+        throw new FalhaRetentavelException(
+          `[P-10] OS ${evento.ordemServicoId} mudou de status durante a gravação de FINISHED`
+        );
+      }
+    }
 
     if (os.status === 'AWAITING_PARTS') {
       await this.registrarFalhaDeReparo(evento.ordemServicoId);
@@ -43,16 +67,9 @@ export class AtualizarStatusFinalizadaHandler {
       );
     }
 
-    if (os.status !== 'IN_PROGRESS') {
-      this.logger.log(
-        `[P-10] ExecucaoConcluida ignorada: OS ${evento.ordemServicoId} em ${os.status}, esperado IN_PROGRESS`
-      );
-      return;
-    }
-
-    this.transicao.validarTransicao('IN_PROGRESS', 'FINISHED');
-    await this.ordemServicoRepository.update(evento.ordemServicoId, { status: 'FINISHED' });
-    await this.emissor.emitir(new OrdemServicoFinalizada(evento.ordemServicoId));
+    this.logger.log(
+      `[P-10] ExecucaoConcluida ignorada: OS ${evento.ordemServicoId} em ${os.status}, esperado IN_PROGRESS`
+    );
   }
 
   // AWAITING_PARTS → FINISHED não é transição válida: erro de negócio, sem retry (ADR-0018).
