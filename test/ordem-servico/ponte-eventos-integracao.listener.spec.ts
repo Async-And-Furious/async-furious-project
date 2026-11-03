@@ -14,25 +14,25 @@ describe('PonteEventosIntegracaoListener', () => {
     ponte = new PonteEventosIntegracaoListener(publicador);
   });
 
-  it('publica OrdemServicoRecebida e OrcamentoCalculado', async () => {
+  it('publica OrdemServicoRecebida e OrcamentoCalculado', () => {
     const recebida = new OrdemServicoRecebida('os-1');
     const calculado = new OrcamentoCalculado('os-1', 100, 50, 150);
 
-    await ponte.onOrdemServicoRecebida(recebida);
-    await ponte.onOrcamentoCalculado(calculado);
+    ponte.onOrdemServicoRecebida(recebida);
+    ponte.onOrcamentoCalculado(calculado);
 
     expect(publicador.publicar.mock.calls).toEqual([[recebida], [calculado]]);
   });
 
-  it('publica EtapaDaSagaFalhou detectada pelo próprio OS Service', async () => {
+  it('publica EtapaDaSagaFalhou detectada pelo próprio OS Service', () => {
     const falha = new EtapaDaSagaFalhou('os-service', 'ExecucaoConcluida', 'os-1', 'reparo', 'x');
 
-    await ponte.onEtapaDaSagaFalhou(falha);
+    ponte.onEtapaDaSagaFalhou(falha);
 
     expect(publicador.publicar).toHaveBeenCalledWith(falha);
   });
 
-  it('não devolve ao broker uma EtapaDaSagaFalhou vinda de outro serviço', async () => {
+  it('não devolve ao broker uma EtapaDaSagaFalhou vinda de outro serviço', () => {
     const deOutroServico = new EtapaDaSagaFalhou(
       'os-service',
       'OrcamentoCalculado',
@@ -42,9 +42,16 @@ describe('PonteEventosIntegracaoListener', () => {
     );
     (deOutroServico as { servicoOrigem: string }).servicoOrigem = 'billing-service';
 
-    await ponte.onEtapaDaSagaFalhou(deOutroServico);
+    ponte.onEtapaDaSagaFalhou(deOutroServico);
 
     expect(publicador.publicar).not.toHaveBeenCalled();
+  });
+
+  it('não espera o broker: com a publicação pendente, o listener retorna na hora', () => {
+    publicador.publicar.mockReturnValue(new Promise<void>(() => undefined));
+
+    expect(ponte.onOrdemServicoRecebida(new OrdemServicoRecebida('os-1'))).toBeUndefined();
+    expect(publicador.publicar).toHaveBeenCalledTimes(1);
   });
 
   it('falha de publicação vai para o log e não propaga (sem outbox, ADR-0018)', async () => {
@@ -52,7 +59,8 @@ describe('PonteEventosIntegracaoListener', () => {
     const erro = jest.spyOn(Logger.prototype, 'error').mockImplementation();
     const recebida = new OrdemServicoRecebida('os-1');
 
-    await expect(ponte.onOrdemServicoRecebida(recebida)).resolves.toBeUndefined();
+    expect(() => ponte.onOrdemServicoRecebida(recebida)).not.toThrow();
+    await new Promise((resolve) => setImmediate(resolve));
 
     expect(erro).toHaveBeenCalledWith(
       expect.stringContaining(`OrdemServicoRecebida da OS os-1 (eventId ${recebida.eventId})`)

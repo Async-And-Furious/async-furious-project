@@ -140,7 +140,6 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
     },
     publicador,
     enviar,
-    aguardar: () => Promise.resolve(),
   });
 
   const consumir = (eventType: string, data: Record<string, unknown> = {}, topic = 'qualquer') =>

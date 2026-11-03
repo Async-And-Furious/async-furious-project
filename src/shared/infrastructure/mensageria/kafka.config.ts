@@ -6,10 +6,18 @@ export const OS_PRODUCER = 'os-service';
 // acks=all e produtor idempotente (ADR-0018, "Garantias de publicação"). Sem outbox:
 // a publicação sai depois do commit da transação local. O particionador por hash da chave
 // (murmur2, compatível com o cliente Java) põe todos os eventos da mesma OS na mesma partição.
+//
+// Retry finito: com `idempotent` e sem `retry`, o kafkajs usa `retries = MAX_SAFE_INTEGER` e,
+// com o broker fora, o `send` nunca rejeita. Com 5 tentativas (backoff padrão de 300 ms a 30 s),
+// a falha chega ao chamador em segundos e vai para o log. O kafkajs avisa que limitar o retry do
+// produtor idempotente pode invalidar a garantia de exatamente-uma-vez; a ADR-0018 já aceita
+// perder o evento (sem outbox), e a deduplicação no consumidor é por `eventId`.
+export const OS_PRODUCER_RETRIES = 5;
 export const OS_PRODUCER_OPTIONS: ProducerConfig = {
   idempotent: true,
   allowAutoTopicCreation: false,
   createPartitioner: Partitioners.DefaultPartitioner,
+  retry: { retries: OS_PRODUCER_RETRIES },
 };
 
 /** Sem `KAFKA_BROKERS` (dev local, e2e) o publicador fica desligado. Em HML o deploy sempre define. */
@@ -52,11 +60,15 @@ export const OS_RETRY_TOPIC = 'os.retry.v1';
 export const OS_DLT_TOPIC = 'os.dlt.v1';
 export const OS_CONSUMER_GROUP = 'os-consumer';
 
-// 3 entregas no total (ADR-0018): a original e duas pelo retry topic. Backoff de 1 s e 2 s,
-// curto para a espera dentro do eachMessage ficar bem abaixo do sessionTimeout do grupo (30 s).
+// 3 entregas no total (ADR-0018): a original e duas pelo retry topic. Backoff de 30 s e 60 s
+// (ordem do exemplo da ADR): o "ainda não" existe para a ordem quebrada entre tópicos, e um
+// rebalance ou poucos segundos de atraso não podem virar EtapaDaSagaFalhou. A espera não
+// acontece dentro do eachMessage: o consumer pausa a partição do retry topic até o notBefore.
 export const MAX_TENTATIVAS = 3;
-export const ESPERA_MAXIMA_RETRY_MS = 5_000;
 
 export function backoffMs(tentativa: number): number {
-  return 1_000 * 2 ** (tentativa - 1);
+  return 30_000 * 2 ** (tentativa - 1);
 }
+
+// Nova tentativa de conexão do consumer quando o broker está fora na subida ou o kafkajs desiste.
+export const RECONEXAO_CONSUMER_MS = 15_000;
