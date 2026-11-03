@@ -339,21 +339,6 @@
   - 409
   mutating: true
   mock_body: {}
-- id: route-029
-  method: POST
-  path: /api/v1/pagamentos/registrar
-  auth: customer
-  role: null
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body:
-    ordemServicoId: '{{ordem_id}}'
-    valor: 1
 - id: route-030
   method: POST
   path: /api/v1/webhooks/service-orders/status

@@ -51,7 +51,6 @@ import { IniciarMonitoramentoTempoHandler } from './application/event-handlers/i
 import { AtualizarStatusFinalizadaHandler } from './application/event-handlers/atualizar-status-finalizada.handler';
 import { FinalizarMonitoramentoTempoHandler } from './application/event-handlers/finalizar-monitoramento-tempo.handler';
 import { NotificarClienteConclusaoHandler } from './application/event-handlers/notificar-cliente-conclusao.handler';
-import { AtualizarStatusEntregueHandler } from './application/event-handlers/atualizar-status-entregue.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
 import { RegistrarPagamentoConfirmadoHandler } from './application/event-handlers/registrar-pagamento-confirmado.handler';
@@ -259,12 +258,6 @@ import {
       inject: [NOTIFICACAO_CLIENTE_GATEWAY, EMISSOR_EVENTOS],
     },
     {
-      provide: AtualizarStatusEntregueHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEntregueHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
-    },
-    {
       provide: AtualizarStatusEncerradaSemExecucaoHandler,
       useFactory: (
         osRepo: OrdemServicoRepository,
@@ -369,9 +362,11 @@ import {
     },
     {
       provide: RegistrarEntregaVeiculoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new RegistrarEntregaVeiculoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        atualizarStatus: UpdateServiceOrderStatusUseCase
+      ) => new RegistrarEntregaVeiculoUseCase(osRepo, atualizarStatus),
+      inject: [OrdemServicoRepository, UpdateServiceOrderStatusUseCase],
     },
     {
       provide: ConsultarStatusOrdemServicoUseCase,
