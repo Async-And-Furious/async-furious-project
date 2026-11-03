@@ -1,3 +1,4 @@
+import { ConflitoException } from '../../../../shared/domain/exceptions/conflito.exception';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
@@ -58,6 +59,9 @@ export class CriarOrdemServicoUseCase {
       ...data.veiculo,
       clienteId: cliente.id,
     });
+    if (veiculo.clienteId !== cliente.id) {
+      throw new ConflitoException('O veículo com esta placa pertence a outro cliente');
+    }
 
     // 3. Obter Preços e Calcular Totais
     let valorTotalServicos = 0;

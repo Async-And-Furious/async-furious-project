@@ -4,7 +4,10 @@ import { PrismaService } from '../../../../shared/infrastructure/database/prisma
 import {
   formatPaginatedResponse,
   buildSearchWhere,
+  isUniqueConstraintViolation,
 } from '../../../../shared/infrastructure/database/repository.utils';
+import { ConflitoException } from '../../../../shared/domain/exceptions/conflito.exception';
+import { CpfCnpjVo } from '../../domain/value-objects/cpf-cnpj.vo';
 import { Cliente } from '../../domain/entities/cliente.entity';
 import {
   IClienteRepository,
@@ -28,15 +31,22 @@ export class ClienteRepository implements IClienteRepository {
     });
 
     const ormData = ClienteMapper.toOrm(cliente);
-    const ormEntity = await this.prisma.cliente.create({
-      data: {
-        nome: ormData.nome,
-        email: ormData.email,
-        telefone: ormData.telefone,
-        documento: ormData.documento,
-        tipo_documento: ormData.tipo_documento,
-      },
-    });
+    const ormEntity = await this.prisma.cliente
+      .create({
+        data: {
+          nome: ormData.nome,
+          email: ormData.email,
+          telefone: ormData.telefone,
+          documento: ormData.documento,
+          tipo_documento: ormData.tipo_documento,
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflitoException('Já existe um cliente com este documento ou e-mail');
+        }
+        throw error;
+      });
 
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -84,7 +94,7 @@ export class ClienteRepository implements IClienteRepository {
 
   async findByDocumento(documento: string): Promise<Cliente | null> {
     const ormEntity = await this.prisma.cliente.findUnique({
-      where: { documento },
+      where: { documento: CpfCnpjVo.normalizar(documento) },
       include: { veiculos: true },
     });
 

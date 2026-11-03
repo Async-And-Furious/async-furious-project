@@ -187,4 +187,14 @@ describe('CpfCnpjVo', () => {
       expect(cpf.formato).toBe('111.444.777-35');
     });
   });
+
+  describe('normalizar', () => {
+    it('remove pontuação e mantém só os dígitos, a mesma forma usada no criar', () => {
+      expect(CpfCnpjVo.normalizar('529.982.247-25')).toBe('52998224725');
+      expect(CpfCnpjVo.normalizar('11.222.333/0001-81')).toBe('11222333000181');
+      expect(CpfCnpjVo.criar('529.982.247-25', 'CPF').valor).toBe(
+        CpfCnpjVo.normalizar('529.982.247-25')
+      );
+    });
+  });
 });
