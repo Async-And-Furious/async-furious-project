@@ -23,6 +23,7 @@ export class OrdemDeServico {
   finalizada_em: Date | null;
   entregue_em: Date | null;
   reservaPecasPendente: boolean;
+  pago_em: Date | null;
   created_at: Date;
   updated_at: Date;
   orcamento?: Orcamento;

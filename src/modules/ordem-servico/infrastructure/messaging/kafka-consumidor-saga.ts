@@ -2,6 +2,7 @@ import { Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Kafka, type Consumer, type ConsumerCrashEvent, type Producer } from 'kafkajs';
 import type { IPublicadorIntegracao } from '../../../../shared/domain/interfaces/publicador-integracao.interface';
 import {
+  BILLING_TOPIC,
   EXECUCAO_TOPIC,
   OS_CONSUMER_GROUP,
   OS_DLT_TOPIC,
@@ -16,7 +17,7 @@ import { ProcessadorMensagensSaga, type Despachante } from './processador-mensag
 
 // fromBeginning: false também no retry e na DLT: um consumer group novo não reprocessa
 // falhas antigas (nem reemite EtapaDaSagaFalhou de mensagens já tratadas).
-export const TOPICOS_CONSUMIDOS = [EXECUCAO_TOPIC, OS_RETRY_TOPIC, OS_DLT_TOPIC];
+export const TOPICOS_CONSUMIDOS = [EXECUCAO_TOPIC, BILLING_TOPIC, OS_RETRY_TOPIC, OS_DLT_TOPIC];
 
 type ConsumerSaga = Pick<
   Consumer,

@@ -218,9 +218,11 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
        de entrada depende da compensação (#338);
      - consumidor `os-consumer` de `billing.eventos.v1` (`OrcamentoGerado`,
        `OrcamentoAprovado`, `OrcamentoRecusado`, `PagamentoConfirmado`,
-       `PagamentoRecusado`, `EtapaDaSagaFalhou`). Hoje o OS não consome o tópico.
-       Sem ele, `OrcamentoGerado` não leva a OS a `AWAITING_APPROVAL` e
-       `OrcamentoAprovado` não reserva peças;
+       `PagamentoRecusado`, `EtapaDaSagaFalhou`). **Implementado na #331 (parte 3)**
+       para os cinco eventos de orçamento e pagamento, com `pago_em` (migration
+       `20261102120000_os_pago_em`); falta validar em HML. A `EtapaDaSagaFalhou` do
+       Billing e a devolução ao estoque na recusa de pagamento dependem da
+       compensação (#338);
      - publicador de `os.eventos.v1` (`OrdemServicoRecebida`, `OrcamentoCalculado`,
        `EtapaDaSagaFalhou`). **Implementado na #331 (parte 1, PR #385)**; falta
        validar em HML.

@@ -52,9 +52,13 @@ import { NotificarClienteConclusaoHandler } from './application/event-handlers/n
 import { AtualizarStatusEntregueHandler } from './application/event-handlers/atualizar-status-entregue.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
+import { RegistrarPagamentoConfirmadoHandler } from './application/event-handlers/registrar-pagamento-confirmado.handler';
 import { PonteEventosIntegracaoListener } from './infrastructure/messaging/ponte-eventos-integracao.listener';
 import { KafkaConsumidorSaga } from './infrastructure/messaging/kafka-consumidor-saga';
-import { despachantesExecucao } from './infrastructure/messaging/despachantes-saga';
+import {
+  despachantesBilling,
+  despachantesExecucao,
+} from './infrastructure/messaging/despachantes-saga';
 import {
   PUBLICADOR_INTEGRACAO,
   IPublicadorIntegracao,
@@ -99,16 +103,32 @@ import {
         emDiagnostico: AtualizarStatusEmDiagnosticoHandler,
         execucaoIniciada: AtualizarStatusExecucaoIniciadaHandler,
         finalizada: AtualizarStatusFinalizadaHandler,
+        aguardandoAprovacao: AtualizarStatusAguardandoAprovacaoHandler,
+        verificarNecessidadePecas: VerificarNecessidadePecasHandler,
+        encerradaSemExecucao: AtualizarStatusEncerradaSemExecucaoHandler,
+        pagamentoConfirmado: RegistrarPagamentoConfirmadoHandler,
         publicador: IPublicadorIntegracao
       ) =>
         new KafkaConsumidorSaga(
-          despachantesExecucao({ emDiagnostico, execucaoIniciada, finalizada }),
+          {
+            ...despachantesExecucao({ emDiagnostico, execucaoIniciada, finalizada }),
+            ...despachantesBilling({
+              aguardandoAprovacao,
+              verificarNecessidadePecas,
+              encerradaSemExecucao,
+              pagamentoConfirmado,
+            }),
+          },
           publicador
         ),
       inject: [
         AtualizarStatusEmDiagnosticoHandler,
         AtualizarStatusExecucaoIniciadaHandler,
         AtualizarStatusFinalizadaHandler,
+        AtualizarStatusAguardandoAprovacaoHandler,
+        VerificarNecessidadePecasHandler,
+        AtualizarStatusEncerradaSemExecucaoHandler,
+        RegistrarPagamentoConfirmadoHandler,
         PUBLICADOR_INTEGRACAO,
       ],
     },
@@ -166,8 +186,12 @@ import {
     },
     {
       provide: VerificarNecessidadePecasHandler,
-      useFactory: (barramento: IEmissorEventos) => new VerificarNecessidadePecasHandler(barramento),
-      inject: [EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        historicoRepo: StatusHistoryRepository,
+        barramento: IEmissorEventos
+      ) => new VerificarNecessidadePecasHandler(osRepo, historicoRepo, barramento),
+      inject: [OrdemServicoRepository, StatusHistoryRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusEmExecucaoHandler,
@@ -227,9 +251,30 @@ import {
     },
     {
       provide: AtualizarStatusEncerradaSemExecucaoHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEncerradaSemExecucaoHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        historicoRepo: StatusHistoryRepository,
+        transicaoSvc: StatusTransitionService
+      ) =>
+        new AtualizarStatusEncerradaSemExecucaoHandler(
+          osRepo,
+          barramento,
+          historicoRepo,
+          transicaoSvc
+        ),
+      inject: [
+        OrdemServicoRepository,
+        EMISSOR_EVENTOS,
+        StatusHistoryRepository,
+        StatusTransitionService,
+      ],
+    },
+    {
+      provide: RegistrarPagamentoConfirmadoHandler,
+      useFactory: (osRepo: OrdemServicoRepository, historicoRepo: StatusHistoryRepository) =>
+        new RegistrarPagamentoConfirmadoHandler(osRepo, historicoRepo),
+      inject: [OrdemServicoRepository, StatusHistoryRepository],
     },
 
     // Use Cases

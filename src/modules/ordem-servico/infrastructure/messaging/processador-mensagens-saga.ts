@@ -19,8 +19,8 @@ import {
   type EtapaDaSaga,
 } from '../../domain/events/etapa-da-saga-falhou.event';
 
-/** Chama o handler de aplicação do tipo de evento, com o `ordemServicoId` do envelope. */
-export type Despachante = (ordemServicoId: string) => Promise<void>;
+/** Chama o handler de aplicação do tipo de evento com o `data` do envelope. */
+export type Despachante = (data: EnvelopeRecebido['data']) => Promise<void>;
 
 export interface DependenciasProcessador {
   despachantes: Record<string, Despachante>;
@@ -105,7 +105,7 @@ export class ProcessadorMensagensSaga {
     const { ordemServicoId } = envelope.data;
     await runWithLogContext({ ordemServicoId, eventId: envelope.eventId }, async () => {
       try {
-        await despachar(ordemServicoId);
+        await despachar(envelope.data);
         this.logger.log(`${envelope.eventType} processado: OS ${ordemServicoId}`);
       } catch (erro) {
         await this.tratarFalha(envelope, erro);

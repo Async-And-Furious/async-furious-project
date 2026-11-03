@@ -31,6 +31,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     finalizada_em: Date | null;
     entregue_em: Date | null;
     reserva_pecas_pendente: boolean;
+    pago_em: Date | null;
     created_at: Date;
     updated_at: Date;
     orcamento?: unknown;
@@ -47,6 +48,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     entity.finalizada_em = record.finalizada_em;
     entity.entregue_em = record.entregue_em;
     entity.reservaPecasPendente = record.reserva_pecas_pendente;
+    entity.pago_em = record.pago_em;
     entity.created_at = record.created_at;
     entity.updated_at = record.updated_at;
     if (record.orcamento !== undefined) {
@@ -160,6 +162,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
         ...(condicao.reserva_pecas_pendente !== undefined && {
           reserva_pecas_pendente: condicao.reserva_pecas_pendente,
         }),
+        ...(condicao.pago_em !== undefined && { pago_em: condicao.pago_em }),
       },
       data: this.paraDadosPrisma(data),
     });
@@ -176,6 +179,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
       ...(data.reserva_pecas_pendente !== undefined && {
         reserva_pecas_pendente: data.reserva_pecas_pendente,
       }),
+      ...(data.pago_em !== undefined && { pago_em: data.pago_em }),
     };
   }
 

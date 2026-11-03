@@ -81,6 +81,9 @@ model OrdemServico {
   entregue_em            DateTime?
   // Reserva de peças pendente (sem estoque): decide AWAITING_PARTS ao consumir ExecucaoIniciada
   reserva_pecas_pendente Boolean   @default(false)
+  // Pagamento confirmado pelo Billing (PagamentoConfirmado): não muda o status; o detector de
+  // OS parada só considera OS em AWAITING_APPROVAL com pago_em nulo (ADR-0018)
+  pago_em                DateTime?
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 

@@ -94,7 +94,7 @@ describe('KafkaConsumidorSaga', () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  it('entra no grupo os-consumer e assina execucao, retry e DLT do OS sem fromBeginning', async () => {
+  it('entra no grupo os-consumer e assina execucao, billing, retry e DLT do OS sem fromBeginning', async () => {
     const f = kafkaFake();
     const consumidor = new KafkaConsumidorSaga({}, publicador, ENV, f.kafka);
 
@@ -103,10 +103,10 @@ describe('KafkaConsumidorSaga', () => {
     expect(f.kafkaMock.consumer).toHaveBeenCalledWith({ groupId: 'os-consumer' });
     expect(f.kafkaMock.producer).toHaveBeenCalledWith(OS_PRODUCER_OPTIONS);
     expect(f.consumer.subscribe).toHaveBeenCalledWith({
-      topics: ['execucao.eventos.v1', 'os.retry.v1', 'os.dlt.v1'],
+      topics: ['execucao.eventos.v1', 'billing.eventos.v1', 'os.retry.v1', 'os.dlt.v1'],
       fromBeginning: false,
     });
-    expect(TOPICOS_CONSUMIDOS).toHaveLength(3);
+    expect(TOPICOS_CONSUMIDOS).toHaveLength(4);
   });
 
   it('usa o KAFKA_CONSUMER_GROUP do ambiente quando definido', () => {
@@ -129,7 +129,7 @@ describe('KafkaConsumidorSaga', () => {
 
     await f.entregar('execucao.eventos.v1', envelopeExecucaoIniciada());
 
-    expect(despachar).toHaveBeenCalledWith(OS_ID);
+    expect(despachar).toHaveBeenCalledWith({ ordemServicoId: OS_ID });
     expect(f.producer.send).toHaveBeenCalledWith(
       expect.objectContaining({
         topic: OS_RETRY_TOPIC,
