@@ -8,6 +8,13 @@ import {
 import { PecaInsumo } from '../../domain/entities/peca-insumo.entity';
 import { IPecaInsumoRepository } from '../../domain/interfaces/peca-insumo.interface';
 
+// Desfaz a transação de débito quando algum item não tem saldo.
+class EstoqueInsuficienteRollback extends Error {
+  constructor(readonly indisponiveis: string[]) {
+    super('Estoque insuficiente');
+  }
+}
+
 @Injectable()
 export class PecaInsumoRepository implements IPecaInsumoRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -130,6 +137,32 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
       data: { quantidade_estoque: quantidade },
     });
     return this.mapToEntity(record);
+  }
+
+  async debitarEstoqueAtomico(
+    itens: Array<{ id_peca: string; quantidade: number }>
+  ): Promise<{ indisponiveis: string[] }> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const indisponiveis: string[] = [];
+        for (const item of itens) {
+          // Decremento condicional no próprio UPDATE: sem leitura prévia, duas
+          // OS concorrentes não perdem atualização nem deixam saldo negativo.
+          const { count } = await tx.peca.updateMany({
+            where: { id: item.id_peca, quantidade_estoque: { gte: item.quantidade } },
+            data: { quantidade_estoque: { decrement: item.quantidade } },
+          });
+          if (count === 0) indisponiveis.push(item.id_peca);
+        }
+        if (indisponiveis.length > 0) throw new EstoqueInsuficienteRollback(indisponiveis);
+      });
+      return { indisponiveis: [] };
+    } catch (error) {
+      if (error instanceof EstoqueInsuficienteRollback) {
+        return { indisponiveis: error.indisponiveis };
+      }
+      throw error;
+    }
   }
 
   async remove(id: string): Promise<PecaInsumo> {

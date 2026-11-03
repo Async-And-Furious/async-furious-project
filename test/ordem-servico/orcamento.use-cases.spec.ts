@@ -116,6 +116,7 @@ describe('OS + Orçamento Use Cases', () => {
       findByOrdemServicoId: jest.fn(),
       update: jest.fn(),
       updateEstoque: jest.fn(),
+      debitarEstoqueAtomico: jest.fn(),
       remove: jest.fn(),
     };
     mockOsServicoRepository = {
