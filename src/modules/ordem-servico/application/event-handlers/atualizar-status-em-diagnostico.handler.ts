@@ -26,9 +26,19 @@ export class AtualizarStatusEmDiagnosticoHandler {
       return;
     }
     this.transicao.validarTransicao('RECEIVED', 'UNDER_DIAGNOSIS');
-    await this.ordemServicoRepository.update(evento.ordemServicoId, {
-      status: 'UNDER_DIAGNOSIS',
-    });
+    // Condicionada ao status no UPDATE: de duas entregas concorrentes, só a que gravou emite
+    // OrdemServicoEmDiagnostico (e o cliente é notificado uma vez).
+    const aplicou = await this.ordemServicoRepository.atualizarSeCondicao(
+      evento.ordemServicoId,
+      { status: 'RECEIVED' },
+      { status: 'UNDER_DIAGNOSIS' }
+    );
+    if (!aplicou) {
+      this.logger.log(
+        `[P-02] DiagnosticoIniciado ignorado: OS ${evento.ordemServicoId} saiu de RECEIVED antes da gravação`
+      );
+      return;
+    }
     await this.emissor.emitir(new OrdemServicoEmDiagnostico(evento.ordemServicoId));
   }
 }
