@@ -106,6 +106,35 @@ Todo evento do catálogo tem ao menos um consumidor. Como ninguém assina o pró
 `EtapaDaSagaFalhou` aplica a própria compensação local no mesmo ato (ex.: o
 OS Service fechando a OS quando o detector dispara).
 
+## Implementação no OS Service (#331)
+
+Estado em 02/11/2026, nos PRs #385, #386 e #388 e na parte 4, empilhados sobre o #371.
+
+**Publicação em `os.eventos.v1`.** É feita por um publicador separado do
+`EmissorEventos` (`IPublicadorIntegracao`, `KafkaPublicadorIntegracao`) e por uma ponte
+na camada de infraestrutura que escuta os três eventos in-process e os leva ao broker.
+O `eventId` e o `occurredAt` do envelope são os do próprio evento de domínio. Payload
+(`data`):
+
+| Evento | Quando sai | `data` |
+|---|---|---|
+| `OrdemServicoRecebida` | Criação da OS | `ordemServicoId` |
+| `OrcamentoCalculado` | Cálculo do orçamento pelo OS | `ordemServicoId`, `valorTotalServicos`, `valorTotalPecas`, `valorTotalGeral` (números) |
+| `EtapaDaSagaFalhou` | DLT do OS (`os.dlt.v1`) ou detector de OS parada; só com `servicoOrigem = "os-service"` | `servicoOrigem`, `eventTypeOriginal`, `ordemServicoId`, `etapa`, `motivo` |
+
+**Consumo pelo `os-consumer`.** Os handlers de aplicação são chamados diretamente, com a
+classificação de falha da ADR-0018. Os oito eventos de `execucao.eventos.v1` e
+`billing.eventos.v1` estão ligados. A `EtapaDaSagaFalhou` recebida dos outros serviços
+recebe ack sem efeito até a compensação (#338).
+
+**Defasagem do catálogo interno.** O `docs/ddd.md` §5 cataloga 28 eventos de domínio nos
+BCs do OS Service. O código tem 42 classes em `src/modules/*/domain/events/`: 30 em
+`ordem-servico`, 9 em `pecas-insumos` e 3 em `financeiro`. A diferença está nos
+`StatusAtualizado*`, nos eventos de notificação e nas classes espelho dos eventos de
+integração recebidos. O catálogo interno não foi reescrito, e a fonte de verdade dos
+eventos internos é o código. A lista nominal do que continua in-process está na
+[ADR-0009](../adr/0009-eventos-dominio-in-process.md).
+
 ## Eventos fora do escopo deste catálogo
 
 - **Entrega da OS** (`PATCH /ordens-servico/:id/registrar-entrega`): ato

@@ -470,6 +470,72 @@ topologia e o envelope **continuam valendo**. Mudou:
   `servicoOrigem = "os-service"`; o detector ignora OS com `pago_em`
   preenchido.
 
+## Revisão de 02/11/2026 (implementação no OS Service, #331)
+
+O OS Service passou a publicar e consumir pelo Kafka (PRs #385, #386, #388 e a parte 4,
+empilhados sobre o #371). A topologia, o envelope e a classificação acima **continuam
+valendo**. Esta seção registra como cada item foi implementado e o que a implementação
+precisou decidir.
+
+- **Integração versus in-process.** Só cruzam o broker os eventos de integração: três
+  publicados em `os.eventos.v1` e nove consumidos de `billing.eventos.v1` e
+  `execucao.eventos.v1`. Todo o resto continua no `EmissorEventos`. A lista nominal está
+  na [ADR-0009](./0009-eventos-dominio-in-process.md).
+- **Publicador separado.** `IPublicadorIntegracao` no domínio e `KafkaPublicadorIntegracao`
+  na infraestrutura, com `acks: -1`, produtor idempotente, sem criação automática de
+  tópico e com o particionador por hash da chave (`ordemServicoId`). O `EmissorEventos`
+  não mudou. Uma ponte em `infrastructure/messaging` leva os três eventos ao broker. Ela
+  só republica a `EtapaDaSagaFalhou` com `servicoOrigem = "os-service"`, para não
+  devolver ao broker a falha recebida de outro serviço.
+- **Consumidor.** O `os-consumer` chama os handlers de aplicação **diretamente**. O
+  `@OnEvent` do `@nestjs/event-emitter` suprime a rejeição do listener, e o consumidor
+  precisa dela para escolher entre ack, retry e DLT. A classificação ficou assim:
+  - **"Já-passou":** o handler termina sem erro, e a mensagem recebe ack.
+  - **"Ainda-não":** `FalhaRetentavelException` ou erro técnico vai para `os.retry.v1`.
+    - São 3 entregas no total, com backoff de 1 s e 2 s.
+    - A espera fica dentro do `eachMessage` e é limitada a 5 s, abaixo do
+      `sessionTimeout` do grupo. Esperas de 30 s ou mais derrubariam o consumidor do
+      grupo.
+  - **Erro de negócio:** `DomainException` (inclusive OS inexistente e payload sem campo
+    do contrato) vai direto para `os.dlt.v1`.
+  - **Na DLT:** a mensagem vira `EtapaDaSagaFalhou`, com a `etapa` da tabela de
+    `saga-flow.md` §3, exceto `PagamentoConfirmado` e `EtapaDaSagaFalhou`.
+- **Guardas de estado.** Cada consumidor decide pelo estado atual da OS, com gravação
+  condicionada no próprio `UPDATE` (`atualizarSeCondicao`).
+  - **Efeito não naturalmente idempotente** (reservar peças em `OrcamentoAprovado`): o
+    marcador é uma linha de `HistoricoStatusOS`, gravada antes da reserva. Continua não
+    havendo tabela de mensagens processadas.
+  - **`PagamentoConfirmado`:** grava `pago_em` (coluna nova) condicionado a `pago_em`
+    nulo.
+- **Detector de OS parada.** O CronJob `detector-os-parada` usa a mesma imagem e o mesmo
+  ambiente da API, roda a cada 5 minutos com `concurrencyPolicy: Forbid`, e o prazo vem
+  de `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (padrão 2880).
+  - **Critério de "parada":** a OS não tem coluna com o instante de entrada em
+    `AWAITING_APPROVAL`, então a varredura usa a última atualização da linha
+    (`updated_at`) como aproximação.
+  - **Ordem das ações:** para cada OS, o detector publica a `EtapaDaSagaFalhou` **antes**
+    de fechá-la. Se o fechamento falhar, a próxima execução publica de novo, e as
+    compensações são idempotentes.
+  - **Compensação local:** o detector fecha a OS como `CLOSED_WITHOUT_EXECUTION`,
+    condicionado a `AWAITING_APPROVAL` e `pago_em` nulo, no mesmo ato da publicação
+    (`saga-flow.md`, "Origem da falha e assinaturas"). Fechada, a OS sai das próximas
+    varreduras.
+  - **Fica fora:** a devolução ao estoque das peças reservadas é compensação da #338.
+- **Os dois dual-writes do OS Service.** Depois do commit no Postgres, o mesmo caso de
+  uso pode escrever em dois lugares fora da transação. Nenhuma das duas escritas desfaz
+  o commit, e elas falham de formas diferentes:
+  - **Evento no Kafka:** publicação pós-commit, sem outbox. Um evento perdido na etapa de
+    aprovação/pagamento é coberto pelo detector. Nas demais etapas, é recuperado por
+    replay manual, que é o risco já aceito acima.
+  - **Read model no DocumentDB:** write-through da #335. Uma projeção perdida deixa a
+    leitura desatualizada até o rebuild da coleção.
+
+  O teste conjunto dos dois depende de a #335 (PR #381) entrar nesta pilha. Hoje o teste
+  de consumo cobre só o lado do evento.
+- **SASL.** A plataforma (`repo-k8s-infra`, #314) entregou SASL/PLAIN, o plano B desta
+  ADR, e os três serviços usam o mesmo mecanismo, com a senha vinda do Secrets Manager
+  (`tc3/kafka/hml`). Fica registrada a troca do SCRAM previsto em "Decisão" pelo PLAIN.
+
 ## Referências
 
 - Tech Challenge — Fase 4 (`12SOAT - Fase 4 - Tech challenge.pdf`), p.4 e p.5

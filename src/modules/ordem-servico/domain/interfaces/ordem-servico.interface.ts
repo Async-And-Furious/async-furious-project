@@ -46,6 +46,8 @@ export interface IOrdemServicoRepository {
     condicao: OrdemServicoCondicao,
     data: OrdemServicoUpdateData
   ): Promise<boolean>;
+  /** OS em AWAITING_APPROVAL, sem pagamento e sem atualização desde `limite` (detector). */
+  findParadasAguardandoAprovacao(limite: Date): Promise<OrdemDeServico[]>;
   remove(id: string): Promise<OrdemDeServico>;
   calcularTempoMedioExecucao(): Promise<{ totalMinutos: number; total: number }>;
 }

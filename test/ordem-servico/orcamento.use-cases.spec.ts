@@ -89,6 +89,7 @@ describe('OS + Orçamento Use Cases', () => {
       findAllAtivas: jest.fn(),
       remove: jest.fn(),
       calcularTempoMedioExecucao: jest.fn(),
+      findParadasAguardandoAprovacao: jest.fn(),
     } as jest.Mocked<IOrdemServicoRepository>;
     mockClienteRepository = {
       create: jest.fn(),

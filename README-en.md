@@ -123,6 +123,8 @@ Without `MP_ACCESS_TOKEN`, approving an estimate fails; without `MP_WEBHOOK_SECR
 
 Without `KAFKA_BROKERS`, the OS Service starts without publishing the integration events (`OrdemServicoRecebida`, `OrcamentoCalculado` and `EtapaDaSagaFalhou` on `os.eventos.v1`) and only logs a warning. In HML, `deploy-eks.yml` fills in the broker and the SASL credentials.
 
+The stalled-order detector runs as a CronJob (`k8s/app/detector-os-parada-cronjob.yaml`, every 5 minutes) with the same image as the API: `node dist/detector-os-parada.js`. It closes orders in `AWAITING_APPROVAL` with no payment beyond `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (default 2880, i.e. 48 h) and publishes `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`). For the demo, lower the deadline in the ConfigMap to a few minutes.
+
 ### 3. Start with Docker for development
 
 ```bash
