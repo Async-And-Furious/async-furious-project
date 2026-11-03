@@ -13,7 +13,6 @@ import { IniciarMonitoramentoTempoHandler } from '../../src/modules/ordem-servic
 import { AtualizarStatusFinalizadaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-finalizada.handler';
 import { FinalizarMonitoramentoTempoHandler } from '../../src/modules/ordem-servico/application/event-handlers/finalizar-monitoramento-tempo.handler';
 import { NotificarClienteConclusaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/notificar-cliente-conclusao.handler';
-import { AtualizarStatusEntregueHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-entregue.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-aguardando-pecas.handler';
 import { FalhaRetentavelException } from '../../src/shared/domain/exceptions/falha-retentavel.exception';
@@ -40,10 +39,8 @@ import { OrcamentoAprovado } from '../../src/modules/ordem-servico/domain/events
 import { OrdemServicoEmDiagnostico } from '../../src/modules/ordem-servico/domain/events/ordem-servico-em-diagnostico.event';
 import { OrdemServicoEmExecucao } from '../../src/modules/ordem-servico/domain/events/ordem-servico-em-execucao.event';
 import { OrdemServicoFinalizada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-finalizada.event';
-import { OrdemServicoEntregue } from '../../src/modules/ordem-servico/domain/events/ordem-servico-entregue.event';
 import { OsSemPecasConfirmada } from '../../src/modules/ordem-servico/domain/events/os-sem-pecas-confirmada.event';
 // `ServicoAprovadoPeloCliente` removed: not used in tests
-import { PagamentoRegistrado } from '../../src/modules/ordem-servico/domain/events/pagamento-registrado.event';
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
 import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/events/pecas-indisponiveis.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
@@ -1212,35 +1209,6 @@ describe('OS Event handlers', () => {
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido.constructor.name).toBe('ClienteNotificadoConclusao');
-    });
-  });
-
-  // ─── P-13 ────────────────────────────────────────────────────────────────
-
-  describe('P-13 AtualizarStatusEntregueHandler', () => {
-    it('deve atualizar para DELIVERED com entregue_em e emitir StatusAtualizadoEntregue', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'FINISHED' }));
-      osRepo.update.mockResolvedValue(mockOs({ status: 'DELIVERED' }));
-      const handler = new AtualizarStatusEntregueHandler(osRepo, emissor);
-
-      await handler.handle(new PagamentoRegistrado('os-1'));
-
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
-        status: 'DELIVERED',
-        entregue_em: expect.any(Date),
-      });
-      const emitido = emissor.emitir.mock.calls[0][0];
-      expect(emitido).toBeInstanceOf(OrdemServicoEntregue);
-    });
-
-    it('não deve atualizar quando OS não está em FINISHED', async () => {
-      const handler = new AtualizarStatusEntregueHandler(osRepo, emissor);
-      await shouldNotUpdateWhenStatusIs(
-        osRepo,
-        handler,
-        'IN_PROGRESS',
-        new PagamentoRegistrado('os-1')
-      );
     });
   });
 

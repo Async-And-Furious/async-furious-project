@@ -88,13 +88,13 @@ sequenceDiagram
 
 ## Integração com o contexto Financeiro
 
-`POST /pagamentos/registrar` (autenticado, qualquer papel) registra um
-pagamento e, segundo o README, "dispara a entrega da OS". A relação exata
-entre esse endpoint e `PATCH /ordens-servico/:id/registrar-entrega` **não
-estava detalhada em nenhum artefato de modelagem** (nem Domain Storytelling,
-nem Event Storming, nem diagrama de sequência dedicado ao financeiro) — gap
-pré-existente, não introduzido nem resolvido pela Fase 3. A definição abaixo
-fecha esse gap, como parte da Feature #307 (Fase 4).
+Até a Feature #330, `POST /pagamentos/registrar` disparava a entrega da OS
+por um evento `PagamentoRegistrado`, e `registrar-entrega` emitia esse mesmo
+evento sem existir pagamento. A #330 removeu os dois: hoje
+`PATCH /ordens-servico/:id/registrar-entrega` é o **único** caminho de
+escrita para `DELIVERED` (exige `FINISHED`, grava `entregue_em` e uma linha
+de histórico), e o webhook `POST /webhooks/service-orders/status` rejeita
+`DELIVERED` com `400`.
 
 **Mercado Pago no monólito (Feature #325, 20/10/2026).** Antes do Billing
 Service existir, a cobrança já roda no módulo `financeiro`:
@@ -112,14 +112,13 @@ Service existir, a cobrança já roda no módulo `financeiro`:
   transação do `Pagamento`: aprovado com o valor da cobrança → `CONFIRMADO` +
   `PagamentoConfirmadoEvent`; `rejected`/`cancelled` → `RECUSADO` +
   `PagamentoRecusadoEvent` (terminal, simplificação da ADR-0022); pendente →
-  sem efeito.
-- `POST /pagamentos/registrar` não cria nem marca pagamento: só dispara a
-  entrega (`PagamentoRegistrado`) se o `Pagamento` da OS estiver `CONFIRMADO`;
-  caso contrário, `409`.
-- Diferenças em relação ao fluxo da Fase 4 descrito abaixo: a OS não espera o
+  sem efeito. Esses eventos in-process do monólito não têm consumidor.
+- O OS Service consome `PagamentoConfirmado` do Billing pelo Kafka
+  (`RegistrarPagamentoConfirmadoHandler`, #331): grava `pago_em` e uma linha
+  em `HistoricoStatusOS`, **sem mudar status**, e não é gatilho da entrega.
+- Diferença em relação ao fluxo da Fase 4 descrito abaixo: a OS não espera o
   pagamento para sair de `AWAITING_APPROVAL` (só `ExecucaoIniciada` a leva a
-  `IN_PROGRESS`, e ela só chega do Execução) e nada consome os eventos de
-  pagamento por enquanto.
+  `IN_PROGRESS`, e ela só chega do Execução).
 
 ### Integração com o contexto Financeiro (Fase 4) {#integração-com-o-contexto-financeiro-fase-4}
 
@@ -221,7 +220,8 @@ usado por este fluxo. Logs de consumo registram `eventId` e
 [ADR-0018](../adr/0018-mensageria-contratos-eventos.md).
 
 O webhook existente `POST /api/v1/webhooks/service-orders/status` permanece
-como fallback documentado. A publicação após commit tem a janela aceita de
+como fallback documentado, exceto para `DELIVERED`, que ele rejeita (a
+entrega só passa por `registrar-entrega`). A publicação após commit tem a janela aceita de
 perda entre persistência e publicação; não há garantia de outbox. O fluxo
 completo, a matriz de falhas e os contratos de eventos estão em
 [`saga-flow.md`](./saga-flow.md) e [`event-catalog.md`](./event-catalog.md).
