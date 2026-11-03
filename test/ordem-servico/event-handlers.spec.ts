@@ -19,6 +19,13 @@ import { AtualizarStatusAguardandoPecasHandler } from '../../src/modules/ordem-s
 import { FalhaRetentavelException } from '../../src/shared/domain/exceptions/falha-retentavel.exception';
 import { StatusTransitionService } from '../../src/modules/ordem-servico/domain/services/status-transition.service';
 import { HistoricoStatus } from '../../src/modules/ordem-servico/domain/entities/historico-status.entity';
+import { PagamentoRecusado } from '../../src/modules/ordem-servico/domain/events/pagamento-recusado.event';
+import { StatusAtualizadoEncerradaSemExecucao } from '../../src/modules/ordem-servico/domain/events/status-atualizado-encerrada-sem-execucao.event';
+import { MOTIVO_ORCAMENTO_APROVADO } from '../../src/modules/ordem-servico/application/event-handlers/verificar-necessidade-pecas.handler';
+import {
+  MOTIVO_ORCAMENTO_RECUSADO,
+  MOTIVO_PAGAMENTO_RECUSADO,
+} from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-criada.event';
 import { DiagnosticoIniciado } from '../../src/modules/ordem-servico/domain/events/diagnostico-iniciado.event';
 import { ExecucaoIniciada } from '../../src/modules/ordem-servico/domain/events/execucao-iniciada.event';
@@ -254,32 +261,67 @@ describe('OS Event handlers', () => {
   // ─── P-06 ────────────────────────────────────────────────────────────────
 
   describe('P-06 AtualizarStatusAguardandoAprovacaoHandler', () => {
-    it('deve atualizar para AWAITING_APPROVAL quando OS está UNDER_DIAGNOSIS', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
+    it.each([
+      ['OrcamentoEnviado (in-process)', 'handle', new OrcamentoEnviado('os-1', 'orc-1')],
+      ['OrcamentoGerado (Billing)', 'handleOrcamentoGerado', new OrcamentoGerado('os-1', 'orc-1')],
+    ] as const)(
+      '%s leva UNDER_DIAGNOSIS a AWAITING_APPROVAL, condicionado ao status',
+      async (_origem, metodo, evento) => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
+        osRepo.atualizarSeCondicao.mockResolvedValue(true);
+        const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
+
+        await (handler[metodo] as (e: unknown) => Promise<void>).call(handler, evento);
+
+        expect(osRepo.atualizarSeCondicao).toHaveBeenCalledWith(
+          'os-1',
+          { status: 'UNDER_DIAGNOSIS' },
+          { status: 'AWAITING_APPROVAL' }
+        );
+        expect(osRepo.update).not.toHaveBeenCalled();
+      }
+    );
+
+    it('OrcamentoGerado com a OS em RECEIVED lança FalhaRetentavelException sem gravar', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
       const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
 
-      await handler.handle(new OrcamentoEnviado('os-1', 'orc-1'));
-
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'AWAITING_APPROVAL' });
+      await expect(
+        handler.handleOrcamentoGerado(new OrcamentoGerado('os-1', 'orc-1'))
+      ).rejects.toBeInstanceOf(FalhaRetentavelException);
+      expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
     });
 
-    it('não deve atualizar quando OS já não está UNDER_DIAGNOSIS', async () => {
-      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
-      await shouldNotUpdateWhenStatusIs(
-        osRepo,
-        handler,
-        'AWAITING_APPROVAL',
-        new OrcamentoEnviado('os-1', 'orc-1')
-      );
-    });
+    it.each<OSStatus>(['AWAITING_APPROVAL', 'IN_PROGRESS', 'CLOSED_WITHOUT_EXECUTION'])(
+      'com a OS já em %s é ack, sem gravar',
+      async (status) => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status }));
+        const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
+
+        await handler.handleOrcamentoGerado(new OrcamentoGerado('os-1', 'orc-1'));
+
+        expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+        expect(osRepo.update).not.toHaveBeenCalled();
+      }
+    );
   });
 
   // ─── P-07 ────────────────────────────────────────────────────────────────
 
   describe('P-07 VerificarNecessidadePecasHandler', () => {
-    it('deve emitir OrcamentoAprovadoComPecas quando valorTotalPecas > 0', async () => {
-      const handler = new VerificarNecessidadePecasHandler(emissor);
+    let historyRepo: jest.Mocked<IStatusHistoryRepository>;
+    let handler: VerificarNecessidadePecasHandler;
 
+    beforeEach(() => {
+      historyRepo = {
+        create: jest.fn(),
+        findByOrdemServicoId: jest.fn().mockResolvedValue([]),
+      } as jest.Mocked<IStatusHistoryRepository>;
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+      handler = new VerificarNecessidadePecasHandler(osRepo, historyRepo, emissor);
+    });
+
+    it('deve emitir OrcamentoAprovadoComPecas quando valorTotalPecas > 0', async () => {
       await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 50));
 
       const emitido = emissor.emitir.mock.calls[0][0];
@@ -287,13 +329,65 @@ describe('OS Event handlers', () => {
     });
 
     it('deve emitir OsSemPecasConfirmada quando valorTotalPecas é 0', async () => {
-      const handler = new VerificarNecessidadePecasHandler(emissor);
-
       await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 0));
 
       const emitido = emissor.emitir.mock.calls[0][0];
       expect(emitido).toBeInstanceOf(OsSemPecasConfirmada);
     });
+
+    it('registra a aprovação no histórico antes de pedir a reserva, sem mudar o status', async () => {
+      await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 50));
+
+      expect(historyRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ordemServicoId: 'os-1',
+          statusAnterior: 'AWAITING_APPROVAL',
+          statusNovo: 'AWAITING_APPROVAL',
+          motivo: MOTIVO_ORCAMENTO_APROVADO,
+        })
+      );
+      expect(historyRepo.create.mock.invocationCallOrder[0]).toBeLessThan(
+        emissor.emitir.mock.invocationCallOrder[0]
+      );
+      expect(osRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('reentrega com a aprovação já registrada não reserva de novo', async () => {
+      historyRepo.findByOrdemServicoId.mockResolvedValue([
+        HistoricoStatus.create({
+          ordemServicoId: 'os-1',
+          statusAnterior: 'AWAITING_APPROVAL',
+          statusNovo: 'AWAITING_APPROVAL',
+          motivo: MOTIVO_ORCAMENTO_APROVADO,
+        }),
+      ]);
+
+      await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 50));
+
+      expect(historyRepo.create).not.toHaveBeenCalled();
+      expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+
+    it('com a OS já CLOSED_WITHOUT_EXECUTION não reserva (ack)', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'CLOSED_WITHOUT_EXECUTION' }));
+
+      await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 50));
+
+      expect(historyRepo.create).not.toHaveBeenCalled();
+      expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+
+    it.each<OSStatus>(['RECEIVED', 'UNDER_DIAGNOSIS'])(
+      'com a OS em %s (antes do orçamento) lança FalhaRetentavelException sem reservar',
+      async (status) => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status }));
+
+        await expect(
+          handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 50))
+        ).rejects.toBeInstanceOf(FalhaRetentavelException);
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      }
+    );
   });
 
   // ─── P-08 ────────────────────────────────────────────────────────────────
@@ -1033,15 +1127,105 @@ describe('OS Event handlers', () => {
   // ─── P-14 ────────────────────────────────────────────────────────────────
 
   describe('P-14 AtualizarStatusEncerradaSemExecucaoHandler', () => {
-    it('deve atualizar para CLOSED_WITHOUT_EXECUTION e emitir StatusAtualizadoEncerradaSemExecucao', async () => {
-      osRepo.update.mockResolvedValue(mockOs({ status: 'CLOSED_WITHOUT_EXECUTION' }));
-      const handler = new AtualizarStatusEncerradaSemExecucaoHandler(osRepo, emissor);
+    let historyRepo: jest.Mocked<IStatusHistoryRepository>;
+    let handler: AtualizarStatusEncerradaSemExecucaoHandler;
+    const recusas = [
+      [
+        'OrcamentoRecusado',
+        (h: AtualizarStatusEncerradaSemExecucaoHandler) =>
+          h.handle(new OrcamentoRecusado('os-1', 'orc-1')),
+        MOTIVO_ORCAMENTO_RECUSADO,
+      ],
+      [
+        'PagamentoRecusado',
+        (h: AtualizarStatusEncerradaSemExecucaoHandler) =>
+          h.handlePagamentoRecusado(new PagamentoRecusado('os-1', 'pag-1')),
+        MOTIVO_PAGAMENTO_RECUSADO,
+      ],
+    ] as const;
 
-      await handler.handle(new OrcamentoRecusado('os-1', 'orc-1'));
+    beforeEach(() => {
+      historyRepo = {
+        create: jest.fn(),
+        findByOrdemServicoId: jest.fn().mockResolvedValue([]),
+      } as jest.Mocked<IStatusHistoryRepository>;
+      handler = new AtualizarStatusEncerradaSemExecucaoHandler(
+        osRepo,
+        emissor,
+        historyRepo,
+        transicao
+      );
+    });
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'CLOSED_WITHOUT_EXECUTION' });
-      const emitido = emissor.emitir.mock.calls[0][0];
-      expect(emitido.constructor.name).toBe('StatusAtualizadoEncerradaSemExecucao');
+    describe.each(recusas)('%s', (_nome, consumir, motivo) => {
+      it.each<OSStatus>(['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'])(
+        'em %s fecha a OS condicionado ao status lido, registra o motivo e emite',
+        async (status) => {
+          osRepo.findOne.mockResolvedValue(mockOs({ status }));
+          osRepo.atualizarSeCondicao.mockResolvedValue(true);
+
+          await consumir(handler);
+
+          expect(osRepo.atualizarSeCondicao).toHaveBeenCalledWith(
+            'os-1',
+            { status },
+            { status: 'CLOSED_WITHOUT_EXECUTION' }
+          );
+          expect(historyRepo.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+              statusAnterior: status,
+              statusNovo: 'CLOSED_WITHOUT_EXECUTION',
+              motivo,
+            })
+          );
+          expect(emissor.emitir.mock.calls[0][0]).toBeInstanceOf(
+            StatusAtualizadoEncerradaSemExecucao
+          );
+        }
+      );
+
+      it('se a OS mudou entre a leitura e a gravação, lança FalhaRetentavelException', async () => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+        osRepo.atualizarSeCondicao.mockResolvedValue(false);
+
+        await expect(consumir(handler)).rejects.toBeInstanceOf(FalhaRetentavelException);
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      });
+
+      it.each<OSStatus>(['IN_PROGRESS', 'AWAITING_PARTS'])(
+        'em %s (reparo em andamento) só registra o motivo, uma vez, sem mudar o status',
+        async (status) => {
+          jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+          osRepo.findOne.mockResolvedValue(mockOs({ status }));
+
+          await consumir(handler);
+          historyRepo.findByOrdemServicoId.mockResolvedValue([
+            HistoricoStatus.create({
+              ordemServicoId: 'os-1',
+              statusAnterior: status,
+              statusNovo: status,
+              motivo,
+            }),
+          ]);
+          await consumir(handler);
+
+          expect(historyRepo.create).toHaveBeenCalledTimes(1);
+          expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+          expect(emissor.emitir).not.toHaveBeenCalled();
+        }
+      );
+
+      it.each<OSStatus>(['CLOSED_WITHOUT_EXECUTION', 'FINISHED', 'DELIVERED'])(
+        'em %s é ack, sem gravar',
+        async (status) => {
+          osRepo.findOne.mockResolvedValue(mockOs({ status }));
+
+          await consumir(handler);
+
+          expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+          expect(historyRepo.create).not.toHaveBeenCalled();
+        }
+      );
     });
   });
 

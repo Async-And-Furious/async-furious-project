@@ -47,6 +47,7 @@ export function osKafkaSendRequest(
 }
 
 export const EXECUCAO_TOPIC = 'execucao.eventos.v1';
+export const BILLING_TOPIC = 'billing.eventos.v1';
 export const OS_RETRY_TOPIC = 'os.retry.v1';
 export const OS_DLT_TOPIC = 'os.dlt.v1';
 export const OS_CONSUMER_GROUP = 'os-consumer';

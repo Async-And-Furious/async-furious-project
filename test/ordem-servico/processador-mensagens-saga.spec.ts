@@ -28,7 +28,7 @@ const envelope = (eventType: string, extra: Record<string, unknown> = {}) => ({
 const json = (valor: unknown) => JSON.stringify(valor);
 
 describe('ProcessadorMensagensSaga', () => {
-  let despachar: jest.Mock<Promise<void>, [string]>;
+  let despachar: jest.Mock<Promise<void>, [Record<string, unknown>]>;
   let enviar: jest.Mock<Promise<void>, [string, string | null, unknown]>;
   let aguardar: jest.Mock<Promise<void>, [number]>;
   let publicador: jest.Mocked<IPublicadorIntegracao>;
@@ -38,7 +38,7 @@ describe('ProcessadorMensagensSaga', () => {
     jest.spyOn(Logger.prototype, 'log').mockImplementation();
     jest.spyOn(Logger.prototype, 'warn').mockImplementation();
     jest.spyOn(Logger.prototype, 'error').mockImplementation();
-    despachar = jest.fn<Promise<void>, [string]>().mockResolvedValue(undefined);
+    despachar = jest.fn<Promise<void>, [Record<string, unknown>]>().mockResolvedValue(undefined);
     enviar = jest
       .fn<Promise<void>, [string, string | null, unknown]>()
       .mockResolvedValue(undefined);
@@ -58,7 +58,7 @@ describe('ProcessadorMensagensSaga', () => {
   it('despacha o evento consumido com o ordemServicoId do envelope e faz ack', async () => {
     await processador.processar(EXECUCAO_TOPIC, OS_ID, json(envelope('ExecucaoIniciada')));
 
-    expect(despachar).toHaveBeenCalledWith(OS_ID);
+    expect(despachar).toHaveBeenCalledWith({ ordemServicoId: OS_ID });
     expect(enviar).not.toHaveBeenCalled();
   });
 
@@ -147,7 +147,7 @@ describe('ProcessadorMensagensSaga', () => {
     );
 
     expect(aguardar).toHaveBeenCalledWith(5_000);
-    expect(despachar).toHaveBeenCalledWith(OS_ID);
+    expect(despachar).toHaveBeenCalledWith({ ordemServicoId: OS_ID });
   });
 
   it('a terceira falha vai à DLT com attempt=3 e lastError', async () => {

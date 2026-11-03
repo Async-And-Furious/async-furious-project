@@ -7,12 +7,14 @@ export type OrdemServicoUpdateData = {
   finalizada_em?: Date | null;
   entregue_em?: Date | null;
   reserva_pecas_pendente?: boolean;
+  pago_em?: Date | null;
 };
 
 // Condição checada no próprio UPDATE (where), não numa leitura anterior.
+// `pago_em: null` casa só com OS ainda sem pagamento registrado.
 export type OrdemServicoCondicao = Pick<
   OrdemServicoUpdateData,
-  'status' | 'reserva_pecas_pendente'
+  'status' | 'reserva_pecas_pendente' | 'pago_em'
 >;
 
 export interface IOrdemServicoRepository {
