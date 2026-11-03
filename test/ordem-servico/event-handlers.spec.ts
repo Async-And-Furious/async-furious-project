@@ -121,6 +121,7 @@ describe('OS Event handlers', () => {
       findAll: jest.fn(),
       remove: jest.fn(),
       calcularTempoMedioExecucao: jest.fn(),
+      findParadasAguardandoAprovacao: jest.fn(),
     } as unknown as jest.Mocked<IOrdemServicoRepository>;
     orcRepo = {
       findByOrdemServicoId: jest.fn(),

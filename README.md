@@ -175,6 +175,8 @@ Sem `MP_ACCESS_TOKEN`, aprovar um orçamento falha; sem `MP_WEBHOOK_SECRET`, o w
 
 Sem `KAFKA_BROKERS`, o OS Service sobe sem publicar os eventos de integração (`OrdemServicoRecebida`, `OrcamentoCalculado` e `EtapaDaSagaFalhou` em `os.eventos.v1`) e só registra um aviso no log. Em HML, o `deploy-eks.yml` preenche o broker e as credenciais SASL.
 
+O detector de OS parada roda como CronJob (`k8s/app/detector-os-parada-cronjob.yaml`, a cada 5 minutos) com a mesma imagem da API: `node dist/detector-os-parada.js`. Ele fecha as OS em `AWAITING_APPROVAL` sem pagamento além de `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (padrão 2880, ou seja, 48 h) e publica `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`). Para a demonstração, baixe o prazo no ConfigMap para alguns minutos.
+
 ### 3. Iniciar com Docker para desenvolvimento
 
 ```bash

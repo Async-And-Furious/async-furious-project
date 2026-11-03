@@ -1,0 +1,43 @@
+# Detector de OS parada (ADR-0018, "Garantias de publicação"): varre OS em AWAITING_APPROVAL
+# sem pagamento além de DETECTOR_OS_PARADA_PRAZO_MINUTOS, publica EtapaDaSagaFalhou
+# (etapa=aprovacao-pagamento) e fecha a OS. Mesma imagem e mesmo ambiente da API.
+# concurrencyPolicy: Forbid garante uma execução por vez, mesmo com HPA nos pods da API.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: detector-os-parada
+  namespace: async-furious
+spec:
+  schedule: '*/5 * * * *'
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 120
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 240
+      template:
+        metadata:
+          labels:
+            app: detector-os-parada
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          containers:
+            - name: detector
+              image: ${app_image}
+              imagePullPolicy: IfNotPresent
+              command: ['node', 'dist/detector-os-parada.js']
+              resources:
+                requests:
+                  cpu: '50m'
+                  memory: '128Mi'
+                limits:
+                  cpu: '250m'
+                  memory: '256Mi'
+              envFrom:
+                - configMapRef:
+                    name: async-furious-config
+                - secretRef:
+                    name: async-furious-secret

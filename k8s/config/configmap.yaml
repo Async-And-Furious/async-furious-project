@@ -22,3 +22,5 @@ data:
   NEW_RELIC_LOG: "stdout"
   KAFKA_CLIENT_ID: "os-service"
   KAFKA_CONSUMER_GROUP: "os-consumer"
+  # Prazo do detector de OS parada (CronJob), em minutos. Padrão 48 h; na demonstração, alguns minutos.
+  DETECTOR_OS_PARADA_PRAZO_MINUTOS: "2880"

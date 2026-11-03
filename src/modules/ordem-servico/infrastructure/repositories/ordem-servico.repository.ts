@@ -169,6 +169,14 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     return count > 0;
   }
 
+  async findParadasAguardandoAprovacao(limite: Date): Promise<OrdemDeServico[]> {
+    const records = await this.prisma.ordemServico.findMany({
+      where: { status: 'AWAITING_APPROVAL', pago_em: null, updated_at: { lt: limite } },
+      orderBy: { updated_at: 'asc' },
+    });
+    return records.map((record) => this.mapToEntity(record));
+  }
+
   private paraDadosPrisma(data: OrdemServicoUpdateData) {
     return {
       ...(data.status && { status: data.status }),
