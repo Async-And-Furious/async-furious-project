@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 /**
  * Utility helpers for common repository patterns to avoid code duplication
  */
@@ -82,4 +83,9 @@ export async function findOneOrThrow<T>(
     throw new Error(`${entityName} not found`);
   }
   return entity;
+}
+
+// Violação de índice único no Postgres (Prisma P2002): o repository traduz para ConflitoException.
+export function isUniqueConstraintViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }

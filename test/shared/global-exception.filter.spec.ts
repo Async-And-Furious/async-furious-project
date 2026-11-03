@@ -110,8 +110,8 @@ describe('GlobalExceptionFilter', () => {
       expect(mockResponse.json.mock.calls[0][0].message).toBe(httpException.message);
     });
 
-    it('deve tratar erro genérico', () => {
-      const error = new Error('Erro genérico');
+    it('não devolve a mensagem interna de um erro não tratado; o detalhe fica só no log', () => {
+      const error = new Error("Can't reach database server at db.interno:5432");
 
       filter.catch(error, mockArgumentsHost);
 
@@ -120,9 +120,14 @@ describe('GlobalExceptionFilter', () => {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         timestamp: expect.any(String),
         path: '/api/v1/test',
-        message: 'Erro genérico',
+        message: 'Internal server error',
         error: 'Internal Server Error',
       });
+      expect(JSON.stringify(mockResponse.json.mock.calls[0][0])).not.toContain('db.interno');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        { err: error, statusCode: HttpStatus.INTERNAL_SERVER_ERROR },
+        'Unhandled exception: Internal Server Error'
+      );
     });
 
     it('deve tratar erro sem message', () => {
