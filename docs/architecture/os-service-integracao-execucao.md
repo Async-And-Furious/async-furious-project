@@ -95,6 +95,8 @@ do `@nestjs/event-emitter` (`suppressErrors: true`): o erro do listener é
 registrado em log pelo Nest e não sai do `emitAsync`. Até o consumidor Kafka
 existir, a falha retentável não é retentada; ela só não grava. O consumidor Kafka
 tem de receber a rejeição do handler, sem passar pelo wrapper que a suprime.
+Por isso o consumidor (`ProcessadorMensagensSaga`, #331) chama os handlers
+diretamente, e não pelo `EventEmitter2`.
 
 **Desvio do critério de ack em `ExecucaoIniciada`.** O critério original manda
 ack, com log, para `ExecucaoIniciada` com a OS além de `AWAITING_APPROVAL`. Em
@@ -211,14 +213,17 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
      - consumidor `os-consumer` de `execucao.eventos.v1` (`DiagnosticoIniciado`,
        `ExecucaoIniciada`, `ExecucaoConcluida`, `EtapaDaSagaFalhou`), com a
        classificação de falha da ADR-0018 e sem o wrapper que suprime a rejeição
-       (§3);
+       (§3). **Implementado na #331 (parte 2)** para os três eventos do Execução,
+       com `os.retry.v1` e `os.dlt.v1`; falta validar em HML. A `EtapaDaSagaFalhou`
+       de entrada depende da compensação (#338);
      - consumidor `os-consumer` de `billing.eventos.v1` (`OrcamentoGerado`,
        `OrcamentoAprovado`, `OrcamentoRecusado`, `PagamentoConfirmado`,
        `PagamentoRecusado`, `EtapaDaSagaFalhou`). Hoje o OS não consome o tópico.
        Sem ele, `OrcamentoGerado` não leva a OS a `AWAITING_APPROVAL` e
        `OrcamentoAprovado` não reserva peças;
      - publicador de `os.eventos.v1` (`OrdemServicoRecebida`, `OrcamentoCalculado`,
-       `EtapaDaSagaFalhou`). Hoje esses eventos saem só in-process.
+       `EtapaDaSagaFalhou`). **Implementado na #331 (parte 1, PR #385)**; falta
+       validar em HML.
   4. **`full-acceptance.yml` passando pelo fluxo do mecânico em HML**: a OS sai de
      `RECEIVED` e chega a `FINISHED`, e o tempo médio é consultado com dado real.
 

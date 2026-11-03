@@ -42,10 +42,32 @@ export function osKafkaConfig(env: NodeJS.ProcessEnv = process.env): KafkaConfig
 }
 
 /** Chave do registro = `ordemServicoId`: garante a ordem dos eventos da mesma OS no tópico. */
-export function osKafkaSendRequest(topic: string, key: string, envelope: unknown): ProducerRecord {
+export function osKafkaSendRequest(
+  topic: string,
+  key: string | null,
+  envelope: unknown
+): ProducerRecord {
   return {
     topic,
     acks: -1,
     messages: [{ key, value: JSON.stringify(envelope) }],
   };
 }
+
+export const EXECUCAO_TOPIC = 'execucao.eventos.v1';
+export const OS_RETRY_TOPIC = 'os.retry.v1';
+export const OS_DLT_TOPIC = 'os.dlt.v1';
+export const OS_CONSUMER_GROUP = 'os-consumer';
+
+// 3 entregas no total (ADR-0018): a original e duas pelo retry topic. Backoff de 30 s e 60 s
+// (ordem do exemplo da ADR): o "ainda não" existe para a ordem quebrada entre tópicos, e um
+// rebalance ou poucos segundos de atraso não podem virar EtapaDaSagaFalhou. A espera não
+// acontece dentro do eachMessage: o consumer pausa a partição do retry topic até o notBefore.
+export const MAX_TENTATIVAS = 3;
+
+export function backoffMs(tentativa: number): number {
+  return 30_000 * 2 ** (tentativa - 1);
+}
+
+// Nova tentativa de conexão do consumer quando o broker está fora na subida ou o kafkajs desiste.
+export const RECONEXAO_CONSUMER_MS = 15_000;
