@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import type { Application } from 'express';
 import { AppModule } from './../src/app.module';
 
 describe('AppController (e2e)', () => {
@@ -15,7 +16,7 @@ describe('AppController (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api/v1');
     await app.init();
-    server = request(app.getHttpServer());
+    server = request(app.getHttpServer() as unknown as Application);
   });
 
   it('/api/v1/health/live (GET) - liveness check', () => {

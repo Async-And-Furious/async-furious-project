@@ -1103,56 +1103,6 @@
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/assumir",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/assumir",
-      "description": "Role: mechanic",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{mechanic_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_040",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/analisar",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/analisar",
-      "description": "Role: mechanic",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{mechanic_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_041",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/servicos-insumos",
       "name": "PATCH /ordens-servico/{{ordem_id}}/servicos-insumos",
       "description": "Role: mechanic",
@@ -1174,7 +1124,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_042",
+      "_id": "req_040",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1199,7 +1149,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_043",
+      "_id": "req_041",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1224,32 +1174,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_044",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/finalizar-execucao",
-      "description": "Role: mechanic",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{mechanic_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_045",
+      "_id": "req_042",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1274,7 +1199,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_046",
+      "_id": "req_043",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1299,7 +1224,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_047",
+      "_id": "req_044",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,

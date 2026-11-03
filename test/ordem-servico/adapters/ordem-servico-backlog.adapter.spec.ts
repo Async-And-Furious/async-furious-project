@@ -55,7 +55,7 @@ describe('OrdemServicoBacklogAdapter', () => {
   });
 
   describe('findAllAguardandoPecas', () => {
-    it('should return all ordens servico awaiting parts with their pecas', async () => {
+    it('should return ordens awaiting parts (or with pending reservation) with their pecas', async () => {
       mockPrismaService.ordemServico.findMany.mockResolvedValue(mockOrdensServico);
 
       const result = await adapter.findAllAguardandoPecas();
@@ -66,7 +66,12 @@ describe('OrdemServicoBacklogAdapter', () => {
       expect(result[1].ordemId).toBe('os-2');
       expect(result[1].pecas).toHaveLength(1);
       expect(mockPrismaService.ordemServico.findMany).toHaveBeenCalledWith({
-        where: { status: 'AWAITING_PARTS' },
+        where: {
+          OR: [
+            { status: 'AWAITING_PARTS' },
+            { status: 'AWAITING_APPROVAL', reserva_pecas_pendente: true },
+          ],
+        },
         include: { osPecas: true },
       });
     });

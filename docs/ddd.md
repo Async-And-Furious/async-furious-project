@@ -255,6 +255,21 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `OrcamentoAprovado`
 *   `OrcamentoRejeitado`
 
+**Eventos de integração com o Execução e Produção (Fase 4, Feature #334).** Não
+são eventos de domínio do BC: atravessam a fronteira entre serviços
+(contrato em [`architecture/event-catalog.md`](./architecture/event-catalog.md);
+tratamento no código em
+[`architecture/os-service-integracao-execucao.md`](./architecture/os-service-integracao-execucao.md)).
+Hoje trafegam pelo `EmissorEventos` in-process, com o mesmo nome.
+
+*   Publicados pelo OS Service: `OrdemServicoRecebida` (entrada na fila de
+    diagnóstico do Execução), `OrcamentoCalculado` (renomeado a partir de
+    `ServicosEInsumosListados`; carrega `valorTotalServicos`,
+    `valorTotalPecas` e `valorTotalGeral`) e `EtapaDaSagaFalhou`.
+*   Consumidos pelo OS Service: `DiagnosticoIniciado` (`UNDER_DIAGNOSIS`),
+    `ExecucaoIniciada` (`IN_PROGRESS` e, com a reserva de peças pendente,
+    `AWAITING_PARTS`) e `ExecucaoConcluida` (`FINISHED`).
+
 #### Comandos:
 
 *   `IniciarOrdemDeServico`
@@ -269,14 +284,15 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `ConsultarProgressoOS`
 *   `AdicionarServicoAOS`
 *   `AdicionarPecaAOS`
-*   `FinalizarOrdemDeServico`
+*   `FinalizarOrdemDeServico` (disparado pelo evento `ExecucaoConcluida`; a
+    rota `finalizar-execucao` saiu do OS Service)
 *   `EntregarOrdemDeServico`
 
 ---
 
 ### 5.2. BC: Gestão Cadastral (`cadastro`)
 
-#### Eventos de Domínio (9):
+#### Eventos de Domínio (8):
 
 *   `ClienteCadastrado`
 *   `ClienteAtualizado`
@@ -286,7 +302,6 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `VeiculoRemovido`
 *   `ClienteIdentificado`
 *   `DadosClienteInformados`
-*   `VeiculoAnalisado`
 
 #### Comandos:
 
@@ -298,7 +313,6 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `RemoverVeiculo`
 *   `IdentificarCliente`
 *   `InformarDadosCliente`
-*   `AnalisarVeiculo`
 
 ---
 

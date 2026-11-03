@@ -71,16 +71,18 @@ model Veiculo {
 }
 
 model OrdemServico {
-  id            String    @id @default(uuid())
-  id_veiculo    String
-  id_cliente    String
-  status        SOStatus  @default(RECEIVED)
-  descricao     String?
-  iniciada_em   DateTime?
-  finalizada_em DateTime?
-  entregue_em   DateTime?
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  id                     String    @id @default(uuid())
+  id_veiculo             String
+  id_cliente             String
+  status                 SOStatus  @default(RECEIVED)
+  descricao              String?
+  iniciada_em            DateTime?
+  finalizada_em          DateTime?
+  entregue_em            DateTime?
+  // Reserva de peças pendente (sem estoque): decide AWAITING_PARTS ao consumir ExecucaoIniciada
+  reserva_pecas_pendente Boolean   @default(false)
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
 
   veiculo         Veiculo             @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
   cliente         Cliente             @relation(fields: [id_cliente], references: [id], onDelete: Cascade)

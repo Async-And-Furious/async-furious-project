@@ -317,48 +317,6 @@ collection:
             send: true
             store: true
           rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/assumir"
-        name: Assumir Ordem Servico
-        meta:
-          id: req_os_assumir
-          created: 1785600000000
-          modified: 1785600000000
-          isPrivate: false
-          description: "Requires MECANICO role — RECEIVED → UNDER_DIAGNOSIS"
-          sortKey: -1745628000056
-        method: PATCH
-        authentication:
-          type: bearer
-          token: "{{ mecanico_token }}"
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/analisar"
-        name: Analisar Veiculo
-        meta:
-          id: req_os_analisar
-          created: 1785600000000
-          modified: 1785600000000
-          isPrivate: false
-          description: "Requires MECANICO role — registers vehicle analysis"
-          sortKey: -1745628000057
-        method: PATCH
-        authentication:
-          type: bearer
-          token: "{{ mecanico_token }}"
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/servicos-insumos"
         name: Gerar Orcamento (servicos e insumos)
         meta:
@@ -366,7 +324,7 @@ collection:
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "Requires MECANICO role — generates quote (UNDER_DIAGNOSIS → AWAITING_APPROVAL)"
+          description: "Requires MECANICO role — calcula os totais e publica OrcamentoCalculado (OS em UNDER_DIAGNOSIS); o orçamento é gerado pelo Billing"
           sortKey: -1745628000058
         method: PATCH
         body:
@@ -420,27 +378,6 @@ collection:
           sortKey: -1745628000060
         method: PATCH
         authentication: {}
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/finalizar-execucao"
-        name: Finalizar Execucao
-        meta:
-          id: req_os_finalizar_execucao
-          created: 1785600000000
-          modified: 1785600000000
-          isPrivate: false
-          description: "Requires MECANICO role — IN_PROGRESS → FINISHED"
-          sortKey: -1745628000061
-        method: PATCH
-        authentication:
-          type: bearer
-          token: "{{ mecanico_token }}"
         settings:
           renderRequestBody: true
           encodeUrl: true
