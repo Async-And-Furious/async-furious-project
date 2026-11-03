@@ -327,15 +327,8 @@ jobs:
           print(address)
           PY
           )
-          access=$(python3 - "$state_file" "$runner_ip" <<'PY'
-          import json
-          import sys
-
-          state = json.load(open(sys.argv[1]))
-          cidrs = list(dict.fromkeys([*state["publicAccessCidrs"], f"{sys.argv[2]}/32"]))
-          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess=true,publicAccessCidrs={','.join(cidrs)}")
-          PY
-          )
+          printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-hml-runner-cidr"
+          access=$(python3 scripts/eks_endpoint_access.py open "$state_file" "${runner_ip}/32")
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
           deadline=$((SECONDS + 600))
@@ -575,21 +568,30 @@ jobs:
         run: |
           set -euo pipefail
           state_file="$RUNNER_TEMP/eks-hml-endpoint-access.json"
-          if [[ ! -s "$state_file" ]]; then
+          cidr_file="$RUNNER_TEMP/eks-hml-runner-cidr"
+          if [[ ! -s "$state_file" || ! -s "$cidr_file" ]]; then
             echo 'No saved HML EKS endpoint state; nothing to restore.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          access=$(python3 - "$state_file" <<'PY'
-          import json
-          import sys
-
-          state = json.load(open(sys.argv[1]))
-          access = f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess={str(state['endpointPublicAccess']).lower()}"
-          if state['publicAccessCidrs']:
-              access += f",publicAccessCidrs={','.join(state['publicAccessCidrs'])}"
-          print(access)
-          PY
-          )
+          # Billing e Execução liberam o próprio runner no mesmo cluster: a restauração relê a
+          # configuração atual e remove só o /32 deste run (scripts/eks_endpoint_access.py).
+          current_file="$RUNNER_TEMP/eks-hml-endpoint-current.json"
+          describe_error=$(mktemp)
+          if ! aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+            --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' \
+            --output json > "$current_file" 2>"$describe_error"; then
+            if grep -q ResourceNotFoundException "$describe_error"; then
+              echo 'HML EKS cluster no longer exists; endpoint state cannot be restored.' >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            cat "$describe_error" >&2
+            exit 1
+          fi
+          access=$(python3 scripts/eks_endpoint_access.py restore "$state_file" "$current_file" "$(<"$cidr_file")")
+          if [[ -z "$access" ]]; then
+            echo "### HML EKS endpoint already without $(<"$cidr_file"); nothing to restore." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           error_file=$(mktemp)
           trap 'status=$?; rm -f "$error_file"; if (( status != 0 )); then echo "### HML EKS endpoint restoration failed (exit $status)." >> "$GITHUB_STEP_SUMMARY"; fi; exit "$status"' EXIT
           deadline=$((SECONDS + 600))
@@ -606,7 +608,7 @@ jobs:
           while (( SECONDS < deadline )); do
             status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
             if [[ "$status" == 'Successful' ]]; then
-              echo '### HML EKS endpoint access restored to the saved original settings.' >> "$GITHUB_STEP_SUMMARY"
+              echo "### Removed $(<"$cidr_file") from HML EKS endpoint access; other deploys' access preserved." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
             [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "HML EKS endpoint restoration ended with status $status." >&2; exit 1; }
@@ -769,14 +771,9 @@ jobs:
           print(address)
           PY
           )
+          printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-prod-runner-cidr"
           state_file="$RUNNER_TEMP/eks-prod-endpoint-access.json"
-          access=$(python3 - "$state_file" "$runner_ip" <<'PY'
-          import json, sys
-          state = json.load(open(sys.argv[1]))
-          cidrs = list(dict.fromkeys([*state['publicAccessCidrs'], f'{sys.argv[2]}/32']))
-          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess=true,publicAccessCidrs={','.join(cidrs)}")
-          PY
-          )
+          access=$(python3 scripts/eks_endpoint_access.py open "$state_file" "${runner_ip}/32")
           update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --resources-vpc-config "$access" --query 'update.id' --output text)
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
@@ -943,13 +940,12 @@ jobs:
         run: |
           set -euo pipefail
           state_file="$RUNNER_TEMP/eks-prod-endpoint-access.json"
-          [[ -s "$state_file" ]] || exit 0
-          access=$(python3 - "$state_file" <<'PY'
-          import json, sys
-          state = json.load(open(sys.argv[1]))
-          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess={str(state['endpointPublicAccess']).lower()},publicAccessCidrs={','.join(state['publicAccessCidrs'])}")
-          PY
-          )
+          cidr_file="$RUNNER_TEMP/eks-prod-runner-cidr"
+          [[ -s "$state_file" && -s "$cidr_file" ]] || exit 0
+          current_file="$RUNNER_TEMP/eks-prod-endpoint-current.json"
+          aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
+          access=$(python3 scripts/eks_endpoint_access.py restore "$state_file" "$current_file" "$(<"$cidr_file")")
+          [[ -n "$access" ]] || exit 0
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
           deadline=$((SECONDS + 600))
