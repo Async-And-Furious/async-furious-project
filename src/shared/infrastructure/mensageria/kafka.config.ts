@@ -51,11 +51,15 @@ export const OS_RETRY_TOPIC = 'os.retry.v1';
 export const OS_DLT_TOPIC = 'os.dlt.v1';
 export const OS_CONSUMER_GROUP = 'os-consumer';
 
-// 3 entregas no total (ADR-0018): a original e duas pelo retry topic. Backoff de 1 s e 2 s,
-// curto para a espera dentro do eachMessage ficar bem abaixo do sessionTimeout do grupo (30 s).
+// 3 entregas no total (ADR-0018): a original e duas pelo retry topic. Backoff de 30 s e 60 s
+// (ordem do exemplo da ADR): o "ainda não" existe para a ordem quebrada entre tópicos, e um
+// rebalance ou poucos segundos de atraso não podem virar EtapaDaSagaFalhou. A espera não
+// acontece dentro do eachMessage: o consumer pausa a partição do retry topic até o notBefore.
 export const MAX_TENTATIVAS = 3;
-export const ESPERA_MAXIMA_RETRY_MS = 5_000;
 
 export function backoffMs(tentativa: number): number {
-  return 1_000 * 2 ** (tentativa - 1);
+  return 30_000 * 2 ** (tentativa - 1);
 }
+
+// Nova tentativa de conexão do consumer quando o broker está fora na subida ou o kafkajs desiste.
+export const RECONEXAO_CONSUMER_MS = 15_000;

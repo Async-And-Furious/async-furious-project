@@ -7,7 +7,6 @@ import {
   type EnvelopeRecebido,
 } from '../../../../shared/infrastructure/mensageria/envelope';
 import {
-  ESPERA_MAXIMA_RETRY_MS,
   MAX_TENTATIVAS,
   OS_DLT_TOPIC,
   OS_PRODUCER,
@@ -27,8 +26,15 @@ export interface DependenciasProcessador {
   despachantes: Record<string, Despachante>;
   publicador: IPublicadorIntegracao;
   enviar: (topic: string, key: string | null, envelope: unknown) => Promise<void>;
-  aguardar?: (ms: number) => Promise<void>;
   agora?: () => Date;
+}
+
+/**
+ * Mensagem do retry topic cujo `notBefore` ainda não chegou: não foi processada. O consumer
+ * pausa a partição e volta a entregar a mesma mensagem depois de `esperaMs`.
+ */
+export interface Adiamento {
+  esperaMs: number;
 }
 
 // `saga-flow.md` §3, "Evento original → etapa", linhas do OS Service.
@@ -61,44 +67,43 @@ const mensagemDeErro = (erro: unknown): string =>
  */
 export class ProcessadorMensagensSaga {
   private readonly logger = new Logger(ProcessadorMensagensSaga.name);
-  private readonly aguardar: (ms: number) => Promise<void>;
   private readonly agora: () => Date;
 
   constructor(private readonly deps: DependenciasProcessador) {
-    this.aguardar =
-      deps.aguardar ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
     this.agora = deps.agora ?? (() => new Date());
   }
 
+  /** Devolve um `Adiamento` quando a mensagem do retry topic ainda não deve ser processada. */
   async processar(
     topic: string,
     chave: string | null,
     valor: Buffer | string | null
-  ): Promise<void> {
+  ): Promise<Adiamento | null> {
     const bruto = this.parse(valor);
     if (topic === OS_DLT_TOPIC) {
       await this.processarDlt(bruto);
-      return;
+      return null;
     }
 
     const envelope = lerEnvelope(bruto, chave);
     if (!envelope) {
       await this.enviarEnvelopeInvalido(topic, chave);
-      return;
+      return null;
     }
 
     const despachar = this.deps.despachantes[envelope.eventType];
     if (!despachar) {
       this.logger.log(`${envelope.eventType} em ${topic} não é consumido pelo OS Service: ack`);
-      return;
+      return null;
+    }
+
+    if (topic === OS_RETRY_TOPIC && envelope.retry) {
+      const esperaMs = Date.parse(envelope.retry.notBefore) - this.agora().getTime();
+      if (esperaMs > 0) return { esperaMs };
     }
 
     const { ordemServicoId } = envelope.data;
     await runWithLogContext({ ordemServicoId, eventId: envelope.eventId }, async () => {
-      if (topic === OS_RETRY_TOPIC && envelope.retry) {
-        const espera = Date.parse(envelope.retry.notBefore) - this.agora().getTime();
-        if (espera > 0) await this.aguardar(Math.min(espera, ESPERA_MAXIMA_RETRY_MS));
-      }
       try {
         await despachar(ordemServicoId);
         this.logger.log(`${envelope.eventType} processado: OS ${ordemServicoId}`);
@@ -106,6 +111,7 @@ export class ProcessadorMensagensSaga {
         await this.tratarFalha(envelope, erro);
       }
     });
+    return null;
   }
 
   private async tratarFalha(envelope: EnvelopeRecebido, erro: unknown): Promise<void> {
