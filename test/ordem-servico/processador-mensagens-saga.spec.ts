@@ -30,7 +30,6 @@ const json = (valor: unknown) => JSON.stringify(valor);
 describe('ProcessadorMensagensSaga', () => {
   let despachar: jest.Mock<Promise<void>, [string]>;
   let enviar: jest.Mock<Promise<void>, [string, string | null, unknown]>;
-  let aguardar: jest.Mock<Promise<void>, [number]>;
   let publicador: jest.Mocked<IPublicadorIntegracao>;
   let processador: ProcessadorMensagensSaga;
 
@@ -42,13 +41,11 @@ describe('ProcessadorMensagensSaga', () => {
     enviar = jest
       .fn<Promise<void>, [string, string | null, unknown]>()
       .mockResolvedValue(undefined);
-    aguardar = jest.fn<Promise<void>, [number]>().mockResolvedValue(undefined);
     publicador = { publicar: jest.fn().mockResolvedValue(undefined) };
     processador = new ProcessadorMensagensSaga({
       despachantes: { ExecucaoIniciada: despachar },
       publicador,
       enviar,
-      aguardar,
       agora: () => AGORA,
     });
   });
@@ -89,7 +86,7 @@ describe('ProcessadorMensagensSaga', () => {
     );
   });
 
-  it('ainda-não (falha retentável) na primeira entrega vai ao retry topic com backoff de 1 s', async () => {
+  it('ainda-não (falha retentável) na primeira entrega vai ao retry topic com backoff de 30 s', async () => {
     despachar.mockRejectedValue(new FalhaRetentavelException('OS ainda em RECEIVED'));
 
     await processador.processar(EXECUCAO_TOPIC, OS_ID, json(envelope('ExecucaoIniciada')));
@@ -99,27 +96,28 @@ describe('ProcessadorMensagensSaga', () => {
       retry: {
         attempt: 1,
         firstFailedAt: AGORA.toISOString(),
-        notBefore: '2026-11-02T12:00:01.000Z',
+        notBefore: '2026-11-02T12:00:30.000Z',
       },
       lastError: 'OS ainda em RECEIVED',
     });
   });
 
-  it('no retry topic, espera o notBefore, e a segunda falha volta ao retry com backoff de 2 s', async () => {
+  it('no retry topic, com o notBefore já vencido, despacha e a segunda falha volta ao retry com backoff de 60 s', async () => {
     despachar.mockRejectedValue(new Error('banco indisponível'));
     const retry = {
       attempt: 1,
-      firstFailedAt: '2026-11-02T11:59:59.000Z',
-      notBefore: '2026-11-02T12:00:00.800Z',
+      firstFailedAt: '2026-11-02T11:59:29.000Z',
+      notBefore: '2026-11-02T11:59:59.000Z',
     };
 
-    await processador.processar(
+    const adiamento = await processador.processar(
       OS_RETRY_TOPIC,
       OS_ID,
       json(envelope('ExecucaoIniciada', { retry }))
     );
 
-    expect(aguardar).toHaveBeenCalledWith(800);
+    expect(adiamento).toBeNull();
+    expect(despachar).toHaveBeenCalledWith(OS_ID);
     expect(enviar).toHaveBeenCalledWith(
       OS_RETRY_TOPIC,
       OS_ID,
@@ -127,26 +125,44 @@ describe('ProcessadorMensagensSaga', () => {
         retry: {
           attempt: 2,
           firstFailedAt: retry.firstFailedAt,
-          notBefore: '2026-11-02T12:00:02.000Z',
+          notBefore: '2026-11-02T12:01:00.000Z',
         },
       })
     );
   });
 
-  it('a espera no retry topic é limitada, para não estourar o sessionTimeout do grupo', async () => {
+  it('no retry topic, antes do notBefore, não despacha nem espera: devolve o adiamento ao consumer', async () => {
     const retry = {
       attempt: 1,
       firstFailedAt: AGORA.toISOString(),
-      notBefore: '2026-11-02T13:00:00.000Z',
+      notBefore: '2026-11-02T12:00:30.000Z',
     };
 
-    await processador.processar(
+    const adiamento = await processador.processar(
       OS_RETRY_TOPIC,
       OS_ID,
       json(envelope('ExecucaoIniciada', { retry }))
     );
 
-    expect(aguardar).toHaveBeenCalledWith(5_000);
+    expect(adiamento).toEqual({ esperaMs: 30_000 });
+    expect(despachar).not.toHaveBeenCalled();
+    expect(enviar).not.toHaveBeenCalled();
+  });
+
+  it('notBefore no futuro fora do retry topic não adia (o bloco retry só vale no retry topic)', async () => {
+    const retry = {
+      attempt: 1,
+      firstFailedAt: AGORA.toISOString(),
+      notBefore: '2026-11-02T12:00:30.000Z',
+    };
+
+    const adiamento = await processador.processar(
+      EXECUCAO_TOPIC,
+      OS_ID,
+      json(envelope('ExecucaoIniciada', { retry }))
+    );
+
+    expect(adiamento).toBeNull();
     expect(despachar).toHaveBeenCalledWith(OS_ID);
   });
 
@@ -154,7 +170,7 @@ describe('ProcessadorMensagensSaga', () => {
     despachar.mockRejectedValue(new FalhaRetentavelException('ainda não'));
     const retry = {
       attempt: 2,
-      firstFailedAt: '2026-11-02T11:59:57.000Z',
+      firstFailedAt: '2026-11-02T11:58:30.000Z',
       notBefore: AGORA.toISOString(),
     };
 
@@ -231,7 +247,7 @@ describe('ProcessadorMensagensSaga', () => {
     );
 
     it('mensagem ilegível na DLT não gera evento nem derruba o consumidor', async () => {
-      await expect(processador.processar(OS_DLT_TOPIC, null, 'lixo')).resolves.toBeUndefined();
+      await expect(processador.processar(OS_DLT_TOPIC, null, 'lixo')).resolves.toBeNull();
       expect(publicador.publicar).not.toHaveBeenCalled();
     });
 

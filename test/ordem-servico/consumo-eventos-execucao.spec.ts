@@ -100,7 +100,6 @@ function montar(inicial: Estado) {
     }),
     publicador,
     enviar,
-    aguardar: () => Promise.resolve(),
   });
 
   const consumir = (eventType: string) =>
