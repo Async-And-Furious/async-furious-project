@@ -224,7 +224,8 @@ dead-letter-exchange nativo:
    registrada na #314 — "DLT → evento de falha → compensação"), no tópico
    `*.eventos.v1` do próprio serviço que falhou, com o campo `etapa`
    indicando onde a saga parou, para que os demais serviços interessados
-   possam compensar. O **detector de OS parada** (ver "Garantias de
+   possam compensar. Esta publicação de falha técnica é distinta dos cinco
+   eventos de negócio listados no catálogo. O **detector de OS parada** (ver "Garantias de
    publicação") publica o mesmo evento quando uma OS passa do prazo numa
    etapa. Payload: ver "Eventos de falha da saga" abaixo.
 

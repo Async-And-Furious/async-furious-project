@@ -100,8 +100,9 @@ Billing:
 
 O Billing consome `OrcamentoCalculado` (com `ordemServicoId`,
 `valorTotalServicos`, `valorTotalPecas` e `valorTotalGeral`) e
-`EtapaDaSagaFalhou` (payload descrito na ADR-0018). Não publica
-`OrcamentoAprovadoComPecas`, `SagaCompleted` ou `PagamentoEstornado`.
+`EtapaDaSagaFalhou` (falha técnica; payload descrito na ADR-0018), além dos
+cinco eventos de negócio listados acima. Não publica `OrcamentoAprovadoComPecas`,
+`SagaCompleted` ou `PagamentoEstornado`.
 `SagaStep` é evento customizado do New Relic, não evento Kafka. A publicação
 ocorre após o commit, sem outbox; webhook redelivered após o commit do
 processamento é considerado já processado e não república o evento. A única
