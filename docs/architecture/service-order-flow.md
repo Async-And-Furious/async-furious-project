@@ -110,8 +110,8 @@ o Billing Service é o dono deles. O OS Service:
   grava `pago_em` e uma linha em `HistoricoStatusOS`, **sem mudar status**, e
   não é gatilho da entrega).
 
-As tabelas `pagamentos`, `Orcamento` e `webhook_recebido` continuam no banco
-do OS Service até a migration destrutiva, em PR separado da #330.
+As tabelas `pagamentos`, `Orcamento` e `webhook_recebido` saíram do banco do
+OS Service na migration `20261103180000_remover_contexto_financeiro`.
 
 ### Integração com o contexto Financeiro (Fase 4) {#integração-com-o-contexto-financeiro-fase-4}
 
