@@ -73,7 +73,7 @@ kind load docker-image async-furious-api:latest --name async-furious
 |--------|------|----------|
 | `cadastro` | `src/modules/cadastro/` | Cliente, Veiculo, Servico |
 | `pecas-insumos` | `src/modules/pecas-insumos/` | Peca |
-| `ordem-servico` | `src/modules/ordem-servico/` | OrdemServico (Orcamento and Pagamento moved to the Billing Service in #330) |
+| `ordem-servico` | `src/modules/ordem-servico/` | OrdemServico (Orcamento and Pagamento live in the Billing Service since #330, code and tables) |
 | `auth` | `src/auth/` | User (JWT) |
 
 ### Shared
@@ -136,14 +136,12 @@ npx prisma migrate deploy # Production
 - `Cliente` → `Customer` table (with `nome`, `documento`, `tipo_documento`)
 - `Veiculo` → `Vehicle` table (with `placa`, `marca`, `modelo`, `ano`)
 - `OrdemServico` → `ServiceOrder` table (with `id_veiculo`, `id_cliente`)
-- `Orcamento` → `Estimate` table (1:1 with OrdemServico). No code uses it since #330; the model and the `Pagamento` model stay until the destructive migration PR
 - `Peca` → `Part` table
 - `Servico` → `Service` table
 
 ### Enums
 - `TaxIdType`: `CPF`, `CNPJ`
 - `SOStatus`: `RECEIVED`, `UNDER_DIAGNOSIS`, `AWAITING_APPROVAL`, `IN_PROGRESS`, `AWAITING_PARTS`, `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`
-- `EstimateStatus`: `PENDING`, `APPROVED`, `REJECTED`
 
 ---
 

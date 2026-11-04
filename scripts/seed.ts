@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-import { Prisma, PrismaClient, TaxIdType, SOStatus, EstimateStatus } from '@prisma/client';
+import { Prisma, PrismaClient, TaxIdType, SOStatus } from '@prisma/client';
 import { cpf } from 'cpf-cnpj-validator';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
@@ -678,14 +678,10 @@ async function seedPecasInsumos(db: SeedClient): Promise<void> {
   console.log(`  ✅ Peças/Insumos: ${criados} criados, ${pulados} já existiam`);
 }
 
+// Orçamento e pagamento são do Billing Service (#330): o seed do OS não os cria.
 type OrderTemplate = {
   descricao: string;
   status: SOStatus;
-  orcamento: {
-    valor_total_servicos: number;
-    valor_total_pecas: number;
-    status: EstimateStatus;
-  } | null;
 };
 
 type SeedOrder = Awaited<ReturnType<SeedClient['ordemServico']['create']>>;
@@ -698,13 +694,11 @@ type SeedManifest = {
   services: string[];
   parts: string[];
   orders: Array<{ id: string; status: SOStatus }>;
-  estimates: string[];
   orderServices: string[];
   orderParts: string[];
   supplierOrders: string[];
   supplierItems: string[];
   reservations: string[];
-  payments: string[];
   statusHistory: string[];
 };
 
@@ -741,31 +735,6 @@ async function findOrCreateOrdem(
   }
 }
 
-async function upsertOrcamento(
-  db: SeedClient,
-  osId: string,
-  orcamento: NonNullable<OrderTemplate['orcamento']>
-): Promise<void> {
-  const { valor_total_servicos, valor_total_pecas, status } = orcamento;
-  await db.orcamento.upsert({
-    where: { id_ordem_servico: osId },
-    update: {
-      valor_total_servicos,
-      valor_total_pecas,
-      valor_total_geral: valor_total_servicos + valor_total_pecas,
-      status,
-    },
-    create: {
-      id: stableSeedId(`orcamento:${osId}`),
-      id_ordem_servico: osId,
-      valor_total_servicos,
-      valor_total_pecas,
-      valor_total_geral: valor_total_servicos + valor_total_pecas,
-      status,
-    },
-  });
-}
-
 async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<SeedOrder[]> {
   const seededVehicleIds = VEICULOS_TEMPLATE.map(({ placa }) => stableSeedId(`veiculo:${placa}`));
   const veiculos = await db.veiculo.findMany({
@@ -779,84 +748,42 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
     {
       descricao: 'Troca de óleo e revisão completa do motor',
       status: SOStatus.RECEIVED,
-      orcamento: null,
     },
     {
       descricao: 'Barulho na suspensão dianteira',
       status: SOStatus.UNDER_DIAGNOSIS,
-      orcamento: null,
     },
     {
       descricao: 'Falha no sistema de freios — pastilhas desgastadas',
       status: SOStatus.AWAITING_APPROVAL,
-      orcamento: {
-        valor_total_servicos: 280.0,
-        valor_total_pecas: 89.9,
-        status: EstimateStatus.PENDING,
-      },
     },
     {
       descricao: 'Revisão dos 30.000 km',
       status: SOStatus.IN_PROGRESS,
-      orcamento: {
-        valor_total_servicos: 850.0,
-        valor_total_pecas: 230.0,
-        status: EstimateStatus.APPROVED,
-      },
     },
     {
       descricao: 'Troca de correia dentada e tensor',
       status: SOStatus.FINISHED,
-      orcamento: {
-        valor_total_servicos: 450.0,
-        valor_total_pecas: 185.0,
-        status: EstimateStatus.APPROVED,
-      },
     },
     {
       descricao: 'Higienização do ar condicionado',
       status: SOStatus.DELIVERED,
-      orcamento: {
-        valor_total_servicos: 200.0,
-        valor_total_pecas: 0.0,
-        status: EstimateStatus.APPROVED,
-      },
     },
     {
       descricao: 'Diagnóstico eletrônico — luz de injeção acesa',
       status: SOStatus.AWAITING_APPROVAL,
-      orcamento: {
-        valor_total_servicos: 150.0,
-        valor_total_pecas: 49.9,
-        status: EstimateStatus.REJECTED,
-      },
     },
     {
       descricao: 'Troca de bateria e verificação elétrica',
       status: SOStatus.DELIVERED,
-      orcamento: {
-        valor_total_servicos: 190.0,
-        valor_total_pecas: 280.0,
-        status: EstimateStatus.APPROVED,
-      },
     },
     {
       descricao: 'Alinhamento, balanceamento e geometria',
       status: SOStatus.IN_PROGRESS,
-      orcamento: {
-        valor_total_servicos: 430.0,
-        valor_total_pecas: 0.0,
-        status: EstimateStatus.APPROVED,
-      },
     },
     {
       descricao: 'Reparo no escapamento com vazamento',
       status: SOStatus.DELIVERED,
-      orcamento: {
-        valor_total_servicos: 310.0,
-        valor_total_pecas: 0.0,
-        status: EstimateStatus.REJECTED,
-      },
     },
   ];
 
@@ -876,10 +803,6 @@ async function seedOrdensServico(db: SeedClient, clienteIds: string[]): Promise<
     } else {
       criadas++;
     }
-
-    if (template.orcamento) {
-      await upsertOrcamento(db, result.os.id, template.orcamento);
-    }
   }
 
   console.log(`  ✅ Ordens de Serviço: ${criadas} criadas, ${puladas} já existiam`);
@@ -894,11 +817,9 @@ async function seedRelations(
   const partIds = PECAS_INSUMOS.map((part) => stableSeedId(`peca:${part.codigo}`));
   const orderServices: string[] = [];
   const orderParts: string[] = [];
-  const estimates: string[] = [];
   const supplierOrders: string[] = [];
   const supplierItems: string[] = [];
   const reservations: string[] = [];
-  const payments: string[] = [];
   const statusHistory: string[] = [];
 
   for (let index = 0; index < orders.length; index++) {
@@ -918,10 +839,6 @@ async function seedRelations(
     orderServices.push(osService.id);
     orderParts.push(osPart.id);
 
-    if (order.status !== SOStatus.RECEIVED && order.status !== SOStatus.UNDER_DIAGNOSIS) {
-      const estimateId = stableSeedId(`orcamento:${order.id}`);
-      estimates.push(estimateId);
-    }
     const historyId = stableSeedId(`historico:${order.id}:${order.status}`);
     await db.historicoStatusOS.upsert({
       where: { id: historyId },
@@ -930,16 +847,6 @@ async function seedRelations(
     });
     statusHistory.push(historyId);
 
-    if (index % 3 === 0) {
-      const paymentId = stableSeedId(`pagamento:${order.id}`);
-      // Upsert pela OS: ordemServicoId é único, e a OS pode já ter uma cobrança do Mercado Pago com outro id.
-      const payment = await db.pagamento.upsert({
-        where: { ordemServicoId: order.id },
-        update: { valor: 100 + index * 10, status: index % 2 === 0 ? 'PAGO' : 'AGUARDANDO_PAGAMENTO' },
-        create: { id: paymentId, ordemServicoId: order.id, valor: 100 + index * 10, status: index % 2 === 0 ? 'PAGO' : 'AGUARDANDO_PAGAMENTO' },
-      });
-      payments.push(payment.id);
-    }
     if (index % 2 === 0) {
       const reservationId = stableSeedId(`reserva:${order.id}:${partId}`);
       const existingReservation = await db.reservaEstoque.findFirst({ where: { ordem_id: order.id, peca_id: partId } });
@@ -957,7 +864,7 @@ async function seedRelations(
   await db.pedidoFornecedorItem.upsert({ where: { id: supplierItemId }, update: { quantidade_solicitada: 5, quantidade_recebida: 5 }, create: { id: supplierItemId, id_pedido_fornecedor: supplierOrderId, id_peca: partIds[0], quantidade_solicitada: 5, quantidade_recebida: 5 } });
   supplierItems.push(supplierItemId);
 
-  return { orders: orders.map((order) => ({ id: order.id, status: order.status })), estimates, orderServices, orderParts, supplierOrders, supplierItems, reservations, payments, statusHistory };
+  return { orders: orders.map((order) => ({ id: order.id, status: order.status })), orderServices, orderParts, supplierOrders, supplierItems, reservations, statusHistory };
 }
 
 async function seed(): Promise<void> {
