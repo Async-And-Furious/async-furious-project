@@ -51,7 +51,7 @@ foram removidos. `ServicosEInsumosListados` foi renomeado para
 | Evento | Quando | Consumidor |
 |---|---|---|
 | `OrdemServicoRecebida` | `POST /ordens-servico`, logo depois de `OrdemServicoCriada` | Execução e Produção (cria a `Execucao` na fila de diagnóstico) |
-| `OrcamentoCalculado` | `servicos-insumos` bem-sucedido | Billing Service; hoje, `GerarOrcamentoHandler` (ver §5) |
+| `OrcamentoCalculado` | `servicos-insumos` bem-sucedido | Billing Service (o `GerarOrcamentoHandler` in-process saiu na #330) |
 | `EtapaDaSagaFalhou` (`etapa=reparo`) | `ExecucaoConcluida` com a OS em `AWAITING_PARTS` | só registro e alerta; sem compensação automática (ADR-0018) |
 
 Enquanto não há produtor Kafka, os três saem pelo `EmissorEventos` in-process
@@ -137,7 +137,7 @@ mecânico inicia o reparo (`ExecucaoIniciada`). Por isso:
   Com a OS em `AWAITING_APPROVAL` só a pendência muda. Com a OS em `IN_PROGRESS`,
   é reserva confirmada depois do início do reparo: log informativo. Antes da
   aprovação, falha retentável; com o reparo encerrado, ack (§6).
-  `OsSemPecasConfirmada` deixou de ter ouvinte.
+  `OsSemPecasConfirmada` deixou de ter ouvinte e foi removido na #330.
 - `OrdemServicoBacklogAdapter.findAllAguardandoPecas` passou a devolver também
   as OS em `AWAITING_APPROVAL` com `reserva_pecas_pendente = true`: elas ainda
   não receberam `ExecucaoIniciada`, mas já esperam peça e precisam ser
@@ -177,10 +177,9 @@ diferentes. A coluna é aditiva: `BOOLEAN NOT NULL DEFAULT false`, migration
   `FINISHED`. O monólito sozinho não percorre mais o fluxo do mecânico: o
   teste e2e (`test/ordem-servico.e2e-spec.ts`) injeta os três eventos pelo
   `EventEmitter2`.
-- **`GerarOrcamentoHandler` continua**, agora ouvindo `OrcamentoCalculado`: faz
-  in-process o papel do Billing (persiste o `Orcamento` e emite
-  `OrcamentoGerado`). Deve ser removido junto com o corte do `Orcamento` para o
-  Billing, para não haver dois criadores de orçamento.
+- **`GerarOrcamentoHandler` foi removido na #330**, junto com o `Orcamento`: o
+  único criador de orçamento é o Billing, e a OS vai a `AWAITING_APPROVAL` pelo
+  `OrcamentoGerado` dele.
 - **Condição de merge.** As rotas do mecânico só saem de `develop` quando o fluxo
   estiver ligado de ponta a ponta. A condição é o conjunto abaixo, por repositório.
   O estado descrito foi conferido no código de cada repo em 28/10; antes do merge,

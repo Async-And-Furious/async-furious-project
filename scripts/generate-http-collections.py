@@ -41,7 +41,7 @@ def flatten(nodes):
     return result
 
 manifest_routes = flatten(manifest)
-assert len(manifest_routes) == 44 and len({r["id"] for r in manifest_routes}) == 44
+assert len(manifest_routes) == 41 and len({r["id"] for r in manifest_routes}) == 41
 def route_role(route):
     if route["auth"] == "customer":
         return "customer"

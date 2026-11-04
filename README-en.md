@@ -24,7 +24,6 @@ Backend for **integrated auto repair shop management**, built as the FIAP Softwa
 | **Vehicles** | CRUD with Brazilian plate validation. |
 | **Services** | Catalog of services offered by the shop. |
 | **Parts and Supplies** | CRUD with inventory control and supplier requests. |
-| **Payments** | Mercado Pago charge (Checkout Pro) on estimate approval, confirmed by webhook; manual payment registration with delivery trigger. |
 | **Authentication** | JWT with `ADMIN`, `RECEPCIONISTA`, and `MECANICO` roles. |
 
 ---
@@ -113,13 +112,9 @@ BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
 SEED_ADMIN_EMAIL="admin@oficina.com"
 SEED_ADMIN_PASSWORD="changeme123"
-# Mercado Pago (Checkout Pro) — credentials from the "Teste" tab of the Developer Dashboard
-MP_ACCESS_TOKEN=""
-MP_WEBHOOK_SECRET=""      # Webhooks → Configure notifications → secret key
-MP_NOTIFICATION_URL=""    # optional: public webhook URL, sent with each preference
 ```
 
-Without `MP_ACCESS_TOKEN`, approving an estimate fails; without `MP_WEBHOOK_SECRET`, the Mercado Pago webhook rejects every notification with `401`.
+Estimates, approval and charging (Mercado Pago) belong to the Billing Service; the Mercado Pago credentials live there.
 
 Without `KAFKA_BROKERS`, the OS Service starts without publishing the integration events (`OrdemServicoRecebida`, `OrcamentoCalculado` and `EtapaDaSagaFalhou` on `os.eventos.v1`) and only logs a warning. In HML, `deploy-eks.yml` fills in the broker and the SASL credentials.
 
@@ -210,9 +205,7 @@ docs/http/insomnia.yaml
 | PATCH | `/ordens-servico/:id` | ADMIN | Update service order. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Delete service order. |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Submit services and supplies (service order in `UNDER_DIAGNOSIS`): responds `200` with the calculated totals and publishes `OrcamentoCalculado`. Diagnosis start and execution completion now belong to the Execution service (`PATCH /execucoes/:id/iniciar-diagnostico` and `/concluir`) and reach this service as events. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Public | Customer approves estimate; the response includes `linkPagamento` (Mercado Pago Checkout Pro). `502` if Mercado Pago fails (estimate stays pending). |
-| PATCH | `/ordens-servico/:id/orcamento/recusar` | Public | Customer rejects estimate. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Public | Customer approves performed service. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Authenticated | Customer approves performed service. |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery (`FINISHED` → `DELIVERED`). The only path to `DELIVERED`: the status webhook rejects that value. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Check average execution time. |
 
@@ -229,11 +222,7 @@ docs/http/insomnia.yaml
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Request parts from supplier. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirm receipt of parts. |
 
-#### Mercado Pago webhook (`/api/v1/webhooks/mercado-pago`)
-
-| Method | Endpoint | Access | Description |
-| ------ | -------- | ------ | ----------- |
-| POST | `/webhooks/mercado-pago` | Public (`x-signature` signature) | Payment notification: re-fetches the payment from Mercado Pago; approved → `CONFIRMADO`, rejected → `RECUSADO`. Redeliveries have no effect. |
+Approving or rejecting the estimate and the Mercado Pago webhook live in the Billing Service (`/api/v1/orcamentos/*` and `/api/v1/webhooks/mercado-pago`).
 
 ---
 
@@ -359,9 +348,8 @@ src/
 │   │   ├── application/     # Use cases
 │   │   ├── infrastructure/  # Prisma repositories
 │   │   └── presentation/    # Controllers, DTOs
-│   ├── ordem-servico/       # Service Orders + Estimates
-│   ├── pecas-insumos/       # Parts, stock, supplier requests
-│   └── financeiro/          # Payments
+│   ├── ordem-servico/       # Service Orders
+│   └── pecas-insumos/       # Parts, stock, supplier requests
 └── shared/
     ├── domain/              # DomainEvent base, exceptions, interfaces
     └── infrastructure/      # PrismaService, EventEmitter, filters

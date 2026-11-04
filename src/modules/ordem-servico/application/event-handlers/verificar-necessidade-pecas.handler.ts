@@ -7,7 +7,6 @@ import type { IStatusHistoryRepository } from '../../domain/interfaces/status-hi
 import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 import { OrcamentoAprovado } from '../../domain/events/orcamento-aprovado.event';
-import { OsSemPecasConfirmada } from '../../domain/events/os-sem-pecas-confirmada.event';
 import { OrcamentoAprovadoComPecas } from '../../domain/events/orcamento-aprovado-com-pecas.event';
 
 export const MOTIVO_ORCAMENTO_APROVADO = 'Orçamento aprovado, aguardando pagamento';
@@ -68,11 +67,9 @@ export class VerificarNecessidadePecasHandler {
       })
     );
 
+    // Sem peças não há o que reservar: a OS segue em AWAITING_APPROVAL até ExecucaoIniciada.
     if (evento.valorTotalPecas > 0) {
-      // Emit event for pecas-insumos module to reserve stock (P-18 listener)
       await this.emissor.emitir(new OrcamentoAprovadoComPecas(ordemServicoId, evento.orcamentoId));
-    } else {
-      await this.emissor.emitir(new OsSemPecasConfirmada(ordemServicoId));
     }
   }
 }

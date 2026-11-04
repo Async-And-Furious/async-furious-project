@@ -24,7 +24,6 @@ Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech 
 | **Veículos** | CRUD com validação de placa brasileira. |
 | **Serviços** | Catálogo de serviços oferecidos pela oficina. |
 | **Peças e Insumos** | CRUD com controle de estoque e pedidos a fornecedores. |
-| **Pagamentos** | Cobrança via Mercado Pago (Checkout Pro) na aprovação do orçamento, confirmada por webhook; registro manual de pagamento com disparo da entrega. |
 | **Autenticação** | JWT com papéis `ADMIN`, `RECEPCIONISTA` e `MECANICO`. |
 
 ---
@@ -165,13 +164,9 @@ BCRYPT_SALT_ROUNDS=10
 ALLOWED_ORIGINS=http://localhost:3000
 SEED_ADMIN_EMAIL="admin@oficina.com"
 SEED_ADMIN_PASSWORD="changeme123"
-# Mercado Pago (Checkout Pro) — credenciais da aba "Teste" do Painel do Desenvolvedor
-MP_ACCESS_TOKEN=""
-MP_WEBHOOK_SECRET=""      # Webhooks → Configurar notificação → chave secreta
-MP_NOTIFICATION_URL=""    # opcional: URL pública do webhook, enviada em cada preference
 ```
 
-Sem `MP_ACCESS_TOKEN`, aprovar um orçamento falha; sem `MP_WEBHOOK_SECRET`, o webhook do Mercado Pago recusa toda notificação com `401`.
+Orçamento, aprovação e cobrança (Mercado Pago) são do Billing Service; as credenciais do Mercado Pago ficam lá.
 
 Sem `KAFKA_BROKERS`, o OS Service sobe sem publicar os eventos de integração (`OrdemServicoRecebida`, `OrcamentoCalculado` e `EtapaDaSagaFalhou` em `os.eventos.v1`) e só registra um aviso no log. Em HML, o `deploy-eks.yml` preenche o broker e as credenciais SASL.
 
@@ -264,9 +259,7 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Lançar serviços e insumos (OS em `UNDER_DIAGNOSIS`): responde `200` com os totais calculados e publica `OrcamentoCalculado`. O início do diagnóstico e a conclusão da execução agora são do serviço de Execução (`PATCH /execucoes/:id/iniciar-diagnostico` e `/concluir`) e chegam aqui por evento. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento; a resposta traz `linkPagamento` (Checkout Pro do Mercado Pago). `502` se o Mercado Pago falhar (orçamento segue pendente). |
-| PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Autenticado | Cliente aprova serviço prestado. |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega (OS `FINISHED` → `DELIVERED`). Único caminho para `DELIVERED`: o webhook de status rejeita esse valor. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
@@ -283,11 +276,7 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar peças a fornecedor. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de peças. |
 
-#### Webhook do Mercado Pago (`/api/v1/webhooks/mercado-pago`)
-
-| Método | Endpoint | Acesso | Descrição |
-| ------ | -------- | ------ | --------- |
-| POST | `/webhooks/mercado-pago` | Público (assinatura `x-signature`) | Notificação de pagamento: reconsulta o Mercado Pago; aprovado → `CONFIRMADO`, recusado → `RECUSADO`. Reentregas não têm efeito. |
+Aprovar ou recusar o orçamento e o webhook do Mercado Pago ficam no Billing Service (`/api/v1/orcamentos/*` e `/api/v1/webhooks/mercado-pago`).
 
 ---
 
@@ -409,9 +398,8 @@ src/
 │   │   ├── application/     # Use cases
 │   │   ├── infrastructure/  # Repositorios Prisma
 │   │   └── presentation/    # Controllers, DTOs
-│   ├── ordem-servico/       # Ordens de Servico + Orcamentos
-│   ├── pecas-insumos/       # Pecas, estoque, pedidos a fornecedores
-│   └── financeiro/          # Pagamentos
+│   ├── ordem-servico/       # Ordens de Servico
+│   └── pecas-insumos/       # Pecas, estoque, pedidos a fornecedores
 └── shared/
     ├── domain/              # DomainEvent base, excecoes, interfaces
     └── infrastructure/      # PrismaService, EmissorEventos, filtros

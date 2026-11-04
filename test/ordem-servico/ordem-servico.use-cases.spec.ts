@@ -1,11 +1,6 @@
-import { Prisma } from '@prisma/client';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
-import {
-  AprovarOrcamentoUseCase,
-  RecusarOrcamentoUseCase,
-} from '../../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
 import {
   CriarOrdemServicoUseCase,
   ListarServicosInsumosNaOsUseCase,
@@ -22,7 +17,6 @@ import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/event
 import { OrdemServicoRecebida } from '../../src/modules/ordem-servico/domain/events/ordem-servico-recebida.event';
 import { OrcamentoCalculado } from '../../src/modules/ordem-servico/domain/events/orcamento-calculado.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
-import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { IOsPecaRepository } from '../../src/modules/ordem-servico/domain/interfaces/os-peca.interface';
 import type { IClienteRepository } from '../../src/modules/cadastro/domain/interfaces/cliente.interface';
 import type { IVeiculoRepository } from '../../src/modules/cadastro/domain/interfaces/veiculo.interface';
@@ -30,10 +24,8 @@ import type { IServicoRepository } from '../../src/modules/cadastro/domain/inter
 import type { IPecaInsumoRepository } from '../../src/modules/pecas-insumos/domain/interfaces/peca-insumo.interface';
 import type { IOsServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/os-servico.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
-import type { ICobrancaPagamentoPort } from '../../src/shared/domain/interfaces/cobranca-pagamento.port';
 import type { Cliente } from '../../src/modules/cadastro/domain/entities/cliente.entity';
 import type { Veiculo } from '../../src/modules/cadastro/domain/entities/veiculo.entity';
-import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 import {
   OrdemDeServico,
   type OSStatus,
@@ -55,30 +47,17 @@ const makeOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico =>
     ...overrides,
   });
 
-describe('OS + Orçamento Use Cases', () => {
+describe('OS Use Cases', () => {
   let mockOsRepository: jest.Mocked<IOrdemServicoRepository>;
   let mockClienteRepository: jest.Mocked<IClienteRepository>;
   let mockVeiculoRepository: jest.Mocked<IVeiculoRepository>;
   let mockServicoRepository: jest.Mocked<IServicoRepository>;
   let mockPecaInsumoRepository: jest.Mocked<IPecaInsumoRepository>;
   let mockOsServicoRepository: jest.Mocked<IOsServicoRepository>;
-  let mockOrcamentoRepository: jest.Mocked<IOrcamentoRepository>;
   let mockOsPecaRepository: jest.Mocked<IOsPecaRepository>;
   let mockBarramento: jest.Mocked<EmissorEventos>;
-  let mockCobranca: jest.Mocked<ICobrancaPagamentoPort>;
 
   const mockOs = makeOs();
-
-  const mockOrcamento: Orcamento = {
-    id: 'orc-1',
-    id_ordem_servico: 'os-1',
-    valor_total_servicos: 100,
-    valor_total_pecas: 50,
-    valor_total_geral: 150,
-    status: 'PENDING',
-    created_at: new Date(),
-    updated_at: new Date(),
-  };
 
   beforeEach(() => {
     mockOsRepository = {
@@ -129,12 +108,6 @@ describe('OS + Orçamento Use Cases', () => {
       replaceAll: jest.fn(),
       findByOrdemServicoId: jest.fn(),
     };
-    mockOrcamentoRepository = {
-      create: jest.fn(),
-      findByOrdemServicoId: jest.fn(),
-      update: jest.fn(),
-      aprovarSePendente: jest.fn(),
-    } as jest.Mocked<IOrcamentoRepository>;
     mockOsPecaRepository = {
       replaceAll: jest.fn(),
       findByOrdemServicoId: jest.fn(),
@@ -142,9 +115,6 @@ describe('OS + Orçamento Use Cases', () => {
     mockBarramento = {
       emitir: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<EmissorEventos>;
-    mockCobranca = {
-      gerarLinkPagamento: jest.fn().mockResolvedValue('https://mp.test/checkout/os-1'),
-    };
   });
 
   describe('CriarOrdemServicoUseCase', () => {
@@ -167,7 +137,6 @@ describe('OS + Orçamento Use Cases', () => {
         mockPecaInsumoRepository,
         mockOsServicoRepository,
         mockOsPecaRepository,
-        mockOrcamentoRepository,
         mockBarramento
       );
 
@@ -191,7 +160,6 @@ describe('OS + Orçamento Use Cases', () => {
         clienteId: 'cli-1',
         descricao: 'Teste',
       });
-      expect(mockOrcamentoRepository.create).toHaveBeenCalled();
       expect(mockBarramento.emitir).toHaveBeenCalledTimes(2);
       expect(mockBarramento.emitir.mock.calls[0][0]).toBeInstanceOf(OrdemServicoCriada);
       expect(mockBarramento.emitir.mock.calls[1][0]).toBeInstanceOf(OrdemServicoRecebida);
@@ -214,7 +182,6 @@ describe('OS + Orçamento Use Cases', () => {
         mockPecaInsumoRepository,
         mockOsServicoRepository,
         mockOsPecaRepository,
-        mockOrcamentoRepository,
         mockBarramento
       );
 
@@ -259,7 +226,6 @@ describe('OS + Orçamento Use Cases', () => {
         valorTotalPecas: 320.5,
         valorTotalGeral: 770.5,
       });
-      expect(mockOrcamentoRepository.findByOrdemServicoId).not.toHaveBeenCalled();
     });
 
     it('soma sem erro de ponto flutuante (0.1 + 0.2)', async () => {
@@ -348,257 +314,6 @@ describe('OS + Orçamento Use Cases', () => {
         uc.execute('os-1', { descricao: 'Tentativa de edição', status: 'AWAITING_APPROVAL' })
       ).rejects.toThrow(DomainException);
       expect(mockOsRepository.update).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('AprovarOrcamentoUseCase', () => {
-    it('deve aprovar orçamento pendente e emitir OrcamentoAprovado', async () => {
-      const orcamentoAprovado = { ...mockOrcamento, status: 'APPROVED' as const };
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
-      mockOrcamentoRepository.aprovarSePendente.mockResolvedValue(orcamentoAprovado);
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      const result = await uc.execute('os-1');
-
-      expect(mockCobranca.gerarLinkPagamento).toHaveBeenCalledWith('os-1', 150);
-      expect(mockOrcamentoRepository.aprovarSePendente).toHaveBeenCalledWith('orc-1');
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('APPROVED');
-      expect(result.linkPagamento).toBe('https://mp.test/checkout/os-1');
-    });
-
-    it('deve enviar o valor como number quando o repositório devolve Decimal do Prisma', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
-        ...mockOrcamento,
-        valor_total_geral: new Prisma.Decimal('150.50') as unknown as number,
-      });
-      mockOrcamentoRepository.aprovarSePendente.mockResolvedValue({
-        ...mockOrcamento,
-        status: 'APPROVED',
-      });
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      await uc.execute('os-1');
-
-      expect(mockCobranca.gerarLinkPagamento).toHaveBeenCalledWith('os-1', 150.5);
-    });
-
-    it('deve manter orçamento PENDING quando a cobrança no Mercado Pago falha', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
-      mockCobranca.gerarLinkPagamento.mockRejectedValue(new Error('Mercado Pago indisponível'));
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-
-      await expect(uc.execute('os-1')).rejects.toThrow('Mercado Pago indisponível');
-      expect(mockOrcamentoRepository.aprovarSePendente).not.toHaveBeenCalled();
-      expect(mockBarramento.emitir).not.toHaveBeenCalled();
-    });
-
-    it('aprovação concorrente que perde a transição devolve o mesmo link sem publicar OrcamentoAprovado', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
-      mockOrcamentoRepository.aprovarSePendente.mockResolvedValue(null);
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      const result = await uc.execute('os-1');
-
-      expect(result.status).toBe('APPROVED');
-      expect(result.linkPagamento).toBe('https://mp.test/checkout/os-1');
-      expect(mockBarramento.emitir).not.toHaveBeenCalled();
-    });
-
-    it('deve lançar EntityNotFoundException quando OS não encontrada', async () => {
-      mockOsRepository.findOne.mockRejectedValue(
-        new EntityNotFoundException('OrdemDeServico', 'invalid')
-      );
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      await expect(uc.execute('invalid')).rejects.toThrow(EntityNotFoundException);
-    });
-
-    it('deve lançar DomainException quando orçamento não está PENDING', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
-        ...mockOrcamento,
-        status: 'REJECTED',
-      });
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
-
-    it('deve lançar EntityNotFoundException quando orçamento não existe', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(null);
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      await expect(uc.execute('os-1')).rejects.toThrow(EntityNotFoundException);
-    });
-
-    it('deve lançar DomainException quando valor_total_geral é zero', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
-        ...mockOrcamento,
-        valor_total_geral: 0,
-      });
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
-
-    it('deve lançar DomainException quando valor_total_geral é negativo', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
-        ...mockOrcamento,
-        valor_total_geral: -10,
-      });
-
-      const uc = new AprovarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento,
-        mockCobranca
-      );
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
-
-    it('deve lançar DomainException quando OS não está em AWAITING_APPROVAL', async () => {
-      const statusesInvalidos: OrdemDeServico['status'][] = [
-        'RECEIVED',
-        'UNDER_DIAGNOSIS',
-        'IN_PROGRESS',
-        'FINISHED',
-        'DELIVERED',
-        'CLOSED_WITHOUT_EXECUTION',
-      ];
-
-      for (const status of statusesInvalidos) {
-        mockOsRepository.findOne.mockResolvedValue(makeOs({ status }));
-
-        const uc = new AprovarOrcamentoUseCase(
-          mockOsRepository,
-          mockOrcamentoRepository,
-          mockBarramento,
-          mockCobranca
-        );
-        await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-        expect(mockOrcamentoRepository.findByOrdemServicoId).not.toHaveBeenCalled();
-        jest.clearAllMocks();
-      }
-    });
-  });
-
-  describe('RecusarOrcamentoUseCase', () => {
-    it('deve recusar orçamento pendente e emitir OrcamentoRecusado', async () => {
-      const orcamentoRecusado = { ...mockOrcamento, status: 'REJECTED' as const };
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
-      mockOrcamentoRepository.update.mockResolvedValue(orcamentoRecusado);
-
-      const uc = new RecusarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento
-      );
-      const result = await uc.execute('os-1');
-
-      expect(mockOrcamentoRepository.update).toHaveBeenCalledWith('orc-1', { status: 'REJECTED' });
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('REJECTED');
-    });
-
-    it('deve lançar DomainException quando orçamento não está PENDING', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue({
-        ...mockOrcamento,
-        status: 'APPROVED',
-      });
-
-      const uc = new RecusarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento
-      );
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
-
-    it('deve lançar EntityNotFoundException quando orçamento não existe', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'AWAITING_APPROVAL' }));
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(null);
-
-      const uc = new RecusarOrcamentoUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockBarramento
-      );
-      await expect(uc.execute('os-1')).rejects.toThrow(EntityNotFoundException);
-    });
-
-    it('deve lançar DomainException quando OS não está em AWAITING_APPROVAL', async () => {
-      const statusesInvalidos: OrdemDeServico['status'][] = [
-        'RECEIVED',
-        'UNDER_DIAGNOSIS',
-        'IN_PROGRESS',
-        'FINISHED',
-        'DELIVERED',
-        'CLOSED_WITHOUT_EXECUTION',
-      ];
-
-      for (const status of statusesInvalidos) {
-        mockOsRepository.findOne.mockResolvedValue(makeOs({ status }));
-
-        const uc = new RecusarOrcamentoUseCase(
-          mockOsRepository,
-          mockOrcamentoRepository,
-          mockBarramento
-        );
-        await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-        expect(mockOrcamentoRepository.findByOrdemServicoId).not.toHaveBeenCalled();
-        jest.clearAllMocks();
-      }
     });
   });
 

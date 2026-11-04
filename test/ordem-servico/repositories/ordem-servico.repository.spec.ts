@@ -32,7 +32,6 @@ describe('OrdemServicoRepository', () => {
       documento: '12345678901',
       tipo_documento: 'CPF',
     },
-    orcamento: null,
   };
 
   // Entity-shaped object (mapped by mapToEntity)
@@ -143,7 +142,6 @@ describe('OrdemServicoRepository', () => {
         include: {
           veiculo: true,
           cliente: true,
-          orcamento: true,
         },
       });
       expect(prismaService.ordemServico.count).toHaveBeenCalledWith({ where: {} });
@@ -178,7 +176,6 @@ describe('OrdemServicoRepository', () => {
         include: {
           veiculo: true,
           cliente: true,
-          orcamento: true,
         },
       });
       expect(result.data).toEqual([expect.objectContaining(mappedOrdemServico)]);
@@ -201,7 +198,6 @@ describe('OrdemServicoRepository', () => {
         include: {
           veiculo: true,
           cliente: true,
-          orcamento: true,
         },
       });
       expect(result.pagination).toEqual({
@@ -222,7 +218,7 @@ describe('OrdemServicoRepository', () => {
 
       expect(prismaService.ordemServico.findUnique).toHaveBeenCalledWith({
         where: { id },
-        include: { veiculo: true, cliente: true, orcamento: true },
+        include: { veiculo: true, cliente: true },
       });
       expect(result).toEqual(expect.objectContaining(mappedOrdemServico));
     });

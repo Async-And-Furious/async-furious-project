@@ -1,10 +1,7 @@
-import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { Logger } from '@nestjs/common';
 import { AtualizarStatusRecebidaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-recebida.handler';
 import { AtualizarStatusEmDiagnosticoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-em-diagnostico.handler';
 import { NotificarClienteDiagnosticoHandler } from '../../src/modules/ordem-servico/application/event-handlers/notificar-cliente-diagnostico.handler';
-import { GerarOrcamentoHandler } from '../../src/modules/ordem-servico/application/event-handlers/gerar-orcamento.handler';
-import { EnviarOrcamentoHandler } from '../../src/modules/ordem-servico/application/event-handlers/enviar-orcamento.handler';
 import { AtualizarStatusAguardandoAprovacaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-aguardando-aprovacao.handler';
 import { VerificarNecessidadePecasHandler } from '../../src/modules/ordem-servico/application/event-handlers/verificar-necessidade-pecas.handler';
 import { AtualizarStatusExecucaoIniciadaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-execucao-iniciada.handler';
@@ -32,27 +29,22 @@ import { ExecucaoConcluida } from '../../src/modules/ordem-servico/domain/events
 import { EtapaDaSagaFalhou } from '../../src/modules/ordem-servico/domain/events/etapa-da-saga-falhou.event';
 import { StatusAtualizadoAguardandoPecas } from '../../src/modules/ordem-servico/domain/events/status-atualizado-aguardando-pecas.event';
 import { StatusAtualizadoEmDiagnostico } from '../../src/modules/ordem-servico/domain/events/status-atualizado-em-diagnostico.event';
-import { OrcamentoCalculado } from '../../src/modules/ordem-servico/domain/events/orcamento-calculado.event';
 import { OrcamentoGerado } from '../../src/modules/ordem-servico/domain/events/orcamento-gerado.event';
-import { OrcamentoEnviado } from '../../src/modules/ordem-servico/domain/events/orcamento-enviado.event';
 import { OrcamentoAprovado } from '../../src/modules/ordem-servico/domain/events/orcamento-aprovado.event';
 import { OrdemServicoEmDiagnostico } from '../../src/modules/ordem-servico/domain/events/ordem-servico-em-diagnostico.event';
 import { OrdemServicoEmExecucao } from '../../src/modules/ordem-servico/domain/events/ordem-servico-em-execucao.event';
 import { OrdemServicoFinalizada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-finalizada.event';
-import { OsSemPecasConfirmada } from '../../src/modules/ordem-servico/domain/events/os-sem-pecas-confirmada.event';
 // `ServicoAprovadoPeloCliente` removed: not used in tests
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
 import { PecasIndisponiveis } from '../../src/modules/pecas-insumos/domain/events/pecas-indisponiveis.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
-import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import {
   OrdemDeServico,
   type OSStatus,
 } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { INotificacaoClienteGateway } from '../../src/modules/ordem-servico/application/ports/notificacao-cliente.gateway';
-import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 
 const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => {
   const os = new OrdemDeServico();
@@ -76,18 +68,6 @@ const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => {
   return os;
 };
 
-const mockOrc = (overrides: Partial<Orcamento> = {}): Orcamento => ({
-  id: 'orc-1',
-  id_ordem_servico: 'os-1',
-  valor_total_servicos: 100,
-  valor_total_pecas: 50,
-  valor_total_geral: 150,
-  status: 'PENDING',
-  created_at: new Date(),
-  updated_at: new Date(),
-  ...overrides,
-});
-
 /** Test helper: verifies handler should NOT update when OS has wrong status */
 async function shouldNotUpdateWhenStatusIs(
   osRepo: jest.Mocked<IOrdemServicoRepository>,
@@ -103,7 +83,6 @@ async function shouldNotUpdateWhenStatusIs(
 
 describe('OS Event handlers', () => {
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
-  let orcRepo: jest.Mocked<IOrcamentoRepository>;
   let emissor: jest.Mocked<EmissorEventos>;
   let notificacaoGateway: jest.Mocked<INotificacaoClienteGateway>;
   let transicao: StatusTransitionService;
@@ -120,12 +99,6 @@ describe('OS Event handlers', () => {
       calcularTempoMedioExecucao: jest.fn(),
       findParadasAguardandoAprovacao: jest.fn(),
     } as unknown as jest.Mocked<IOrdemServicoRepository>;
-    orcRepo = {
-      findByOrdemServicoId: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      aprovarSePendente: jest.fn(),
-    } as jest.Mocked<IOrcamentoRepository>;
     emissor = {
       emitir: jest.fn().mockResolvedValue(undefined),
     } as unknown as jest.Mocked<EmissorEventos>;
@@ -209,91 +182,23 @@ describe('OS Event handlers', () => {
     });
   });
 
-  // ─── P-04 ────────────────────────────────────────────────────────────────
-
-  describe('P-04 GerarOrcamentoHandler', () => {
-    const evento = new OrcamentoCalculado('os-1', 100, 50, 150);
-
-    it('deve criar orçamento quando não existe nenhum e emitir OrcamentoGerado', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      orcRepo.findByOrdemServicoId.mockResolvedValue(null);
-      orcRepo.create.mockResolvedValue(mockOrc());
-      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
-
-      await handler.handle(evento);
-
-      expect(orcRepo.create).toHaveBeenCalledWith(
-        expect.objectContaining({ id_ordem_servico: 'os-1' })
-      );
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrcamentoGerado));
-    });
-
-    it('deve atualizar orçamento existente com status PENDING', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
-      orcRepo.findByOrdemServicoId.mockResolvedValue(mockOrc({ status: 'PENDING' }));
-      orcRepo.update.mockResolvedValue(mockOrc());
-      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
-
-      await handler.handle(evento);
-
-      expect(orcRepo.update).toHaveBeenCalledWith(
-        'orc-1',
-        expect.objectContaining({ status: 'PENDING' })
-      );
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrcamentoGerado));
-    });
-
-    it('deve lançar DomainException quando orçamento já está APPROVED', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
-      orcRepo.findByOrdemServicoId.mockResolvedValue(mockOrc({ status: 'APPROVED' }));
-      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
-
-      await expect(handler.handle(evento)).rejects.toThrow(DomainException);
-    });
-
-    it('deve lançar DomainException quando OS está em status inválido', async () => {
-      osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const handler = new GerarOrcamentoHandler(osRepo, orcRepo, emissor);
-
-      await expect(handler.handle(evento)).rejects.toThrow(DomainException);
-    });
-  });
-
-  // ─── P-05 ────────────────────────────────────────────────────────────────
-
-  describe('P-05 EnviarOrcamentoHandler', () => {
-    it('deve emitir OrcamentoEnviado', async () => {
-      const handler = new EnviarOrcamentoHandler(emissor);
-
-      await handler.handle(new OrcamentoGerado('os-1', 'orc-1'));
-
-      expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrcamentoEnviado));
-    });
-  });
-
   // ─── P-06 ────────────────────────────────────────────────────────────────
 
   describe('P-06 AtualizarStatusAguardandoAprovacaoHandler', () => {
-    it.each([
-      ['OrcamentoEnviado (in-process)', 'handle', new OrcamentoEnviado('os-1', 'orc-1')],
-      ['OrcamentoGerado (Billing)', 'handleOrcamentoGerado', new OrcamentoGerado('os-1', 'orc-1')],
-    ] as const)(
-      '%s leva UNDER_DIAGNOSIS a AWAITING_APPROVAL, condicionado ao status',
-      async (_origem, metodo, evento) => {
-        osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-        osRepo.atualizarSeCondicao.mockResolvedValue(true);
-        const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
+    it('OrcamentoGerado (Billing) leva UNDER_DIAGNOSIS a AWAITING_APPROVAL, condicionado ao status', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
+      osRepo.atualizarSeCondicao.mockResolvedValue(true);
+      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
 
-        await (handler[metodo] as (e: unknown) => Promise<void>).call(handler, evento);
+      await handler.handleOrcamentoGerado(new OrcamentoGerado('os-1', 'orc-1'));
 
-        expect(osRepo.atualizarSeCondicao).toHaveBeenCalledWith(
-          'os-1',
-          { status: 'UNDER_DIAGNOSIS' },
-          { status: 'AWAITING_APPROVAL' }
-        );
-        expect(osRepo.update).not.toHaveBeenCalled();
-      }
-    );
+      expect(osRepo.atualizarSeCondicao).toHaveBeenCalledWith(
+        'os-1',
+        { status: 'UNDER_DIAGNOSIS' },
+        { status: 'AWAITING_APPROVAL' }
+      );
+      expect(osRepo.update).not.toHaveBeenCalled();
+    });
 
     it('OrcamentoGerado com a OS em RECEIVED lança FalhaRetentavelException sem gravar', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
@@ -341,11 +246,11 @@ describe('OS Event handlers', () => {
       expect(emitido.constructor.name).toBe('OrcamentoAprovadoComPecas');
     });
 
-    it('deve emitir OsSemPecasConfirmada quando valorTotalPecas é 0', async () => {
+    it('sem peças registra a aprovação e não emite evento de reserva', async () => {
       await handler.handle(new OrcamentoAprovado('os-1', 'orc-1', 0));
 
-      const emitido = emissor.emitir.mock.calls[0][0];
-      expect(emitido).toBeInstanceOf(OsSemPecasConfirmada);
+      expect(historyRepo.create).toHaveBeenCalledTimes(1);
+      expect(emissor.emitir).not.toHaveBeenCalled();
     });
 
     it('registra a aprovação no histórico antes de pedir a reserva, sem mudar o status', async () => {
