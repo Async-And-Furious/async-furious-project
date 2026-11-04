@@ -2,13 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { FalhaRetentavelException } from '../../../../shared/domain/exceptions/falha-retentavel.exception';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
-import { OrcamentoEnviado } from '../../domain/events/orcamento-enviado.event';
 import type { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event';
 
 /**
- * Leva a OS de UNDER_DIAGNOSIS a AWAITING_APPROVAL quando o orçamento fica pronto. In-process,
- * chega por OrcamentoEnviado (GerarOrcamentoHandler, até a #330 tirar o orçamento do OS); pelo
- * broker, por OrcamentoGerado do Billing, via `handleOrcamentoGerado`.
+ * Leva a OS de UNDER_DIAGNOSIS a AWAITING_APPROVAL quando o orçamento fica pronto: OrcamentoGerado
+ * do Billing (o Orcamento saiu do OS na #330). Pelo broker, chega via despachante; o @OnEvent
+ * serve ao e2e, que simula o Billing in-process.
  *
  * Guarda (ADR-0018): RECEIVED é "ainda-não" (o diagnóstico não foi consumido), falha
  * retentável; de AWAITING_APPROVAL em diante é "já-passou", ack. A gravação é condicionada a
@@ -20,11 +19,7 @@ export class AtualizarStatusAguardandoAprovacaoHandler {
 
   constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
 
-  @OnEvent('OrcamentoEnviado')
-  async handle(evento: OrcamentoEnviado): Promise<void> {
-    await this.aguardarAprovacao(evento.ordemServicoId, 'OrcamentoEnviado');
-  }
-
+  @OnEvent('OrcamentoGerado')
   async handleOrcamentoGerado(evento: OrcamentoGerado): Promise<void> {
     await this.aguardarAprovacao(evento.ordemServicoId, 'OrcamentoGerado');
   }

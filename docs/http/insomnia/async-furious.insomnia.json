@@ -1103,56 +1103,6 @@
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/aprovar",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/aprovar",
-      "description": "Role: customer",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_040",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/recusar",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/recusar",
-      "description": "Role: customer",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_041",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
       "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
       "name": "PATCH /ordens-servico/{{ordem_id}}/aprovar-servico",
       "description": "Role: customer",
@@ -1174,32 +1124,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_042",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
-      "name": "POST /ordens-servico/{{ordem_id}}/aprovar-servico",
-      "description": "Role: customer",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\"decisao\": \"APROVADO\"}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_043",
+      "_id": "req_040",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,

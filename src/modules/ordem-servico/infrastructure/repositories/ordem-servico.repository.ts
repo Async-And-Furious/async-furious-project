@@ -34,7 +34,6 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     pago_em: Date | null;
     created_at: Date;
     updated_at: Date;
-    orcamento?: unknown;
     veiculo?: unknown;
     cliente?: unknown;
   }): OrdemDeServico {
@@ -51,9 +50,6 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     entity.pago_em = record.pago_em;
     entity.created_at = record.created_at;
     entity.updated_at = record.updated_at;
-    if (record.orcamento !== undefined) {
-      entity.orcamento = record.orcamento as OrdemDeServico['orcamento'];
-    }
     return entity;
   }
 
@@ -93,7 +89,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
         skip: (page - 1) * limit,
         take: limit,
         orderBy: { created_at: 'desc' },
-        include: { veiculo: true, cliente: true, orcamento: true },
+        include: { veiculo: true, cliente: true },
       }),
       this.prisma.ordemServico.count({ where }),
     ]);
@@ -119,7 +115,6 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
       this.prisma.ordemServico.findMany({
         where,
         orderBy: { created_at: 'asc' },
-        include: { orcamento: true },
       }),
       this.prisma.ordemServico.count({ where }),
     ]);
@@ -135,7 +130,7 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
   async findOne(id: string): Promise<OrdemDeServico> {
     const record = await this.prisma.ordemServico.findUnique({
       where: { id },
-      include: { veiculo: true, cliente: true, orcamento: true },
+      include: { veiculo: true, cliente: true },
     });
     if (!record) throw new EntityNotFoundException('OrdemDeServico', id);
     return this.mapToEntity(record);

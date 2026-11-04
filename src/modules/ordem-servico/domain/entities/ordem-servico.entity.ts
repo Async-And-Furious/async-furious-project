@@ -1,4 +1,3 @@
-import type { Orcamento } from './orcamento.entity';
 import { OsPeca } from './os-peca.entity';
 import { OsServico } from './os-servico.entity';
 import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
@@ -26,7 +25,6 @@ export class OrdemDeServico {
   pago_em: Date | null;
   created_at: Date;
   updated_at: Date;
-  orcamento?: Orcamento;
   osPecas?: OsPeca[];
   osServicos?: OsServico[];
 
@@ -58,14 +56,6 @@ export class OrdemDeServico {
     if (this.status !== 'FINISHED') {
       throw new DomainException(
         `OS deve estar Finalizada para registrar a entrega. Status atual: ${this.status}`
-      );
-    }
-  }
-
-  podeAprovarOuRecusarOrcamento(): void {
-    if (this.status !== 'AWAITING_APPROVAL') {
-      throw new DomainException(
-        `OS deve estar em Aguardando Aprovação para aprovar ou recusar o orçamento. Status atual: ${this.status}`
       );
     }
   }

@@ -2,7 +2,6 @@ import { ConflitoException } from '../../../../shared/domain/exceptions/conflito
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
 import type { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
-import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOsPecaRepository } from '../../domain/interfaces/os-peca.interface';
 import { OrdemServicoCriada } from '../../domain/events/ordem-servico-criada.event';
 import { OrdemServicoRecebida } from '../../domain/events/ordem-servico-recebida.event';
@@ -26,7 +25,6 @@ export class CriarOrdemServicoUseCase {
     private readonly pecaInsumoRepository: IPecaInsumoRepository,
     private readonly osServicoRepository: IOsServicoRepository,
     private readonly osPecaRepository: IOsPecaRepository,
-    private readonly orcamentoRepository: IOrcamentoRepository,
     private readonly emissor: IEmissorEventos
   ) {}
 
@@ -64,7 +62,6 @@ export class CriarOrdemServicoUseCase {
     }
 
     // 3. Obter Preços e Calcular Totais
-    let valorTotalServicos = 0;
     const servicosComPreco: Array<{
       id_servico: string;
       quantidade: number;
@@ -75,7 +72,6 @@ export class CriarOrdemServicoUseCase {
       const servico = await this.servicoRepository.findOne(item.id_servico);
       const preco = Number(servico.preco);
       const total = preco * item.quantidade;
-      valorTotalServicos += total;
       servicosComPreco.push({
         id_servico: item.id_servico,
         quantidade: item.quantidade,
@@ -84,7 +80,6 @@ export class CriarOrdemServicoUseCase {
       });
     }
 
-    let valorTotalPecas = 0;
     const pecasComPreco: Array<{
       id_peca: string;
       quantidade: number;
@@ -95,7 +90,6 @@ export class CriarOrdemServicoUseCase {
       const peca = await this.pecaInsumoRepository.findOne(item.id_peca);
       const preco = Number(peca.preco);
       const total = preco * item.quantidade;
-      valorTotalPecas += total;
       pecasComPreco.push({
         id_peca: item.id_peca,
         quantidade: item.quantidade,
@@ -119,16 +113,7 @@ export class CriarOrdemServicoUseCase {
       await this.osPecaRepository.replaceAll(os.id, pecasComPreco);
     }
 
-    // 6. Gerar Orçamento Automático
-    // Assumindo que a interface IOrcamentoRepository possui um método create ou que podemos injetar CriarOrcamentoUseCase.
-    // Como a OS acabou de ser criada, o orcamento ainda não existe, então usamos o repository.create.
-    await this.orcamentoRepository.create({
-      id_ordem_servico: os.id,
-      valor_total_servicos: valorTotalServicos,
-      valor_total_pecas: valorTotalPecas,
-      valor_total_geral: valorTotalServicos + valorTotalPecas,
-    });
-
+    // O Orcamento é do Billing: nasce de OrcamentoCalculado, publicado em servicos-insumos.
     await this.emissor.emitir(new OrdemServicoCriada(os.id, os.clienteId, os.veiculoId));
     await this.emissor.emitir(new OrdemServicoRecebida(os.id));
     return this.ordemServicoRepository.findOne(os.id);

@@ -327,7 +327,8 @@ painel do vendedor de teste.
     (`PagamentoRegistrado`, fluxo da Fase 3) não é reaproveitado pelo webhook.
     **Atualização (#330, 03/11/2026):** `POST /pagamentos/registrar` e o
     `PagamentoRegistrado` foram removidos; a entrega só passa por
-    `registrar-entrega`;
+    `registrar-entrega`. Em seguida o módulo `financeiro` inteiro saiu do
+    monólito: a integração com o Mercado Pago vive só no Billing Service;
   - a migração `20261020150000_pagamento_idempotencia_mercado_pago` cria o
     índice único por OS e falha se um ambiente já tiver mais de um
     `Pagamento` para a mesma OS. O Billing começa vazio e não tem esse risco.
