@@ -11,7 +11,7 @@ descrições do monólito das Fases 1–3 para inferir requisitos da Fase 4.
 
 | Tipo | Fonte | O que estabelece |
 |---|---|---|
-| Requisito | Especificação do desafio no workspace: `docs/specs/tech-challenge-fase4.md` | O que o desafio exige; não comprova implementação. |
+| Requisito | Especificação do desafio no workspace (`docs/specs/tech-challenge-fase4.md`) | Referência de workspace para o que o desafio exige; não comprova implementação e não é link público. |
 | Decisão aceita | [ADRs 0016–0021](../adr/README.md) | Decisões arquiteturais aceitas para a Fase 4. |
 | Decisão proposta | [ADR-0022](../adr/0022-integracao-mercado-pago-checkout-pro.md) e [ADR-0023](../adr/0023-ferramenta-bdd-suite-saga.md) | Propostas ainda não aprovadas; não as trate como decisões vigentes. |
 | Desenho de arquitetura | [Fluxo único da Saga](../architecture/saga-flow.md), [fronteiras de serviço](../architecture/service-boundaries.md), [catálogo de eventos](../architecture/event-catalog.md) e [topologia da borda](../architecture/edge-topology.md) | Desenhos e contratos arquiteturais da Fase 4, não prova de que estão implantados. `saga-flow.md` é a fonte única do fluxo da Saga. |
@@ -39,12 +39,11 @@ pertence exclusivamente a qual fase; portanto, não se atribui essa divisão.
 Consulte também as [notas das fases anteriores](../adr/notas-fases-anteriores.md),
 que são material de trabalho, não ADR nem autoridade para a Fase 4.
 
-## Decisões anteriores sem fase estabelecida
+## Decisões da Fase 3
 
-As [ADRs 0001–0005](../adr/README.md) são decisões anteriores, mas a fonte não
-estabelece fase específica para cada uma. Não as classifique como decisões
-exclusivas de uma fase por inferência. Verifique o status individual no índice
-de ADRs.
+As [ADRs 0001, 0002, 0004 e 0005](../adr/README.md) referem explicitamente a
+Fase 3. A ADR-0003 não é atribuída a essa fase: não inferir sua classificação.
+Consulte o status individual no índice de ADRs.
 
 ## Fase 3 — material histórico
 
