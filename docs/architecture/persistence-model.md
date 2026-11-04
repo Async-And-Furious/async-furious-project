@@ -240,7 +240,7 @@ recriadas:
 | Serviço | Banco relacional | Banco não relacional |
 |---|---|---|
 | OS Service | PostgreSQL, banco lógico `os_service` na instância `tc3-db-${environment}` (ADR-0020); `db_name` de `workshop` para `os_service` em `repo-db-infra` (recria a instância) | DocumentDB — banco `os_read_model`, coleções `os_read_model` e `cliente_read_model` (cluster `tc3-docdb-${environment}`) |
-| Billing Service | PostgreSQL, banco lógico `billing` na mesma instância — **começa vazio** (`pagamentos` hoje só tem dado de teste) | Nenhum |
+| Billing Service | PostgreSQL, banco lógico `billing` na mesma instância — **começa vazio** (a tabela `pagamentos` do OS Service só tinha dado de teste e foi descartada na #330, sem migração de dados) | Nenhum |
 | Execução e Produção | PostgreSQL, banco lógico `execucao_producao` na mesma instância — schema nasce vazio | Nenhum |
 
 Detalhe do isolamento por credencial (por que uma instância só, com banco e
