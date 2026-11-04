@@ -45,7 +45,10 @@ alvo.
 O OS Service publica no tópico `os.eventos.v1`:
 
 - `OrdemServicoRecebida` → Execução e Produção;
-- `OrcamentoCalculado` → Billing Service.
+- `OrcamentoCalculado` → Billing Service;
+- `EtapaDaSagaFalhou` quando o OS Service detecta falha técnica ou OS parada, conforme as condições descritas no [catálogo de eventos](./architecture/event-catalog.md).
+
+A lista é exemplificativa; consulte o catálogo para contrato e condições completos.
 
 Consome no grupo `os-consumer`:
 
