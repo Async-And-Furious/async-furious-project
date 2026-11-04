@@ -1419,45 +1419,6 @@
           }
         },
         {
-          "name": "POST /pagamentos/registrar",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/pagamentos/registrar",
-              "host": [
-                "{{base_url}}/api/v1",
-                "/pagamentos/registrar"
-              ]
-            },
-            "description": "Role: customer; 400 is allowed for an intentionally invalid/state-incompatible mock.",
-            "body": {
-              "mode": "raw",
-              "raw": "{\"ordemServicoId\": \"{{ordem_id}}\", \"valor\": 1}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{customer_token}}",
-                  "type": "string"
-                }
-              ]
-            }
-          }
-        },
-        {
           "name": "POST /webhooks/service-orders/status",
           "request": {
             "method": "POST",

@@ -213,7 +213,7 @@ docs/http/insomnia.yaml
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Public | Customer approves estimate; the response includes `linkPagamento` (Mercado Pago Checkout Pro). `502` if Mercado Pago fails (estimate stays pending). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Public | Customer rejects estimate. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Public | Customer approves performed service. |
-| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery. |
+| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery (`FINISHED` → `DELIVERED`). The only path to `DELIVERED`: the status webhook rejects that value. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Check average execution time. |
 
 #### Parts and Supplies (`/api/v1/pecas`)
@@ -228,12 +228,6 @@ docs/http/insomnia.yaml
 | DELETE | `/pecas/:id` | ADMIN | Delete part or supply. |
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Request parts from supplier. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirm receipt of parts. |
-
-#### Payments (`/api/v1/pagamentos`)
-
-| Method | Endpoint | Access | Description |
-| ------ | -------- | ------ | ----------- |
-| POST | `/pagamentos/registrar` | Authenticated | Trigger delivery of a service order whose payment was already confirmed by Mercado Pago (`409` otherwise). Does not create or mark payments. |
 
 #### Mercado Pago webhook (`/api/v1/webhooks/mercado-pago`)
 
@@ -286,9 +280,11 @@ execution started` — payment happens right after estimate approval and
 **before** execution starts, as a mandatory step so that the Billing
 Service participates in the distributed transaction. Delivery is left out
 of the saga's scope because it is an in-person act with no asynchronous
-counterpart to coordinate; the "payment confirmed" check performed before
-`registrar-entrega` is a safety lock on that same payment — not a second
-charge. Compensation is logical by default (revert OS status, close the
+counterpart to coordinate; `registrar-entrega` does not check payment,
+because `FINISHED` is only reachable after `PagamentoConfirmado`
+([`saga-flow.md` §4](./docs/architecture/saga-flow.md)). The OS Service only
+records the `pago_em` marker when it receives `PagamentoConfirmado`, without
+changing status. Compensation is logical by default (revert OS status, close the
 estimate without execution); a real Mercado Pago refund is only triggered
 if the payment had already been captured before the failure.
 

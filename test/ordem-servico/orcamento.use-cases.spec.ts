@@ -17,6 +17,7 @@ import {
   DetalharOrdemServicoUseCase,
   DeletarOrdemServicoUseCase,
 } from '../../src/modules/ordem-servico/application/use-cases/ordem-servico.use-cases';
+import type { UpdateServiceOrderStatusUseCase } from '../../src/modules/ordem-servico/application/use-cases/update-service-order-status.use-case';
 import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-criada.event';
 import { OrdemServicoRecebida } from '../../src/modules/ordem-servico/domain/events/ordem-servico-recebida.event';
 import { OrcamentoCalculado } from '../../src/modules/ordem-servico/domain/events/orcamento-calculado.event';
@@ -624,26 +625,34 @@ describe('OS + Orçamento Use Cases', () => {
   });
 
   describe('RegistrarEntregaVeiculoUseCase', () => {
-    it('deve emitir PagamentoRegistrado e retornar a OS entregue', async () => {
-      const osFinalizada = makeOs({ status: 'FINISHED' });
-      const osEntregue = makeOs({ status: 'DELIVERED' });
-      mockOsRepository.findOne
-        .mockResolvedValueOnce(osFinalizada)
-        .mockResolvedValueOnce(osEntregue);
+    const makeAtualizarStatus = () =>
+      ({ execute: jest.fn() }) as unknown as jest.Mocked<UpdateServiceOrderStatusUseCase>;
 
-      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, mockBarramento);
+    it('deve gravar DELIVERED pelo caso de uso de status, sem evento de pagamento', async () => {
+      const osEntregue = makeOs({ status: 'DELIVERED' });
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'FINISHED' }));
+      const atualizarStatus = makeAtualizarStatus();
+      atualizarStatus.execute.mockResolvedValue(osEntregue);
+
+      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, atualizarStatus);
       const result = await uc.execute('os-1');
 
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('DELIVERED');
+      expect(atualizarStatus.execute).toHaveBeenCalledWith('os-1', 'DELIVERED');
+      expect(mockBarramento.emitir).not.toHaveBeenCalled();
+      expect(result).toBe(osEntregue);
     });
 
-    it('deve lançar DomainException quando OS não está FINISHED', async () => {
-      mockOsRepository.findOne.mockResolvedValue(mockOs);
+    it.each<OSStatus>(['IN_PROGRESS', 'AWAITING_APPROVAL', 'DELIVERED'])(
+      'deve rejeitar a entrega quando a OS está %s',
+      async (status) => {
+        mockOsRepository.findOne.mockResolvedValue(makeOs({ status }));
+        const atualizarStatus = makeAtualizarStatus();
 
-      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, mockBarramento);
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
+        const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, atualizarStatus);
+        await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+        expect(atualizarStatus.execute).not.toHaveBeenCalled();
+      }
+    );
   });
 
   describe('ConsultarStatusOrdemServicoUseCase', () => {

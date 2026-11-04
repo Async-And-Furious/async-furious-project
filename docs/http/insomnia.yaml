@@ -1278,43 +1278,6 @@ collection:
             send: true
             store: true
           rebuildPath: true
-  - name: Pagamentos
-    meta:
-      id: fld_pagamentos
-      created: 1785600000010
-      modified: 1785600000010
-      sortKey: -1745628000055
-      description: Payment registration endpoints
-    children:
-      - url: "{{ base_url }}/pagamentos/registrar"
-        name: Registrar Pagamento
-        meta:
-          id: req_pagamento_registrar
-          created: 1785600000010
-          modified: 1785600000010
-          isPrivate: false
-          description: "PUBLIC - No auth required — registers payment for an OS"
-          sortKey: -1745628000055
-        method: POST
-        body:
-          mimeType: application/json
-          text: |-
-            {
-              "ordemServicoId": "{{ ordem_id }}",
-              "valor": 330.00
-            }
-        headers:
-          - name: Content-Type
-            value: application/json
-        authentication: {}
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
 cookieJar:
   name: Default Jar
   meta:
