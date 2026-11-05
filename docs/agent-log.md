@@ -1,5 +1,11 @@
 # Log de agentes
 
+## 2026-10-28 — Índice documental por fase
+
+- Adicionado `docs/phases/README.md` para separar fontes da Fase 4,
+  referências históricas e tipos de evidência; atualizado `docs/README.md`.
+- Nenhuma implementação, ADR ou documento existente foi movido ou alterado.
+
 ## 2026-10-28 — Ajustes da pipeline Fase 4 (#333)
 
 - A decisão vigente da Fase 4 é HML-only: `deploy-prod` fica inerte, e os
