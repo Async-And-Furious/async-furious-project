@@ -4,6 +4,7 @@ import { getLoggerToken } from 'nestjs-pino';
 import { GlobalExceptionFilter } from '../../src/shared/infrastructure/filters/global-exception.filter';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
+import { FalhaRetentavelException } from '../../src/shared/domain/exceptions/falha-retentavel.exception';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 
 describe('GlobalExceptionFilter', () => {
@@ -72,6 +73,15 @@ describe('GlobalExceptionFilter', () => {
       });
     });
 
+    it('não deve tratar FalhaRetentavelException como erro de negócio (400): responde 500', () => {
+      filter.catch(
+        new FalhaRetentavelException('ExecucaoIniciada antes da aprovação'),
+        mockArgumentsHost
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
+    });
+
     it('deve tratar ConflitoException como 409', () => {
       filter.catch(new ConflitoException('Já existe'), mockArgumentsHost);
 
@@ -110,8 +120,8 @@ describe('GlobalExceptionFilter', () => {
       expect(mockResponse.json.mock.calls[0][0].message).toBe(httpException.message);
     });
 
-    it('deve tratar erro genérico', () => {
-      const error = new Error('Erro genérico');
+    it('não devolve a mensagem interna de um erro não tratado; o detalhe fica só no log', () => {
+      const error = new Error("Can't reach database server at db.interno:5432");
 
       filter.catch(error, mockArgumentsHost);
 
@@ -120,9 +130,14 @@ describe('GlobalExceptionFilter', () => {
         statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
         timestamp: expect.any(String),
         path: '/api/v1/test',
-        message: 'Erro genérico',
+        message: 'Internal server error',
         error: 'Internal Server Error',
       });
+      expect(JSON.stringify(mockResponse.json.mock.calls[0][0])).not.toContain('db.interno');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        { err: error, statusCode: HttpStatus.INTERNAL_SERVER_ERROR },
+        'Unhandled exception: Internal Server Error'
+      );
     });
 
     it('deve tratar erro sem message', () => {

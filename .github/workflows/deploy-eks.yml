@@ -561,6 +561,8 @@ jobs:
           kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
+          sed "s|\${app_image}|$IMAGE|g" k8s/app/detector-os-parada-cronjob.yaml > "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
+          kubectl apply -f "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
 
       - name: Capture HML rollout diagnostics
@@ -936,6 +938,8 @@ jobs:
           kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
+          sed "s|\${app_image}|$IMAGE|g" k8s/app/detector-os-parada-cronjob.yaml > "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
+          kubectl apply -f "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
 
       - name: Restore original PROD EKS endpoint access

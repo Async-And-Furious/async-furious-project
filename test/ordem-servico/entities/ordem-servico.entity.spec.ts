@@ -150,4 +150,27 @@ describe('OrdemDeServico Entity', () => {
     expect(ordemServico.created_at).toBeDefined();
     expect(ordemServico.updated_at).toBeDefined();
   });
+
+  describe('podeLancarServicosInsumos', () => {
+    const osComStatus = (status: OSStatus): OrdemDeServico =>
+      Object.assign(new OrdemDeServico(), { id: 'os-1', status });
+
+    it('aceita a OS em UNDER_DIAGNOSIS', () => {
+      expect(() => osComStatus('UNDER_DIAGNOSIS').podeLancarServicosInsumos()).not.toThrow();
+    });
+
+    it.each<OSStatus>([
+      'RECEIVED',
+      'AWAITING_APPROVAL',
+      'IN_PROGRESS',
+      'AWAITING_PARTS',
+      'FINISHED',
+      'DELIVERED',
+      'CLOSED_WITHOUT_EXECUTION',
+    ])('rejeita a OS em %s', (status) => {
+      expect(() => osComStatus(status).podeLancarServicosInsumos()).toThrow(
+        'OS deve estar Em Diagnóstico para lançar serviços e insumos'
+      );
+    });
+  });
 });

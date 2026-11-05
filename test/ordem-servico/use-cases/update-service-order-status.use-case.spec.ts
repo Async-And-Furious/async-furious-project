@@ -33,7 +33,7 @@ describe('UpdateServiceOrderStatusUseCase', () => {
   });
 
   it('deve lançar EntityNotFoundException se OS não existir', async () => {
-    osRepo.findOne.mockResolvedValue(null as any);
+    osRepo.findOne.mockResolvedValue(null as unknown as OrdemDeServico);
     await expect(useCase.execute('invalid-id', 'UNDER_DIAGNOSIS')).rejects.toThrow(
       EntityNotFoundException
     );

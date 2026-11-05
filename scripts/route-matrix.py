@@ -69,7 +69,7 @@ def flatten(nodes):
             result.append(node)
     return result
 routes = flatten(manifest)
-assert len(routes) == 48 and len({r["id"] for r in routes}) == 48 and len({(r["method"], r["path"]) for r in routes}) == 48
+assert len(routes) == 45 and len({r["id"] for r in routes}) == 45 and len({(r["method"], r["path"]) for r in routes}) == 45
 collection = json.load(open(os.path.join(os.path.dirname(__file__), "..", "docs", "http", "postman", "async-furious.postman_collection.json"), encoding="utf-8"))
 items = []
 def collect(items_in):

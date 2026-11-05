@@ -16,6 +16,30 @@ Fase 4 — ver nota abaixo)
 > particular entre os Bounded Contexts `ordem-servico` e `pecas-insumos`,
 > que permanecem no mesmo processo e continuam usando o `EmissorEventos`
 > in-process descrito abaixo.
+>
+> **Escopo remanescente (#331, 02/11/2026).** Saem do processo, pelo Kafka, só os
+> eventos de integração:
+> - **publicados:** `OrdemServicoRecebida`, `OrcamentoCalculado` e `EtapaDaSagaFalhou`;
+> - **consumidos:** `DiagnosticoIniciado`, `ExecucaoIniciada`, `ExecucaoConcluida`,
+>   `OrcamentoGerado`, `OrcamentoAprovado`, `OrcamentoRecusado`, `PagamentoConfirmado`,
+>   `PagamentoRecusado` e `EtapaDaSagaFalhou`.
+>
+> Continuam **in-process**, pelo `EmissorEventos`, sem passar pelo broker:
+> - **`ordem-servico`:** `OrdemServicoCriada`, `OrdemServicoEmDiagnostico`,
+>   `OrdemServicoAguardandoAprovacao`, `OrdemServicoEmExecucao`, `OrdemServicoFinalizada`,
+>   `OrdemServicoEntregue`, `OrcamentoEnviado`, `OrcamentoAprovadoComPecas`,
+>   `OsSemPecasConfirmada`, `ServicoAprovadoPeloCliente`, `PagamentoRegistrado`,
+>   `ClienteNotificadoConclusao` e os sete `StatusAtualizado*`;
+> - **`pecas-insumos`:** `PecasEmEstoqueConfirmadas`, `PecasIndisponiveis`,
+>   `PecasNaoExistem`, `PecasReservadas`, `EstoqueDebitado`, `PecasRecebidas`,
+>   `PedidoFornecedorEnviado`, `EstoqueAtualizadoAposRecebimento` e
+>   `BacklogValidadoPecasDisponiveis`;
+> - **`financeiro`:** `PagamentoRegistradoEvent`, `PagamentoConfirmadoEvent` e
+>   `PagamentoRecusadoEvent`, até a extração do contexto (#330).
+>
+> Até a #330, `OrcamentoGerado`, `OrcamentoAprovado` e `OrcamentoRecusado` também
+> circulam in-process, emitidos pelas rotas de orçamento do próprio OS. Os handlers
+> deles têm a mesma guarda de estado nos dois caminhos.
 
 ## Contexto
 

@@ -45,6 +45,7 @@ requisito da Fase 4.
 | [architecture/persistence-model.md](./architecture/persistence-model.md) | **Fase 4**: read model do OS Service no DocumentDB; validar estado runtime separadamente |
 | [architecture/authentication-flow.md](./architecture/authentication-flow.md) | Fluxos mistos; reconciliar autenticação local/legada com ADR-0021 e a borda Fase 4 |
 | [architecture/service-order-flow.md](./architecture/service-order-flow.md) | Fluxo síncrono atual/legado; não confundir com `saga-flow.md` da Fase 4 |
+| [architecture/os-service-integracao-execucao.md](./architecture/os-service-integracao-execucao.md) | Integração do OS Service com o Execução e Produção: rotas removidas, eventos consumidos e publicados, reserva de peças pendente, janela de corte |
 
 ## Infraestrutura
 
