@@ -2,11 +2,10 @@
 
 Índice central da documentação técnica e arquitetural do projeto.
 
-Convenção usada em todo `docs/`: **[ATUAL]** = implementado e rodando hoje;
-**[PENDENTE]** = exigido pela Fase 3, sem decisão ainda. A marca
-**[PROPOSTA FASE 3]** foi retirada dos documentos de infraestrutura: o que
-estava proposto foi implementado, e o que segue pendente está listado ao final
-de cada documento.
+As marcas **[ATUAL]** e **[PENDENTE]** se referem à fase e ao ambiente
+descritos em cada documento. Uma implementação atual da Fase 3 (inclusive
+monólito em PROD) não significa que o alvo da Fase 4 esteja implantado; o
+estado deve ser lido no contexto de fase/ambiente explicitado no documento.
 
 ## Arquitetura
 
@@ -22,6 +21,20 @@ de cada documento.
 | [architecture/persistence-model.md](./architecture/persistence-model.md) | Read model do OS Service no DocumentDB (coleções, índice da fila, write-through) |
 | [architecture/authentication-flow.md](./architecture/authentication-flow.md) | Sequências de autenticação de staff e cliente, local e AWS, com fluxos de erro |
 | [architecture/service-order-flow.md](./architecture/service-order-flow.md) | Sequência de abertura e acompanhamento da Ordem de Serviço |
+
+## Fase 4 — serviços
+
+| Serviço | Arquitetura |
+|---|---|
+| OS Service | [architecture.md](./architecture.md) |
+| Billing Service | [repo-billing/docs/architecture.md](https://github.com/Async-And-Furious/repo-billing/blob/docs/349-billing-architecture/docs/architecture.md) |
+| Execução e Produção | [repo-execucao-service/docs/architecture.md](https://github.com/Async-And-Furious/repo-execucao-service/blob/docs/349-execucao-architecture/docs/architecture.md) |
+
+ADRs transversais aos serviços permanecem centralizadas neste repositório;
+ADRs locais pertencem aos repositórios de cada serviço. Este repositório OS
+continua sendo a casa da documentação central e é dono da suíte BDD da Saga e
+do read model DocumentDB. Essa assimetria é deliberada e pode ser citada no
+PDF de submissão.
 
 ## Infraestrutura
 
@@ -46,9 +59,10 @@ de cada documento.
 
 ## Decisões
 
-- **ADRs**: ver [adr/README.md](./adr/README.md). Vinte e duas
-  decisões arquiteturais, da separação em quatro repositórios (Fase 3) à
-  integração com o Mercado Pago (Fase 4), mais [notas das fases anteriores](./adr/notas-fases-anteriores.md).
+- **ADRs**: ver [adr/README.md](./adr/README.md). O índice contém 23 ADRs,
+  desde a separação em quatro repositórios (Fase 3) até a integração com o
+  Mercado Pago (Fase 4); ADR-0022 e ADR-0023 permanecem propostas. Ver também
+  [notas das fases anteriores](./adr/notas-fases-anteriores.md).
 - **RFCs**: ver [rfcs/README.md](./rfcs/README.md). RFC-003 (integração API
   Gateway e EKS), RFC-004 (ownership de VPC), RFC-006 (segredos e assinatura
   JWT), RFC-007 (exceção de acesso público do RDS em homologação) e a
