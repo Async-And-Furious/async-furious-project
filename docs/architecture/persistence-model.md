@@ -184,10 +184,9 @@ mesmo use case de `/status`).
   callers. Isso requer mudança de código e validação antes de ser tratado como
   comportamento implementado. O caso `PagamentoConfirmado` grava `pago_em` e
   histórico sem mudar o status; `pago_em` não entra no `os_read_model`.
-- **Ponto exato:** **depois** da transação do repository (OS + histórico) —
-  nunca antes, para nunca projetar um estado que pode ainda ser revertido.
-  Hoje não existe `prisma.$transaction` no código; "após o commit" significa
-  "após a transação do repository".
+- **Ponto proposto:** projetar **depois** da transação do repository (OS +
+  histórico), nunca antes. Essa transação ainda não está implementada; o
+  comportamento atual não garante atomicidade entre OS e histórico.
 - **Atualização desde `RECEIVED`:** a criação da OS (`POST
   /ordens-servico`) já escreve o primeiro documento em `os_read_model`.
 - **Comportamento em caso de falha na escrita do read model:** o Postgres
