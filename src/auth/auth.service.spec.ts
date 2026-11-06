@@ -258,18 +258,22 @@ describe('AuthService', () => {
       }
     );
 
-    it('fails closed when User identity lookup fails', async () => {
+    it('raises a sanitized operational error when User identity lookup fails', async () => {
       mockPrisma.user.findUnique.mockRejectedValue(new Error('database unavailable'));
       mockPrisma.cliente.findUnique.mockResolvedValue(null);
 
-      await expect(service.validateTokenSubject({ sub: 'subject-id' })).resolves.toBeNull();
+      await expect(service.validateTokenSubject({ sub: 'subject-id' })).rejects.toThrow(
+        'Identity lookup failed'
+      );
     });
 
-    it('fails closed when customer identity lookup fails', async () => {
+    it('raises a sanitized operational error when customer identity lookup fails', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.cliente.findUnique.mockRejectedValue(new Error('database unavailable'));
 
-      await expect(service.validateTokenSubject({ sub: 'subject-id' })).resolves.toBeNull();
+      await expect(service.validateTokenSubject({ sub: 'subject-id' })).rejects.toThrow(
+        'Identity lookup failed'
+      );
     });
   });
 

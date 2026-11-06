@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { INestApplication } from '@nestjs/common';
+import type { PinoLogger } from 'nestjs-pino';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test } from '@nestjs/testing';
 import { PassportModule } from '@nestjs/passport';
@@ -7,6 +8,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import request from 'supertest';
 import type { Application } from 'express';
 import { AuthService } from '../src/auth/services/auth.service';
+import { GlobalExceptionFilter } from '../src/shared/infrastructure/filters/global-exception.filter';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../src/auth/guards/roles.guard';
 import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
@@ -37,6 +39,7 @@ describe('Gateway JWT authorization over HTTP', () => {
   const publicPem = publicKey.export({ format: 'pem', type: 'spki' }).toString();
   const { privateKey: otherPrivateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
   const otherPrivatePem = otherPrivateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
+  const logger = { error: jest.fn(), warn: jest.fn() };
 
   let app: INestApplication;
   let jwtService: JwtService;
@@ -120,6 +123,7 @@ describe('Gateway JWT authorization over HTTP', () => {
     }).compile();
 
     app = module.createNestApplication();
+    app.useGlobalFilters(new GlobalExceptionFilter(logger as unknown as PinoLogger));
     await app.init();
     jwtService = module.get<JwtService>(JwtService);
     server = request(app.getHttpServer() as unknown as Application);
@@ -130,6 +134,8 @@ describe('Gateway JWT authorization over HTTP', () => {
   });
 
   const token = (claims: Record<string, unknown>) => jwtService.sign(claims);
+
+  beforeEach(() => logger.error.mockClear());
 
   it.each([
     ['customer subject only', { sub: customer.id }],
@@ -228,19 +234,50 @@ describe('Gateway JWT authorization over HTTP', () => {
     }
   );
 
-  it('fails closed when identity lookup fails', async () => {
+  it('returns a sanitized 500 and structured operational signal when User lookup fails', async () => {
     prisma.user.findUnique.mockRejectedValueOnce(new Error('database unavailable'));
     await server
       .get('/ordens-servico')
       .set('Authorization', `Bearer ${token({ sub: customer.id })}`)
-      .expect(401);
+      .expect(500)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          statusCode: 500,
+          message: 'Internal server error',
+          error: 'Internal Server Error',
+        });
+        expect(JSON.stringify(body)).not.toContain(customer.id);
+        expect(JSON.stringify(body)).not.toContain('database unavailable');
+      });
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: expect.objectContaining({
+          name: 'IdentityLookupError',
+          message: 'Identity lookup failed',
+        }),
+        statusCode: 500,
+      }),
+      'Unhandled exception: Internal Server Error'
+    );
+    const loggedError = logger.error.mock.calls[0][0].err as Error;
+    expect(loggedError.stack).not.toContain(customer.id);
+    expect(loggedError.stack).not.toContain('database unavailable');
   });
 
-  it('fails closed when customer lookup fails', async () => {
+  it('returns a sanitized 500 and logs no raw details when Cliente lookup fails', async () => {
     prisma.cliente.findUnique.mockRejectedValueOnce(new Error('database unavailable'));
     await server
       .get('/ordens-servico')
       .set('Authorization', `Bearer ${token({ sub: customer.id })}`)
-      .expect(401);
+      .expect(500)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ statusCode: 500, message: 'Internal server error' });
+        expect(JSON.stringify(body)).not.toContain(customer.id);
+        expect(JSON.stringify(body)).not.toContain('database unavailable');
+      });
+    const loggedError = logger.error.mock.calls[0][0].err as Error;
+    expect(loggedError.name).toBe('IdentityLookupError');
+    expect(loggedError.stack).not.toContain(customer.id);
+    expect(loggedError.stack).not.toContain('database unavailable');
   });
 });

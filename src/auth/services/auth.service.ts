@@ -7,6 +7,13 @@ import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { Role } from '../enums/role.enum';
 import type { AuthenticatedUser, JwtPayload } from '../types/auth.types';
 
+class IdentityLookupError extends Error {
+  constructor() {
+    super('Identity lookup failed');
+    this.name = 'IdentityLookupError';
+  }
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -117,7 +124,7 @@ export class AuthService {
 
       return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
     } catch {
-      return null;
+      throw new IdentityLookupError();
     }
   }
   async findById(id: string) {

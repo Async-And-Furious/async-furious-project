@@ -19,7 +19,7 @@ Defensively fix the `AUTH_MODE=gateway` identity mapping so a customer JWT canno
 - A gateway customer token with forged staff `role` and/or `email` claims still resolves as that customer (`CLIENTE`), never staff.
 - Non-colliding staff subjects resolve using the staff database role; non-colliding active customer subjects resolve as `CLIENTE`.
 - If the same subject exists in both `User` and `Cliente`, authentication fails with 401 regardless of customer active status. Do not let any JWT claim choose which record wins.
-- Identity lookup database errors fail closed as 401; do not log subject IDs, email, CPF, or database error details.
+- Identity lookup database errors return sanitized 500 (not 401), retain an operationally identifiable structured error signal, and never log subject IDs, email, CPF, or raw database error details.
 - `RolesGuard` continues denying `CLIENTE` for staff roles (including `RECEPCIONISTA`, `ADMIN`, and `MECANICO`).
 - `GET /ordens-servico` and `GET /ordens-servico/:id` require `ADMIN`, `RECEPCIONISTA`, or `MECANICO`; authorized staff retain access and customers are denied. Public status/tracking routes stay public.
 - `PATCH /ordens-servico/:id/aprovar-servico` remains JWT-authenticated without a new role restriction.
@@ -40,4 +40,4 @@ Defensively fix the `AUTH_MODE=gateway` identity mapping so a customer JWT canno
 - Adding role metadata changes authorization behavior on two existing routes but not their API shape. It prevents broad OS reads by customer identities; do not add ownership filtering or redesign customer OS access in this issue.
 - Approval is JWT-only today; preserve that behavior even though its summary says customer approval. Do not infer authorization policy from prose or change public/private status.
 - Prior implementation work exists in closed PR #362 (`fix/issue-360-client-role`) and in the separate worktree `issue-360-completion`, whose base is 36 commits behind current `develop`. Treat its tests/spec as reference only; rebase concepts against current code, inspect for stale assumptions, and do not touch that worktree.
-- Collision policy is fail-closed by explicit user decision: a `sub` present in both `User` and `Cliente` is unauthorized even if the customer is inactive. This avoids escalation but leaves identity-data cleanup and any future collision resolution policy open; do not log sensitive subject data.
+- Collision policy is fail-closed by explicit user decision: a `sub` present in both `User` and `Cliente` is unauthorized even if the customer is inactive. This avoids escalation but leaves identity-data cleanup open. Database lookup failures remain 500 with a sanitized operational signal so they are not misclassified as invalid credentials; do not log sensitive subject data or raw DB errors.

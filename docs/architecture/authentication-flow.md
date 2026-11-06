@@ -92,7 +92,10 @@ sequenceDiagram
         GW->>App: HTTP_PROXY via VPC Link
         App->>App: JwtStrategy revalida RS256, issuer, audience e exp
         App->>RDS: validateTokenSubject consulta User e Cliente pelo sub
-        alt falha de consulta ou sub existe em User e Cliente
+        alt falha na consulta ao banco
+            App-->>C: 500 Internal Server Error (mensagem sanitizada)
+            App->>App: log estruturado IdentityLookupError sem subject ou detalhe DB
+        else sub existe em User e Cliente
             App-->>C: 401 Unauthorized (fail-closed)
         else somente User existe
             App->>App: usa role persistida do staff
@@ -171,9 +174,11 @@ cliente são resolvidos pela `JwtStrategy` padrão.
   `repo-auth-serverless`.
 - A resolução consulta ambos os cadastros: `User` sem colisão usa sua role
   persistida; `Cliente` ativo sem colisão usa `Role.CLIENTE`; sujeito
-  ausente/inativo, colisão entre `User` e `Cliente` ou falha de consulta falha
-  fechada com 401. Claims `role`/`email` não escolhem identidade e os erros de
-  lookup não registram IDs, e-mail ou CPF.
+  ausente/inativo ou colisão entre `User` e `Cliente` retorna 401. Falhas de
+  consulta retornam 500 com resposta genérica e log estruturado com
+  `err.name=IdentityLookupError`; a exceção original do banco não é propagada nem
+  registrada. Claims `role`/`email` não escolhem identidade e nenhum subject,
+  e-mail ou CPF é registrado nesse caminho.
 - `GET /api/v1/ordens-servico` e `GET /api/v1/ordens-servico/:id` exigem
   `ADMIN`, `RECEPCIONISTA` ou `MECANICO` (403 para cliente). As rotas
   `/status` e `/rastreamento` permanecem públicas; `PATCH
