@@ -118,6 +118,32 @@ describe('DetectarOsParadaUseCase', () => {
     );
   });
 
+  it('mantém publicação antes do CAS e grava histórico após falha síncrona do logger', async () => {
+    const order: string[] = [];
+    osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
+    publicador.publicar.mockImplementation(() => {
+      order.push('publish');
+      return Promise.resolve();
+    });
+    osRepo.atualizarSeCondicao.mockImplementation(() => {
+      order.push('cas');
+      return Promise.resolve(true);
+    });
+    historicoRepo.create.mockImplementation((historico) => {
+      order.push('history');
+      return Promise.resolve(historico);
+    });
+    jest.spyOn(Logger.prototype, 'log').mockImplementationOnce(() => {
+      order.push('log');
+      throw new Error('logger unavailable');
+    });
+
+    const resultado = await detector().executar();
+
+    expect(resultado).toEqual({ encontradas: 1, encerradas: 1, falhas: 0 });
+    expect(order).toEqual(['publish', 'cas', 'log', 'history']);
+  });
+
   it('a falha de publicação de uma OS não impede as outras e não fecha a OS', async () => {
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1'), os('os-2')]);
     publicador.publicar.mockRejectedValueOnce(new Error('broker indisponível'));

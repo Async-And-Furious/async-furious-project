@@ -4,7 +4,8 @@ Base: `origin/develop` `f1757162f8bc38b80105c617f833856d32abe704`.
 
 ## Scope and boundary
 
-Log only async transitions confirmed by conditional repository updates:
+Log transitions observed in selected producers, only when the conditional
+repository update confirms this call changed the row:
 `IN_PROGRESS -> FINISHED` in `AtualizarStatusFinalizadaHandler`, allowed
 pre-repair statuses to `CLOSED_WITHOUT_EXECUTION` in
 `AtualizarStatusEncerradaSemExecucaoHandler`, and `AWAITING_APPROVAL ->
@@ -28,21 +29,23 @@ import) and one fixed JSON object after the conditional update succeeds:
 - `newStatus`
 
 No OS/order ID, customer/vehicle/payment data, `motivo`, raw event, correlation
-ID, headers, tokens, or exception text in this record. `service` is already
+ID, headers, tokens, or exception text in the serialized record. The helper
+explicitly overrides Kafka mixin identity fields with `undefined`; a real Pino
+serialization test verifies they are omitted. `service` is already
 provided by the existing Pino mixin; `appName` is agent-provided, not set here.
 Catch a synchronous logger failure so telemetry cannot interrupt follow-up
 history/event work. Existing business failures and retry behavior remain intact.
 
-The separate dashboard draft currently filters on `event =
-'os.status.transition'`; that does not match this source contract. Dashboard
-work must change the filter to `logType` before use.
+The separate dashboard draft must filter on `logType =
+'os.status.transition'`; do not use `event` for this record.
 
 ## Reliability and coverage limits
 
 This is best-effort diagnostic telemetry, not an authoritative ledger. A crash
 after the database commit but before logging can lose a record; collector/replay
-can duplicate it. The dashboard counts observed async records only: generic
-API/webhook transitions are absent. Never describe counts as exact totals or
+can duplicate it. The dashboard counts transitions observed in selected async
+producers only: generic API/webhook and other uninstrumented async transitions
+are absent. Never describe counts as exact totals or
 use them for billing/audit/reconciliation. Durable complete accounting would
 need a separately approved transactional outbox design.
 

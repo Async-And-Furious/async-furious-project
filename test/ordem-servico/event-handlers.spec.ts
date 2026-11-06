@@ -1121,6 +1121,28 @@ describe('OS Event handlers', () => {
       expect(emissor.emitir).not.toHaveBeenCalled();
     });
 
+    it('continua publicando após falha síncrona do logger', async () => {
+      const order: string[] = [];
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
+      osRepo.atualizarSeCondicao.mockImplementation(() => {
+        order.push('cas');
+        return Promise.resolve(true);
+      });
+      emissor.emitir.mockImplementation(() => {
+        order.push('publish');
+        return Promise.resolve();
+      });
+      jest.spyOn(Logger.prototype, 'log').mockImplementationOnce(() => {
+        order.push('log');
+        throw new Error('logger unavailable');
+      });
+      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor, transicao);
+
+      await handler.handle(new ExecucaoConcluida('os-1'));
+
+      expect(order).toEqual(['cas', 'log', 'publish']);
+    });
+
     it.each<OSStatus>(['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'])(
       'ignora ExecucaoConcluida (ack, com log) quando a OS está em %s',
       async (status) => {
@@ -1366,6 +1388,31 @@ describe('OS Event handlers', () => {
         expect(log).not.toHaveBeenCalledWith(
           expect.objectContaining({ logType: 'os.status.transition' })
         );
+      });
+
+      it('continua gravando histórico e publicando após falha síncrona do logger', async () => {
+        const order: string[] = [];
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+        osRepo.atualizarSeCondicao.mockImplementation(() => {
+          order.push('cas');
+          return Promise.resolve(true);
+        });
+        historyRepo.create.mockImplementation((historico) => {
+          order.push('history');
+          return Promise.resolve(historico);
+        });
+        emissor.emitir.mockImplementation(() => {
+          order.push('publish');
+          return Promise.resolve();
+        });
+        jest.spyOn(Logger.prototype, 'log').mockImplementationOnce(() => {
+          order.push('log');
+          throw new Error('logger unavailable');
+        });
+
+        await consumir(handler);
+
+        expect(order).toEqual(['cas', 'log', 'history', 'publish']);
       });
 
       it.each<OSStatus>(['IN_PROGRESS', 'AWAITING_PARTS'])(
