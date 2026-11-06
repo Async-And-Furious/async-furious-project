@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthService } from '../services/auth.service';
 import { Role } from '../enums/role.enum';
+import type { JwtPayload } from '../types/auth.types';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -13,6 +14,7 @@ describe('JwtStrategy', () => {
     authService = {
       validateUser: jest.fn(),
       validateCustomer: jest.fn(),
+      validateTokenSubject: jest.fn((payload: JwtPayload) => authService.validateUser(payload.sub)),
     } as unknown as jest.Mocked<AuthService>;
 
     config = {
@@ -99,9 +101,9 @@ describe('JwtStrategy', () => {
     const customer = {
       id: 'customer-id',
       email: 'customer@test.com',
-      role: Role.RECEPCIONISTA,
+      role: Role.CLIENTE,
     };
-    authService.validateCustomer.mockResolvedValue(customer);
+    authService.validateTokenSubject.mockResolvedValue(customer);
 
     await expect(
       strategy.validate({
@@ -111,10 +113,12 @@ describe('JwtStrategy', () => {
         exp: 9999999999,
       })
     ).resolves.toEqual(customer);
-    expect(authService.validateCustomer).toHaveBeenCalledWith('customer-id');
+    expect(authService.validateTokenSubject).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'customer-id' })
+    );
   });
 
-  it('should reject a gateway token whose customer does not exist', async () => {
+  it('ignores gateway role/email claims and resolves identity from the subject', async () => {
     const gatewayValues: Record<string, string> = {
       AUTH_MODE: 'gateway',
       JWT_PUBLIC_KEY: 'public-key',
@@ -123,7 +127,34 @@ describe('JwtStrategy', () => {
     };
     config.get.mockImplementation((key: string) => gatewayValues[key]);
     strategy = new JwtStrategy(config, authService);
-    authService.validateCustomer.mockResolvedValue(null);
+    const customer = { id: 'customer-id', email: 'database@example.com', role: Role.CLIENTE };
+    authService.validateTokenSubject.mockResolvedValue(customer);
+
+    await expect(
+      strategy.validate({
+        sub: 'customer-id',
+        role: Role.ADMIN,
+        email: 'forged@example.com',
+        iss: 'auth-lambda',
+        aud: 'workshop-api',
+        exp: 9999999999,
+      })
+    ).resolves.toEqual(customer);
+    expect(authService.validateTokenSubject).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'customer-id', role: Role.ADMIN, email: 'forged@example.com' })
+    );
+  });
+
+  it('rejects a missing gateway subject identity', async () => {
+    const gatewayValues: Record<string, string> = {
+      AUTH_MODE: 'gateway',
+      JWT_PUBLIC_KEY: 'public-key',
+      JWT_ISSUER: 'auth-lambda',
+      JWT_AUDIENCE: 'workshop-api',
+    };
+    config.get.mockImplementation((key: string) => gatewayValues[key]);
+    strategy = new JwtStrategy(config, authService);
+    authService.validateTokenSubject.mockResolvedValue(null);
 
     await expect(
       strategy.validate({
