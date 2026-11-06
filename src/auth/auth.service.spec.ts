@@ -278,7 +278,7 @@ describe('AuthService', () => {
       await expect(service.validateCustomer('customer-id')).resolves.toEqual({
         id: 'customer-id',
         email: 'customer@test.com',
-        role: 'RECEPCIONISTA',
+        role: 'CLIENTE',
       });
       expect(mockPrisma.cliente.findFirst).toHaveBeenCalledWith({
         where: { id: 'customer-id', ativo: true },
