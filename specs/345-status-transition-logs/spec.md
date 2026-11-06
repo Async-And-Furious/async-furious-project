@@ -30,9 +30,10 @@ import) and one fixed JSON object after the conditional update succeeds:
 
 No OS/order ID, customer/vehicle/payment data, `motivo`, raw event, correlation
 ID, headers, tokens, or exception text in the serialized record. The helper
-explicitly overrides Kafka mixin identity fields with `undefined`; a real Pino
-serialization test verifies they are omitted. `service` is already
-provided by the existing Pino mixin; `appName` is agent-provided, not set here.
+explicitly overrides Kafka mixin identity fields with `undefined`. A dedicated
+Pino logger with no HTTP child bindings or Kafka mixin emits the record; this
+also protects the refusal handler when called from an HTTP request. `service`
+is set by this isolated logger; `appName` is agent-provided, not set here.
 Catch a synchronous logger failure so telemetry cannot interrupt follow-up
 history/event work. Existing business failures and retry behavior remain intact.
 
@@ -50,7 +51,9 @@ use them for billing/audit/reconciliation. Durable complete accounting would
 need a separately approved transactional outbox design.
 
 This is deliberately not representative of all OS transitions: the generic
-HTTP status use case does not emit these records. Dashboard titles/labels must
+HTTP status use case does not emit these records. The refusal handler may be
+called by an HTTP flow and emits when its conditional update succeeds.
+Dashboard titles/labels must
 identify the data as partial async telemetry.
 
 ## TDD / checks

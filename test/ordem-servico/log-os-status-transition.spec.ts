@@ -1,9 +1,6 @@
 import { logOsStatusTransition } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 import pino from 'pino';
-import {
-  pinoHttpOptions,
-  runWithLogContext,
-} from '../../src/shared/infrastructure/logging/pino-logger.config';
+import { runWithLogContext } from '../../src/shared/infrastructure/logging/pino-logger.config';
 import { Store, storage } from 'nestjs-pino/storage';
 import { OsStatusTransitionPinoLogger } from '../../src/modules/ordem-servico/infrastructure/logging/os-status-transition-pino-logger';
 
@@ -38,15 +35,15 @@ describe('logOsStatusTransition', () => {
 
   it('serializes without HTTP bindings or Kafka IDs through the real Nest/Pino context chain', () => {
     const lines: string[] = [];
-    const root = pino(
-      { mixin: pinoHttpOptions.mixin },
+    const independentLogger = pino(
+      { base: { service: 'async-furious-project' } },
       { write: (line: string) => lines.push(line) }
     );
-    const requestLogger = root.child({
+    const requestLogger = independentLogger.child({
       req: { id: 'private-request-id', headers: { authorization: 'private-token' } },
       correlationId: 'private-http-correlation',
     });
-    const transitionLogger = new OsStatusTransitionPinoLogger(root);
+    const transitionLogger = new OsStatusTransitionPinoLogger(independentLogger);
 
     storage.run(new Store(requestLogger), () =>
       runWithLogContext({ ordemServicoId: 'private-order-id', eventId: 'private-event-id' }, () =>

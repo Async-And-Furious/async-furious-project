@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { PinoLogger } from 'nestjs-pino';
 import { OrdemServicoController } from './presentation/controllers/ordem-servico.controller';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
@@ -81,7 +80,7 @@ import {
   providers: [
     {
       provide: OS_STATUS_TRANSITION_LOGGER,
-      useFactory: () => new OsStatusTransitionPinoLogger(PinoLogger.root),
+      useFactory: () => new OsStatusTransitionPinoLogger(),
     },
     OrdemServicoRepository,
     OrcamentoRepository,
