@@ -117,4 +117,3 @@ saga por OS” — ela não existe.
 - [Especificação da issue #353](../../specs/353-video-script/spec.md)
 - Issue [#341 — fluxo e preparação da demonstração](https://github.com/Async-And-Furious/async-furious-project/issues/341)
 - Issue central: [#353 — Vídeo de Demonstração](https://github.com/Async-And-Furious/async-furious-project/issues/353)
-- Issue relacionada: [#341 — roteiro/fluxos de demonstração](https://github.com/Async-And-Furious/async-furious-project/issues/341)
