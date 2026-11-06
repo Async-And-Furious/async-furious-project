@@ -19,9 +19,11 @@ event contract, schema, dashboard, or Terraform changes in this OS slice.
 
 ## Structured log contract
 
-Use the existing Nest `Logger` / `nestjs-pino` with the formatting/emission
-helper in `ordem-servico/application/logging` (no application-to-infrastructure
-import) and one fixed JSON object after the conditional update succeeds:
+Use the formatting/emission helper in `ordem-servico/application/logging` (no
+application-to-infrastructure import) and an independent Pino logger after the
+conditional update succeeds. It shares the configured `SERVICE_NAME` and
+`os-service` fallback with the HTTP logger and does not inherit HTTP/Kafka
+bindings. Emit one fixed JSON object:
 
 - `logType: "os.status.transition"` (not `event`, which is reserved in existing
   logging conventions)
@@ -29,11 +31,9 @@ import) and one fixed JSON object after the conditional update succeeds:
 - `newStatus`
 
 No OS/order ID, customer/vehicle/payment data, `motivo`, raw event, correlation
-ID, headers, tokens, or exception text in the serialized record. The helper
-explicitly overrides Kafka mixin identity fields with `undefined`. A dedicated
-Pino logger with no HTTP child bindings or Kafka mixin emits the record; this
-also protects the refusal handler when called from an HTTP request. `service`
-is set by this isolated logger; `appName` is agent-provided, not set here.
+ID, headers, tokens, or exception text in the serialized record. This also
+protects the refusal handler when called from an HTTP request. `appName` is
+agent-provided, not set here.
 Catch a synchronous logger failure so telemetry cannot interrupt follow-up
 history/event work. Existing business failures and retry behavior remain intact.
 
@@ -61,6 +61,10 @@ identify the data as partial async telemetry.
 - Each eligible producer: success emits exactly the fixed object above;
   conditional no-op and update rejection emit no transition object.
 - Test logger failure does not alter subsequent history/event behavior.
+- Nest wiring tests extract the real transition logger and producer providers
+  from the API and detector module metadata, then compile them with external
+  repository/publisher stubs. This validates those provider factories and their
+  emission, but is not a full application bootstrap.
 - Assert object contains only the approved keys/values (no identity, reason,
   correlation, or token); test existing handler retry/idempotency paths remain
   unchanged.

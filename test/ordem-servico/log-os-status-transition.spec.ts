@@ -1,6 +1,9 @@
 import { logOsStatusTransition } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 import pino from 'pino';
-import { runWithLogContext } from '../../src/shared/infrastructure/logging/pino-logger.config';
+import {
+  runWithLogContext,
+  SERVICE_NAME,
+} from '../../src/shared/infrastructure/logging/pino-logger.config';
 import { Store, storage } from 'nestjs-pino/storage';
 import { OsStatusTransitionPinoLogger } from '../../src/modules/ordem-servico/infrastructure/logging/os-status-transition-pino-logger';
 
@@ -15,9 +18,6 @@ describe('logOsStatusTransition', () => {
       logType: 'os.status.transition',
       previousStatus: 'IN_PROGRESS',
       newStatus: 'FINISHED',
-      correlationId: undefined,
-      ordemServicoId: undefined,
-      eventId: undefined,
     });
   });
 
@@ -36,7 +36,7 @@ describe('logOsStatusTransition', () => {
   it('serializes without HTTP bindings or Kafka IDs through the real Nest/Pino context chain', () => {
     const lines: string[] = [];
     const independentLogger = pino(
-      { base: { service: 'async-furious-project' } },
+      { base: { service: SERVICE_NAME } },
       { write: (line: string) => lines.push(line) }
     );
     const requestLogger = independentLogger.child({
@@ -58,6 +58,7 @@ describe('logOsStatusTransition', () => {
       logType: 'os.status.transition',
       previousStatus: 'IN_PROGRESS',
       newStatus: 'FINISHED',
+      service: SERVICE_NAME,
     });
     for (const sensitive of [
       'private-order-id',

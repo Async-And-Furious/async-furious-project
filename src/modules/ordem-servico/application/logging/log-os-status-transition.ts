@@ -22,9 +22,6 @@ export function logOsStatusTransition(
       logType: 'os.status.transition',
       previousStatus,
       newStatus,
-      correlationId: undefined,
-      ordemServicoId: undefined,
-      eventId: undefined,
     });
   } catch {
     // Best-effort telemetry must not interfere with the committed transition's follow-up work.
