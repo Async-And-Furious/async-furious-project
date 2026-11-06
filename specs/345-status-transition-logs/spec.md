@@ -44,17 +44,17 @@ The separate dashboard draft must filter on `logType =
 
 This is best-effort diagnostic telemetry, not an authoritative ledger. A crash
 after the database commit but before logging can lose a record; collector/replay
-can duplicate it. The dashboard counts transitions observed in selected async
-producers only: generic API/webhook and other uninstrumented async transitions
-are absent. Never describe counts as exact totals or
+can duplicate it. The dashboard counts transitions observed in selected
+producers only: generic API/webhook and other uninstrumented transitions are
+absent. Never describe counts as exact totals or
 use them for billing/audit/reconciliation. Durable complete accounting would
 need a separately approved transactional outbox design.
 
 This is deliberately not representative of all OS transitions: the generic
 HTTP status use case does not emit these records. The refusal handler may be
 called by an HTTP flow and emits when its conditional update succeeds.
-Dashboard titles/labels must
-identify the data as partial async telemetry.
+Dashboard titles/labels must identify the data as partial, best-effort telemetry
+from selected producers.
 
 ## TDD / checks
 

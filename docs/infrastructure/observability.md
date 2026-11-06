@@ -112,11 +112,10 @@ Regras:
   de rastreio. Não use o helper dentro de requisição HTTP: o log já tem o
   `correlationId` da requisição e o campo sairia duplicado.
 - **Exceção restrita — log de transição #345.** `logType: "os.status.transition"`
-  registra apenas `previousStatus` e `newStatus`. O helper sobrescreve os
-  campos `correlationId`, `ordemServicoId` e `eventId` do mixin com `undefined`
-  para que o JSON serializado não contenha IDs, mesmo sob `runWithLogContext`.
-  Isso não altera o mixin nem os demais logs. O teste serializa via Pino real e
-  confirma a ausência dos campos.
+  registra apenas `previousStatus` e `newStatus` como dados da transição. Um
+  logger Pino independente, sem o mixin Kafka ou bindings HTTP, impede que IDs
+  desses contextos sejam incluídos. Isso não altera os demais logs; o teste
+  serializa via Pino real e confirma a ausência desses campos.
 - **Cobertura #345 é parcial.** São transições observadas em produtores
   selecionados (handler de conclusão, recusas elegíveis e detector de OS parada)
   após update condicional bem-sucedido; o caminho HTTP genérico e outros
