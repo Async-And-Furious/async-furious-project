@@ -28,7 +28,7 @@ only after winning the CAS. No schema or public contract change.
 
 Use the formatting/emission helper in `ordem-servico/application/logging` (no
 application-to-infrastructure import) and an independent Pino logger after the
-conditional update succeeds. It shares the configured `SERVICE_NAME` and
+repository update succeeds. It shares the configured `SERVICE_NAME` and
 `os-service` fallback with the HTTP logger and does not inherit HTTP/Kafka
 bindings. Emit one fixed JSON object:
 
@@ -52,8 +52,8 @@ The separate dashboard draft must filter on `logType =
 This is best-effort diagnostic telemetry, not an authoritative ledger. A crash
 after the database commit but before logging can lose a record; collector/replay
 can duplicate it. The dashboard counts observations from current application
-code paths, not exact committed transition totals; generic-route concurrency
-can also make `previousStatus` stale. Direct database writes and future paths
+code paths, not exact committed transition totals; concurrent generic updates
+can also produce duplicate observations and a stale `previousStatus`. Direct database writes and future paths
 are not covered. Never describe counts as exact totals or
 use them for billing/audit/reconciliation. Durable complete accounting would
 need a separately approved transactional outbox design.
