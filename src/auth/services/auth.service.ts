@@ -103,16 +103,22 @@ export class AuthService {
   }
 
   async validateTokenSubject(payload: JwtPayload): Promise<AuthenticatedUser | null> {
-    const user = await this.validateUser(payload.sub);
-    if (user) return user;
+    try {
+      const [user, cliente] = await Promise.all([
+        this.validateUser(payload.sub),
+        this.prisma.cliente.findUnique({
+          where: { id: payload.sub },
+          select: { id: true, email: true, ativo: true },
+        }),
+      ]);
+      if (user && cliente) return null;
+      if (user) return user;
+      if (!cliente?.ativo) return null;
 
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, email: true, ativo: true },
-    });
-    if (!cliente?.ativo) return null;
-
-    return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
+      return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
+    } catch {
+      return null;
+    }
   }
   async findById(id: string) {
     return this.validateUser(id);

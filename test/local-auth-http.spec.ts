@@ -37,13 +37,21 @@ describe('Local JWT identity and authorization over HTTP', () => {
   const prisma = {
     user: {
       findUnique: jest.fn(({ where }: { where: { id: string } }) =>
-        Promise.resolve(where.id === staff.id ? staff : null)
+        Promise.resolve(
+          where.id === staff.id || where.id.startsWith('collision-')
+            ? { ...staff, id: where.id }
+            : null
+        )
       ),
     },
     cliente: {
       findUnique: jest.fn(({ where }: { where: { id: string } }) => {
         if (where.id === customer.id) return Promise.resolve(customer);
         if (where.id === 'inactive-customer') return Promise.resolve({ ...customer, ativo: false });
+        if (where.id === 'collision-active') return Promise.resolve({ ...customer, id: where.id });
+        if (where.id === 'collision-inactive') {
+          return Promise.resolve({ ...customer, id: where.id, ativo: false });
+        }
         return Promise.resolve(null);
       }),
     },
@@ -133,4 +141,11 @@ describe('Local JWT identity and authorization over HTTP', () => {
       .patch('/ordens-servico/00000000-0000-4000-8000-000000000001/aprovar-servico')
       .expect(401);
   });
+
+  it.each(['collision-active', 'collision-inactive'])(
+    'rejects local User/Cliente collision %s regardless of customer state',
+    async (sub) => {
+      await server.get('/ordens-servico').set('Authorization', bearer(sub)).expect(401);
+    }
+  );
 });

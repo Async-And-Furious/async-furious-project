@@ -47,7 +47,7 @@ describe('Gateway JWT authorization over HTTP', () => {
   const prisma = {
     user: {
       findUnique: jest.fn(({ where }: { where: { id: string } }) => {
-        if (where.id === 'collision-id') {
+        if (where.id === 'collision-active' || where.id === 'collision-inactive') {
           return Promise.resolve({ ...staff, id: where.id, role: 'RECEPCIONISTA' });
         }
         if (!where.id.startsWith('staff-')) return Promise.resolve(null);
@@ -59,7 +59,10 @@ describe('Gateway JWT authorization over HTTP', () => {
       findUnique: jest.fn(({ where }: { where: { id: string } }) => {
         if (where.id === customer.id) return Promise.resolve(customer);
         if (where.id === 'inactive-customer') return Promise.resolve({ ...customer, ativo: false });
-        if (where.id === 'collision-id') return Promise.resolve({ ...customer, id: where.id });
+        if (where.id === 'collision-active') return Promise.resolve({ ...customer, id: where.id });
+        if (where.id === 'collision-inactive') {
+          return Promise.resolve({ ...customer, id: where.id, ativo: false });
+        }
         return Promise.resolve(null);
       }),
       findFirst: jest.fn(({ where }: { where: { id: string } }) =>
@@ -215,10 +218,29 @@ describe('Gateway JWT authorization over HTTP', () => {
       .expect(401);
   });
 
-  it('keeps the current database User-first resolution for colliding subject IDs', async () => {
+  it.each(['collision-active', 'collision-inactive'])(
+    'rejects colliding User/Cliente subject %s regardless of customer state',
+    async (sub) => {
+      await server
+        .get('/ordens-servico')
+        .set('Authorization', `Bearer ${token({ sub, role: 'RECEPCIONISTA', email: staff.email })}`)
+        .expect(401);
+    }
+  );
+
+  it('fails closed when identity lookup fails', async () => {
+    prisma.user.findUnique.mockRejectedValueOnce(new Error('database unavailable'));
     await server
       .get('/ordens-servico')
-      .set('Authorization', `Bearer ${token({ sub: 'collision-id', role: 'CLIENTE' })}`)
-      .expect(200);
+      .set('Authorization', `Bearer ${token({ sub: customer.id })}`)
+      .expect(401);
+  });
+
+  it('fails closed when customer lookup fails', async () => {
+    prisma.cliente.findUnique.mockRejectedValueOnce(new Error('database unavailable'));
+    await server
+      .get('/ordens-servico')
+      .set('Authorization', `Bearer ${token({ sub: customer.id })}`)
+      .expect(401);
   });
 });

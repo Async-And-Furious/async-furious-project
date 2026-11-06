@@ -91,11 +91,17 @@ sequenceDiagram
         AuthzFn-->>GW: isAuthorized=true, correlation_id
         GW->>App: HTTP_PROXY via VPC Link
         App->>App: JwtStrategy revalida RS256, issuer, audience e exp
-        App->>RDS: token sem role: validateCustomer(sub) exige ativo=true
-        alt cliente desativado após a emissão
-            App-->>C: 401 Unauthorized
-        else autorizado
+        App->>RDS: validateTokenSubject consulta User e Cliente pelo sub
+        alt falha de consulta ou sub existe em User e Cliente
+            App-->>C: 401 Unauthorized (fail-closed)
+        else somente User existe
+            App->>App: usa role persistida do staff
             App-->>C: resposta do caso de uso
+        else somente Cliente ativo existe
+            App->>App: role CLIENTE; claims role/email ignoradas
+            App-->>C: resposta do caso de uso
+        else Cliente inativo ou subject ausente
+            App-->>C: 401 Unauthorized
         end
     end
 ```
@@ -133,22 +139,22 @@ sequenceDiagram
     GW->>AuthzFn: authorizer REQUEST
     AuthzFn-->>GW: isAuthorized=true
     GW->>App: HTTP_PROXY via VPC Link
-    App->>App: JwtStrategy com role: validateTokenSubject busca User
+    App->>App: JwtStrategy resolve User/Cliente sem confiar em role/email do JWT
     App->>App: RolesGuard compara @Roles(...) com role
     App-->>S: 200, 401 ou 403
 ```
 
 ## 4. Contraste
 
-| Aspecto | Staff, local | Staff, AWS | Cliente, AWS |
-|---|---|---|---|
-| Quem emite | aplicação | aplicação | Lambda `authenticate-customer` |
-| Credencial | e-mail e senha | e-mail e senha | CPF |
-| Algoritmo | HS256 | RS256 (chave compartilhada com a Lambda) | RS256 |
-| Claims | `sub`=`User.id`, `email`, `role` | idem | só `sub`=`Cliente.id` |
-| Primeira barreira | `JwtAuthGuard` | Lambda Authorizer | Lambda Authorizer |
-| Resolução na aplicação | `validateTokenSubject` | `validateTokenSubject` | `validateCustomer` |
-| Expiração | 1800s | 1800s | 1800s |
+| Aspecto                | Staff, local                     | Staff, AWS                               | Cliente, AWS                   |
+| ---------------------- | -------------------------------- | ---------------------------------------- | ------------------------------ |
+| Quem emite             | aplicação                        | aplicação                                | Lambda `authenticate-customer` |
+| Credencial             | e-mail e senha                   | e-mail e senha                           | CPF                            |
+| Algoritmo              | HS256                            | RS256 (chave compartilhada com a Lambda) | RS256                          |
+| Claims                 | `sub`=`User.id`, `email`, `role` | idem                                     | só `sub`=`Cliente.id`          |
+| Primeira barreira      | `JwtAuthGuard`                   | Lambda Authorizer                        | Lambda Authorizer              |
+| Resolução na aplicação | `validateTokenSubject`           | `validateTokenSubject`                   | `validateTokenSubject`         |
+| Expiração              | 1800s                            | 1800s                                    | 1800s                          |
 
 `JwtCustomerStrategy` e `JwtCustomerAuthGuard` existem (PR #182) e
 `Role.CLIENTE` está no enum de papéis, mas nenhuma rota fora de `src/auth/`
@@ -163,9 +169,16 @@ cliente são resolvidos pela `JwtStrategy` padrão.
 - A chave privada RS256 é compartilhada entre a Lambda e a aplicação, o que
   contradiz a premissa da RFC-006 de que ela nunca sai de
   `repo-auth-serverless`.
-- `validateCustomer`, usado pela `JwtStrategy` para tokens sem `role`, atribui
-  `Role.RECEPCIONISTA` ao cliente; `validateTokenSubject` e
-  `JwtCustomerStrategy` atribuem `Role.CLIENTE`. Um token de cliente pode,
-  portanto, satisfazer `@Roles(Role.RECEPCIONISTA)` nos ambientes AWS. Não
-  verifiquei rota a rota se isso é explorável; merece revisão.
+- A resolução consulta ambos os cadastros: `User` sem colisão usa sua role
+  persistida; `Cliente` ativo sem colisão usa `Role.CLIENTE`; sujeito
+  ausente/inativo, colisão entre `User` e `Cliente` ou falha de consulta falha
+  fechada com 401. Claims `role`/`email` não escolhem identidade e os erros de
+  lookup não registram IDs, e-mail ou CPF.
+- `GET /api/v1/ordens-servico` e `GET /api/v1/ordens-servico/:id` exigem
+  `ADMIN`, `RECEPCIONISTA` ou `MECANICO` (403 para cliente). As rotas
+  `/status` e `/rastreamento` permanecem públicas; `PATCH
+/api/v1/ordens-servico/:id/aprovar-servico` continua exigindo JWT, sem role
+  staff adicional.
+- A política fail-closed de colisão evita autenticação ambígua, mas não corrige
+  dados existentes nem decide uma forma futura de desambiguar identidades.
 - A rota `POST /auth` não tem throttling nem WAF.
