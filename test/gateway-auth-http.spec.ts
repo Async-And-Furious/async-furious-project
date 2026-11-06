@@ -47,6 +47,9 @@ describe('Gateway JWT authorization over HTTP', () => {
   const prisma = {
     user: {
       findUnique: jest.fn(({ where }: { where: { id: string } }) => {
+        if (where.id === 'collision-id') {
+          return Promise.resolve({ ...staff, id: where.id, role: 'RECEPCIONISTA' });
+        }
         if (!where.id.startsWith('staff-')) return Promise.resolve(null);
         const role = where.id === staff.id ? staff.role : where.id.slice('staff-'.length);
         return Promise.resolve({ ...staff, id: where.id, role });
@@ -56,6 +59,7 @@ describe('Gateway JWT authorization over HTTP', () => {
       findUnique: jest.fn(({ where }: { where: { id: string } }) => {
         if (where.id === customer.id) return Promise.resolve(customer);
         if (where.id === 'inactive-customer') return Promise.resolve({ ...customer, ativo: false });
+        if (where.id === 'collision-id') return Promise.resolve({ ...customer, id: where.id });
         return Promise.resolve(null);
       }),
       findFirst: jest.fn(({ where }: { where: { id: string } }) =>
@@ -205,6 +209,16 @@ describe('Gateway JWT authorization over HTTP', () => {
     await server
       .patch('/ordens-servico/00000000-0000-4000-8000-000000000001/aprovar-servico')
       .set('Authorization', `Bearer ${token({ sub: customer.id })}`)
+      .expect(200);
+    await server
+      .patch('/ordens-servico/00000000-0000-4000-8000-000000000001/aprovar-servico')
+      .expect(401);
+  });
+
+  it('keeps the current database User-first resolution for colliding subject IDs', async () => {
+    await server
+      .get('/ordens-servico')
+      .set('Authorization', `Bearer ${token({ sub: 'collision-id', role: 'CLIENTE' })}`)
       .expect(200);
   });
 });

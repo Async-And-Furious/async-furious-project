@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthService } from '../services/auth.service';
 import { Role } from '../enums/role.enum';
+import type { JwtPayload } from '../types/auth.types';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -13,7 +14,7 @@ describe('JwtStrategy', () => {
     authService = {
       validateUser: jest.fn(),
       validateCustomer: jest.fn(),
-      validateTokenSubject: jest.fn(),
+      validateTokenSubject: jest.fn((payload: JwtPayload) => authService.validateUser(payload.sub)),
     } as unknown as jest.Mocked<AuthService>;
 
     config = {

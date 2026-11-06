@@ -107,7 +107,7 @@ export class OrdemServicoController {
   @ApiOperation({
     summary: 'Listar ordens de serviço ativas por prioridade',
     description:
-      'Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
+      'Requer role ADMIN, RECEPCIONISTA ou MECANICO. Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
   })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
@@ -131,6 +131,10 @@ export class OrdemServicoController {
     },
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO',
+  })
   listar(@Query() query: ListQueryDto) {
     return this.listarUseCase.execute(Number(query.page) || 1, Number(query.limit) || 10);
   }
@@ -159,10 +163,17 @@ export class OrdemServicoController {
   @Get(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
-  @ApiOperation({ summary: 'Detalhar ordem de serviço' })
+  @ApiOperation({
+    summary: 'Detalhar ordem de serviço',
+    description: 'Requer role ADMIN, RECEPCIONISTA ou MECANICO.',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Ordem de serviço encontrada' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO',
+  })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   detalhar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
     return this.detalharUseCase.execute(id);
