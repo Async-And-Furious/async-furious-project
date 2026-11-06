@@ -33,7 +33,8 @@ describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
       repository as unknown as IOrdemServicoRepository,
       historyRepository as unknown as IStatusHistoryRepository,
       emissor as unknown as IEmissorEventos,
-      new StatusTransitionService()
+      new StatusTransitionService(),
+      { log: jest.fn() }
     );
   });
 

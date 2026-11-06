@@ -406,13 +406,22 @@ import {
         osRepo: OrdemServicoRepository,
         historyRepo: StatusHistoryRepository,
         barramento: IEmissorEventos,
-        transitionSvc: StatusTransitionService
-      ) => new UpdateServiceOrderStatusUseCase(osRepo, historyRepo, barramento, transitionSvc),
+        transitionSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) =>
+        new UpdateServiceOrderStatusUseCase(
+          osRepo,
+          historyRepo,
+          barramento,
+          transitionSvc,
+          transitionLogger
+        ),
       inject: [
         OrdemServicoRepository,
         StatusHistoryRepository,
         EMISSOR_EVENTOS,
         StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
       ],
     },
 

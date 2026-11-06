@@ -5,13 +5,16 @@ import { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.i
 import { IStatusHistoryRepository } from '../../domain/interfaces/status-history.interface';
 import { OSStatus, OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
+import { logOsStatusTransition } from '../logging/log-os-status-transition';
+import type { IOSStatusTransitionLogger } from '../logging/log-os-status-transition';
 
 export class UpdateServiceOrderStatusUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly statusHistoryRepository: IStatusHistoryRepository,
     private readonly emissorEventos: IEmissorEventos,
-    private readonly statusTransitionService: StatusTransitionService
+    private readonly statusTransitionService: StatusTransitionService,
+    private readonly transitionLogger: IOSStatusTransitionLogger
   ) {}
 
   async execute(osId: string, newStatus: OSStatus, motivo?: string): Promise<OrdemDeServico> {
@@ -37,6 +40,10 @@ export class UpdateServiceOrderStatusUseCase {
       ...(newStatus === 'FINISHED' ? { finalizada_em: os.finalizada_em } : {}),
       ...(newStatus === 'DELIVERED' ? { entregue_em: os.entregue_em } : {}),
     });
+
+    if (newStatus === 'FINISHED' || newStatus === 'CLOSED_WITHOUT_EXECUTION') {
+      logOsStatusTransition(this.transitionLogger, currentStatus, newStatus);
+    }
 
     // 4. Salva o histórico
     const historico = HistoricoStatus.create({

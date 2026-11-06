@@ -1,21 +1,28 @@
-# #345 — OS status transition logs (partial)
+# #345 — OS terminal status transition logs (code-path coverage)
 
 Base: `origin/develop` `f1757162f8bc38b80105c617f833856d32abe704`.
 
 ## Scope and boundary
 
-Log transitions observed in selected producers, only when the conditional
-repository update confirms this call changed the row:
-`IN_PROGRESS -> FINISHED` in `AtualizarStatusFinalizadaHandler`, allowed
-pre-repair statuses to `CLOSED_WITHOUT_EXECUTION` in
-`AtualizarStatusEncerradaSemExecucaoHandler`, and `AWAITING_APPROVAL ->
-CLOSED_WITHOUT_EXECUTION` in `DetectarOsParadaUseCase`. Emit only when
-`atualizarSeCondicao` returns true. This is explicitly partial coverage.
+Log code paths that persist either terminal OS status:
 
-`UpdateServiceOrderStatusUseCase` (generic status API/webhook) remains untouched:
-it reads then performs unconditional update and cannot safely identify a
-winning concurrent transition without changing behavior. No public contract,
-event contract, schema, dashboard, or Terraform changes in this OS slice.
+- `FINISHED`: `AtualizarStatusFinalizadaHandler` after its conditional update,
+  and `UpdateServiceOrderStatusUseCase` after repository update.
+- `CLOSED_WITHOUT_EXECUTION`: `AtualizarStatusEncerradaSemExecucaoHandler`
+  after its conditional update, `DetectarOsParadaUseCase` after its conditional
+  update, and `UpdateServiceOrderStatusUseCase` after repository update.
+
+The generic use case is reached by `ServiceOrderStatusWebhookController`; the
+same webhook is reachable through its documented caller. Refusal transitions
+also reach the selected handler from `PATCH :id/orcamento/recusar`, the public
+approval-decision route when the decision is refusal, and Billing Kafka
+`OrcamentoRecusado` / `PagamentoRecusado` events. `ExecucaoConcluida` reaches the
+finish handler; the detector publishes its compensation before its CAS.
+
+Do not change the generic route's current read-then-unconditional-update
+concurrency behavior. Its `previousStatus` is the status observed before the
+update and can be stale under concurrent writes; the conditional producers log
+only after winning the CAS. No schema or public contract change.
 
 ## Structured log contract
 
@@ -44,27 +51,23 @@ The separate dashboard draft must filter on `logType =
 
 This is best-effort diagnostic telemetry, not an authoritative ledger. A crash
 after the database commit but before logging can lose a record; collector/replay
-can duplicate it. The dashboard counts transitions observed in selected
-producers only: generic API/webhook and other uninstrumented transitions are
-absent. Never describe counts as exact totals or
+can duplicate it. The dashboard counts observations from current application
+code paths, not exact committed transition totals; generic-route concurrency
+can also make `previousStatus` stale. Direct database writes and future paths
+are not covered. Never describe counts as exact totals or
 use them for billing/audit/reconciliation. Durable complete accounting would
 need a separately approved transactional outbox design.
 
-This is deliberately not representative of all OS transitions: the generic
-HTTP status use case does not emit these records. The refusal handler may be
-called by an HTTP flow and emits when its conditional update succeeds.
-Dashboard titles/labels must identify the data as partial, best-effort telemetry
-from selected producers.
+Dashboard titles/labels must identify the data as partial, best-effort
+observations, not complete Saga coverage or an authoritative ledger.
 
 ## TDD / checks
 
-- Each eligible producer: success emits exactly the fixed object above;
+- Each terminal code path: successful persisted update emits the fixed object;
   conditional no-op and update rejection emit no transition object.
 - Test logger failure does not alter subsequent history/event behavior.
-- Nest wiring tests extract the real transition logger and producer providers
-  from the API and detector module metadata, then compile them with external
-  repository/publisher stubs. This validates those provider factories and their
-  emission, but is not a full application bootstrap.
+- Nest wiring tests extract real logger and producer providers from module
+  metadata with external dependencies stubbed; not a full bootstrap.
 - Assert object contains only the approved keys/values (no identity, reason,
   correlation, or token); test existing handler retry/idempotency paths remain
   unchanged.

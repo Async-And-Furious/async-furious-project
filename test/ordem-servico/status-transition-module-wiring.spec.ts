@@ -13,9 +13,16 @@ import { OS_STATUS_TRANSITION_LOGGER } from '../../src/modules/ordem-servico/app
 import { OrdemServicoRepository } from '../../src/modules/ordem-servico/infrastructure/repositories/ordem-servico.repository';
 import { StatusHistoryRepository } from '../../src/modules/ordem-servico/infrastructure/repositories/status-history.repository';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
+import { AtualizarStatusFinalizadaHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-finalizada.handler';
 import { DetectarOsParadaUseCase } from '../../src/modules/ordem-servico/application/use-cases/detectar-os-parada.use-case';
+import { UpdateServiceOrderStatusUseCase } from '../../src/modules/ordem-servico/application/use-cases/update-service-order-status.use-case';
 import { SERVICE_NAME } from '../../src/shared/infrastructure/logging/pino-logger.config';
 import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
+import { RecusarOrcamentoUseCase } from '../../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
+import { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
+import { OrcamentoRepository } from '../../src/modules/ordem-servico/infrastructure/repositories/orcamento.repository';
+import { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
+import { ExecucaoConcluida } from '../../src/modules/ordem-servico/domain/events/execucao-concluida.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 
@@ -100,6 +107,67 @@ describe('status transition logging Nest provider wiring', () => {
     }
   });
 
+  it('logs the public refusal use case through the real EventEmitter handler wiring', async () => {
+    let status = 'AWAITING_APPROVAL';
+    const osRepo = {
+      findOne: jest.fn(() =>
+        Promise.resolve(
+          Object.assign(new OrdemDeServico(), {
+            id: 'sensitive-order-id',
+            status,
+            podeAprovarOuRecusarOrcamento: jest.fn(),
+          })
+        )
+      ),
+      atualizarSeCondicao: jest.fn((_id, condition, update) => {
+        if (status !== condition.status) return Promise.resolve(false);
+        status = update.status;
+        return Promise.resolve(true);
+      }),
+    } as unknown as IOrdemServicoRepository;
+    const budgetRepository = {
+      findByOrdemServicoId: jest.fn().mockResolvedValue({ id: 'estimate-id', status: 'PENDING' }),
+      update: jest.fn().mockResolvedValue({ id: 'estimate-id', status: 'REJECTED' }),
+    };
+    const history = { create: jest.fn(), findByOrdemServicoId: jest.fn() };
+    const providers = providersFrom(OrdemServicoModule).filter((provider) => {
+      if (typeof provider === 'function') return provider.name === 'StatusTransitionService';
+      return [
+        OS_STATUS_TRANSITION_LOGGER,
+        AtualizarStatusEncerradaSemExecucaoHandler,
+        RecusarOrcamentoUseCase,
+      ].includes(
+        provider.provide as
+          | typeof OS_STATUS_TRANSITION_LOGGER
+          | typeof AtualizarStatusEncerradaSemExecucaoHandler
+          | typeof RecusarOrcamentoUseCase
+      );
+    });
+    const moduleRef = await Test.createTestingModule({
+      imports: [EventEmitterModule.forRoot()],
+      providers: [
+        ...providers,
+        EmissorEventos,
+        { provide: EMISSOR_EVENTOS, useExisting: EmissorEventos },
+        { provide: OrdemServicoRepository, useValue: osRepo },
+        { provide: OrcamentoRepository, useValue: budgetRepository },
+        { provide: StatusHistoryRepository, useValue: history },
+      ],
+    }).compile();
+    const output = capturedStdout();
+    try {
+      await moduleRef.init();
+      expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
+      await moduleRef.get(RecusarOrcamentoUseCase).execute('sensitive-order-id');
+      expect(status).toBe('CLOSED_WITHOUT_EXECUTION');
+      expectTransitionJson(output.lines, 'AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION');
+      expect(output.lines.join('')).not.toContain('sensitive-order-id');
+    } finally {
+      output.restore();
+      await moduleRef.close();
+    }
+  });
+
   it('uses effective detector module providers to emit after a successful CAS', async () => {
     const repo = {
       findParadasAguardandoAprovacao: jest.fn().mockResolvedValue([{ id: 'sensitive-order-id' }]),
@@ -135,6 +203,89 @@ describe('status transition logging Nest provider wiring', () => {
         { status: 'CLOSED_WITHOUT_EXECUTION' }
       );
       expectTransitionJson(output.lines, 'AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION');
+      expect(output.lines.join('')).not.toContain('sensitive-order-id');
+    } finally {
+      output.restore();
+      await moduleRef.close();
+    }
+  });
+
+  it('uses the effective API finish handler provider after a successful CAS', async () => {
+    const repo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'sensitive-order-id', status: 'IN_PROGRESS' }),
+      atualizarSeCondicao: jest.fn().mockResolvedValue(true),
+    } as unknown as IOrdemServicoRepository;
+    const history = { create: jest.fn(), findByOrdemServicoId: jest.fn() };
+    const emitter = { emitir: jest.fn() };
+    const providers = providersFrom(OrdemServicoModule).filter((provider) => {
+      if (typeof provider === 'function') return provider.name === 'StatusTransitionService';
+      return [OS_STATUS_TRANSITION_LOGGER, AtualizarStatusFinalizadaHandler].includes(
+        provider.provide as
+          | typeof OS_STATUS_TRANSITION_LOGGER
+          | typeof AtualizarStatusFinalizadaHandler
+      );
+    });
+    const moduleRef = await Test.createTestingModule({
+      imports: [EventEmitterModule.forRoot()],
+      providers: [
+        ...providers,
+        { provide: OrdemServicoRepository, useValue: repo },
+        { provide: StatusHistoryRepository, useValue: history },
+        { provide: EMISSOR_EVENTOS, useValue: emitter },
+      ],
+    }).compile();
+    const output = capturedStdout();
+    try {
+      const handler = moduleRef.get(AtualizarStatusFinalizadaHandler);
+      expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
+      await handler.handle(new ExecucaoConcluida('sensitive-order-id'));
+      expect(repo.atualizarSeCondicao).toHaveBeenCalledWith(
+        'sensitive-order-id',
+        { status: 'IN_PROGRESS' },
+        { status: 'FINISHED' }
+      );
+      expectTransitionJson(output.lines, 'IN_PROGRESS', 'FINISHED');
+      expect(output.lines.join('')).not.toContain('sensitive-order-id');
+    } finally {
+      output.restore();
+      await moduleRef.close();
+    }
+  });
+
+  it('uses the generic API provider to log terminal updates after repository persistence', async () => {
+    const repo = {
+      findOne: jest.fn().mockResolvedValue({ id: 'sensitive-order-id', status: 'IN_PROGRESS' }),
+      update: jest.fn().mockResolvedValue({ id: 'sensitive-order-id', status: 'FINISHED' }),
+    } as unknown as IOrdemServicoRepository;
+    const history = { create: jest.fn() } as unknown as jest.Mocked<IStatusHistoryRepository>;
+    const emitter = { emitir: jest.fn() };
+    const providers = providersFrom(OrdemServicoModule).filter((provider) => {
+      if (typeof provider === 'function') return provider.name === 'StatusTransitionService';
+      return [OS_STATUS_TRANSITION_LOGGER, UpdateServiceOrderStatusUseCase].includes(
+        provider.provide as
+          | typeof OS_STATUS_TRANSITION_LOGGER
+          | typeof UpdateServiceOrderStatusUseCase
+      );
+    });
+    const moduleRef = await Test.createTestingModule({
+      imports: [EventEmitterModule.forRoot()],
+      providers: [
+        ...providers,
+        { provide: OrdemServicoRepository, useValue: repo },
+        { provide: StatusHistoryRepository, useValue: history },
+        { provide: EMISSOR_EVENTOS, useValue: emitter },
+      ],
+    }).compile();
+    const output = capturedStdout();
+    try {
+      const useCase = moduleRef.get(UpdateServiceOrderStatusUseCase);
+      expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
+      await useCase.execute('sensitive-order-id', 'FINISHED');
+      expect(repo.update).toHaveBeenCalledWith(
+        'sensitive-order-id',
+        expect.objectContaining({ status: 'FINISHED' })
+      );
+      expectTransitionJson(output.lines, 'IN_PROGRESS', 'FINISHED');
       expect(output.lines.join('')).not.toContain('sensitive-order-id');
     } finally {
       output.restore();
