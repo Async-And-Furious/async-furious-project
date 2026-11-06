@@ -1,7 +1,6 @@
-import type { Logger } from '@nestjs/common';
-import type { OSStatus } from '../../../modules/ordem-servico/domain/entities/ordem-servico.entity';
+import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
 
-type TransitionLogger = Pick<Logger, 'log'>;
+type TransitionLogger = { log(message: Record<string, string>): void };
 
 export function logOsStatusTransition(
   logger: TransitionLogger,

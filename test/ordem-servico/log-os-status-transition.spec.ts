@@ -1,4 +1,4 @@
-import { logOsStatusTransition } from '../../src/shared/infrastructure/logging/os-status-transition';
+import { logOsStatusTransition } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 
 describe('logOsStatusTransition', () => {
   it('logs only the fixed safe fields', () => {

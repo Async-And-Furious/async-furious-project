@@ -4,7 +4,7 @@ import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-serv
 import type { IStatusHistoryRepository } from '../../domain/interfaces/status-history.interface';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 import { EtapaDaSagaFalhou } from '../../domain/events/etapa-da-saga-falhou.event';
-import { logOsStatusTransition } from '../../../../shared/infrastructure/logging/os-status-transition';
+import { logOsStatusTransition } from '../logging/log-os-status-transition';
 
 export const PRAZO_PADRAO_MINUTOS = 48 * 60;
 

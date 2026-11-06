@@ -18,8 +18,9 @@ event contract, schema, dashboard, or Terraform changes in this OS slice.
 
 ## Structured log contract
 
-Use existing Nest `Logger` / `nestjs-pino` and one fixed JSON object after the
-conditional update succeeds:
+Use the existing Nest `Logger` / `nestjs-pino` with the formatting/emission
+helper in `ordem-servico/application/logging` (no application-to-infrastructure
+import) and one fixed JSON object after the conditional update succeeds:
 
 - `logType: "os.status.transition"` (not `event`, which is reserved in existing
   logging conventions)
@@ -32,6 +33,10 @@ provided by the existing Pino mixin; `appName` is agent-provided, not set here.
 Catch a synchronous logger failure so telemetry cannot interrupt follow-up
 history/event work. Existing business failures and retry behavior remain intact.
 
+The separate dashboard draft currently filters on `event =
+'os.status.transition'`; that does not match this source contract. Dashboard
+work must change the filter to `logType` before use.
+
 ## Reliability and coverage limits
 
 This is best-effort diagnostic telemetry, not an authoritative ledger. A crash
@@ -40,6 +45,10 @@ can duplicate it. The dashboard counts observed async records only: generic
 API/webhook transitions are absent. Never describe counts as exact totals or
 use them for billing/audit/reconciliation. Durable complete accounting would
 need a separately approved transactional outbox design.
+
+This is deliberately not representative of all OS transitions: the generic
+HTTP status use case does not emit these records. Dashboard titles/labels must
+identify the data as partial async telemetry.
 
 ## TDD / checks
 

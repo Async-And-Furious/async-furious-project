@@ -10,7 +10,7 @@ import { StatusTransitionService } from '../../domain/services/status-transition
 import { ExecucaoConcluida } from '../../domain/events/execucao-concluida.event';
 import { EtapaDaSagaFalhou } from '../../domain/events/etapa-da-saga-falhou.event';
 import { OrdemServicoFinalizada } from '../../domain/events/ordem-servico-finalizada.event';
-import { logOsStatusTransition } from '../../../../shared/infrastructure/logging/os-status-transition';
+import { logOsStatusTransition } from '../logging/log-os-status-transition';
 
 // Estados anteriores ao reparo: o evento chegou antes da hora. Falha retentável (ADR-0018).
 const ANTES_DO_REPARO: OSStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'];
