@@ -452,10 +452,11 @@ combinadas (detalhado na [ADR-0016](../adr/0016-saga-coreografada.md)):
     universal nem atomicidade/transação entre a atualização da OS e o
     histórico (ver [`persistence-model.md`](./persistence-model.md) §5).
 
-Para reconstruir o histórico completo de uma OS que sofreu compensação, o
-caminho é: partir do `ordemServicoId` (que é o `correlationId`), buscar o
-trace correspondente no New Relic e ler, em ordem, os eventos publicados por
-cada serviço sob aquele identificador.
+É possível reconstruir parcialmente o histórico de uma OS que sofreu
+compensação: partir do `ordemServicoId` (o `correlationId`) e consultar os
+logs, traces e eventos correlacionados que existam e tenham sido retidos.
+Disponibilidade e retenção dessas evidências condicionam o que pode ser
+reconstruído; este documento não garante um histórico completo.
 
 ---
 
