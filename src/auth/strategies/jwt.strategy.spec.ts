@@ -112,7 +112,9 @@ describe('JwtStrategy', () => {
         exp: 9999999999,
       })
     ).resolves.toEqual(customer);
-    expect(authService.validateTokenSubject).toHaveBeenCalledWith(expect.objectContaining({ sub: 'customer-id' }));
+    expect(authService.validateTokenSubject).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'customer-id' })
+    );
   });
 
   it('ignores gateway role/email claims and resolves identity from the subject', async () => {
@@ -154,7 +156,12 @@ describe('JwtStrategy', () => {
     authService.validateTokenSubject.mockResolvedValue(null);
 
     await expect(
-      strategy.validate({ sub: 'missing-customer', iss: 'auth-lambda', aud: 'workshop-api', exp: 9999999999 })
+      strategy.validate({
+        sub: 'missing-customer',
+        iss: 'auth-lambda',
+        aud: 'workshop-api',
+        exp: 9999999999,
+      })
     ).rejects.toThrow(UnauthorizedException);
   });
   it('configures RS256 verification with the shared contract', () => {

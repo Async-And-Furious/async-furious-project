@@ -13,14 +13,11 @@ import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { OrdemServicoController } from '../src/modules/ordem-servico/presentation/controllers/ordem-servico.controller';
 import {
-  AnalisarVeiculoUseCase,
   AprovarServicoPrestadoUseCase,
-  AssumirOrdemServicoUseCase,
   ConsultarStatusOrdemServicoUseCase,
   CriarOrdemServicoUseCase,
   DeletarOrdemServicoUseCase,
   DetalharOrdemServicoUseCase,
-  FinalizarExecucaoUseCase,
   ListarOrdensServicoUseCase,
   ListarServicosInsumosNaOsUseCase,
   RegistrarEntregaVeiculoUseCase,
@@ -69,13 +66,10 @@ describe('Gateway JWT authorization over HTTP', () => {
 
   const useCases = [
     CriarOrdemServicoUseCase,
-    AssumirOrdemServicoUseCase,
-    AnalisarVeiculoUseCase,
     ListarServicosInsumosNaOsUseCase,
     AtualizarOrdemServicoUseCase,
     AprovarOrcamentoUseCase,
     RecusarOrcamentoUseCase,
-    FinalizarExecucaoUseCase,
     AprovarServicoPrestadoUseCase,
     RegistrarEntregaVeiculoUseCase,
     ConsultarStatusOrdemServicoUseCase,
@@ -160,19 +154,24 @@ describe('Gateway JWT authorization over HTTP', () => {
     await server.get('/ordens-servico/tempo-medio').set('Authorization', bearer).expect(403);
   });
 
-  it.each(['ADMIN', 'RECEPCIONISTA', 'MECANICO'])('allows database-backed %s order reads', async (role) => {
-    const staffId = `staff-${role}`;
-    const bearer = `Bearer ${token({ sub: staffId, role: 'CLIENTE', email: 'forged@invalid.test' })}`;
-    await server.get('/ordens-servico').set('Authorization', bearer).expect(200);
-    await server
-      .get('/ordens-servico/00000000-0000-4000-8000-000000000001')
-      .set('Authorization', bearer)
-      .expect(200);
-  });
+  it.each(['ADMIN', 'RECEPCIONISTA', 'MECANICO'])(
+    'allows database-backed %s order reads',
+    async (role) => {
+      const staffId = `staff-${role}`;
+      const bearer = `Bearer ${token({ sub: staffId, role: 'CLIENTE', email: 'forged@invalid.test' })}`;
+      await server.get('/ordens-servico').set('Authorization', bearer).expect(200);
+      await server
+        .get('/ordens-servico/00000000-0000-4000-8000-000000000001')
+        .set('Authorization', bearer)
+        .expect(200);
+    }
+  );
 
   it('keeps order status and tracking public', async () => {
     await server.get('/ordens-servico/00000000-0000-4000-8000-000000000001/status').expect(200);
-    await server.get('/ordens-servico/00000000-0000-4000-8000-000000000001/rastreamento').expect(200);
+    await server
+      .get('/ordens-servico/00000000-0000-4000-8000-000000000001/rastreamento')
+      .expect(200);
   });
 
   it.each(['missing-customer', 'inactive-customer'])('%s cannot authenticate', async (sub) => {
