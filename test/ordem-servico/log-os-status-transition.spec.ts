@@ -4,6 +4,8 @@ import {
   pinoHttpOptions,
   runWithLogContext,
 } from '../../src/shared/infrastructure/logging/pino-logger.config';
+import { Store, storage } from 'nestjs-pino/storage';
+import { OsStatusTransitionPinoLogger } from '../../src/modules/ordem-servico/infrastructure/logging/os-status-transition-pino-logger';
 
 describe('logOsStatusTransition', () => {
   it('logs only the fixed safe fields', () => {
@@ -34,27 +36,45 @@ describe('logOsStatusTransition', () => {
     ).not.toThrow();
   });
 
-  it('serializes without Kafka context identifiers through the real Pino mixin', () => {
-    const records: Record<string, unknown>[] = [];
-    const logger = pino(
+  it('serializes without HTTP bindings or Kafka IDs through the real Nest/Pino context chain', () => {
+    const lines: string[] = [];
+    const root = pino(
       { mixin: pinoHttpOptions.mixin },
-      { write: (line: string) => records.push(JSON.parse(line) as Record<string, unknown>) }
+      { write: (line: string) => lines.push(line) }
+    );
+    const requestLogger = root.child({
+      req: { id: 'private-request-id', headers: { authorization: 'private-token' } },
+      correlationId: 'private-http-correlation',
+    });
+    const transitionLogger = new OsStatusTransitionPinoLogger(root);
+
+    storage.run(new Store(requestLogger), () =>
+      runWithLogContext({ ordemServicoId: 'private-order-id', eventId: 'private-event-id' }, () =>
+        logOsStatusTransition(transitionLogger, 'IN_PROGRESS', 'FINISHED')
+      )
     );
 
-    runWithLogContext({ ordemServicoId: 'private-order-id', eventId: 'private-event-id' }, () =>
-      logOsStatusTransition({ log: (fields) => logger.info(fields) }, 'IN_PROGRESS', 'FINISHED')
-    );
-
-    expect(records).toHaveLength(1);
-    expect(records[0]).toMatchObject({
+    expect(lines).toHaveLength(1);
+    const raw = lines[0];
+    const record = JSON.parse(raw) as Record<string, unknown>;
+    expect(record).toMatchObject({
       logType: 'os.status.transition',
       previousStatus: 'IN_PROGRESS',
       newStatus: 'FINISHED',
     });
-    expect(JSON.stringify(records[0])).not.toContain('private-order-id');
-    expect(JSON.stringify(records[0])).not.toContain('private-event-id');
-    expect(records[0]).not.toHaveProperty('correlationId');
-    expect(records[0]).not.toHaveProperty('ordemServicoId');
-    expect(records[0]).not.toHaveProperty('eventId');
+    for (const sensitive of [
+      'private-order-id',
+      'private-event-id',
+      'private-request-id',
+      'private-http-correlation',
+      'private-token',
+      'req',
+    ]) {
+      expect(raw).not.toContain(sensitive);
+    }
+    expect(record).not.toHaveProperty('correlationId');
+    expect(record).not.toHaveProperty('ordemServicoId');
+    expect(record).not.toHaveProperty('eventId');
+    expect(record).not.toHaveProperty('req');
   });
 });

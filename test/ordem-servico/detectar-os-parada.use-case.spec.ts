@@ -6,6 +6,7 @@ import { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import type { IPublicadorIntegracao } from '../../src/shared/domain/interfaces/publicador-integracao.interface';
+import type { IOSStatusTransitionLogger } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 
 const AGORA = new Date('2026-11-03T12:00:00.000Z');
 const os = (id: string) => Object.assign(new OrdemDeServico(), { id, status: 'AWAITING_APPROVAL' });
@@ -16,11 +17,13 @@ describe('DetectarOsParadaUseCase', () => {
   >;
   let historicoRepo: jest.Mocked<IStatusHistoryRepository>;
   let publicador: jest.Mocked<IPublicadorIntegracao>;
+  let transitionLogger: jest.Mocked<IOSStatusTransitionLogger>;
   const detector = (prazoMinutos = 30) =>
     new DetectarOsParadaUseCase(
       osRepo as unknown as IOrdemServicoRepository,
       historicoRepo,
       publicador,
+      transitionLogger,
       prazoMinutos,
       () => AGORA
     );
@@ -34,6 +37,7 @@ describe('DetectarOsParadaUseCase', () => {
     };
     historicoRepo = { create: jest.fn(), findByOrdemServicoId: jest.fn() };
     publicador = { publicar: jest.fn().mockResolvedValue(undefined) };
+    transitionLogger = { log: jest.fn() };
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -46,8 +50,7 @@ describe('DetectarOsParadaUseCase', () => {
   });
 
   it('publica EtapaDaSagaFalhou (aprovacao-pagamento, sem evento original) e fecha a OS', async () => {
-    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
-    log.mockClear();
+    const log = transitionLogger.log;
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
 
     const resultado = await detector().executar();
@@ -91,8 +94,7 @@ describe('DetectarOsParadaUseCase', () => {
   });
 
   it('se a OS foi paga entre a busca e o fechamento, não fecha nem registra', async () => {
-    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
-    log.mockClear();
+    const log = transitionLogger.log;
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
     osRepo.atualizarSeCondicao.mockResolvedValue(false);
 
@@ -106,8 +108,7 @@ describe('DetectarOsParadaUseCase', () => {
   });
 
   it('não registra transição quando a atualização condicional falha', async () => {
-    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
-    log.mockClear();
+    const log = transitionLogger.log;
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
     osRepo.atualizarSeCondicao.mockRejectedValue(new Error('database failure with private data'));
 
@@ -133,7 +134,7 @@ describe('DetectarOsParadaUseCase', () => {
       order.push('history');
       return Promise.resolve(historico);
     });
-    jest.spyOn(Logger.prototype, 'log').mockImplementationOnce(() => {
+    transitionLogger.log.mockImplementationOnce(() => {
       order.push('log');
       throw new Error('logger unavailable');
     });

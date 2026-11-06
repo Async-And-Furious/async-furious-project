@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { LoggerModule, PinoLogger } from 'nestjs-pino';
 import { DatabaseModule } from '../../shared/infrastructure/database/database.module';
 import { MensageriaModule } from '../../shared/infrastructure/mensageria/mensageria.module';
 import {
@@ -8,6 +9,9 @@ import {
 } from '../../shared/domain/interfaces/publicador-integracao.interface';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
+import { pinoHttpOptions } from '../../shared/infrastructure/logging/pino-logger.config';
+import { OS_STATUS_TRANSITION_LOGGER } from './application/logging/log-os-status-transition';
+import { OsStatusTransitionPinoLogger } from './infrastructure/logging/os-status-transition-pino-logger';
 import {
   DetectarOsParadaUseCase,
   PRAZO_PADRAO_MINUTOS,
@@ -28,8 +32,17 @@ export function prazoDetectorMinutos(env: NodeJS.ProcessEnv = process.env): numb
  * sem consumidor e sem os handlers in-process da API.
  */
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), DatabaseModule, MensageriaModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({ pinoHttp: pinoHttpOptions }),
+    DatabaseModule,
+    MensageriaModule,
+  ],
   providers: [
+    {
+      provide: OS_STATUS_TRANSITION_LOGGER,
+      useFactory: () => new OsStatusTransitionPinoLogger(PinoLogger.root),
+    },
     OrdemServicoRepository,
     StatusHistoryRepository,
     {
@@ -37,9 +50,23 @@ export function prazoDetectorMinutos(env: NodeJS.ProcessEnv = process.env): numb
       useFactory: (
         osRepo: OrdemServicoRepository,
         historicoRepo: StatusHistoryRepository,
-        publicador: IPublicadorIntegracao
-      ) => new DetectarOsParadaUseCase(osRepo, historicoRepo, publicador, prazoDetectorMinutos()),
-      inject: [OrdemServicoRepository, StatusHistoryRepository, PUBLICADOR_INTEGRACAO],
+        publicador: IPublicadorIntegracao,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) =>
+        new DetectarOsParadaUseCase(
+          osRepo,
+          historicoRepo,
+          publicador,
+          transitionLogger,
+          prazoDetectorMinutos(),
+          () => new Date()
+        ),
+      inject: [
+        OrdemServicoRepository,
+        StatusHistoryRepository,
+        PUBLICADOR_INTEGRACAO,
+        OS_STATUS_TRANSITION_LOGGER,
+      ],
     },
   ],
 })

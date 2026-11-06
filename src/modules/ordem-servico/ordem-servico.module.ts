@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 import { OrdemServicoController } from './presentation/controllers/ordem-servico.controller';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
@@ -28,6 +29,8 @@ import {
 } from './application/use-cases/ordem-servico.use-cases';
 import { UpdateServiceOrderStatusUseCase } from './application/use-cases/update-service-order-status.use-case';
 import { StatusTransitionService } from './domain/services/status-transition.service';
+import { OS_STATUS_TRANSITION_LOGGER } from './application/logging/log-os-status-transition';
+import { OsStatusTransitionPinoLogger } from './infrastructure/logging/os-status-transition-pino-logger';
 import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
 import { ServiceOrderStatusWebhookController } from './presentation/controllers/service-order-status-webhook.controller';
 import {
@@ -76,6 +79,10 @@ import {
   imports: [FinanceiroModule],
   controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
   providers: [
+    {
+      provide: OS_STATUS_TRANSITION_LOGGER,
+      useFactory: () => new OsStatusTransitionPinoLogger(PinoLogger.root),
+    },
     OrdemServicoRepository,
     OrcamentoRepository,
     OsPecaRepository,
@@ -222,13 +229,22 @@ import {
         osRepo: OrdemServicoRepository,
         historyRepo: StatusHistoryRepository,
         barramento: IEmissorEventos,
-        transicaoSvc: StatusTransitionService
-      ) => new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, barramento, transicaoSvc),
+        transicaoSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) =>
+        new AtualizarStatusFinalizadaHandler(
+          osRepo,
+          historyRepo,
+          barramento,
+          transicaoSvc,
+          transitionLogger
+        ),
       inject: [
         OrdemServicoRepository,
         StatusHistoryRepository,
         EMISSOR_EVENTOS,
         StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
       ],
     },
     {
@@ -255,19 +271,22 @@ import {
         osRepo: OrdemServicoRepository,
         barramento: IEmissorEventos,
         historicoRepo: StatusHistoryRepository,
-        transicaoSvc: StatusTransitionService
+        transicaoSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
       ) =>
         new AtualizarStatusEncerradaSemExecucaoHandler(
           osRepo,
           barramento,
           historicoRepo,
-          transicaoSvc
+          transicaoSvc,
+          transitionLogger
         ),
       inject: [
         OrdemServicoRepository,
         EMISSOR_EVENTOS,
         StatusHistoryRepository,
         StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
       ],
     },
     {

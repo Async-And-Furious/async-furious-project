@@ -11,6 +11,7 @@ import { OrcamentoRecusado } from '../../domain/events/orcamento-recusado.event'
 import type { PagamentoRecusado } from '../../domain/events/pagamento-recusado.event';
 import { StatusAtualizadoEncerradaSemExecucao } from '../../domain/events/status-atualizado-encerrada-sem-execucao.event';
 import { logOsStatusTransition } from '../logging/log-os-status-transition';
+import type { IOSStatusTransitionLogger } from '../logging/log-os-status-transition';
 
 export const MOTIVO_ORCAMENTO_RECUSADO = 'Orçamento recusado pelo cliente';
 export const MOTIVO_PAGAMENTO_RECUSADO = 'Pagamento recusado pelo Mercado Pago';
@@ -36,7 +37,8 @@ export class AtualizarStatusEncerradaSemExecucaoHandler {
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly emissor: IEmissorEventos,
     private readonly statusHistoryRepository: IStatusHistoryRepository,
-    private readonly transicao: StatusTransitionService
+    private readonly transicao: StatusTransitionService,
+    private readonly transitionLogger: IOSStatusTransitionLogger
   ) {}
 
   @OnEvent('OrcamentoRecusado')
@@ -63,7 +65,7 @@ export class AtualizarStatusEncerradaSemExecucaoHandler {
           `[P-14] ${origem}: OS ${ordemServicoId} saiu de ${os.status} durante a gravação`
         );
       }
-      logOsStatusTransition(this.logger, os.status, 'CLOSED_WITHOUT_EXECUTION');
+      logOsStatusTransition(this.transitionLogger, os.status, 'CLOSED_WITHOUT_EXECUTION');
       await this.statusHistoryRepository.create(
         HistoricoStatus.create({
           ordemServicoId,
