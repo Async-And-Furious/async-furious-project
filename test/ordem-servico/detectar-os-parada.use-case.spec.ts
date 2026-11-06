@@ -46,6 +46,8 @@ describe('DetectarOsParadaUseCase', () => {
   });
 
   it('publica EtapaDaSagaFalhou (aprovacao-pagamento, sem evento original) e fecha a OS', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    log.mockClear();
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
 
     const resultado = await detector().executar();
@@ -71,6 +73,11 @@ describe('DetectarOsParadaUseCase', () => {
       })
     );
     expect(resultado).toEqual({ encontradas: 1, encerradas: 1, falhas: 0 });
+    expect(log).toHaveBeenCalledWith({
+      logType: 'os.status.transition',
+      previousStatus: 'AWAITING_APPROVAL',
+      newStatus: 'CLOSED_WITHOUT_EXECUTION',
+    });
   });
 
   it('publica antes de fechar: o evento sai mesmo se o fechamento falhar depois', async () => {
@@ -84,6 +91,8 @@ describe('DetectarOsParadaUseCase', () => {
   });
 
   it('se a OS foi paga entre a busca e o fechamento, não fecha nem registra', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    log.mockClear();
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
     osRepo.atualizarSeCondicao.mockResolvedValue(false);
 
@@ -91,6 +100,22 @@ describe('DetectarOsParadaUseCase', () => {
 
     expect(historicoRepo.create).not.toHaveBeenCalled();
     expect(resultado).toEqual({ encontradas: 1, encerradas: 0, falhas: 0 });
+    expect(log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ logType: 'os.status.transition' })
+    );
+  });
+
+  it('não registra transição quando a atualização condicional falha', async () => {
+    const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    log.mockClear();
+    osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
+    osRepo.atualizarSeCondicao.mockRejectedValue(new Error('database failure with private data'));
+
+    await detector().executar();
+
+    expect(log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ logType: 'os.status.transition' })
+    );
   });
 
   it('a falha de publicação de uma OS não impede as outras e não fecha a OS', async () => {
