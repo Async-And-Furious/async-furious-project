@@ -40,7 +40,8 @@ function capturedTransitionLogs(): { lines: string[] } {
 function withTransitionLogger(providers: Provider[], output: { lines: string[] }): Provider[] {
   return [
     ...providers.filter(
-      (provider) => typeof provider === 'function' || provider.provide !== OS_STATUS_TRANSITION_LOGGER
+      (provider) =>
+        typeof provider === 'function' || provider.provide !== OS_STATUS_TRANSITION_LOGGER
     ),
     transitionLoggerProvider(output),
   ];
@@ -56,9 +57,7 @@ function transitionLoggerProvider(output: { lines: string[] }): Provider {
   return {
     provide: OS_STATUS_TRANSITION_LOGGER,
     useFactory: () =>
-      new OsStatusTransitionPinoLogger(
-        pino({ base: { service: SERVICE_NAME }, sync: true }, destination)
-      ),
+      new OsStatusTransitionPinoLogger(pino({ base: { service: SERVICE_NAME } }, destination)),
   };
 }
 
