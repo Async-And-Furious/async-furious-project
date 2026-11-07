@@ -1,5 +1,7 @@
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { Test } from '@nestjs/testing';
+import pino from 'pino';
+import { Writable } from 'node:stream';
 import type { Provider, Type } from '@nestjs/common';
 import { MODULE_METADATA } from '@nestjs/common/constants';
 import {
@@ -10,6 +12,7 @@ import { EMISSOR_EVENTOS } from '../../src/shared/domain/interfaces/emissor-even
 import { OrdemServicoModule } from '../../src/modules/ordem-servico/ordem-servico.module';
 import { DetectorOsParadaModule } from '../../src/modules/ordem-servico/detector-os-parada.module';
 import { OS_STATUS_TRANSITION_LOGGER } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
+import { OsStatusTransitionPinoLogger } from '../../src/modules/ordem-servico/infrastructure/logging/os-status-transition-pino-logger';
 import { OrdemServicoRepository } from '../../src/modules/ordem-servico/infrastructure/repositories/ordem-servico.repository';
 import { StatusHistoryRepository } from '../../src/modules/ordem-servico/infrastructure/repositories/status-history.repository';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
@@ -30,13 +33,33 @@ function providersFrom(module: Type<unknown>): Provider[] {
   return Reflect.getMetadata(MODULE_METADATA.PROVIDERS, module) as Provider[];
 }
 
-function capturedStdout(): { lines: string[]; restore: () => void } {
-  const lines: string[] = [];
-  const write = jest.spyOn(process.stdout, 'write').mockImplementation(((chunk: unknown) => {
-    lines.push(String(chunk));
-    return true;
-  }) as typeof process.stdout.write);
-  return { lines, restore: () => write.mockRestore() };
+function capturedTransitionLogs(): { lines: string[] } {
+  return { lines: [] };
+}
+
+function withTransitionLogger(providers: Provider[], output: { lines: string[] }): Provider[] {
+  return [
+    ...providers.filter(
+      (provider) => typeof provider === 'function' || provider.provide !== OS_STATUS_TRANSITION_LOGGER
+    ),
+    transitionLoggerProvider(output),
+  ];
+}
+
+function transitionLoggerProvider(output: { lines: string[] }): Provider {
+  const destination = new Writable({
+    write(chunk, _encoding, callback) {
+      output.lines.push(String(chunk));
+      callback();
+    },
+  });
+  return {
+    provide: OS_STATUS_TRANSITION_LOGGER,
+    useFactory: () =>
+      new OsStatusTransitionPinoLogger(
+        pino({ base: { service: SERVICE_NAME }, sync: true }, destination)
+      ),
+  };
 }
 
 function expectTransitionJson(lines: string[], previousStatus: string, newStatus: string): void {
@@ -84,16 +107,16 @@ describe('status transition logging Nest provider wiring', () => {
           | typeof AtualizarStatusEncerradaSemExecucaoHandler
       );
     });
+    const output = capturedTransitionLogs();
     const moduleRef = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
       providers: [
-        ...providers,
+        ...withTransitionLogger(providers, output),
         { provide: OrdemServicoRepository, useValue: repo },
         { provide: StatusHistoryRepository, useValue: history },
         { provide: EMISSOR_EVENTOS, useValue: emitter },
       ],
     }).compile();
-    const output = capturedStdout();
     try {
       const handler = moduleRef.get(AtualizarStatusEncerradaSemExecucaoHandler);
       expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
@@ -102,7 +125,6 @@ describe('status transition logging Nest provider wiring', () => {
       expectTransitionJson(output.lines, 'AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION');
       expect(output.lines.join('')).not.toContain('sensitive-order-id');
     } finally {
-      output.restore();
       await moduleRef.close();
     }
   });
@@ -143,10 +165,11 @@ describe('status transition logging Nest provider wiring', () => {
           | typeof RecusarOrcamentoUseCase
       );
     });
+    const output = capturedTransitionLogs();
     const moduleRef = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
       providers: [
-        ...providers,
+        ...withTransitionLogger(providers, output),
         EmissorEventos,
         { provide: EMISSOR_EVENTOS, useExisting: EmissorEventos },
         { provide: OrdemServicoRepository, useValue: osRepo },
@@ -154,7 +177,6 @@ describe('status transition logging Nest provider wiring', () => {
         { provide: StatusHistoryRepository, useValue: history },
       ],
     }).compile();
-    const output = capturedStdout();
     try {
       await moduleRef.init();
       expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
@@ -163,7 +185,6 @@ describe('status transition logging Nest provider wiring', () => {
       expectTransitionJson(output.lines, 'AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION');
       expect(output.lines.join('')).not.toContain('sensitive-order-id');
     } finally {
-      output.restore();
       await moduleRef.close();
     }
   });
@@ -183,16 +204,16 @@ describe('status transition logging Nest provider wiring', () => {
         provider.provide as typeof OS_STATUS_TRANSITION_LOGGER | typeof DetectarOsParadaUseCase
       );
     });
+    const output = capturedTransitionLogs();
     const moduleRef = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
       providers: [
-        ...providers,
+        ...withTransitionLogger(providers, output),
         { provide: OrdemServicoRepository, useValue: repo },
         { provide: StatusHistoryRepository, useValue: history },
         { provide: PUBLICADOR_INTEGRACAO, useValue: publisher },
       ],
     }).compile();
-    const output = capturedStdout();
     try {
       const detector = moduleRef.get(DetectarOsParadaUseCase);
       expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
@@ -205,7 +226,6 @@ describe('status transition logging Nest provider wiring', () => {
       expectTransitionJson(output.lines, 'AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION');
       expect(output.lines.join('')).not.toContain('sensitive-order-id');
     } finally {
-      output.restore();
       await moduleRef.close();
     }
   });
@@ -225,16 +245,16 @@ describe('status transition logging Nest provider wiring', () => {
           | typeof AtualizarStatusFinalizadaHandler
       );
     });
+    const output = capturedTransitionLogs();
     const moduleRef = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
       providers: [
-        ...providers,
+        ...withTransitionLogger(providers, output),
         { provide: OrdemServicoRepository, useValue: repo },
         { provide: StatusHistoryRepository, useValue: history },
         { provide: EMISSOR_EVENTOS, useValue: emitter },
       ],
     }).compile();
-    const output = capturedStdout();
     try {
       const handler = moduleRef.get(AtualizarStatusFinalizadaHandler);
       expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
@@ -247,7 +267,6 @@ describe('status transition logging Nest provider wiring', () => {
       expectTransitionJson(output.lines, 'IN_PROGRESS', 'FINISHED');
       expect(output.lines.join('')).not.toContain('sensitive-order-id');
     } finally {
-      output.restore();
       await moduleRef.close();
     }
   });
@@ -267,16 +286,16 @@ describe('status transition logging Nest provider wiring', () => {
           | typeof UpdateServiceOrderStatusUseCase
       );
     });
+    const output = capturedTransitionLogs();
     const moduleRef = await Test.createTestingModule({
       imports: [EventEmitterModule.forRoot()],
       providers: [
-        ...providers,
+        ...withTransitionLogger(providers, output),
         { provide: OrdemServicoRepository, useValue: repo },
         { provide: StatusHistoryRepository, useValue: history },
         { provide: EMISSOR_EVENTOS, useValue: emitter },
       ],
     }).compile();
-    const output = capturedStdout();
     try {
       const useCase = moduleRef.get(UpdateServiceOrderStatusUseCase);
       expect(moduleRef.get(OS_STATUS_TRANSITION_LOGGER)).toBeDefined();
@@ -288,7 +307,6 @@ describe('status transition logging Nest provider wiring', () => {
       expectTransitionJson(output.lines, 'IN_PROGRESS', 'FINISHED');
       expect(output.lines.join('')).not.toContain('sensitive-order-id');
     } finally {
-      output.restore();
       await moduleRef.close();
     }
   });
