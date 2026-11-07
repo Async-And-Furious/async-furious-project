@@ -1,5 +1,13 @@
 # Log de agentes
 
+## 2026-11-07 — Publicação autorizada #345
+
+- Após autorização explícita, este incremento de logs OS será publicado em PR;
+  a abertura executará o diagnóstico HML automático. Esperado: adição temporária
+  do IP `/32` do runner e restauração do endpoint privado. Sem deploy ou merge.
+- A cobertura é parcial/best-effort para os quatro caminhos terminais atuais;
+  não é ledger, contagem exata nem resultado completo da Saga.
+
 ## 2026-11-06 — Cobertura de caminhos terminais #345
 
 - Inventariados os caminhos que persistem `FINISHED` e
