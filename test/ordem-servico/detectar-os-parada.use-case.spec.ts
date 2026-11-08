@@ -6,6 +6,7 @@ import { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import type { IPublicadorIntegracao } from '../../src/shared/domain/interfaces/publicador-integracao.interface';
+import type { IOSStatusTransitionLogger } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 
 const AGORA = new Date('2026-11-03T12:00:00.000Z');
 const os = (id: string) => Object.assign(new OrdemDeServico(), { id, status: 'AWAITING_APPROVAL' });
@@ -16,11 +17,13 @@ describe('DetectarOsParadaUseCase', () => {
   >;
   let historicoRepo: jest.Mocked<IStatusHistoryRepository>;
   let publicador: jest.Mocked<IPublicadorIntegracao>;
+  let transitionLogger: jest.Mocked<IOSStatusTransitionLogger>;
   const detector = (prazoMinutos = 30) =>
     new DetectarOsParadaUseCase(
       osRepo as unknown as IOrdemServicoRepository,
       historicoRepo,
       publicador,
+      transitionLogger,
       prazoMinutos,
       () => AGORA
     );
@@ -34,6 +37,7 @@ describe('DetectarOsParadaUseCase', () => {
     };
     historicoRepo = { create: jest.fn(), findByOrdemServicoId: jest.fn() };
     publicador = { publicar: jest.fn().mockResolvedValue(undefined) };
+    transitionLogger = { log: jest.fn() };
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -46,6 +50,7 @@ describe('DetectarOsParadaUseCase', () => {
   });
 
   it('publica EtapaDaSagaFalhou (aprovacao-pagamento, sem evento original) e fecha a OS', async () => {
+    const log = transitionLogger.log;
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
 
     const resultado = await detector().executar();
@@ -71,6 +76,11 @@ describe('DetectarOsParadaUseCase', () => {
       })
     );
     expect(resultado).toEqual({ encontradas: 1, encerradas: 1, falhas: 0 });
+    expect(log).toHaveBeenCalledWith({
+      logType: 'os.status.transition',
+      previousStatus: 'AWAITING_APPROVAL',
+      newStatus: 'CLOSED_WITHOUT_EXECUTION',
+    });
   });
 
   it('publica antes de fechar: o evento sai mesmo se o fechamento falhar depois', async () => {
@@ -84,6 +94,7 @@ describe('DetectarOsParadaUseCase', () => {
   });
 
   it('se a OS foi paga entre a busca e o fechamento, não fecha nem registra', async () => {
+    const log = transitionLogger.log;
     osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
     osRepo.atualizarSeCondicao.mockResolvedValue(false);
 
@@ -91,6 +102,47 @@ describe('DetectarOsParadaUseCase', () => {
 
     expect(historicoRepo.create).not.toHaveBeenCalled();
     expect(resultado).toEqual({ encontradas: 1, encerradas: 0, falhas: 0 });
+    expect(log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ logType: 'os.status.transition' })
+    );
+  });
+
+  it('não registra transição quando a atualização condicional falha', async () => {
+    const log = transitionLogger.log;
+    osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
+    osRepo.atualizarSeCondicao.mockRejectedValue(new Error('database failure with private data'));
+
+    await detector().executar();
+
+    expect(log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ logType: 'os.status.transition' })
+    );
+  });
+
+  it('mantém publicação antes do CAS e grava histórico após falha síncrona do logger', async () => {
+    const order: string[] = [];
+    osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
+    publicador.publicar.mockImplementation(() => {
+      order.push('publish');
+      return Promise.resolve();
+    });
+    osRepo.atualizarSeCondicao.mockImplementation(() => {
+      order.push('cas');
+      return Promise.resolve(true);
+    });
+    historicoRepo.create.mockImplementation((historico) => {
+      order.push('history');
+      return Promise.resolve(historico);
+    });
+    transitionLogger.log.mockImplementationOnce(() => {
+      order.push('log');
+      throw new Error('logger unavailable');
+    });
+
+    const resultado = await detector().executar();
+
+    expect(resultado).toEqual({ encontradas: 1, encerradas: 1, falhas: 0 });
+    expect(order).toEqual(['publish', 'cas', 'log', 'history']);
   });
 
   it('a falha de publicação de uma OS não impede as outras e não fecha a OS', async () => {

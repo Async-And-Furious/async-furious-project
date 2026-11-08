@@ -4,6 +4,8 @@ import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-serv
 import type { IStatusHistoryRepository } from '../../domain/interfaces/status-history.interface';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 import { EtapaDaSagaFalhou } from '../../domain/events/etapa-da-saga-falhou.event';
+import { logOsStatusTransition } from '../logging/log-os-status-transition';
+import type { IOSStatusTransitionLogger } from '../logging/log-os-status-transition';
 
 export const PRAZO_PADRAO_MINUTOS = 48 * 60;
 
@@ -35,6 +37,7 @@ export class DetectarOsParadaUseCase {
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly statusHistoryRepository: IStatusHistoryRepository,
     private readonly publicador: IPublicadorIntegracao,
+    private readonly transitionLogger: IOSStatusTransitionLogger,
     private readonly prazoMinutos: number = PRAZO_PADRAO_MINUTOS,
     private readonly agora: () => Date = () => new Date()
   ) {}
@@ -59,6 +62,11 @@ export class DetectarOsParadaUseCase {
           this.logger.warn(`OS ${os.id} mudou entre a busca e o fechamento: segue como está`);
           continue;
         }
+        logOsStatusTransition(
+          this.transitionLogger,
+          'AWAITING_APPROVAL',
+          'CLOSED_WITHOUT_EXECUTION'
+        );
         await this.statusHistoryRepository.create(
           HistoricoStatus.create({
             ordemServicoId: os.id,

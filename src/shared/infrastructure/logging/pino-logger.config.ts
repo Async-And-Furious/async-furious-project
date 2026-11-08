@@ -6,7 +6,7 @@ import type { Options } from 'pino-http';
 const CORRELATION_ID_HEADER = 'x-correlation-id';
 const CORRELATION_ID_PATTERN = /^[a-zA-Z0-9._:-]{1,128}$/;
 // Nome do serviço em todo log (contrato de log, docs/infrastructure/observability.md).
-const SERVICE_NAME = process.env.SERVICE_NAME ?? 'os-service';
+export const SERVICE_NAME = process.env.SERVICE_NAME ?? 'os-service';
 
 /** Campos do envelope do evento consumido (ADR-0018). */
 export interface MessageLogContext {
