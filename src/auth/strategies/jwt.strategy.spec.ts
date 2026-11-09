@@ -67,6 +67,41 @@ describe('JwtStrategy', () => {
     await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
   });
 
+  it.each(['sub', 'iss', 'aud', 'exp'])(
+    'rejects a token with an invalid %s claim',
+    async (claim) => {
+      const payload: JwtPayload = {
+        sub: 'user-1',
+        iss: 'repo-auth-serverless',
+        aud: 'async-furious-project',
+        exp: 9999999999,
+      };
+      if (claim === 'sub') payload.sub = ' ';
+      if (claim === 'iss') payload.iss = '';
+      if (claim === 'aud') payload.aud = '';
+      if (claim === 'exp') payload.exp = undefined;
+
+      await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+      expect(authService.validateTokenSubject).not.toHaveBeenCalled();
+    }
+  );
+
+  it('falls back to validateUser for an older AuthService without subject resolution', async () => {
+    const user = { id: 'user-1', email: 'test@test.com', role: Role.ADMIN };
+    const validateUser = jest.fn().mockResolvedValue(user);
+    const legacyStrategy = new JwtStrategy(config, { validateUser } as unknown as AuthService);
+
+    await expect(
+      legacyStrategy.validate({
+        sub: 'user-1',
+        iss: 'repo-auth-serverless',
+        aud: 'async-furious-project',
+        exp: 9999999999,
+      })
+    ).resolves.toEqual(user);
+    expect(validateUser).toHaveBeenCalledWith('user-1');
+  });
+
   it('should use role from DB, not from token payload', async () => {
     const dbUser = {
       id: 'user-1',
