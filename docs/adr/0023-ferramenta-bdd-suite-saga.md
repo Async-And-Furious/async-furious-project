@@ -92,6 +92,17 @@ O workflow que executa o compose e a suíte (job de BDD) não é criado nesta en
 
 A suíte é considerada estável quando o job de BDD passa **três execuções consecutivas** no CI, sem reexecução manual e sem alteração de código entre elas. Uma falha que passa em uma reexecução conta como flaky e zera a contagem.
 
+## Escopo reduzido entregue na #340 (03/11)
+
+O comentário de escopo mínimo da #340 (03/11) reduziu o que entra agora, em relação às seções 3 e 4. Esta seção registra a decisão; o status da ADR continua Proposta até o aceite do grupo.
+
+- **Entra:** `jest-cucumber@4.5.0` como devDependency, `test/jest-bdd.json`, script `test:bdd`, step BDD no job `test` do CI (depois do e2e, antes do build), e o caminho feliz executável. O OS Service roda de verdade (app Nest com PostgreSQL de teste).
+- **Eventos de Execução e Billing simulados.** Entram pelo `ProcessadorMensagensSaga`, com os despachantes e os handlers reais do OS. O Mercado Pago é um stub. Kafka e mongo não sobem.
+- **Fica de fora (dívida):** o `docker-compose.bdd.yml` (seção 3), com broker, criação de tópicos, Billing e Execução reais. Sem isso, a seção 4 (três execuções consecutivas verdes no CI) vale para a suíte reduzida.
+- **Cenário de falha pulado:** o item 5 de "Em aberto" foi aplicado na opção (b): a tag `@depende-338` é excluída pelo `tagFilter`, e os passos do cenário são `pending()`. A tag sai junto com a #338.
+- **Desvios do `.feature`:** os passos que descrevem Execução ou Billing, ou rotas e eventos que o código de hoje não emite, foram ajustados. A lista e o motivo de cada um estão em `test/bdd/README.md`.
+- **Leitura de estado:** o item 3 de "Em aberto" continua aberto. Hoje o status vem por HTTP, e o `Orcamento`, o `pago_em` e o estoque vêm do repositório do módulo.
+
 ## Alternativas consideradas
 
 ### Ferramenta de BDD
