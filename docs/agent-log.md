@@ -1,5 +1,13 @@
 # Log de agentes
 
+## 2026-11-09 — Segurança SonarCloud no PR #381
+
+- Anotação do check Sonar em `k8s/database/read-model.yaml:16` apontou o token
+  de ServiceAccount montado automaticamente no Pod do Mongo. Desativada a
+  montagem; esse workload não precisa acessar a API do Kubernetes. Quality
+  Gate remoto ainda precisa ser reavaliado.
+- Nenhum gate foi alterado e nenhuma operação de cluster foi executada.
+
 ## 2026-10-28 — Ajustes da pipeline Fase 4 (#333)
 
 - A decisão vigente da Fase 4 é HML-only: `deploy-prod` fica inerte, e os

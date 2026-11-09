@@ -13,6 +13,7 @@ spec:
     metadata:
       labels: { app: read-model }
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: mongo
           image: mongo:5.0
