@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import {
@@ -12,10 +12,15 @@ import {
   UpdateVeiculoInput,
 } from '../../domain/interfaces/veiculo.interface';
 import { VeiculoMapper, VeiculoORMEntity } from '../persistence/veiculo.orm-entity';
+import { CLIENTE_READ_MODEL_PROJECTOR } from '../../domain/interfaces/cliente-read-model.interface';
+import type { IClienteReadModelProjector } from '../../domain/interfaces/cliente-read-model.interface';
 
 @Injectable()
 export class VeiculoRepository implements IVeiculoRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CLIENTE_READ_MODEL_PROJECTOR) private readonly projector: IClienteReadModelProjector
+  ) {}
 
   async create(data: CreateVeiculoInput): Promise<Veiculo> {
     const veiculo = Veiculo.criar({
@@ -111,6 +116,7 @@ export class VeiculoRepository implements IVeiculoRepository {
     const ormEntity = await this.prisma.veiculo.delete({
       where: { id },
     });
+    await this.projector.removerOrdensServicoEmCascata({ veiculoId: id });
 
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }

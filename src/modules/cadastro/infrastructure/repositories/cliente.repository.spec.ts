@@ -20,7 +20,10 @@ interface MockPrismaService {
 describe('ClienteRepository', () => {
   let repository: ClienteRepository;
   let mockPrismaService: MockPrismaService;
-  const projector = { project: jest.fn().mockResolvedValue(undefined) };
+  const projector = {
+    project: jest.fn().mockResolvedValue(undefined),
+    removerOrdensServicoEmCascata: jest.fn().mockResolvedValue(undefined),
+  };
 
   const validCpf = '11144477735';
   const validCnpj = '11222333000181';
@@ -449,6 +452,7 @@ describe('ClienteRepository', () => {
       await repository.remove('123');
 
       expect(projector.project).toHaveBeenCalledWith('123');
+      expect(projector.removerOrdensServicoEmCascata).toHaveBeenCalledWith({ clienteId: '123' });
     });
 
     it('não projeta quando a escrita falha no Postgres', async () => {
