@@ -2487,7 +2487,6 @@
               "IN_PROGRESS",
               "AWAITING_PARTS",
               "FINISHED",
-              "DELIVERED",
               "CLOSED_WITHOUT_EXECUTION"
             ],
             "example": "UNDER_DIAGNOSIS"

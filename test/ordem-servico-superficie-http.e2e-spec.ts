@@ -131,16 +131,29 @@ describe('OrdemServico superfície HTTP (e2e)', () => {
       .expect(401);
   });
 
-  it('webhook de status rejeita a transição para DELIVERED (400) sem alterar a OS', async () => {
-    await server
-      .post('/webhooks/service-orders/status')
-      .set('Authorization', `Bearer ${recepcionistaToken}`)
-      .set('x-webhook-secret', webhookSecret)
-      .send({ osId: ordemServicoId, status: 'DELIVERED' })
-      .expect(400);
+  it('webhook de status rejeita DELIVERED (400) mesmo com a OS em FINISHED', async () => {
+    // FINISHED → DELIVERED é válida na máquina de estados: o 400 vem só da regra do webhook.
+    await prismaService.ordemServico.update({
+      where: { id: ordemServicoId },
+      data: { status: 'FINISHED' },
+    });
 
-    const os = await prismaService.ordemServico.findUnique({ where: { id: ordemServicoId } });
-    expect(os?.status).toBe('RECEIVED');
+    try {
+      await server
+        .post('/webhooks/service-orders/status')
+        .set('Authorization', `Bearer ${recepcionistaToken}`)
+        .set('x-webhook-secret', webhookSecret)
+        .send({ osId: ordemServicoId, status: 'DELIVERED' })
+        .expect(400);
+
+      const os = await prismaService.ordemServico.findUnique({ where: { id: ordemServicoId } });
+      expect(os?.status).toBe('FINISHED');
+    } finally {
+      await prismaService.ordemServico.update({
+        where: { id: ordemServicoId },
+        data: { status: 'RECEIVED' },
+      });
+    }
   });
 
   it('webhook de status aplica uma transição válida pela máquina de estados', async () => {
