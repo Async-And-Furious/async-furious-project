@@ -7,6 +7,10 @@ import {
   READ_MODEL_DB,
 } from '../../../../shared/infrastructure/read-model/read-model.config';
 import {
+  isDuplicateKeyError,
+  versionFilter,
+} from '../../../../shared/infrastructure/read-model/version-guard';
+import {
   buildOsReadModelDocument,
   OS_PROJECAO_INCLUDE,
   OsReadModelDocument,
@@ -32,8 +36,13 @@ export class OsReadModelProjector implements IOsReadModelProjector {
         await collection.deleteOne({ _id: ordemServicoId });
         return;
       }
-      await collection.replaceOne({ _id: os.id }, buildOsReadModelDocument(os), { upsert: true });
+      const doc = buildOsReadModelDocument(os);
+      // Só aceita snapshot igual ou mais novo: duas projeções concorrentes da
+      // mesma OS não deixam o estado antigo por último. E11000 = já há
+      // documento mais novo, no-op.
+      await collection.replaceOne(versionFilter(doc), doc, { upsert: true });
     } catch (error) {
+      if (isDuplicateKeyError(error)) return;
       this.failureReporter.report(OS_READ_MODEL_COLLECTION, ordemServicoId, error);
     }
   }
