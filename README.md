@@ -354,6 +354,14 @@ etapa e matriz `etapa → falha → compensação`):
 [ADR-0016](./docs/adr/0016-saga-coreografada.md) e
 [`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md).
 
+### Observabilidade do OS Service
+
+- **APM:** agente `newrelic` carregado na primeira linha do `src/main.ts`, configurado só por ambiente. Em HML o app se chama `async-furious-project-hml`, a mesma entidade da Fase 3 (histórico preservado). Os outros serviços aparecem como `af-billing-hml` e `af-execucao-hml`.
+- **Variáveis:** `NEW_RELIC_APP_NAME` e `NEW_RELIC_NO_CONFIG_FILE` (aplicadas pelo `deploy-eks.yml`), `NEW_RELIC_LICENSE_KEY` (secret do repositório) e, no `k8s/config/configmap.yaml`, as de log e `NEW_RELIC_FEATURE_FLAG_KAFKAJS_INSTRUMENTATION=true`. Na versão 14.x do agente, a instrumentação do `kafkajs` fica atrás dessa flag, desligada por padrão; sem ela, o trace distribuído não atravessa o broker.
+- **Trace distribuído:** começa no OS (a borda API Gateway → Lambda não entra) e segue pelos headers das mensagens Kafka até o Billing e o Execução.
+- **Correlação:** cada evento leva no envelope `eventId` e `correlationId`, que é igual ao `ordemServicoId` e à chave da mensagem (ADR-0018). Isso permite buscar nos logs a sequência de uma OS. O `correlationId` não é o `trace.id`.
+- **Dashboard e alertas:** `tc3-observability-hml` no New Relic, mantido como código no `repo-k8s-infra`. Detalhes em [`docs/infrastructure/observability.md`](./docs/infrastructure/observability.md).
+
 ---
 
 ## Autenticação e Papéis
