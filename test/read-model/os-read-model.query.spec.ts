@@ -38,9 +38,11 @@ describe('OsReadModelQuery', () => {
     it('filtra os status fora da fila e ordena pelo índice composto', async () => {
       await query.listarFila(10);
 
-      expect(collection.find).toHaveBeenCalledWith({
-        status: { $nin: ['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'] },
-      });
+      // só a fila lê de réplica; detalhe e status seguem no primário
+      expect(collection.find).toHaveBeenCalledWith(
+        { status: { $nin: ['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'] } },
+        { readPreference: 'secondaryPreferred' }
+      );
       expect(cursor.sort).toHaveBeenCalledWith({ prioridade: 1, createdAt: 1, _id: 1 });
       expect(cursor.limit).toHaveBeenCalledWith(11);
     });
@@ -76,14 +78,17 @@ describe('OsReadModelQuery', () => {
 
       await query.listarFila(10, encodeFilaCursor(ultimo));
 
-      expect(collection.find).toHaveBeenCalledWith({
-        status: { $nin: ['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'] },
-        $or: [
-          { prioridade: { $gt: 2 } },
-          { prioridade: 2, createdAt: { $gt: ultimo.createdAt } },
-          { prioridade: 2, createdAt: ultimo.createdAt, _id: { $gt: 'b' } },
-        ],
-      });
+      expect(collection.find).toHaveBeenCalledWith(
+        {
+          status: { $nin: ['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'] },
+          $or: [
+            { prioridade: { $gt: 2 } },
+            { prioridade: 2, createdAt: { $gt: ultimo.createdAt } },
+            { prioridade: 2, createdAt: ultimo.createdAt, _id: { $gt: 'b' } },
+          ],
+        },
+        expect.anything()
+      );
     });
   });
 

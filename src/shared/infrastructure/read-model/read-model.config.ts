@@ -25,6 +25,9 @@ export function resolveReadModelConnection(env: NodeJS.ProcessEnv): ReadModelCon
   const options: MongoClientOptions = { maxPoolSize: 5, serverSelectionTimeoutMS: 5000 };
 
   if (env.DOCDB_URI) {
+    if (env.NODE_ENV === 'production' && !/[?&](tls|ssl)=true/i.test(env.DOCDB_URI)) {
+      throw new Error('DOCDB_URI em produção precisa de tls=true');
+    }
     return { uri: env.DOCDB_URI, database, options };
   }
 
@@ -46,7 +49,9 @@ export function resolveReadModelConnection(env: NodeJS.ProcessEnv): ReadModelCon
       tls: true,
       tlsCAFile: env.DOCDB_TLS_CA_FILE || DEFAULT_CA_FILE,
       replicaSet: 'rs0',
-      readPreference: 'secondaryPreferred',
+      // primary garante read-your-writes no detalhe e no status logo após a
+      // escrita; só a fila lê de réplica (ver OsReadModelQuery.listarFila).
+      readPreference: 'primary',
       retryWrites: false,
     },
   };

@@ -28,7 +28,7 @@ describe('resolveReadModelConnection', () => {
       tls: true,
       tlsCAFile: '/app/certs/global-bundle.pem',
       replicaSet: 'rs0',
-      readPreference: 'secondaryPreferred',
+      readPreference: 'primary',
       retryWrites: false,
     });
   });
@@ -47,6 +47,18 @@ describe('resolveReadModelConnection', () => {
 
   it('cai no mongo local fora de produção quando nada está configurado', () => {
     expect(resolveReadModelConnection({ NODE_ENV: 'test' }).uri).toBe('mongodb://localhost:27017');
+  });
+
+  it('exige tls=true na DOCDB_URI em produção', () => {
+    expect(() =>
+      resolveReadModelConnection({ NODE_ENV: 'production', DOCDB_URI: 'mongodb://h:27017' })
+    ).toThrow('tls=true');
+    expect(
+      resolveReadModelConnection({
+        NODE_ENV: 'production',
+        DOCDB_URI: 'mongodb://h:27017/?tls=true',
+      }).uri
+    ).toBe('mongodb://h:27017/?tls=true');
   });
 
   it('exige configuração em produção', () => {
