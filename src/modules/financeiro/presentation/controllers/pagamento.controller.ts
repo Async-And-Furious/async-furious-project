@@ -1,7 +1,10 @@
 import { Controller, Post, Body } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import { RegistrarPagamentoUseCase } from '../../application/use-cases/registrar-pagamento.use-case';
 import { RegistrarPagamentoDto } from '../dto/registrar-pagamento.dto';
 
+// Sem @Public(): o JwtAuthGuard global vale aqui, então o Swagger declara o bearer.
+@ApiBearerAuth()
 @Controller('pagamentos')
 export class PagamentoController {
   constructor(private readonly registrarPagamentoUseCase: RegistrarPagamentoUseCase) {}

@@ -25,10 +25,19 @@ export class OsReadModelRebuilder {
   ) {}
 
   rebuild(): Promise<RebuildResult> {
-    return rebuildCollection(
-      this.db.collection<OsReadModelDocument>(OS_READ_MODEL_COLLECTION),
-      this.pages()
-    );
+    return rebuildCollection(this.db.collection<OsReadModelDocument>(OS_READ_MODEL_COLLECTION), {
+      pages: this.pages(),
+      existentes: (ids) => this.existentes(ids),
+      versionado: true,
+    });
+  }
+
+  private async existentes(ids: string[]): Promise<Set<string>> {
+    const rows = await this.prisma.ordemServico.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row) => row.id));
   }
 
   private async *pages(): AsyncGenerator<OsReadModelDocument[]> {

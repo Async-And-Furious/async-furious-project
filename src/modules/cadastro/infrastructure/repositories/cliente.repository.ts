@@ -122,6 +122,7 @@ export class ClienteRepository implements IClienteRepository {
       where: { id },
     });
     await this.projector.project(id);
+    await this.projector.removerOrdensServicoEmCascata({ clienteId: id });
 
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }

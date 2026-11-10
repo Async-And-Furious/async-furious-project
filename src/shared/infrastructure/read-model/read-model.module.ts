@@ -23,7 +23,12 @@ import type { Db } from 'mongodb';
       inject: [READ_MODEL_CLIENT],
     },
     { provide: ReadModelFailureReporter, useFactory: () => new ReadModelFailureReporter() },
-    ReadModelBootstrapService,
+    {
+      provide: ReadModelBootstrapService,
+      useFactory: (client: MongoClient, db: Db, reporter: ReadModelFailureReporter) =>
+        new ReadModelBootstrapService(client, db, reporter),
+      inject: [READ_MODEL_CLIENT, READ_MODEL_DB, ReadModelFailureReporter],
+    },
   ],
   exports: [READ_MODEL_CLIENT, READ_MODEL_DB, ReadModelFailureReporter],
 })

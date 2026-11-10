@@ -52,9 +52,10 @@ alteração) e introduzir o **DocumentDB como lado de leitura** de
 - Duas coleções — `os_read_model` (documento por OS) e `cliente_read_model`
   (documento por cliente) — no banco lógico `os_read_model`: mais simples de
   operar em 8 semanas, ao custo de não ter uma query só que atravesse os dois.
-- Um **índice composto parcial** obrigatório em `os_read_model` (`filaGrupo`,
-  `filaOrdem`), com campo de ordenação composto `prioridade#createdAt`, para
-  servir `GET /ordens-servico` sem `ORDER BY` em memória.
+- Um **índice composto** obrigatório em `os_read_model` para servir
+  `GET /ordens-servico` sem `ORDER BY` em memória. O desenho original era
+  parcial (`filaGrupo`, `filaOrdem`); a implementação usa índice **não
+  parcial** em (`prioridade`, `createdAt`, `_id`), ver a revisão de 29/10/2026.
 - Sincronização por **write-through síncrono**: quem grava no Postgres (o
   repository, ver "Write-through no repository" na revisão abaixo) atualiza o
   documento correspondente no DocumentDB logo após o commit, dentro do mesmo request.
@@ -189,7 +190,7 @@ Escopo vigente — **"OS + Cliente simples"**:
   **não** dependem de `Orcamento`.
 - **`CLOSED_WITHOUT_EXECUTION` entra em `STATUS_EXCLUIDOS_DA_LISTAGEM`**
   (`status-priority.policy.ts`): a OS encerrada sem execução sai da fila e
-  do índice (parcial), como `FINISHED`/`DELIVERED`. **Mudança de
+  da fila (filtro `status $nin`), como `FINISHED`/`DELIVERED`. **Mudança de
   comportamento** da listagem — hoje essa OS aparece na fila, com prioridade
   6. Implementação do código pendente (esta revisão é só de documentação).
 
@@ -243,9 +244,9 @@ CQRS, write-through síncrono no repository e o escopo "OS + Cliente simples"
   usuário restrito à coleção exige um passo de bootstrap com `mongosh`.
 - **Mapeamento.** Tabela vira coleção, item vira documento, chave de
   partição vira `_id` (`ordemServicoId`, `clienteId`), GSI esparso vira
-  índice composto **parcial** (`partialFilterExpression` sobre `filaGrupo`),
-  `Query`/`GetItem` viram `find`/`findOne`, e a paginação passa a usar
-  `limit` com cursor por `filaOrdem`. Coleções e índices são criados de forma
+  índice composto (desenhado como parcial; implementado **não parcial**, ver
+  a revisão de 29/10/2026), `Query`/`GetItem` viram `find`/`findOne`, e a
+  paginação passa a usar `limit` com cursor keyset. Coleções e índices são criados de forma
   idempotente pelo OS Service, não pelo Terraform (`persistence-model.md`).
 - **Custo (consequência aceita).** O DocumentDB não tem free tier contínuo e
   a instância é cobrada por hora; em HML o `down.yml` destrói o cluster, e a
@@ -302,15 +303,20 @@ write-through síncrono no repository e escopo "OS + Cliente simples"
   `IClienteReadModelQuery` (leitura). Os adaptadores com o driver `mongodb`
   ficam em `infrastructure/read-model/` de cada módulo, e nenhum repository
   importa o driver. O projetor relê o agregado no Postgres e faz
-  `replaceOne({ _id }, doc, { upsert: true })`, ou `deleteOne` quando o
-  registro não existe mais (remoção).
-- **Pontos de escrita.** `OrdemServicoRepository.create/update/remove`,
-  `OsPecaRepository.replaceAll`, `OsServicoRepository.replaceAll` e
-  `ClienteRepository.create/update/remove` projetam depois da escrita. O
-  `HistoricoStatusOS` é gravado na mesma `$transaction` da OS sempre que o
-  status muda, com `statusAnterior` lido dentro da transação e `motivo`
-  vindo de cada handler. O `UpdateServiceOrderStatusUseCase` só valida a
-  transição, e o `StatusHistoryRepository` usa o `PrismaService`.
+  `replaceOne` com upsert, ou `deleteOne` quando o registro não existe mais
+  (remoção). Na OS o filtro é `{ _id, updatedAt: { $lte: doc.updatedAt } }`:
+  duas projeções concorrentes da mesma OS não deixam o snapshot antigo por
+  último (o E11000 do upsert quando já há documento mais novo é no-op).
+- **Pontos de escrita.** `OrdemServicoRepository.create/update/remove` e
+  `ClienteRepository.create/update/remove` projetam depois da escrita. Os
+  `replaceAll` de itens não projetam, porque itens não entram no documento.
+  OS têm `onDelete: Cascade` para Cliente e Veículo, então
+  `ClienteRepository.remove` e `VeiculoRepository.remove` também apagam do
+  `os_read_model` as OS do cliente/veículo. O `HistoricoStatusOS` é gravado
+  na mesma `$transaction` da OS sempre que o status muda, com
+  `statusAnterior` lido com `SELECT ... FOR UPDATE` (transições concorrentes
+  da mesma OS são serializadas) e `motivo` vindo de cada handler. O
+  `UpdateServiceOrderStatusUseCase` só valida a transição.
 - **Falha.** O `try/catch` fica no adaptador: loga em nível de erro e emite o
   evento custom `ReadModelProjectionFailure` no New Relic, sem derrubar o
   request. O documento se corrige na próxima escrita ou no rebuild.
@@ -319,14 +325,23 @@ write-through síncrono no repository e escopo "OS + Cliente simples"
   `DOCDB_USER`, `DOCDB_PASSWORD` e `DOCDB_NAME`, já materializados pelo
   pipeline a partir do secret `tc3-docdb-os-<env>`, com `tls=true`,
   `tlsCAFile=/app/certs/global-bundle.pem` (baixado no `Dockerfile`),
-  `replicaSet=rs0`, `readPreference=secondaryPreferred`, `retryWrites=false` e
-  `maxPoolSize=5`. As coleções e o índice são criados de forma idempotente na
-  subida (`ReadModelBootstrapService`).
+  `replicaSet=rs0`, `readPreference=primary`, `retryWrites=false` e
+  `maxPoolSize=5`. Detalhe e status leem do primário (read-your-writes logo
+  após a escrita); só a fila usa `secondaryPreferred`. Em produção, uma
+  `DOCDB_URI` sem `tls=true` é recusada. As coleções e o índice são criados
+  de forma idempotente na subida (`ReadModelBootstrapService`). Se o
+  DocumentDB estiver fora na subida, a API sobe assim mesmo (as escritas só
+  dependem do Postgres): a falha é relatada como `ReadModelProjectionFailure`
+  e o schema é tentado de novo a cada 30 s.
 - **Status público.** `GET /ordens-servico/{id}/status` devolve
   `{ ordemServicoId, status, marcos }`, sem dados do cliente.
 - **Rebuild.** O job `dist/jobs/rebuild-read-model.job.js` usa os mesmos
-  builders do write-through, grava em lote por `bulkWrite` e remove os
-  documentos órfãos. O `deploy-eks.yml` o roda depois da migration.
+  builders do write-through e grava em lote por `bulkWrite` (na OS, com o
+  mesmo filtro por `updatedAt`, para não sobrescrever projeção feita durante
+  o rebuild). No fim, percorre os ids da coleção em lotes e remove só os que
+  não existem mais no Postgres naquele momento: o que o write-through gravou
+  durante o rebuild fica, e não há `$nin` com todos os ids. Fonte vazia não
+  apaga nada. O `deploy-eks.yml` o roda depois da migration.
 - **Pendente de HML:** validação contra o DocumentDB real (conexão TLS,
   `explain` da fila, segmentos de datastore MongoDB no New Relic). Os runners
   do GitHub não alcançam a subnet privada do cluster.

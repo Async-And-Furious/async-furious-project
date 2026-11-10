@@ -18,6 +18,10 @@ describe('AppController (e2e)', () => {
     server = request(app.getHttpServer());
   });
 
+  afterEach(async () => {
+    if (app) await app.close();
+  });
+
   it('/api/v1/health/live (GET) - liveness check', () => {
     return server
       .get('/api/v1/health/live')

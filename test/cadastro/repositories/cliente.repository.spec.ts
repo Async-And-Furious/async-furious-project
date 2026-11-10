@@ -6,6 +6,7 @@ describe('ClienteRepository', () => {
     const prisma = { cliente: { findUnique: jest.fn().mockResolvedValue(null) } };
     const repository = new ClienteRepository(prisma as unknown as PrismaService, {
       project: jest.fn(),
+      removerOrdensServicoEmCascata: jest.fn(),
     });
 
     await expect(repository.findByDocumento('00000000000')).resolves.toBeNull();

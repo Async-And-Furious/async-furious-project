@@ -20,7 +20,8 @@ describe('OrdemServicoRepository', () => {
   };
 
   let tx: {
-    ordemServico: { create: jest.Mock; findUnique: jest.Mock; update: jest.Mock };
+    $queryRaw: jest.Mock;
+    ordemServico: { create: jest.Mock; update: jest.Mock };
     historicoStatusOS: { create: jest.Mock };
   };
   let prisma: {
@@ -34,9 +35,9 @@ describe('OrdemServicoRepository', () => {
   beforeEach(() => {
     ordem = [];
     tx = {
+      $queryRaw: jest.fn().mockResolvedValue([{ status: 'RECEIVED' }]),
       ordemServico: {
         create: jest.fn().mockResolvedValue(registro),
-        findUnique: jest.fn().mockResolvedValue({ status: 'RECEIVED' }),
         update: jest.fn((args: { data: Record<string, unknown> }) =>
           Promise.resolve({ ...registro, ...args.data })
         ),
@@ -101,6 +102,10 @@ describe('OrdemServicoRepository', () => {
         motivo: 'Orçamento recusado pelo cliente',
       });
 
+      // lê o status atual com lock de linha dentro da transação
+      const [sql, id] = tx.$queryRaw.mock.calls[0] as [TemplateStringsArray, string];
+      expect(sql.join('?')).toMatch(/SELECT status FROM "OrdemServico" WHERE id = \? FOR UPDATE/);
+      expect(id).toBe('os-123');
       expect(tx.ordemServico.update).toHaveBeenCalledWith({
         where: { id: 'os-123' },
         data: { status: 'CLOSED_WITHOUT_EXECUTION' },
@@ -150,7 +155,7 @@ describe('OrdemServicoRepository', () => {
     });
 
     it('lança EntityNotFoundException e não projeta quando a OS não existe', async () => {
-      tx.ordemServico.findUnique.mockResolvedValue(null);
+      tx.$queryRaw.mockResolvedValue([]);
 
       await expect(repository.update('x', { status: 'UNDER_DIAGNOSIS' })).rejects.toThrow(
         EntityNotFoundException

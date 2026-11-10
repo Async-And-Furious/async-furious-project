@@ -4,6 +4,7 @@ import { PrismaService } from '../../../../shared/infrastructure/database/prisma
 import { ReadModelFailureReporter } from '../../../../shared/infrastructure/read-model/read-model-failure.reporter';
 import {
   CLIENTE_READ_MODEL_COLLECTION,
+  OS_READ_MODEL_COLLECTION,
   READ_MODEL_DB,
 } from '../../../../shared/infrastructure/read-model/read-model.config';
 import {
@@ -35,6 +36,20 @@ export class ClienteReadModelProjector implements IClienteReadModelProjector {
       });
     } catch (error) {
       this.failureReporter.report(CLIENTE_READ_MODEL_COLLECTION, clienteId, error);
+    }
+  }
+
+  async removerOrdensServicoEmCascata(
+    origem: { clienteId: string } | { veiculoId: string }
+  ): Promise<void> {
+    const [filtro, id] =
+      'clienteId' in origem
+        ? [{ 'cliente.id': origem.clienteId }, origem.clienteId]
+        : [{ 'veiculo.id': origem.veiculoId }, origem.veiculoId];
+    try {
+      await this.db.collection(OS_READ_MODEL_COLLECTION).deleteMany(filtro);
+    } catch (error) {
+      this.failureReporter.report(OS_READ_MODEL_COLLECTION, id, error);
     }
   }
 }

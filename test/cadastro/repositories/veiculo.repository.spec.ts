@@ -12,7 +12,10 @@ describe('VeiculoRepository', () => {
         count: jest.fn().mockResolvedValue(0),
       },
     };
-    repository = new VeiculoRepository(prisma as unknown as PrismaService);
+    repository = new VeiculoRepository(prisma as unknown as PrismaService, {
+      project: jest.fn(),
+      removerOrdensServicoEmCascata: jest.fn(),
+    });
   });
 
   it('pages from the first record with 10 items when no pagination is given', async () => {

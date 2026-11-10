@@ -2,6 +2,7 @@ import {
   ensureReadModelSchema,
   ReadModelBootstrapService,
 } from '../../src/shared/infrastructure/read-model/read-model-bootstrap.service';
+import type { ReadModelFailureReporter } from '../../src/shared/infrastructure/read-model/read-model-failure.reporter';
 import type { Db, MongoClient } from 'mongodb';
 
 function fakeDb(existing: string[]) {
@@ -48,7 +49,8 @@ describe('ReadModelBootstrapService', () => {
     const client = { connect: jest.fn().mockResolvedValue(undefined), close: jest.fn() };
     const service = new ReadModelBootstrapService(
       client as unknown as MongoClient,
-      db as unknown as Db
+      db as unknown as Db,
+      { report: jest.fn() } as unknown as ReadModelFailureReporter
     );
 
     await service.onModuleInit();
@@ -57,5 +59,36 @@ describe('ReadModelBootstrapService', () => {
     expect(client.connect).toHaveBeenCalled();
     expect(db.listCollections).toHaveBeenCalled();
     expect(client.close).toHaveBeenCalled();
+  });
+
+  it('DocumentDB fora na subida não derruba a API: relata e tenta de novo depois', async () => {
+    jest.useFakeTimers();
+    try {
+      const { db } = fakeDb(['os_read_model', 'cliente_read_model']);
+      const falha = new Error('connect ECONNREFUSED');
+      const client = {
+        connect: jest.fn().mockRejectedValueOnce(falha).mockResolvedValue(undefined),
+        close: jest.fn(),
+      };
+      const reporter = { report: jest.fn() };
+      const service = new ReadModelBootstrapService(
+        client as unknown as MongoClient,
+        db as unknown as Db,
+        reporter as unknown as ReadModelFailureReporter,
+        1000
+      );
+
+      await expect(service.onModuleInit()).resolves.toBeUndefined();
+      expect(reporter.report).toHaveBeenCalledWith('bootstrap', 'os_read_model', falha);
+      expect(db.listCollections).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(1000);
+
+      expect(client.connect).toHaveBeenCalledTimes(2);
+      expect(db.listCollections).toHaveBeenCalled();
+      await service.onModuleDestroy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

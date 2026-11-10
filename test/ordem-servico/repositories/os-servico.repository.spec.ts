@@ -6,7 +6,6 @@ describe('OsServicoRepository', () => {
     osServico: { deleteMany: jest.Mock; createMany: jest.Mock };
   };
   let repository: OsServicoRepository;
-  let projector: { project: jest.Mock };
 
   beforeEach(() => {
     tx = {
@@ -18,8 +17,7 @@ describe('OsServicoRepository', () => {
     const prisma = {
       $transaction: jest.fn((callback: (client: typeof tx) => Promise<void>) => callback(tx)),
     };
-    projector = { project: jest.fn().mockResolvedValue(undefined) };
-    repository = new OsServicoRepository(prisma as unknown as PrismaService, projector);
+    repository = new OsServicoRepository(prisma as unknown as PrismaService);
   });
 
   it('clears the services of the order and inserts nothing when the new list is empty', async () => {
@@ -56,11 +54,5 @@ describe('OsServicoRepository', () => {
         },
       ],
     });
-  });
-
-  it('projects the order after replacing its services (write-through)', async () => {
-    await repository.replaceAll('os-1', []);
-
-    expect(projector.project).toHaveBeenCalledWith('os-1');
   });
 });

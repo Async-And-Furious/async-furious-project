@@ -70,7 +70,7 @@ export class OsReadModelQuery implements IOsReadModelQuery {
     }
 
     const docs = await this.collection
-      .find(filter)
+      .find(filter, { readPreference: 'secondaryPreferred' })
       .sort({ prioridade: 1, createdAt: 1, _id: 1 })
       .limit(limit + 1)
       .toArray();

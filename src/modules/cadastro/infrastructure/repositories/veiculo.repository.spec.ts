@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { VeiculoRepository } from './veiculo.repository';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
+import { CLIENTE_READ_MODEL_PROJECTOR } from '../../domain/interfaces/cliente-read-model.interface';
 
 interface MockPrismaVeiculo {
   create: jest.Mock;
@@ -20,6 +21,10 @@ describe('VeiculoRepository', () => {
   let repository: VeiculoRepository;
 
   let mockPrismaService: MockPrismaService;
+  const projector = {
+    project: jest.fn(),
+    removerOrdensServicoEmCascata: jest.fn().mockResolvedValue(undefined),
+  };
 
   const validPlaca = 'ABC1234';
 
@@ -54,6 +59,7 @@ describe('VeiculoRepository', () => {
           provide: PrismaService,
           useValue: mockPrismaService,
         },
+        { provide: CLIENTE_READ_MODEL_PROJECTOR, useValue: projector },
       ],
     }).compile();
 
@@ -257,12 +263,15 @@ describe('VeiculoRepository', () => {
       expect(mockPrismaService.veiculo.delete).toHaveBeenCalledWith({
         where: { id: '123' },
       });
+      // OS apagadas em cascata saem do read model
+      expect(projector.removerOrdensServicoEmCascata).toHaveBeenCalledWith({ veiculoId: '123' });
     });
 
     it('should throw NotFoundException when trying to delete nonexistent veiculo', async () => {
       mockPrismaService.veiculo.findUnique.mockResolvedValue(null);
 
       await expect(repository.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      expect(projector.removerOrdensServicoEmCascata).not.toHaveBeenCalled();
     });
   });
 

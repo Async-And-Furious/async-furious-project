@@ -14,7 +14,7 @@ export class AtualizarStatusRecebidaHandler {
     if (os.status !== 'RECEIVED') {
       await this.ordemServicoRepository.update(evento.ordemServicoId, {
         status: 'RECEIVED',
-        motivo: 'OS criada',
+        motivo: 'Status reconfirmado como RECEIVED',
       });
     }
   }

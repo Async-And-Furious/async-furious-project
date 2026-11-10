@@ -190,7 +190,7 @@ export class OrdemServicoController {
   @ApiOperation({
     summary: 'Consultar status da OS (rota pública, sem token)',
     description:
-      'Única rota pública do OS Service, servida pelo read model. Resposta mínima: id, status e marcos de tempo da OS, sem dados do cliente.',
+      'Rota pública de consulta da OS, servida pelo read model. Resposta mínima: id, status e marcos de tempo da OS, sem dados do cliente.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })
@@ -289,10 +289,13 @@ export class OrdemServicoController {
   }
 
   @Patch(':id/orcamento/aprovar')
+  // Pública no serviço até a extração do financeiro (#330); na borda passa pelo authorizer.
   @Public()
+  @ApiSecurity({})
   @ApiOperation({
     summary: 'Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)',
-    description: 'Aprova o orçamento da ordem de serviço. Público.',
+    description:
+      'Aprova o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({
@@ -311,11 +314,14 @@ export class OrdemServicoController {
   }
 
   @Patch(':id/orcamento/recusar')
+  // Pública no serviço até a extração do financeiro (#330); na borda passa pelo authorizer.
   @Public()
+  @ApiSecurity({})
   @ApiOperation({
     summary:
       'Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)',
-    description: 'Recusa o orçamento da ordem de serviço. Público.',
+    description:
+      'Recusa o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Orçamento recusado. OS → Encerrada Sem Execução' })

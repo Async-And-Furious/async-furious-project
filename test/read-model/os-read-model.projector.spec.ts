@@ -50,7 +50,7 @@ describe('OsReadModelProjector', () => {
       },
     });
     expect(collection.replaceOne).toHaveBeenCalledWith(
-      { _id: 'os-1' },
+      { _id: 'os-1', updatedAt: { $lte: linhaOs.updated_at } },
       {
         _id: 'os-1',
         status: 'IN_PROGRESS',
@@ -102,5 +102,12 @@ describe('OsReadModelProjector', () => {
 
     await expect(projector.project('os-1')).resolves.toBeUndefined();
     expect(reporter.report).toHaveBeenCalledWith('os_read_model', 'os-1', falha);
+  });
+
+  it('não sobrescreve documento mais novo: E11000 do upsert condicionado é no-op', async () => {
+    collection.replaceOne.mockRejectedValue(Object.assign(new Error('E11000'), { code: 11000 }));
+
+    await expect(projector.project('os-1')).resolves.toBeUndefined();
+    expect(reporter.report).not.toHaveBeenCalled();
   });
 });

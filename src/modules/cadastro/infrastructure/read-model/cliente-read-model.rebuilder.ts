@@ -26,8 +26,16 @@ export class ClienteReadModelRebuilder {
   rebuild(): Promise<RebuildResult> {
     return rebuildCollection(
       this.db.collection<ClienteReadModelDocument>(CLIENTE_READ_MODEL_COLLECTION),
-      this.pages()
+      { pages: this.pages(), existentes: (ids) => this.existentes(ids) }
     );
+  }
+
+  private async existentes(ids: string[]): Promise<Set<string>> {
+    const rows = await this.prisma.cliente.findMany({
+      where: { id: { in: ids } },
+      select: { id: true },
+    });
+    return new Set(rows.map((row) => row.id));
   }
 
   private async *pages(): AsyncGenerator<ClienteReadModelDocument[]> {
