@@ -1,4 +1,4 @@
-import { Controller, Get, INestApplication } from '@nestjs/common';
+import { Controller, Get, INestApplication, Post } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { buildSwaggerDocument } from '../../../src/shared/infrastructure/swagger/swagger.config';
@@ -18,12 +18,21 @@ class RecursoController {
   }
 }
 
+@ApiSecurity({ bearer: [], 'webhook-secret': [] })
+@Controller('webhook')
+class WebhookController {
+  @Post()
+  receber(): void {
+    return;
+  }
+}
+
 describe('buildSwaggerDocument', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      controllers: [RecursoController],
+      controllers: [RecursoController, WebhookController],
     }).compile();
     app = moduleRef.createNestApplication();
   });
@@ -47,5 +56,13 @@ describe('buildSwaggerDocument', () => {
 
     expect(document.paths['/recursos'].get?.security).toEqual([{ bearer: [] }]);
     expect(document.paths['/recursos/publico'].get?.security).toEqual([]);
+  });
+
+  it('combina JWT e x-webhook-secret em um único requisito no webhook', () => {
+    const document = buildSwaggerDocument(app);
+
+    expect(document.paths['/webhook'].post?.security).toEqual([
+      { bearer: [], 'webhook-secret': [] },
+    ]);
   });
 });
