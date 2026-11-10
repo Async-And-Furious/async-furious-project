@@ -1,5 +1,13 @@
 # Log de agentes
 
+## 2026-11-10 — Revisão documental do PR #379
+
+- Removida a comparação temporal vencida do overview preliminar e corrigida a
+  classificação da ADR-0003, que propõe EKS na Fase 3. A especificação do desafio
+  citada no índice existe no workspace (`docs/specs/tech-challenge-fase4.md`).
+- O PR #384 permanece aberto e requer harmonização do índice antes de sua
+  integração em `develop`.
+
 ## 2026-10-28 — Índice documental por fase
 
 - Adicionado `docs/phases/README.md` para separar fontes da Fase 4,

@@ -19,9 +19,9 @@ descrições do monólito das Fases 1–3 para inferir requisitos da Fase 4.
 | Evidência operacional/live | Estado observado nos ambientes, pipelines e recursos efetivamente implantados | Confirme ambiente e data da observação. Um diagrama ou workflow não comprova estado live. |
 
 O [overview de arquitetura](../architecture/overview.md) declara-se preliminar,
-com data **02/11/2026**, posterior à data atual desta revisão (**28/10/2026**).
-Não o trate como aprovado; confirme a data e a aprovação com o grupo antes de
-usar como referência normativa.
+e traz a data **02/11/2026**. O cabeçalho agenda a revisão de fechamento para
+depois do encerramento da Saga (**08/11/2026**); confirme se a aprovação ocorreu
+antes de usá-lo como referência normativa.
 
 ### Repositórios da Fase 4
 
@@ -41,9 +41,9 @@ que são material de trabalho, não ADR nem autoridade para a Fase 4.
 
 ## Decisões da Fase 3
 
-As [ADRs 0001, 0002, 0004 e 0005](../adr/README.md) referem explicitamente a
-Fase 3. A ADR-0003 não é atribuída a essa fase: não inferir sua classificação.
-Consulte o status individual no índice de ADRs.
+As [ADRs 0001–0005](../adr/README.md) referem explicitamente à Fase 3,
+incluindo a proposta de EKS da ADR-0003. Consulte o status individual no índice
+de ADRs.
 
 ## Fase 3 — material histórico
 
