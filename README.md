@@ -356,9 +356,12 @@ etapa e matriz `etapa → falha → compensação`):
 
 ### Observabilidade do OS Service
 
-- **Trace distribuído:** começa no OS (a borda API Gateway → Lambda não entra). O trace atravessa o Kafka por propagação manual (#344): o publicador grava `traceparent`, `tracestate` e `newrelic` nos headers da mensagem, dentro da transação ativa, e o consumidor abre uma background transaction `Kafka/<tópico>` que aceita esses headers. Retry e DLT também levam os headers.
-- **Instrumentação automática do kafkajs:** a feature flag `kafkajs_instrumentation` do agente fica **desligada de propósito**. Na versão 14.x, o wrapper do `eachMessage` não devolve a promise do handler, e o kafkajs confirmaria o offset antes do processamento.
+- **APM:** agente `newrelic` carregado na primeira linha do `src/main.ts`, configurado só por ambiente. Em HML o app se chama `async-furious-project-hml`, a mesma entidade da Fase 3 (histórico preservado). Os outros serviços aparecem como `af-billing-hml` e `af-execucao-hml`. O CronJob `detector-os-parada` roda com `NEW_RELIC_ENABLED=false`: não abre transação e sairia antes do envio dos dados.
+- **Variáveis:** `NEW_RELIC_APP_NAME` e `NEW_RELIC_NO_CONFIG_FILE` (aplicadas pelo `deploy-eks.yml`), `NEW_RELIC_LICENSE_KEY` (secret do repositório) e, no `k8s/config/configmap.yaml`, as de log. A feature flag `kafkajs_instrumentation` do agente fica **desligada de propósito**: na versão 14.x, o wrapper do `eachMessage` não devolve a promise do handler, e o kafkajs confirmaria o offset antes do processamento.
+- **Trace distribuído:** começa no OS (a borda API Gateway → Lambda não entra). O trace atravessa o Kafka por propagação manual (#344): o publicador grava `traceparent`, `tracestate` e `newrelic` nos headers da mensagem, dentro da transação ativa, e o consumidor abre uma background transaction `Kafka/<tópico>` que aceita esses headers e registra o erro quando o processamento falha. Retry e DLT também levam os headers.
 - **Sem agente ativo** (testes, `NEW_RELIC_ENABLED=false`): as chamadas do agente viram no-op e a publicação e o consumo seguem normalmente.
+- **Correlação:** cada evento leva no envelope `eventId` e `correlationId`, que é igual ao `ordemServicoId` e à chave da mensagem (ADR-0018). Isso permite buscar nos logs a sequência de uma OS. O `correlationId` não é o `trace.id`.
+- **Dashboard e alertas:** `tc3-observability-hml` no New Relic, mantido como código no `repo-k8s-infra`. Detalhes em [`docs/infrastructure/observability.md`](./docs/infrastructure/observability.md).
 
 ---
 

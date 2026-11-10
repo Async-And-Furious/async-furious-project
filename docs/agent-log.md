@@ -1,5 +1,31 @@
 # Log de agentes
 
+## 2026-11-10 — Revisão documental do PR #379
+
+- Removida a comparação temporal vencida do overview preliminar e corrigida a
+  classificação da ADR-0003, que propõe EKS na Fase 3. A especificação do desafio
+  citada no índice existe no workspace (`docs/specs/tech-challenge-fase4.md`).
+- O PR #384 permanece aberto e requer harmonização do índice antes de sua
+  integração em `develop`.
+
+## 2026-11-09 — Cobertura SonarCloud no PR #396
+
+- Corrigida a classificação Sonar dos testes `src/**/*.spec.ts` para não serem
+  contados como código de produção; a coleta de cobertura passou a incluir a
+  `JwtStrategy`, com casos para claims inválidas e fallback legado. O gate
+  remoto ainda precisa de uma nova análise.
+- Validação: 96 suítes/1.129 testes passaram; cobertura global 97,02% statements,
+  83,56% branches, 92,98% funções e 97,15% linhas. Typecheck, ESLint focado e
+  build passaram. A estratégia JWT ficou com 95,23% linhas e 84,21% branches.
+  Execução local usou Node 26 (projeto/CI exige Node 22); gate Sonar remoto pendente.
+  Nenhum gate foi afrouxado.
+
+## 2026-10-28 — Índice documental por fase
+
+- Adicionado `docs/phases/README.md` para separar fontes da Fase 4,
+  referências históricas e tipos de evidência; atualizado `docs/README.md`.
+- Nenhuma implementação, ADR ou documento existente foi movido ou alterado.
+
 ## 2026-11-07 — Publicação autorizada #345
 
 - Após autorização explícita, este incremento de logs OS será publicado em PR;
