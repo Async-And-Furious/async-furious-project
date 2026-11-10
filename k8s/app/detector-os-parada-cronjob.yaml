@@ -41,3 +41,8 @@ spec:
                     name: async-furious-config
                 - secretRef:
                     name: async-furious-secret
+              env:
+                # O job não abre transação e sai antes do envio dos dados: o agente só geraria
+                # conexão ao coletor e aviso de carga tardia (ele é importado via kafka-trace).
+                - name: NEW_RELIC_ENABLED
+                  value: 'false'

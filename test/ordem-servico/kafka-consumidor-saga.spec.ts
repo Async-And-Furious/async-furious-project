@@ -27,6 +27,7 @@ jest.mock('newrelic', () => ({
   getTransaction: () => mockTransacao,
   startBackgroundTransaction: (nome: string, grupo: string, handle: () => Promise<unknown>) =>
     mockStartBackgroundTransaction(nome, grupo, handle),
+  noticeError: jest.fn(),
 }));
 
 function kafkaFake() {

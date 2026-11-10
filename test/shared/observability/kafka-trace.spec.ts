@@ -12,11 +12,13 @@ const mockStartBackgroundTransaction = jest.fn<
   Promise<unknown>,
   [string, string, () => Promise<unknown>]
 >();
+const mockNoticeError = jest.fn<void, [Error]>();
 
 jest.mock('newrelic', () => ({
   getTransaction: () => mockTransacao,
   startBackgroundTransaction: (nome: string, grupo: string, handle: () => Promise<unknown>) =>
     mockStartBackgroundTransaction(nome, grupo, handle),
+  noticeError: (erro: Error) => mockNoticeError(erro),
 }));
 
 describe('kafka-trace com o agente mockado', () => {
@@ -106,6 +108,32 @@ describe('kafka-trace com o agente mockado', () => {
       await expect(
         comTransacaoDeConsumo('execucao.eventos.v1', {}, () => Promise.reject(erro))
       ).rejects.toBe(erro);
+    });
+
+    it('registra o erro do handler na transação, para o consumo falho não aparecer como sucesso', async () => {
+      const erro = new Error('falha ao publicar na DLT');
+
+      await expect(
+        comTransacaoDeConsumo('os.eventos.v1', {}, () => Promise.reject(erro))
+      ).rejects.toBe(erro);
+
+      expect(mockNoticeError).toHaveBeenCalledWith(erro);
+    });
+
+    it('rejeição que não é Error vira Error no APM e propaga o valor original', async () => {
+      await expect(
+        // Rejeição com valor que não é Error é justamente o caso testado.
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+        comTransacaoDeConsumo('os.eventos.v1', {}, () => Promise.reject('timeout'))
+      ).rejects.toBe('timeout');
+
+      expect(mockNoticeError).toHaveBeenCalledWith(new Error('timeout'));
+    });
+
+    it('sucesso não registra erro', async () => {
+      await comTransacaoDeConsumo('os.eventos.v1', {}, () => Promise.resolve());
+
+      expect(mockNoticeError).not.toHaveBeenCalled();
     });
   });
 });

@@ -133,6 +133,26 @@ describe('KafkaPublicadorIntegracao', () => {
     });
   });
 
+  it('lê os headers de trace antes de conectar: a transação HTTP pode terminar durante o connect', async () => {
+    let transacaoAtiva = true;
+    mockTransacao.insertDistributedTraceHeaders.mockImplementation((headers) => {
+      if (transacaoAtiva) headers.traceparent = TRACEPARENT;
+    });
+    const { producer, kafka } = kafkaFake();
+    producer.connect.mockImplementation(() => {
+      transacaoAtiva = false;
+      return Promise.resolve();
+    });
+    const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
+
+    await publicador.publicar(new OrdemServicoRecebida(OS_ID));
+
+    expect(producer.send.mock.calls[0][0].messages[0].headers).toEqual({
+      traceparent: TRACEPARENT,
+    });
+    mockTransacao.insertDistributedTraceHeaders.mockReset();
+  });
+
   it('sem transação ativa publica com headers vazios, sem quebrar', async () => {
     const { producer, kafka } = kafkaFake();
     const publicador = new KafkaPublicadorIntegracao(ENV, kafka);

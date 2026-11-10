@@ -11,6 +11,7 @@ interface AgenteTrace {
     acceptDistributedTraceHeaders(transporte: string, headers: Record<string, string>): void;
   };
   startBackgroundTransaction<T>(nome: string, grupo: string, handle: () => Promise<T>): Promise<T>;
+  noticeError(erro: Error): void;
 }
 
 const agente: AgenteTrace = newrelic;
@@ -30,7 +31,8 @@ export function injetarHeadersTrace(): Record<string, string> {
 /**
  * Roda o consumo de uma mensagem numa background transaction (APM: `Kafka/<tópico>`) ligada ao
  * trace do publicador. `fn` é aguardada e seus erros propagam, para o retry e a DLT do consumidor
- * continuarem funcionando. A transação termina quando a promise de `fn` resolve ou rejeita.
+ * continuarem funcionando. A transação termina quando a promise de `fn` resolve ou rejeita; o
+ * erro é registrado nela antes, senão o consumo que falhou apareceria como sucesso no APM.
  */
 export function comTransacaoDeConsumo<T>(
   topico: string,
@@ -40,7 +42,10 @@ export function comTransacaoDeConsumo<T>(
   const headersTexto = paraTexto(headers);
   return agente.startBackgroundTransaction(topico, GRUPO_APM, () => {
     agente.getTransaction().acceptDistributedTraceHeaders(TRANSPORTE_KAFKA, headersTexto);
-    return fn();
+    return fn().catch((erro: unknown) => {
+      agente.noticeError(erro instanceof Error ? erro : new Error(String(erro)));
+      throw erro;
+    });
   });
 }
 
