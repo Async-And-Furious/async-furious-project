@@ -1,10 +1,10 @@
-# OS Service — arquitetura
+# OS Service: arquitetura
 
 > **Alvo aceito da Fase 4**, não declaração de implantação concluída. O código
 > deste repositório e seu README ainda contêm documentação histórica do
-> monólito; a separação e as integrações abaixo são o alvo arquitetural. As
-> páginas dos outros serviços podem corresponder a PRs ainda não integrados, e
-> não se afirma aqui que o fluxo foi validado em HML.
+> monólito; a separação e as integrações abaixo são o alvo arquitetural. Kafka
+> é contrato-alvo e não está implementado neste branch. Não se afirma aqui que
+> o fluxo foi validado em HML.
 
 ## Papel e ownership
 
@@ -30,6 +30,8 @@ aceito, não necessariamente a versão atualmente implantada.
 | Autenticação | `POST /api/v1/auth/login` |
 | Clientes, veículos e catálogo | `/api/v1/clientes`, `/api/v1/veiculos`, `/api/v1/servicos` (operações CRUD); `GET /api/v1/clientes/:id` e `GET /api/v1/veiculos/:id` |
 | Ordens de Serviço | `/api/v1/ordens-servico` (criação, consultas e comandos); `PATCH /api/v1/ordens-servico/{id}/servicos-insumos`; `PATCH /api/v1/ordens-servico/{id}/registrar-entrega` |
+| Peças e insumos | `GET, POST /api/v1/pecas`; `GET, PATCH, DELETE /api/v1/pecas/{id}` |
+| Estoque e fornecedor | `PATCH /api/v1/pecas/{id}/estoque`; `POST /api/v1/pecas/fornecedor/solicitar`; `PATCH /api/v1/pecas/fornecedor/pedidos/{pedidoId}/receber` |
 | Estado e saúde | `GET /api/v1/ordens-servico/{id}/status` (pública); `GET /api/v1/health/live`; `GET /api/v1/health/ready` |
 | Fallback de status | `POST /api/v1/webhooks/service-orders/status` (rota protegida pelo mecanismo legado, não pública no Gateway) |
 
@@ -40,7 +42,7 @@ detalhes de roteamento, autenticação e exceções públicas estão na
 monólito em outras seções do README são contexto histórico, não contrato do
 alvo.
 
-## Eventos Kafka
+## Contrato-alvo de eventos Kafka (não implementado neste branch)
 
 O OS Service publica no tópico `os.eventos.v1`:
 
@@ -48,7 +50,8 @@ O OS Service publica no tópico `os.eventos.v1`:
 - `OrcamentoCalculado` → Billing Service;
 - `EtapaDaSagaFalhou` quando o OS Service detecta falha técnica ou OS parada, conforme as condições descritas no [catálogo de eventos](./architecture/event-catalog.md).
 
-A lista é exemplificativa; consulte o catálogo para contrato e condições completos.
+Payloads e condições de publicação/consumo estão definidos no
+[catálogo de eventos](./architecture/event-catalog.md).
 
 Consome no grupo `os-consumer`:
 
@@ -65,11 +68,18 @@ de payloads: [catálogo de eventos](./architecture/event-catalog.md) e
 ## Persistência e dependências
 
 - **PostgreSQL/RDS:** fonte de verdade e banco de escrita do OS Service,
-  acessado com sua própria credencial. Não compartilha credenciais com os
-  demais serviços.
+  com modelos transacionais como clientes, veículos, serviços, peças, OS e
+  histórico de status. Em termos de domínio, `Cliente`, `Veiculo`, `Servico`,
+  `Peca`, `OrdemServico` e `HistoricoStatusOS` permanecem no Prisma/Postgres;
+  orçamento e pagamento pertencem ao Billing. Localmente,
+  `docker-compose.dependencies.yml` inicia PostgreSQL
+  16, mapeado para `localhost:5433`; o `DOCDB_URI` usado pela aplicação aponta
+  para o read model separado.
 - **DocumentDB:** read model pertencente exclusivamente ao OS Service para
   leituras selecionadas de OS e cliente. É projetado a partir das gravações;
-  não substitui o PostgreSQL como fonte de verdade.
+  não substitui o PostgreSQL como fonte de verdade. Local e CI usam MongoDB
+  5.0 (`mongo:5.0`) como compatibilidade para `DOCDB_URI`; em AWS, o destino é
+  DocumentDB.
 - **Kafka:** integração assíncrona com Billing e Execução e Produção.
 - **API Gateway + ALB interno:** entrada HTTP aprovada; não há BFF nem REST
   serviço-a-serviço.
@@ -81,21 +91,26 @@ model: [persistência](./architecture/persistence-model.md) e
 
 ## ADRs transversais
 
-[ADR-0016 — Saga coreografada](./adr/0016-saga-coreografada.md),
-[ADR-0017 — ownership por serviço](./adr/0017-divisao-microsservicos-ownership-dados.md),
-[ADR-0018 — mensageria e contratos](./adr/0018-mensageria-contratos-eventos.md),
-[ADR-0019 — read model DocumentDB](./adr/0019-documentdb-read-model-os-cliente.md),
-[ADR-0020 — isolamento por credencial](./adr/0020-bancos-compartilhados-isolamento-credencial.md) e
-[ADR-0021 — borda sem BFF](./adr/0021-borda-sem-bff.md).
+[ADR-0016: Saga coreografada](./adr/0016-saga-coreografada.md),
+[ADR-0017: ownership por serviço](./adr/0017-divisao-microsservicos-ownership-dados.md),
+[ADR-0018: mensageria e contratos](./adr/0018-mensageria-contratos-eventos.md),
+[ADR-0019: read model DocumentDB](./adr/0019-documentdb-read-model-os-cliente.md),
+[ADR-0020: isolamento por credencial](./adr/0020-bancos-compartilhados-isolamento-credencial.md) e
+[ADR-0021: borda sem BFF](./adr/0021-borda-sem-bff.md).
 
 ## Como executar localmente
 
-Requisitos: Node.js 22, pnpm e Docker. Para subir PostgreSQL local e aplicação
-com migrações e seed:
+Requisitos: Node.js 22, pnpm e Docker. PostgreSQL mantém a escrita; MongoDB 5.0
+é necessário localmente para `DOCDB_URI` e simula o read model DocumentDB.
+`pnpm run dev` executa `docker compose ... down -v` antes da inicialização,
+removendo o volume local do banco e apagando seus dados. Para preservar dados,
+suba dependências manualmente e rode a aplicação sem esse script:
 
 ```bash
 docker compose -f docker-compose.dependencies.yml up -d
-pnpm run dev
+pnpm exec prisma generate
+pnpm exec prisma migrate deploy
+pnpm exec nest start --watch
 ```
 
 O modo local da aplicação é o ambiente do repositório, não uma execução da

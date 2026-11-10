@@ -1,4 +1,4 @@
-# Documentação — Async & Furious
+# Documentação: Async & Furious
 
 Índice central da documentação técnica e arquitetural do projeto.
 
@@ -22,13 +22,13 @@ estado deve ser lido no contexto de fase/ambiente explicitado no documento.
 | [architecture/authentication-flow.md](./architecture/authentication-flow.md) | Sequências de autenticação de staff e cliente, local e AWS, com fluxos de erro |
 | [architecture/service-order-flow.md](./architecture/service-order-flow.md) | Sequência de abertura e acompanhamento da Ordem de Serviço |
 
-## Fase 4 — serviços
+## Fase 4: serviços
 
 | Serviço | Arquitetura |
 |---|---|
 | OS Service | [architecture.md](./architecture.md) |
-| Billing Service | [repo-billing/docs/architecture.md](https://github.com/Async-And-Furious/repo-billing/blob/docs/349-billing-architecture/docs/architecture.md) |
-| Execução e Produção | [repo-execucao-service/docs/architecture.md](https://github.com/Async-And-Furious/repo-execucao-service/blob/docs/349-execucao-architecture/docs/architecture.md) |
+| Billing Service | [repo-billing/docs/architecture.md](https://github.com/Async-And-Furious/repo-billing/blob/main/docs/architecture.md) |
+| Execução e Produção | [repo-execucao-service/docs/architecture.md](https://github.com/Async-And-Furious/repo-execucao-service/blob/develop/docs/architecture.md) |
 
 ADRs transversais aos serviços permanecem centralizadas neste repositório;
 ADRs locais pertencem aos repositórios de cada serviço. Este repositório OS

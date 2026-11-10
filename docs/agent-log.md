@@ -1,5 +1,9 @@
 # Log de agentes
 
+## 2026-11-10 — Ajustes de documentação OS Service (PR #384)
+
+- Atualizada a tabela de rotas a partir dos controllers, explicitado Kafka como contrato-alvo, detalhados os bancos e riscos do setup local, e alinhados links/ADRs da arquitetura. Conferidos os heads remotos `main` do Billing e `develop` do Execução; nenhuma alteração de aplicação ou operação de deploy/AWS foi feita.
+
 ## 2026-11-09 — Segurança SonarCloud no PR #381
 
 - Anotação do check Sonar em `k8s/database/read-model.yaml:16` apontou o token
