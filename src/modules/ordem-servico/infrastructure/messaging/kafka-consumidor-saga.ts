@@ -13,6 +13,10 @@ import {
   osKafkaConfig,
   osKafkaSendRequest,
 } from '../../../../shared/infrastructure/mensageria/kafka.config';
+import {
+  comTransacaoDeConsumo,
+  injetarHeadersTrace,
+} from '../../../../shared/infrastructure/observability/kafka-trace';
 import { ProcessadorMensagensSaga, type Despachante } from './processador-mensagens-saga';
 
 // fromBeginning: false também no retry e na DLT: um consumer group novo não reprocessa
@@ -55,7 +59,7 @@ export class KafkaConsumidorSaga implements OnModuleInit, OnModuleDestroy {
       despachantes,
       publicador,
       enviar: async (topic, key, envelope) => {
-        await this.producer?.send(osKafkaSendRequest(topic, key, envelope));
+        await this.producer?.send(osKafkaSendRequest(topic, key, envelope, injetarHeadersTrace()));
       },
     });
   }
@@ -89,10 +93,9 @@ export class KafkaConsumidorSaga implements OnModuleInit, OnModuleDestroy {
       await consumer.run({
         eachMessage: async (payload) => {
           const { topic, partition, message } = payload;
-          const adiamento = await this.processador.processar(
-            topic,
-            message.key?.toString() ?? null,
-            message.value
+          // A transação cobre o processamento inteiro, inclusive o retry e a DLT que saem dele.
+          const adiamento = await comTransacaoDeConsumo(topic, message.headers, () =>
+            this.processador.processar(topic, message.key?.toString() ?? null, message.value)
           );
           if (adiamento) {
             this.adiar(topic, partition, message.offset, adiamento.esperaMs, () => payload.pause());

@@ -354,6 +354,12 @@ etapa e matriz `etapa → falha → compensação`):
 [ADR-0016](./docs/adr/0016-saga-coreografada.md) e
 [`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md).
 
+### Observabilidade do OS Service
+
+- **Trace distribuído:** começa no OS (a borda API Gateway → Lambda não entra). O trace atravessa o Kafka por propagação manual (#344): o publicador grava `traceparent`, `tracestate` e `newrelic` nos headers da mensagem, dentro da transação ativa, e o consumidor abre uma background transaction `Kafka/<tópico>` que aceita esses headers. Retry e DLT também levam os headers.
+- **Instrumentação automática do kafkajs:** a feature flag `kafkajs_instrumentation` do agente fica **desligada de propósito**. Na versão 14.x, o wrapper do `eachMessage` não devolve a promise do handler, e o kafkajs confirmaria o offset antes do processamento.
+- **Sem agente ativo** (testes, `NEW_RELIC_ENABLED=false`): as chamadas do agente viram no-op e a publicação e o consumo seguem normalmente.
+
 ---
 
 ## Autenticação e Papéis

@@ -1,5 +1,5 @@
 import { Logger } from '@nestjs/common';
-import type { ConsumerCrashEvent, EachMessagePayload, Kafka } from 'kafkajs';
+import type { ConsumerCrashEvent, EachMessagePayload, IHeaders, Kafka } from 'kafkajs';
 import {
   KafkaConsumidorSaga,
   TOPICOS_CONSUMIDOS,
@@ -13,6 +13,21 @@ import {
 } from '../../src/shared/infrastructure/mensageria/kafka.config';
 
 const OS_ID = 'os-1';
+const TRACEPARENT = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01';
+const mockTransacao = {
+  insertDistributedTraceHeaders: jest.fn<void, [Record<string, string>]>(),
+  acceptDistributedTraceHeaders: jest.fn<void, [string, Record<string, string>]>(),
+};
+const mockStartBackgroundTransaction = jest.fn<
+  Promise<unknown>,
+  [string, string, () => Promise<unknown>]
+>();
+
+jest.mock('newrelic', () => ({
+  getTransaction: () => mockTransacao,
+  startBackgroundTransaction: (nome: string, grupo: string, handle: () => Promise<unknown>) =>
+    mockStartBackgroundTransaction(nome, grupo, handle),
+}));
 
 function kafkaFake() {
   let eachMessage: ((payload: EachMessagePayload) => Promise<void>) | undefined;
@@ -43,11 +58,11 @@ function kafkaFake() {
     consumer: jest.fn().mockReturnValue(consumer),
     producer: jest.fn().mockReturnValue(producer),
   };
-  const entregar = (topic: string, value: string) =>
+  const entregar = (topic: string, value: string, headers?: IHeaders) =>
     eachMessage!({
       topic,
       partition: 0,
-      message: { key: Buffer.from(OS_ID), value: Buffer.from(value), offset: '7' },
+      message: { key: Buffer.from(OS_ID), value: Buffer.from(value), offset: '7', headers },
       pause,
     } as unknown as EachMessagePayload);
   const crash = (restart: boolean) =>
@@ -91,6 +106,10 @@ describe('KafkaConsumidorSaga', () => {
   beforeEach(() => {
     for (const nivel of ['log', 'warn', 'error'] as const)
       jest.spyOn(Logger.prototype, nivel).mockImplementation();
+    mockTransacao.insertDistributedTraceHeaders.mockImplementation((headers) => {
+      headers.traceparent = TRACEPARENT;
+    });
+    mockStartBackgroundTransaction.mockImplementation((_nome, _grupo, handle) => handle());
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -136,6 +155,100 @@ describe('KafkaConsumidorSaga', () => {
         acks: -1,
         messages: [expect.objectContaining({ key: OS_ID })],
       })
+    );
+  });
+
+  it('consome cada mensagem numa background transaction do tópico, aceitando os headers de trace', async () => {
+    const f = kafkaFake();
+    const consumidor = new KafkaConsumidorSaga(
+      { ExecucaoIniciada: jest.fn().mockResolvedValue(undefined) },
+      publicador,
+      ENV,
+      f.kafka
+    );
+    await subir(consumidor);
+
+    await f.entregar('execucao.eventos.v1', envelopeExecucaoIniciada(), {
+      traceparent: Buffer.from(TRACEPARENT),
+    });
+
+    expect(mockStartBackgroundTransaction).toHaveBeenCalledWith(
+      'execucao.eventos.v1',
+      'Kafka',
+      expect.any(Function)
+    );
+    expect(mockTransacao.acceptDistributedTraceHeaders).toHaveBeenCalledWith('Kafka', {
+      traceparent: TRACEPARENT,
+    });
+  });
+
+  it('o eachMessage só resolve depois do processamento (o offset não é confirmado antes)', async () => {
+    const f = kafkaFake();
+    let liberar!: () => void;
+    const despachar = jest.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          liberar = resolve;
+        })
+    );
+    const consumidor = new KafkaConsumidorSaga(
+      { ExecucaoIniciada: despachar },
+      publicador,
+      ENV,
+      f.kafka
+    );
+    await subir(consumidor);
+
+    let resolveu = false;
+    const pendente = f.entregar('execucao.eventos.v1', envelopeExecucaoIniciada()).then(() => {
+      resolveu = true;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(despachar).toHaveBeenCalledTimes(1);
+    expect(resolveu).toBe(false);
+
+    liberar();
+    await pendente;
+    expect(resolveu).toBe(true);
+  });
+
+  it('o retry sai com os headers de trace da transação de consumo', async () => {
+    const f = kafkaFake();
+    const despachar = jest.fn().mockRejectedValue(new FalhaRetentavelException('ainda não'));
+    const consumidor = new KafkaConsumidorSaga(
+      { ExecucaoIniciada: despachar },
+      publicador,
+      ENV,
+      f.kafka
+    );
+    await subir(consumidor);
+
+    await f.entregar('execucao.eventos.v1', envelopeExecucaoIniciada(), {
+      traceparent: Buffer.from(TRACEPARENT),
+    });
+
+    expect(f.producer.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        topic: OS_RETRY_TOPIC,
+        messages: [expect.objectContaining({ headers: { traceparent: TRACEPARENT } })],
+      })
+    );
+  });
+
+  it('falha ao enviar o retry propaga ao kafkajs, que entrega a mensagem de novo', async () => {
+    const f = kafkaFake();
+    f.producer.send.mockRejectedValueOnce(new Error('broker indisponível'));
+    const despachar = jest.fn().mockRejectedValue(new FalhaRetentavelException('ainda não'));
+    const consumidor = new KafkaConsumidorSaga(
+      { ExecucaoIniciada: despachar },
+      publicador,
+      ENV,
+      f.kafka
+    );
+    await subir(consumidor);
+
+    await expect(f.entregar('execucao.eventos.v1', envelopeExecucaoIniciada())).rejects.toThrow(
+      'broker indisponível'
     );
   });
 

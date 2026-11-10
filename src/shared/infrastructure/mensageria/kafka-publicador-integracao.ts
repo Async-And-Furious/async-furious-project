@@ -5,6 +5,7 @@ import type {
   IPublicadorIntegracao,
 } from '../../domain/interfaces/publicador-integracao.interface';
 import { montarEnvelope } from './envelope';
+import { injetarHeadersTrace } from '../observability/kafka-trace';
 import {
   OS_PRODUCER_OPTIONS,
   OS_TOPIC,
@@ -74,7 +75,9 @@ export class KafkaPublicadorIntegracao
       return;
     }
     await this.conectar();
-    await this.producer.send(osKafkaSendRequest(OS_TOPIC, evento.ordemServicoId, envelope));
+    await this.producer.send(
+      osKafkaSendRequest(OS_TOPIC, evento.ordemServicoId, envelope, injetarHeadersTrace())
+    );
     this.logger.log(
       `${envelope.eventType} publicado em ${OS_TOPIC}: OS ${evento.ordemServicoId}, eventId ${envelope.eventId}`
     );
