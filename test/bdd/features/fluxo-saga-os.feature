@@ -1,17 +1,19 @@
 # language: pt
 # Fluxo distribuído da Ordem de Serviço (Saga coreografada, ADR-0016).
 # Fonte dos passos: docs/architecture/saga-flow.md (§1 e §3) e docs/architecture/event-catalog.md.
-# Status, eventos, tópicos e rotas usam exatamente os nomes desses documentos.
+# Execução e Billing estão simulados (eventos entregues ao consumidor da saga). Os ajustes deste
+# arquivo em relação ao desenho original e o motivo de cada um estão em test/bdd/README.md.
 # Decisão da suíte e do ambiente: docs/adr/0023-ferramenta-bdd-suite-saga.md.
 @saga
 Funcionalidade: Fluxo da Ordem de Serviço pela Saga entre os três serviços
   Para que a recepção, o mecânico e o cliente acompanhem um reparo de ponta a ponta
-  Quero que a Ordem de Serviço atravesse OS Service, Billing Service e Execução e Produção por eventos reais no Kafka
+  Quero que a Ordem de Serviço atravesse OS Service, Billing Service e Execução e Produção por eventos
   E que ela termine em FINISHED ou seja compensada até CLOSED_WITHOUT_EXECUTION
 
   Contexto:
-    Dado que o OS Service, o Billing Service e a Execução e Produção estão no ar
-    E que o Kafka, o PostgreSQL, o mongo e o stub do Mercado Pago estão disponíveis
+    Dado que o OS Service está no ar com o banco de teste
+    E que o stub do Mercado Pago responde às cobranças
+    E que o Billing Service e a Execução e Produção são simulados por eventos entregues ao consumidor da saga
 
   @caminho-feliz
   Cenário: Ordem de Serviço percorre a saga do recebimento até FINISHED
@@ -19,44 +21,32 @@ Funcionalidade: Fluxo da Ordem de Serviço pela Saga entre os três serviços
     Quando a recepcionista abre a Ordem de Serviço (POST /api/v1/ordens-servico)
     Então a OS está em RECEIVED
     E o evento OrdemServicoRecebida é publicado em os.eventos.v1
-    E a Execucao da OS está em AGUARDANDO_DIAGNOSTICO
 
-    Quando o mecânico inicia o diagnóstico (PATCH /api/v1/execucoes/{id}/iniciar-diagnostico)
-    Então a Execucao está em EM_DIAGNOSTICO
-    E o evento DiagnosticoIniciado é publicado em execucao.eventos.v1
-    E a OS está em UNDER_DIAGNOSIS
+    Quando a Execução publica DiagnosticoIniciado
+    Então a OS está em UNDER_DIAGNOSIS
 
     Quando o mecânico define os serviços e as peças (PATCH /api/v1/ordens-servico/{id}/servicos-insumos)
     Então o evento OrcamentoCalculado é publicado em os.eventos.v1
     E o Orcamento está em PENDING
-    E o evento OrcamentoGerado é publicado em billing.eventos.v1
     E a OS está em AWAITING_APPROVAL
 
-    Quando o cliente aprova o orçamento (PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar)
+    Quando o cliente aprova o orçamento (PATCH /api/v1/ordens-servico/{id}/orcamento/aprovar)
     Então a resposta contém linkPagamento
     E o Orcamento está em APPROVED
-    E o Pagamento está em AGUARDANDO_PAGAMENTO
-    E o evento OrcamentoAprovado é publicado em billing.eventos.v1
     E as peças da OS são reservadas
     E a OS continua em AWAITING_APPROVAL
 
-    Quando o Mercado Pago notifica o pagamento aprovado (POST /api/v1/webhooks/mercado-pago, com assinatura válida) e a reconsulta devolve approved
-    Então o Pagamento está em CONFIRMADO
-    E o evento PagamentoConfirmado é publicado em billing.eventos.v1
-    E a Execucao está em AGUARDANDO_REPARO
-    E a OS registra pago_em e continua em AWAITING_APPROVAL
+    Quando o Billing publica PagamentoConfirmado
+    Então a OS registra pago_em e continua em AWAITING_APPROVAL
 
-    Quando o mecânico inicia o reparo (PATCH /api/v1/execucoes/{id}/iniciar-reparo)
-    Então a Execucao está em EM_REPARO
-    E o evento ExecucaoIniciada é publicado em execucao.eventos.v1
-    E a OS está em IN_PROGRESS
+    Quando a Execução publica ExecucaoIniciada
+    Então a OS está em IN_PROGRESS
 
-    Quando o mecânico conclui a execução (PATCH /api/v1/execucoes/{id}/concluir)
-    Então a Execucao está em CONCLUIDA
-    E o evento ExecucaoConcluida é publicado em execucao.eventos.v1
-    E a OS está em FINISHED
+    Quando a Execução publica ExecucaoConcluida
+    Então a OS está em FINISHED
 
   # Depende da #338 (compensações): este cenário só passa depois que as compensações estiverem implementadas.
+  # Não revisado nesta entrega: o texto é o alvo da #338 e ainda descreve o webhook do Billing.
   @compensacao @depende-338
   Cenário: Pagamento recusado compensa a saga até CLOSED_WITHOUT_EXECUTION
     Dado que a OS está em AWAITING_APPROVAL com o Orcamento em PENDING

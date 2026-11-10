@@ -108,6 +108,7 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
     }),
   };
   const transicao = new StatusTransitionService();
+  const transitionLogger = { log: jest.fn() };
   const enviar = jest
     .fn<Promise<void>, [string, string | null, unknown]>()
     .mockResolvedValue(undefined);
@@ -120,7 +121,13 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
       ...despachantesExecucao({
         emDiagnostico: new AtualizarStatusEmDiagnosticoHandler(osRepo, emissor, transicao),
         execucaoIniciada: new AtualizarStatusExecucaoIniciadaHandler(osRepo, emissor, transicao),
-        finalizada: new AtualizarStatusFinalizadaHandler(osRepo, historicoRepo, emissor, transicao),
+        finalizada: new AtualizarStatusFinalizadaHandler(
+          osRepo,
+          historicoRepo,
+          emissor,
+          transicao,
+          transitionLogger
+        ),
       }),
       ...despachantesBilling({
         aguardandoAprovacao: new AtualizarStatusAguardandoAprovacaoHandler(osRepo),
@@ -133,7 +140,8 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
           osRepo,
           emissor,
           historicoRepo,
-          transicao
+          transicao,
+          transitionLogger
         ),
         pagamentoConfirmado: new RegistrarPagamentoConfirmadoHandler(osRepo, historicoRepo),
       }),

@@ -153,7 +153,9 @@ describe('Eventos do Execução e Produção → OS Service (fiação @OnEvent)'
         {
           provide: AtualizarStatusFinalizadaHandler,
           useFactory: (e: EmissorEventos) =>
-            new AtualizarStatusFinalizadaHandler(osRepo, historico, e, transicao),
+            new AtualizarStatusFinalizadaHandler(osRepo, historico, e, transicao, {
+              log: jest.fn(),
+            }),
           inject: [EmissorEventos],
         },
         {

@@ -12,6 +12,27 @@
   Execução local usou Node 26 (projeto/CI exige Node 22); gate Sonar remoto pendente.
   Nenhum gate foi afrouxado.
 
+## 2026-11-07 — Publicação autorizada #345
+
+- Após autorização explícita, este incremento de logs OS será publicado em PR;
+  a abertura executará o diagnóstico HML automático. Esperado: adição temporária
+  do IP `/32` do runner e restauração do endpoint privado. Sem deploy ou merge.
+- A cobertura é parcial/best-effort para os quatro caminhos terminais atuais;
+  não é ledger, contagem exata nem resultado completo da Saga.
+
+## 2026-11-06 — Cobertura de caminhos terminais #345
+
+- Inventariados os caminhos que persistem `FINISHED` e
+  `CLOSED_WITHOUT_EXECUTION`: handler ExecucaoConcluida, handler de recusas
+  chamado por fluxo local HTTP ou Kafka, detector e caso de uso genérico usado
+  pelo webhook de status. Nenhuma outra escrita terminal de status foi
+  encontrada nos casos de uso da aplicação.
+- Incluído o caso genérico sem mudar sua atualização incondicional; o status
+  anterior logado é a leitura pré-update e pode estar desatualizado sob corrida.
+  O registro segue best-effort, não é ledger ou contagem exata.
+- Atualizados spec e documentação; testes focados, typecheck, lint, build e
+  `git diff --check` são executados nesta revisão. Sem push, HML ou AWS.
+
 ## 2026-10-28 — Ajustes da pipeline Fase 4 (#333)
 
 - A decisão vigente da Fase 4 é HML-only: `deploy-prod` fica inerte, e os
