@@ -55,6 +55,10 @@ describe('eks_endpoint_access.py open', () => {
       `endpointPrivateAccess=true,endpointPublicAccess=true,publicAccessCidrs=${OS}`
     );
   });
+
+  it('runner já liberado: nada a fazer (o EKS recusa update sem mudança)', () => {
+    expect(abrir(config(true, [ADMIN, OS]), OS)).toBe('');
+  });
 });
 
 describe('eks_endpoint_access.py restore: deploys concorrentes no mesmo cluster', () => {
@@ -99,6 +103,11 @@ describe('eks_endpoint_access.py restore: deploys concorrentes no mesmo cluster'
     expect(restaurar(PRIVADO, config(true, [TODOS, OS]), OS)).toBe(
       `endpointPrivateAccess=true,endpointPublicAccess=false,publicAccessCidrs=${TODOS}`
     );
+  });
+
+  it('outro pipeline já deixou o endpoint privado: nunca religa o acesso público (nem para 0.0.0.0/0)', () => {
+    // A foto era pública com CIDRs específicos; o repo-k8s-infra restaurou a dele (privada) antes.
+    expect(restaurar(config(true, [ADMIN]), PRIVADO, OS)).toBe('');
   });
 
   it('IP do runner que já estava na lista original não é removido', () => {

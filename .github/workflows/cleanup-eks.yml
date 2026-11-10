@@ -151,23 +151,26 @@ jobs:
           )
           printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-cleanup-runner-cidr"
           # Acrescenta o runner sem tirar o acesso de deploys em andamento (scripts/eks_endpoint_access.py).
-          access=$(python3 scripts/eks_endpoint_access.py open "$RUNNER_TEMP/eks-cleanup-endpoint-access.json" "${runner_ip}/32")
+          # Toda tentativa, inclusive a primeira, parte da configuração atual, e não da foto salva no
+          # passo anterior: outro deploy pode ter mudado o endpoint desde então.
+          current_file="$RUNNER_TEMP/eks-cleanup-endpoint-open.json"
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
           deadline=$((SECONDS + 600))
-          while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" \
-            --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "$access" \
-            --query 'update.id' \
-            --output text 2>"$error_file"); do
+          while true; do
+            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
+            access=$(python3 scripts/eks_endpoint_access.py open "$current_file" "${runner_ip}/32")
+            [[ -n "$access" ]] || exit 0
+            update_id=$(aws eks update-cluster-config \
+              --region "$AWS_REGION" \
+              --name "$EKS_CLUSTER_NAME" \
+              --resources-vpc-config "$access" \
+              --query 'update.id' \
+              --output text 2>"$error_file") && break
             error=$(<"$error_file")
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
             (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting the EKS endpoint update.' >&2; exit 1; }
             sleep 10
-            # Outro deploy pode ter mudado o endpoint durante a espera: recalcula a partir da configuração atual.
-            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$RUNNER_TEMP/eks-cleanup-endpoint-retry.json"
-            access=$(python3 scripts/eks_endpoint_access.py open "$RUNNER_TEMP/eks-cleanup-endpoint-retry.json" "${runner_ip}/32")
           done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
@@ -256,6 +259,9 @@ jobs:
           cidr_file="$RUNNER_TEMP/eks-cleanup-runner-cidr"
           [[ -s "$state_file" && -s "$cidr_file" ]] || exit 0
           current_file="$RUNNER_TEMP/eks-cleanup-endpoint-current.json"
+          # Espera um update em andamento (a abertura deste run, se estourou o prazo) terminar antes
+          # de ler; senão o /32 não aparece e ficaria liberado. Erro aqui é tratado pelo describe abaixo.
+          aws eks wait cluster-active --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" 2>/dev/null || true
           describe_error=$(mktemp)
           if ! aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
             --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' \

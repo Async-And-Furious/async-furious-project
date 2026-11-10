@@ -4,13 +4,18 @@
 Uso: eks_endpoint_access.py open <atual.json> <cidr-do-runner>
      eks_endpoint_access.py restore <original.json> <atual.json> <cidr-do-runner>
 
-Imprime o valor de --resources-vpc-config, ou nada (restore) se o endpoint já está como
-deve ficar.
+Imprime o valor de --resources-vpc-config, ou nada se o endpoint já está como deve ficar
+(o EKS recusa um update sem mudança).
 
-Abertura: com o acesso público ligado, acrescenta o /32 do runner à lista atual. Com o
+Abertura: parte sempre de um describe-cluster feito na hora, nunca da foto salva no início do
+run. Com o acesso público ligado, acrescenta o /32 do runner à lista atual. Com o
 endpoint só privado, abre apenas para o runner: nesse caso o EKS devolve
 publicAccessCidrs = ["0.0.0.0/0"], e acrescentar o /32 a essa lista abriria o endpoint
 para a internet inteira durante o deploy.
+
+A restauração nunca liga o acesso público: se ele já está desligado (outro pipeline restaurou
+antes), não há o que tirar, e o ["0.0.0.0/0"] que o EKS devolve nesse caso não é um CIDR a
+preservar.
 
 O OS, o Billing e o Execução liberam o IP do próprio runner no mesmo cluster, e o
 `concurrency` de cada workflow só vale dentro do repositório. Por isso a restauração parte da
@@ -30,6 +35,8 @@ import sys
 
 def acesso_aberto(atual: dict, cidr_runner: str) -> str:
     if atual["endpointPublicAccess"]:
+        if cidr_runner in (atual.get("publicAccessCidrs") or []):
+            return ""
         cidrs = list(dict.fromkeys([*(atual.get("publicAccessCidrs") or []), cidr_runner]))
     else:
         cidrs = [cidr_runner]
@@ -40,6 +47,8 @@ def acesso_aberto(atual: dict, cidr_runner: str) -> str:
 
 
 def acesso_restaurado(original: dict, atual: dict, cidr_runner: str) -> str:
+    if not atual["endpointPublicAccess"]:
+        return ""
     originais = original.get("publicAccessCidrs") or []
     atuais = atual.get("publicAccessCidrs") or []
     if cidr_runner in originais:

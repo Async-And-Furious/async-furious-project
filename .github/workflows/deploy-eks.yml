@@ -315,7 +315,6 @@ jobs:
       - name: Allow HML runner to reach Academy EKS
         run: |
           set -euo pipefail
-          state_file="$RUNNER_TEMP/eks-hml-endpoint-access.json"
           runner_ip=$(curl --fail --silent --show-error --ipv4 --proto '=https' https://checkip.amazonaws.com)
           runner_ip=$(python3 - "$runner_ip" <<'PY'
           import ipaddress
@@ -328,20 +327,23 @@ jobs:
           PY
           )
           printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-hml-runner-cidr"
-          access=$(python3 scripts/eks_endpoint_access.py open "$state_file" "${runner_ip}/32")
+          current_file="$RUNNER_TEMP/eks-hml-endpoint-open.json"
           error_file=$(mktemp)
           trap 'rm -f "$error_file"' EXIT
           deadline=$((SECONDS + 600))
-          while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
+          # Toda tentativa, inclusive a primeira, parte da configuração atual, e não da foto salva no
+          # passo anterior: outro deploy pode ter mudado o endpoint desde então (scripts/eks_endpoint_access.py).
+          while true; do
+            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
+            access=$(python3 scripts/eks_endpoint_access.py open "$current_file" "${runner_ip}/32")
+            [[ -n "$access" ]] || { echo "HML EKS already allows ${runner_ip}/32." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+            update_id=$(aws eks update-cluster-config \
+              --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
+              --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file") && break
             error=$(<"$error_file")
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
             (( SECONDS < deadline )) || { echo 'Timed out requesting HML EKS endpoint update.' >&2; exit 1; }
             sleep 10
-            # Outro deploy pode ter mudado o endpoint durante a espera: recalcula a partir da configuração atual.
-            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$RUNNER_TEMP/eks-hml-endpoint-retry.json"
-            access=$(python3 scripts/eks_endpoint_access.py open "$RUNNER_TEMP/eks-hml-endpoint-retry.json" "${runner_ip}/32")
           done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
@@ -578,6 +580,10 @@ jobs:
           fi
           # Billing e Execução liberam o próprio runner no mesmo cluster: a restauração relê a
           # configuração atual e remove só o /32 deste run (scripts/eks_endpoint_access.py).
+          # Espera o update em andamento (por exemplo, a abertura deste run que estourou o prazo ou
+          # foi cancelada) terminar; senão a leitura não mostra o /32, e ele ficaria liberado.
+          # Erro aqui (cluster inexistente, por exemplo) é tratado pelo describe logo abaixo.
+          aws eks wait cluster-active --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" 2>/dev/null || true
           current_file="$RUNNER_TEMP/eks-hml-endpoint-current.json"
           describe_error=$(mktemp)
           if ! aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
@@ -779,9 +785,21 @@ jobs:
           PY
           )
           printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-prod-runner-cidr"
-          state_file="$RUNNER_TEMP/eks-prod-endpoint-access.json"
-          access=$(python3 scripts/eks_endpoint_access.py open "$state_file" "${runner_ip}/32")
-          update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --resources-vpc-config "$access" --query 'update.id' --output text)
+          current_file="$RUNNER_TEMP/eks-prod-endpoint-open.json"
+          error_file=$(mktemp)
+          trap 'rm -f "$error_file"' EXIT
+          deadline=$((SECONDS + 600))
+          # Mesma regra do HML: toda tentativa parte da configuração atual.
+          while true; do
+            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
+            access=$(python3 scripts/eks_endpoint_access.py open "$current_file" "${runner_ip}/32")
+            [[ -n "$access" ]] || exit 0
+            update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file") && break
+            error=$(<"$error_file")
+            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
+            (( SECONDS < deadline )) || { echo 'Timed out requesting PROD EKS endpoint update.' >&2; exit 1; }
+            sleep 10
+          done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
             status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
@@ -950,6 +968,8 @@ jobs:
           cidr_file="$RUNNER_TEMP/eks-prod-runner-cidr"
           [[ -s "$state_file" && -s "$cidr_file" ]] || exit 0
           current_file="$RUNNER_TEMP/eks-prod-endpoint-current.json"
+          # Espera um update em andamento terminar antes de ler (ver o passo equivalente do HML).
+          aws eks wait cluster-active --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" 2>/dev/null || true
           aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
           access=$(python3 scripts/eks_endpoint_access.py restore "$state_file" "$current_file" "$(<"$cidr_file")")
           [[ -n "$access" ]] || exit 0
