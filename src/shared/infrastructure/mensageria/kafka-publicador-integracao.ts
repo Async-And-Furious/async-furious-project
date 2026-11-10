@@ -5,6 +5,7 @@ import type {
   IPublicadorIntegracao,
 } from '../../domain/interfaces/publicador-integracao.interface';
 import { montarEnvelope } from './envelope';
+import { injetarHeadersTrace } from '../observability/kafka-trace';
 import {
   OS_PRODUCER_OPTIONS,
   OS_TOPIC,
@@ -73,8 +74,13 @@ export class KafkaPublicadorIntegracao
       );
       return;
     }
+    // Lidos antes do connect: a ponte de eventos não aguarda o publicar, e a transação HTTP pode
+    // terminar durante a conexão; aí o agente já não devolve a transação e o trace se perderia.
+    const headersTrace = injetarHeadersTrace();
     await this.conectar();
-    await this.producer.send(osKafkaSendRequest(OS_TOPIC, evento.ordemServicoId, envelope));
+    await this.producer.send(
+      osKafkaSendRequest(OS_TOPIC, evento.ordemServicoId, envelope, headersTrace)
+    );
     this.logger.log(
       `${envelope.eventType} publicado em ${OS_TOPIC}: OS ${evento.ordemServicoId}, eventId ${envelope.eventId}`
     );
