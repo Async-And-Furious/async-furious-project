@@ -7,7 +7,11 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
-import { buildSwaggerDocument, SWAGGER_PATH } from './shared/infrastructure/swagger/swagger.config';
+import {
+  API_PREFIX,
+  buildSwaggerDocument,
+  SWAGGER_PATH,
+} from './shared/infrastructure/swagger/swagger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -48,7 +52,7 @@ async function bootstrap() {
   // Redirect root to API entry point (fixes ZAP spider on /)
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path === '/' && req.method === 'GET') {
-      res.redirect(302, '/api/v1');
+      res.redirect(302, `/${API_PREFIX}`);
       return;
     }
     next();
@@ -64,7 +68,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix(API_PREFIX);
 
   // Swagger Documentation
   SwaggerModule.setup(SWAGGER_PATH, app, buildSwaggerDocument(app));
