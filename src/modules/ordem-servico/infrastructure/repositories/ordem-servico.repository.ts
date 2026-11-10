@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import type { SOStatus } from '@prisma/client';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import {
@@ -87,7 +88,12 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
 
   async update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico> {
     const record = await this.prisma.$transaction(async (tx) => {
-      const atual = await tx.ordemServico.findUnique({ where: { id }, select: { status: true } });
+      // FOR UPDATE serializa transições concorrentes da mesma OS: sem o lock,
+      // duas transações leriam o mesmo status e gravariam dois históricos com
+      // o mesmo status_anterior.
+      const [atual] = await tx.$queryRaw<Array<{ status: SOStatus }>>`
+        SELECT status FROM "OrdemServico" WHERE id = ${id} FOR UPDATE
+      `;
       if (!atual) throw new EntityNotFoundException('OrdemDeServico', id);
 
       const updated = await tx.ordemServico.update({
