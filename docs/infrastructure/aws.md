@@ -127,8 +127,14 @@ Actions não alcança a API do cluster. O `deploy-eks.yml` resolve isso abrindo 
 endpoint temporariamente apenas para o IP do runner, com `/32`, e removendo esse
 `/32` num passo `if: always()`
 (passos "Allow HML runner to reach Academy EKS", nome legado, e "Restore original HML EKS endpoint access" do `.github/workflows/deploy-eks.yml`). O mesmo padrão existe no
-`cleanup-eks.yml`. As duas operações ficam em `scripts/eks_endpoint_access.py`,
-coberto por `test/deploy/eks-endpoint-access.spec.ts`:
+`cleanup-eks.yml`. O cálculo das duas operações fica em `scripts/eks_endpoint_access.py`
+(`test/deploy/eks-endpoint-access.spec.ts`), e a aplicação em
+`scripts/eks_endpoint_update.sh` (`test/deploy/eks-endpoint-update.spec.ts`):
+espera o cluster ficar `ACTIVE`, lê a configuração atual, calcula, aplica, espera
+o update terminar e lê de novo, repetindo até a leitura confirmar o resultado (o
+`/32` presente na abertura, ausente na restauração). O EKS não tem
+compare-and-swap; reler depois do update é o que detecta outro update que chegou
+no meio.
 
 - **Abertura:** com o acesso público já ligado, o `/32` é acrescentado à lista
   atual. Com o endpoint só privado, abre apenas para o runner. Nesse caso o EKS
@@ -139,7 +145,30 @@ coberto por `test/deploy/eks-endpoint-access.spec.ts`:
   só vale dentro do repositório, então reaplicar a foto do início derrubaria o
   acesso de um deploy em andamento em outro repositório. Se não sobra nenhum CIDR,
   o acesso público é desligado. Se sobra algum de outro run, o acesso fica ligado
-  para ele. Caso contrário, volta ao valor original.
+  para ele. Caso contrário, volta ao valor original. Se o acesso público já está
+  desligado (outro pipeline restaurou antes), não faz nada: nunca religa.
+
+**Limitações conhecidas.**
+
+- A regra só vale se todo pipeline que mexe no endpoint a seguir. O CI do
+  `repo-k8s-infra` (`ci.yml`, passo "Allow HML runner to reach existing EKS
+  cluster" e a restauração dele) ainda grava só o próprio runner e depois
+  reaplica a foto do início. Isso corta o acesso de um deploy de serviço em
+  andamento e pode regravar o `/32` de um deploy que já terminou. Evite rodar o
+  CI do `repo-k8s-infra` junto com deploys de serviço até ele adotar a mesma regra.
+- Um `/32` que sobra de um runner perdido (o passo `always()` não roda quando o
+  runner morre) ou de uma restauração que falhou entra na foto "original" dos
+  runs seguintes e não sai sozinho. O resumo do job avisa quando a restauração
+  falha.
+
+**Reset manual do endpoint**, com nenhum deploy rodando (confira os workflows em
+andamento no OS, no Billing, no Execução e no `repo-k8s-infra`):
+
+```bash
+aws eks update-cluster-config --region us-east-2 --name tc3-eks-hml \
+  --resources-vpc-config endpointPrivateAccess=true,endpointPublicAccess=false
+aws eks wait cluster-active --region us-east-2 --name tc3-eks-hml
+```
 
 ## 6. Registry: ECR
 

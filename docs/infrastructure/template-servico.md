@@ -82,9 +82,12 @@ levar o label que o Service seleciona (`app: <serviço>-api`): com ele, o pod en
 nos endpoints do Service e no target group do ALB (`targetType: ip`) e recebe
 tráfego sem escutar a porta. Use `app.kubernetes.io/component: migration`.
 
-A liberação do runner no endpoint do EKS segue `scripts/eks_endpoint_access.py`:
-abre só para o `/32` do runner e, no fim, remove só esse `/32`. Copie a regra e
-não a foto do início do run. Os três serviços usam o mesmo cluster. O seed é **opcional por serviço**: só entra quem
+A liberação do runner no endpoint do EKS segue `scripts/eks_endpoint_access.py`
+(cálculo) e `scripts/eks_endpoint_update.sh` (aplicação com releitura): abre só
+para o `/32` do runner e, no fim, remove só esse `/32`. Copie os dois scripts, e
+não a foto do início do run. O `scripts/deploy/infra.sh` do Billing ainda
+reaplica o mesmo valor a cada tentativa e precisa adotar o laço
+(ver [aws.md §5](./aws.md#5-computação-eks)). Os três serviços usam o mesmo cluster. O seed é **opcional por serviço**: só entra quem
 precisa de dado inicial.
 
 ## Dívida técnica: cópia em vez de `workflow_call`

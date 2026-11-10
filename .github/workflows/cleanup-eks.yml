@@ -150,37 +150,9 @@ jobs:
           PY
           )
           printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-cleanup-runner-cidr"
-          # Acrescenta o runner sem tirar o acesso de deploys em andamento (scripts/eks_endpoint_access.py).
-          # Toda tentativa, inclusive a primeira, parte da configuração atual, e não da foto salva no
-          # passo anterior: outro deploy pode ter mudado o endpoint desde então.
-          current_file="$RUNNER_TEMP/eks-cleanup-endpoint-open.json"
-          error_file=$(mktemp)
-          trap 'rm -f "$error_file"' EXIT
-          deadline=$((SECONDS + 600))
-          while true; do
-            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
-            access=$(python3 scripts/eks_endpoint_access.py open "$current_file" "${runner_ip}/32")
-            [[ -n "$access" ]] || exit 0
-            update_id=$(aws eks update-cluster-config \
-              --region "$AWS_REGION" \
-              --name "$EKS_CLUSTER_NAME" \
-              --resources-vpc-config "$access" \
-              --query 'update.id' \
-              --output text 2>"$error_file") && break
-            error=$(<"$error_file")
-            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting the EKS endpoint update.' >&2; exit 1; }
-            sleep 10
-          done
-          deadline=$((SECONDS + 600))
-          while (( SECONDS < deadline )); do
-            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
-            [[ "$status" == 'Successful' ]] && exit 0
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint update ended with status $status." >&2; exit 1; }
-            sleep 10
-          done
-          echo 'Timed out waiting for the EKS endpoint update.' >&2
-          exit 1
+          # Acrescenta o runner sem tirar o acesso de deploys em andamento, partindo da configuração
+          # atual e conferindo depois do update (scripts/eks_endpoint_update.sh).
+          bash scripts/eks_endpoint_update.sh open "${runner_ip}/32"
       - name: Configure kubectl
         if: ${{ steps.cluster.outputs.exists == 'true' }}
         run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
@@ -258,45 +230,5 @@ jobs:
           state_file="$RUNNER_TEMP/eks-cleanup-endpoint-access.json"
           cidr_file="$RUNNER_TEMP/eks-cleanup-runner-cidr"
           [[ -s "$state_file" && -s "$cidr_file" ]] || exit 0
-          current_file="$RUNNER_TEMP/eks-cleanup-endpoint-current.json"
-          # Espera um update em andamento (a abertura deste run, se estourou o prazo) terminar antes
-          # de ler; senão o /32 não aparece e ficaria liberado. Erro aqui é tratado pelo describe abaixo.
-          aws eks wait cluster-active --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" 2>/dev/null || true
-          describe_error=$(mktemp)
-          if ! aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
-            --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' \
-            --output json > "$current_file" 2>"$describe_error"; then
-            grep -q ResourceNotFoundException "$describe_error" && exit 0
-            cat "$describe_error" >&2
-            exit 1
-          fi
-          access=$(python3 scripts/eks_endpoint_access.py restore "$state_file" "$current_file" "$(<"$cidr_file")")
-          [[ -n "$access" ]] || exit 0
-          error_file=$(mktemp)
-          trap 'rm -f "$error_file"' EXIT
-          deadline=$((SECONDS + 600))
-          while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" \
-            --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "$access" \
-            --query 'update.id' \
-            --output text 2>"$error_file"); do
-            error=$(<"$error_file")
-            [[ "$error" == *ResourceNotFoundException* ]] && { printf '%s\n' "$error" >&2; exit 0; }
-            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting public endpoint restoration.' >&2; exit 1; }
-            sleep 10
-            # Outro deploy pode ter mudado o endpoint durante a espera: recalcula a partir da configuração atual.
-            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
-            access=$(python3 scripts/eks_endpoint_access.py restore "$state_file" "$current_file" "$(<"$cidr_file")")
-            [[ -n "$access" ]] || exit 0
-          done
-          deadline=$((SECONDS + 600))
-          while (( SECONDS < deadline )); do
-            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
-            [[ "$status" == 'Successful' ]] && exit 0
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "EKS endpoint restoration ended with status $status." >&2; exit 1; }
-            sleep 10
-          done
-          echo 'Timed out waiting for public endpoint restoration.' >&2
-          exit 1
+          # Mesma regra do deploy-eks.yml (scripts/eks_endpoint_update.sh).
+          bash scripts/eks_endpoint_update.sh restore "$state_file" "$(<"$cidr_file")"
