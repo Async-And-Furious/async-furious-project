@@ -1,5 +1,17 @@
 # Log de agentes
 
+## 2026-11-09 — Cobertura SonarCloud no PR #396
+
+- Corrigida a classificação Sonar dos testes `src/**/*.spec.ts` para não serem
+  contados como código de produção; a coleta de cobertura passou a incluir a
+  `JwtStrategy`, com casos para claims inválidas e fallback legado. O gate
+  remoto ainda precisa de uma nova análise.
+- Validação: 96 suítes/1.129 testes passaram; cobertura global 97,02% statements,
+  83,56% branches, 92,98% funções e 97,15% linhas. Typecheck, ESLint focado e
+  build passaram. A estratégia JWT ficou com 95,23% linhas e 84,21% branches.
+  Execução local usou Node 26 (projeto/CI exige Node 22); gate Sonar remoto pendente.
+  Nenhum gate foi afrouxado.
+
 ## 2026-11-07 — Publicação autorizada #345
 
 - Após autorização explícita, este incremento de logs OS será publicado em PR;

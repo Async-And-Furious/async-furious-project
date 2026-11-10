@@ -20,7 +20,7 @@ export default {
     '!src/**/ports/*.ts',
     '!src/auth/decorators/*.ts',
     '!src/auth/dto/*.ts',
-    '!src/auth/strategies/*.ts',
+    '!src/auth/strategies/jwt-customer.strategy.ts',
     '!src/auth/enums/*.ts',
   ],
   coverageDirectory: './coverage',
