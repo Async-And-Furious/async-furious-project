@@ -165,6 +165,9 @@ jobs:
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
             (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting the EKS endpoint update.' >&2; exit 1; }
             sleep 10
+            # Outro deploy pode ter mudado o endpoint durante a espera: recalcula a partir da configuração atual.
+            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$RUNNER_TEMP/eks-cleanup-endpoint-retry.json"
+            access=$(python3 scripts/eks_endpoint_access.py open "$RUNNER_TEMP/eks-cleanup-endpoint-retry.json" "${runner_ip}/32")
           done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
@@ -277,6 +280,10 @@ jobs:
             [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
             (( SECONDS < deadline )) || { printf '%s\n' "$error" >&2; echo 'Timed out requesting public endpoint restoration.' >&2; exit 1; }
             sleep 10
+            # Outro deploy pode ter mudado o endpoint durante a espera: recalcula a partir da configuração atual.
+            aws eks describe-cluster --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --query 'cluster.resourcesVpcConfig.{endpointPrivateAccess:endpointPrivateAccess,endpointPublicAccess:endpointPublicAccess,publicAccessCidrs:publicAccessCidrs}' --output json > "$current_file"
+            access=$(python3 scripts/eks_endpoint_access.py restore "$state_file" "$current_file" "$(<"$cidr_file")")
+            [[ -n "$access" ]] || exit 0
           done
           deadline=$((SECONDS + 600))
           while (( SECONDS < deadline )); do
