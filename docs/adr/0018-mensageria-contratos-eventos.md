@@ -224,7 +224,8 @@ dead-letter-exchange nativo:
    registrada na #314 — "DLT → evento de falha → compensação"), no tópico
    `*.eventos.v1` do próprio serviço que falhou, com o campo `etapa`
    indicando onde a saga parou, para que os demais serviços interessados
-   possam compensar. O **detector de OS parada** (ver "Garantias de
+   possam compensar. Esta publicação de falha técnica é distinta dos cinco
+   eventos de negócio listados no catálogo. O **detector de OS parada** (ver "Garantias de
    publicação") publica o mesmo evento quando uma OS passa do prazo numa
    etapa. Payload: ver "Eventos de falha da saga" abaixo.
 
@@ -306,6 +307,26 @@ na #314, implementado no épico do OS Service):
   perda de eventos **só na etapa de aprovação/pagamento**. Nas demais
   etapas, um evento perdido é **risco aceito** em HML, recuperado por
   replay manual.
+
+**Limite da recuperação no Billing.** A publicação após commit deixa uma
+janela de perda: o Billing não usa outbox nem republish automático. O
+detector do OS Service só recupera o caso de OS em `AWAITING_APPROVAL` com
+`pago_em` nulo; não cobre as demais etapas. Além disso, se a confirmação do
+webhook já foi commitada no banco do Billing, uma redelivery é reconhecida
+como já processada e não publica novamente `PagamentoConfirmado`.
+
+**Eventos e compensações do Billing.** O Billing publica somente
+`OrcamentoGerado`, `OrcamentoAprovado`, `OrcamentoRecusado`,
+`PagamentoConfirmado` e `PagamentoRecusado`; consome `OrcamentoCalculado` e
+`EtapaDaSagaFalhou`. Na compensação, atua apenas em `etapa=aprovacao-pagamento`
+ou `etapa=inicio-execucao`; ignora pagamento ausente e outras etapas. Um
+pagamento ainda pendente é marcado `CANCELADO`, sem chamada ao Mercado Pago;
+um pagamento confirmado é estornado de forma idempotente e marcado
+`ESTORNADO`, sem publicar evento de estorno. Não são eventos Kafka
+`OrcamentoAprovadoComPecas`, `SagaCompleted` nem `PagamentoEstornado`.
+`SagaStep` é evento customizado do New Relic, não evento Kafka. Nenhum evento
+do Billing altera o status da OS: isso é responsabilidade do OS Service ao
+consumir os eventos.
 
 ### Duplicação de tipos de evento por serviço (sem pacote npm compartilhado)
 

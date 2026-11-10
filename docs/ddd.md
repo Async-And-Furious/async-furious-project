@@ -237,6 +237,13 @@ Serviço próprio (`repo-execucao-service`, banco `execucao_producao`). Referenc
 
 Os eventos de domínio estão organizados por BC, refletindo a estrutura de módulos definida em `src/modules/`.
 
+> **Fronteira de integração (Fase 4):** os eventos financeiros listados em
+> §5.4 são exemplos legados de domínio/in-process do monólito, não contratos
+> de integração Kafka. O catálogo Kafka vigente, incluindo os eventos
+> publicados e consumidos pelo Billing Service, está em
+> [`event-catalog.md`](./architecture/event-catalog.md) e segue a
+> [ADR-0018](./adr/0018-mensageria-contratos-eventos.md).
+
 ---
 
 ### 5.1. BC: Criação e Acompanhamento da OS (`ordem-servico`)
@@ -407,5 +414,4 @@ As imagens abaixo representam cenários complementares levantados na etapa de mo
 *   Cadastro de peças: ![](./static/domainstorytelling.Peças_2026-03-27.png)
 *   Remoção de peças: ![](./static/domainstorytelling.PeçasRemover_2026-03-27.png)
 *   Cadastro de serviços: ![](./static/domainstorytelling.Servico_2026-03-27 (1).png)
-
 
