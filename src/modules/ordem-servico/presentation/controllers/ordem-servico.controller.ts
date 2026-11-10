@@ -305,7 +305,7 @@ export class OrdemServicoController {
   @ApiOperation({
     summary: 'Cliente aprova o serviço prestado',
     description:
-      'Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção após o pagamento.',
+      'Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Serviço aprovado. OS permanece Finalizada' })
@@ -346,7 +346,8 @@ export class OrdemServicoController {
   @Roles(Role.RECEPCIONISTA)
   @ApiOperation({
     summary: 'Registrar entrega do veículo',
-    description: 'Registra a entrega após o pagamento e move a OS para Entregue.',
+    description:
+      'Ato de balcão: registra a retirada do veículo e move a OS de Finalizada para Entregue. Único caminho para Entregue.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Entrega registrada. OS → Entregue' })

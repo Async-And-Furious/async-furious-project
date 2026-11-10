@@ -25,7 +25,6 @@ routes += [
     ("DELETE", "/pecas/{{peca_id}}", "admin", None),
     ("POST", "/pecas/fornecedor/solicitar", "admin", {"fornecedorId": "{{fornecedor_id}}", "pecas": [{"pecaId": "{{peca_id}}", "quantidadeSolicitada": 1}]}),
     ("PATCH", "/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber", "admin", None),
-    ("POST", "/pagamentos/registrar", "public", {"ordemServicoId": "{{ordem_id}}", "valor": 1}),
     ("POST", "/webhooks/service-orders/status", "webhook", {"status": "RECEIVED"}),
 ]
 
@@ -42,7 +41,7 @@ def flatten(nodes):
     return result
 
 manifest_routes = flatten(manifest)
-assert len(manifest_routes) == 45 and len({r["id"] for r in manifest_routes}) == 45
+assert len(manifest_routes) == 44 and len({r["id"] for r in manifest_routes}) == 44
 def route_role(route):
     if route["auth"] == "customer":
         return "customer"

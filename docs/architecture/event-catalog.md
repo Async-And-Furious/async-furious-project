@@ -171,10 +171,11 @@ eventos internos é o código. A lista nominal do que continua in-process está 
 - **Eventos internos** dos BCs `cadastro` e `pecas-insumos` (ex.:
   `ClienteCadastrado`, `PecaCadastrada`, `EstoqueAtualizado`): permanecem
   in-process dentro do OS Service, sem publicação no Kafka.
-- **Eventos do BC `financeiro`** anteriores à Fase 4 (`PagamentoRegistrado`,
-  `NotaFiscalEmitida`): não fazem parte do fluxo de saga coberto por esta
-  Feature; ficam para o épico do Billing Service (#322) avaliar se algum
-  deles precisa de equivalente de integração.
+- **Eventos do BC `financeiro`** anteriores à Fase 4: `PagamentoRegistrado`
+  foi removido na #330 (disparava a entrega; hoje `registrar-entrega` é o
+  único caminho para `DELIVERED`). `NotaFiscalEmitida` não faz parte do fluxo
+  de saga coberto por esta Feature e fica para o épico do Billing Service
+  (#322) avaliar.
 
 ## Referências
 

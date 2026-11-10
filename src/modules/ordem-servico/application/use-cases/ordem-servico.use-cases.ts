@@ -9,7 +9,7 @@ import { OrdemServicoRecebida } from '../../domain/events/ordem-servico-recebida
 import { OrcamentoCalculado } from '../../domain/events/orcamento-calculado.event';
 import { ServicoAprovadoPeloCliente } from '../../domain/events/servico-aprovado-pelo-cliente.event';
 import { OrcamentoVo } from '../../domain/value-objects/orcamento.vo';
-import { PagamentoRegistrado } from '../../domain/events/pagamento-registrado.event';
+import type { UpdateServiceOrderStatusUseCase } from './update-service-order-status.use-case';
 import type { IClienteRepository } from '../../../cadastro/domain/interfaces/cliente.interface';
 import type { IVeiculoRepository } from '../../../cadastro/domain/interfaces/veiculo.interface';
 import type { IServicoRepository } from '../../../cadastro/domain/interfaces/servico.interface';
@@ -233,19 +233,18 @@ export class AprovarServicoPrestadoUseCase {
   }
 }
 
-// UC-09
+// UC-09: único caminho de escrita para DELIVERED (o webhook rejeita esse status).
+// Sem checagem de pagamento: FINISHED só existe depois de PagamentoConfirmado (saga-flow.md §4).
 export class RegistrarEntregaVeiculoUseCase {
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: IEmissorEventos
+    private readonly atualizarStatus: UpdateServiceOrderStatusUseCase
   ) {}
 
   async execute(id: string): Promise<OrdemDeServico> {
     const os = await this.ordemServicoRepository.findOne(id);
     os.podeRegistrarEntrega();
-
-    await this.emissor.emitir(new PagamentoRegistrado(id));
-    return this.ordemServicoRepository.findOne(id);
+    return this.atualizarStatus.execute(id, 'DELIVERED');
   }
 }
 

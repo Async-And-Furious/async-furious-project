@@ -849,31 +849,6 @@
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
-      "url": "{{base_url}}/api/v1/pagamentos/registrar",
-      "name": "POST /pagamentos/registrar",
-      "description": "Role: customer",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\"ordemServicoId\": \"{{ordem_id}}\", \"valor\": 1}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_030",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
       "url": "{{base_url}}/api/v1/webhooks/service-orders/status",
       "name": "POST /webhooks/service-orders/status",
       "description": "Role: webhook",
@@ -899,7 +874,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_031",
+      "_id": "req_030",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -924,7 +899,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_032",
+      "_id": "req_031",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -949,7 +924,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_033",
+      "_id": "req_032",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -974,7 +949,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_034",
+      "_id": "req_033",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -999,7 +974,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_035",
+      "_id": "req_034",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1024,7 +999,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_036",
+      "_id": "req_035",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1049,7 +1024,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_037",
+      "_id": "req_036",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1074,7 +1049,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_038",
+      "_id": "req_037",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1099,7 +1074,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_039",
+      "_id": "req_038",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1124,7 +1099,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_040",
+      "_id": "req_039",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1149,7 +1124,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_041",
+      "_id": "req_040",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1174,7 +1149,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_042",
+      "_id": "req_041",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1199,7 +1174,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_043",
+      "_id": "req_042",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1224,7 +1199,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_044",
+      "_id": "req_043",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,

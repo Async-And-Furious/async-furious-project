@@ -267,7 +267,7 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento; a resposta traz `linkPagamento` (Checkout Pro do Mercado Pago). `502` se o Mercado Pago falhar (orçamento segue pendente). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
 | PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
-| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
+| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega (OS `FINISHED` → `DELIVERED`). Único caminho para `DELIVERED`: o webhook de status rejeita esse valor. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
 #### Peças e Insumos (`/api/v1/pecas`)
@@ -282,12 +282,6 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | DELETE | `/pecas/:id` | ADMIN | Deletar peça ou insumo. |
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar peças a fornecedor. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de peças. |
-
-#### Pagamentos (`/api/v1/pagamentos`)
-
-| Método | Endpoint | Acesso | Descrição |
-| ------ | -------- | ------ | --------- |
-| POST | `/pagamentos/registrar` | Autenticado | Disparar a entrega da OS cujo pagamento já foi confirmado pelo Mercado Pago (`409` se não houver). Não cria nem marca pagamento. |
 
 #### Webhook do Mercado Pago (`/api/v1/webhooks/mercado-pago`)
 
@@ -339,9 +333,10 @@ execução iniciada` — o pagamento acontece logo após a aprovação do
 orçamento e **antes** do início da execução, como etapa obrigatória para
 que o Billing Service participe da transação distribuída. A entrega fica
 fora do escopo da saga por ser um ato presencial, sem contrapartida
-assíncrona a coordenar; a checagem de "pagamento confirmado" feita antes de
-`registrar-entrega` é uma trava de segurança sobre esse mesmo pagamento —
-não uma segunda cobrança. Compensação é lógica por padrão (reverter status
+assíncrona a coordenar; `registrar-entrega` não checa pagamento, porque
+`FINISHED` só é alcançável depois de `PagamentoConfirmado`
+([`saga-flow.md` §4](./docs/architecture/saga-flow.md)). O OS Service só grava
+o marcador `pago_em` ao receber `PagamentoConfirmado`, sem mudar status. Compensação é lógica por padrão (reverter status
 da OS, encerrar orçamento sem execução); o estorno real no Mercado Pago só
 é acionado se o pagamento já tiver sido capturado antes da falha.
 
