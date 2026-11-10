@@ -1,15 +1,19 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
-import type { OperationObject } from '@nestjs/swagger/dist/interfaces/open-api-spec.interface';
 
+export const API_PREFIX = 'api/v1';
 export const SWAGGER_PATH = 'api/docs';
+
+// Só os verbos HTTP são operações; parameters, summary e servers ficam de fora.
+const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace'] as const;
 
 export function buildSwaggerDocument(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('Async Furious - OS Service')
     .setDescription(
       'API do OS Service: ordens de serviço, clientes, veículos, serviços e peças/insumos. ' +
-        'Todas as rotas exigem JWT, exceto GET /ordens-servico/{id}/status. ' +
+        'As rotas exigem JWT, exceto GET /ordens-servico/{id}/status, auth/login, health e o webhook do Mercado Pago. ' +
+        'Até a extração do financeiro (#330), PATCH /ordens-servico/{id}/orcamento/aprovar e /recusar também são públicas no serviço. ' +
         'Nenhuma rota é consumida por outro serviço: Billing e Execução integram por eventos.'
     )
     .setVersion('1.0.0')
@@ -23,9 +27,10 @@ export function buildSwaggerDocument(app: INestApplication): OpenAPIObject {
 // com @ApiSecurity({}) sai com security: [] (sem autenticação) no documento.
 function markPublicOperations(document: OpenAPIObject): OpenAPIObject {
   for (const pathItem of Object.values(document.paths)) {
-    for (const operation of Object.values(pathItem) as OperationObject[]) {
+    for (const method of HTTP_METHODS) {
+      const operation = pathItem[method];
       const isPublic = operation?.security?.some((req) => Object.keys(req).length === 0);
-      if (isPublic) operation.security = [];
+      if (operation && isPublic) operation.security = [];
     }
   }
   return document;

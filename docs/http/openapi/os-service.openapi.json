@@ -1381,7 +1381,7 @@
     },
     "/api/v1/ordens-servico/{id}/status": {
       "get": {
-        "description": "Única rota pública do OS Service. Resposta mínima: id e status da OS, sem dados do cliente.",
+        "description": "Rota pública de consulta da OS. Resposta mínima: id e status da OS, sem dados do cliente.",
         "operationId": "OrdemServicoController_consultarStatus",
         "parameters": [
           {
@@ -1534,7 +1534,7 @@
     },
     "/api/v1/ordens-servico/{id}/orcamento/aprovar": {
       "patch": {
-        "description": "Aprova o orçamento da ordem de serviço. Público.",
+        "description": "Aprova o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).",
         "operationId": "OrdemServicoController_aprovarOrcamento",
         "parameters": [
           {
@@ -1561,11 +1561,7 @@
             "description": "Falha ao gerar o link no Mercado Pago. Orçamento continua pendente"
           }
         },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
+        "security": [],
         "summary": "Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)",
         "tags": [
           "Ordens Servico"
@@ -1574,7 +1570,7 @@
     },
     "/api/v1/ordens-servico/{id}/orcamento/recusar": {
       "patch": {
-        "description": "Recusa o orçamento da ordem de serviço. Público.",
+        "description": "Recusa o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).",
         "operationId": "OrdemServicoController_recusarOrcamento",
         "parameters": [
           {
@@ -1598,11 +1594,7 @@
             "description": "OS ou orçamento não encontrado"
           }
         },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
+        "security": [],
         "summary": "Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)",
         "tags": [
           "Ordens Servico"
@@ -1723,7 +1715,7 @@
     },
     "/api/v1/webhooks/service-orders/status": {
       "post": {
-        "description": "Canal de reprocesso manual. O caminho normal de mudança de status são os eventos da saga. Exige o header x-webhook-secret e passa pelo authorizer da borda. A transição é validada pela mesma máquina de estados dos consumidores de evento; DELIVERED é rejeitado.",
+        "description": "Canal de reprocesso manual. O caminho normal de mudança de status são os eventos da saga. Exige JWT e o header x-webhook-secret, e passa pelo authorizer da borda. A transição é validada pelo StatusTransitionService; DELIVERED é rejeitado.",
         "operationId": "ServiceOrderStatusWebhookController_handleStatusUpdate",
         "parameters": [],
         "requestBody": {
@@ -1744,7 +1736,7 @@
             "description": "Transição de status inválida (inclui DELIVERED) ou dados incorretos."
           },
           "401": {
-            "description": "Header x-webhook-secret ausente ou inválido."
+            "description": "JWT ou header x-webhook-secret ausente ou inválido."
           },
           "404": {
             "description": "Ordem de serviço não encontrada."
@@ -1752,10 +1744,8 @@
         },
         "security": [
           {
+            "bearer": [],
             "webhook-secret": []
-          },
-          {
-            "bearer": []
           }
         ],
         "summary": "Reprocessar manualmente o status da OS (canal de exceção)",
@@ -1783,6 +1773,11 @@
             "description": ""
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "tags": [
           "Pagamento"
         ]
@@ -1881,7 +1876,7 @@
   },
   "info": {
     "title": "Async Furious - OS Service",
-    "description": "API do OS Service: ordens de serviço, clientes, veículos, serviços e peças/insumos. Todas as rotas exigem JWT, exceto GET /ordens-servico/{id}/status. Nenhuma rota é consumida por outro serviço: Billing e Execução integram por eventos.",
+    "description": "API do OS Service: ordens de serviço, clientes, veículos, serviços e peças/insumos. As rotas exigem JWT, exceto GET /ordens-servico/{id}/status, auth/login, health e o webhook do Mercado Pago. Até a extração do financeiro (#330), PATCH /ordens-servico/{id}/orcamento/aprovar e /recusar também são públicas no serviço. Nenhuma rota é consumida por outro serviço: Billing e Execução integram por eventos.",
     "version": "1.0.0",
     "contact": {}
   },
