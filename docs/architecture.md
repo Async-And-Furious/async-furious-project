@@ -48,7 +48,7 @@ O OS Service publica no tópico `os.eventos.v1`:
 
 - `OrdemServicoRecebida` → Execução e Produção;
 - `OrcamentoCalculado` → Billing Service;
-- `EtapaDaSagaFalhou` quando o OS Service detecta falha técnica ou OS parada, conforme as condições descritas no [catálogo de eventos](./architecture/event-catalog.md).
+- `EtapaDaSagaFalhou`: o detector do OS Service publica para OS parada (`etapa=aprovacao-pagamento`); o consumidor da DLT do serviço que esgotou retries publica no tópico próprio, por exemplo, falha ao consumir `OrcamentoGerado` gera `etapa=orcamento`.
 
 Payloads e condições de publicação/consumo estão definidos no
 [catálogo de eventos](./architecture/event-catalog.md).
@@ -70,7 +70,8 @@ de payloads: [catálogo de eventos](./architecture/event-catalog.md) e
 - **PostgreSQL/RDS:** fonte de verdade e banco de escrita do OS Service,
   com modelos transacionais como clientes, veículos, serviços, peças, OS e
   histórico de status. Em termos de domínio, `Cliente`, `Veiculo`, `Servico`,
-  `Peca`, `OrdemServico` e `HistoricoStatusOS` permanecem no Prisma/Postgres;
+  `Peca`, `OrdemServico`, `OsPeca`, `OsServico` e `HistoricoStatusOS`
+  permanecem no Prisma/Postgres;
   orçamento e pagamento pertencem ao Billing. Localmente,
   `docker-compose.dependencies.yml` inicia PostgreSQL
   16, mapeado para `localhost:5433`; o `DOCDB_URI` usado pela aplicação aponta
@@ -79,7 +80,10 @@ de payloads: [catálogo de eventos](./architecture/event-catalog.md) e
   leituras selecionadas de OS e cliente. É projetado a partir das gravações;
   não substitui o PostgreSQL como fonte de verdade. Local e CI usam MongoDB
   5.0 (`mongo:5.0`) como compatibilidade para `DOCDB_URI`; em AWS, o destino é
-  DocumentDB.
+  DocumentDB. O banco lógico `os_read_model` contém as coleções `os_read_model`
+  (OS) e `cliente_read_model` (cliente), com `_id` igual ao UUID no PostgreSQL;
+  a fila usa o índice `fila_prioridade_createdAt_id` em
+  (`prioridade`, `createdAt`, `_id`).
 - **Kafka:** integração assíncrona com Billing e Execução e Produção.
 - **API Gateway + ALB interno:** entrada HTTP aprovada; não há BFF nem REST
   serviço-a-serviço.
