@@ -12,8 +12,8 @@ export function buildSwaggerDocument(app: INestApplication): OpenAPIObject {
     .setTitle('Async Furious - OS Service')
     .setDescription(
       'API do OS Service: ordens de serviço, clientes, veículos, serviços e peças/insumos. ' +
-        'As rotas exigem JWT, exceto GET /ordens-servico/{id}/status, auth/login, health e o webhook do Mercado Pago. ' +
-        'Até a extração do financeiro (#330), PATCH /ordens-servico/{id}/orcamento/aprovar e /recusar também são públicas no serviço. ' +
+        'As rotas exigem JWT, exceto GET /ordens-servico/{id}/status, auth/login e health. ' +
+        'Orçamento e pagamento são do Billing Service (#330). ' +
         'Nenhuma rota é consumida por outro serviço: Billing e Execução integram por eventos.'
     )
     .setVersion('1.0.0')

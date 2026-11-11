@@ -198,7 +198,37 @@ do Checkout Pro com `external_reference=ordemServicoId` e `notification_url`;
 | OS finalizada | OS Service | — | `ExecucaoConcluida` |
 | Fechamento por recusa de orçamento ou pagamento | OS Service | — | `OrcamentoRecusado`, `PagamentoRecusado` |
 | Cancelamento da `Execucao` (sai da fila) por recusa de orçamento ou pagamento | Execução e Produção | — | `OrcamentoRecusado`, `PagamentoRecusado` |
-| Compensação por falha técnica (desenho alvo; implementação parcial) | Os três (ver §3) | `EtapaDaSagaFalhou` | `EtapaDaSagaFalhou` |
+| Compensação por falha técnica | Os três (ver §3) | `EtapaDaSagaFalhou` | `EtapaDaSagaFalhou` |
+
+**Implementação de cada etapa (#337).** Caminhos relativos ao `src/modules/` de cada
+repositório. No OS, os eventos de integração saem pelo `PonteEventosIntegracaoListener` e
+entram pelo `KafkaConsumidorSaga` (`ordem-servico/infrastructure/messaging/`). No Billing, pelo
+`kafka-publicador-eventos.ts` e pelo `kafka-consumidor-eventos.ts`
+(`financeiro/infrastructure/messaging/`). No Execução, pelo `kafka-execucao-event.publisher.ts` e
+pelo `kafka-saga-event.consumer.ts` (`execucao/infrastructure/`).
+
+| Etapa | Repositório | Implementação |
+|---|---|---|
+| Abertura da OS | async-furious-project | `CriarOrdemServicoUseCase` (`ordem-servico/application/use-cases/ordem-servico.use-cases.ts`) |
+| Entrada na fila de diagnóstico | repo-execucao-service | `SagaEventHandler` (`execucao/application/use-cases/saga-event.handler.ts`) |
+| Início do diagnóstico | repo-execucao-service | `IniciarDiagnosticoUseCase` (`execucao/application/use-cases/execucao.use-cases.ts`) |
+| OS em diagnóstico | async-furious-project | `AtualizarStatusEmDiagnosticoHandler` (`ordem-servico/application/event-handlers/`) |
+| Itens e cálculo do orçamento | async-furious-project | `ListarServicosInsumosNaOsUseCase` (`ordem-servico.use-cases.ts`) |
+| Geração do orçamento | repo-billing | `GerarOrcamentoHandler` (`financeiro/application/event-handlers/gerar-orcamento.handler.ts`) |
+| OS aguarda aprovação | async-furious-project | `AtualizarStatusAguardandoAprovacaoHandler` |
+| Aprovação e cobrança | repo-billing | `AprovarOrcamentoUseCase` (`financeiro/application/use-cases/aprovar-orcamento.use-case.ts`) |
+| Recusa do orçamento | repo-billing | `RecusarOrcamentoUseCase` (`recusar-orcamento.use-case.ts`) |
+| Reserva de peças | async-furious-project | `VerificarNecessidadePecasHandler` → `DebitarEstoqueHandler` (`pecas-insumos/application/event-handlers/`) |
+| Confirmação do pagamento | repo-billing | `ProcessarNotificacaoPagamentoUseCase`, pelo `MercadoPagoWebhookController` |
+| Registro de `pago_em` | async-furious-project | `RegistrarPagamentoConfirmadoHandler` |
+| Entrada na fila de reparo | repo-execucao-service | `SagaEventHandler` |
+| Início do reparo | repo-execucao-service | `IniciarReparoUseCase` |
+| OS em execução | async-furious-project | `AtualizarStatusExecucaoIniciadaHandler` |
+| Conclusão da execução | repo-execucao-service | `ConcluirExecucaoUseCase` |
+| OS finalizada (fim da saga) | async-furious-project | `AtualizarStatusFinalizadaHandler` |
+| Fechamento por recusa | async-furious-project | `AtualizarStatusEncerradaSemExecucaoHandler` |
+| Cancelamento da `Execucao` | repo-execucao-service | `SagaEventHandler` |
+| Compensação | os três | matriz da §3 |
 
 **Fronteira do Execução e Produção (modelo híbrido mínimo).** O enunciado
 (p.3) atribui ao serviço "gerenciar a fila de execução da OS", "atualizar

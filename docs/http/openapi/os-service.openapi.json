@@ -1649,7 +1649,7 @@
   },
   "info": {
     "title": "Async Furious - OS Service",
-    "description": "API do OS Service: ordens de serviço, clientes, veículos, serviços e peças/insumos. As rotas exigem JWT, exceto GET /ordens-servico/{id}/status, auth/login, health e o webhook do Mercado Pago. Até a extração do financeiro (#330), PATCH /ordens-servico/{id}/orcamento/aprovar e /recusar também são públicas no serviço. Nenhuma rota é consumida por outro serviço: Billing e Execução integram por eventos.",
+    "description": "API do OS Service: ordens de serviço, clientes, veículos, serviços e peças/insumos. As rotas exigem JWT, exceto GET /ordens-servico/{id}/status, auth/login e health. Orçamento e pagamento são do Billing Service (#330). Nenhuma rota é consumida por outro serviço: Billing e Execução integram por eventos.",
     "version": "1.0.0",
     "contact": {}
   },
