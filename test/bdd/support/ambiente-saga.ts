@@ -7,7 +7,6 @@ import { cpf } from 'cpf-cnpj-validator';
 import request from 'supertest';
 import { AppModule } from '../../../src/app.module';
 import { PrismaService } from '../../../src/shared/infrastructure/database/prisma.service';
-import { GATEWAY_PAGAMENTO } from '../../../src/modules/financeiro/domain/interfaces/pagamento.interface';
 import {
   PUBLICADOR_INTEGRACAO,
   type EventoIntegracao,
@@ -25,9 +24,7 @@ import { AtualizarStatusAguardandoAprovacaoHandler } from '../../../src/modules/
 import { VerificarNecessidadePecasHandler } from '../../../src/modules/ordem-servico/application/event-handlers/verificar-necessidade-pecas.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from '../../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { RegistrarPagamentoConfirmadoHandler } from '../../../src/modules/ordem-servico/application/event-handlers/registrar-pagamento-confirmado.handler';
-import { OrcamentoRepository } from '../../../src/modules/ordem-servico/infrastructure/repositories/orcamento.repository';
 import { OrdemServicoRepository } from '../../../src/modules/ordem-servico/infrastructure/repositories/ordem-servico.repository';
-import type { Orcamento } from '../../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 import type { OrdemDeServico } from '../../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import {
   BILLING_TOPIC,
@@ -46,7 +43,7 @@ interface MensagemEnviada {
 
 /**
  * OS Service de pé para o cenário BDD: app Nest real (módulos, handlers e repositórios) sobre o
- * PostgreSQL de teste. O Mercado Pago é um stub. Execução e Billing não sobem: os eventos deles
+ * PostgreSQL de teste. Execução e Billing não sobem: os eventos deles
  * entram pelo mesmo `ProcessadorMensagensSaga` que o consumidor Kafka usa, com os mesmos
  * despachantes do módulo.
  */
@@ -64,23 +61,6 @@ export class AmbienteSaga {
   private tokenRecepcionista = '';
   private tokenMecanico = '';
 
-  /**
-   * Stub do Mercado Pago. Sem `responderCobrancas()`, a cobrança não tem resposta e o aprovar
-   * falha, então um cenário não passa por engano.
-   */
-  readonly mercadoPago = {
-    criarCobranca: jest.fn<Promise<{ preferenceId: string; linkPagamento: string }>, [string]>(),
-    consultarPagamento: jest.fn().mockResolvedValue(null),
-    responderCobrancas: (): void => {
-      this.mercadoPago.criarCobranca.mockImplementation((ordemServicoId: string) =>
-        Promise.resolve({
-          preferenceId: `pref-bdd-${ordemServicoId}`,
-          linkPagamento: `https://mp.test/checkout/${ordemServicoId}`,
-        })
-      );
-    },
-  };
-
   static async subir(): Promise<AmbienteSaga> {
     const ambiente = new AmbienteSaga();
     const publicador: IPublicadorIntegracao = {
@@ -88,8 +68,6 @@ export class AmbienteSaga {
     };
 
     const moduleFixture = await Test.createTestingModule({ imports: [AppModule] })
-      .overrideProvider(GATEWAY_PAGAMENTO)
-      .useValue(ambiente.mercadoPago)
       .overrideProvider(PUBLICADOR_INTEGRACAO)
       .useValue(publicador)
       .compile();
@@ -240,18 +218,6 @@ export class AmbienteSaga {
       .set('Authorization', `Bearer ${this.tokenMecanico}`)
       .send(totais);
     this.esperarStatus(resposta.status, 200, 'lançar serviços e insumos');
-  }
-
-  async aprovarOrcamento(ordemServicoId: string): Promise<{ linkPagamento: string }> {
-    const resposta = await request(this.servidor()).patch(
-      `/api/v1/ordens-servico/${ordemServicoId}/orcamento/aprovar`
-    );
-    this.esperarStatus(resposta.status, 200, 'aprovar o orçamento');
-    return resposta.body as { linkPagamento: string };
-  }
-
-  async orcamentoDaOs(ordemServicoId: string): Promise<Orcamento | null> {
-    return this.app.get(OrcamentoRepository).findByOrdemServicoId(ordemServicoId);
   }
 
   async ordemDaOs(ordemServicoId: string): Promise<OrdemDeServico> {

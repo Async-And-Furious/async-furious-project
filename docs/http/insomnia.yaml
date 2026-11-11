@@ -345,44 +345,6 @@ collection:
             send: true
             store: true
           rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/orcamento/aprovar"
-        name: Aprovar Orcamento (PUBLIC)
-        meta:
-          id: req_new_aprovar
-          created: 1785500000000
-          modified: 1785500000000
-          isPrivate: false
-          description: "PUBLIC - No auth required"
-          sortKey: -1745628000059
-        method: PATCH
-        authentication: {}
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/orcamento/recusar"
-        name: Recusar Orcamento (PUBLIC)
-        meta:
-          id: req_new_recusar
-          created: 1785600000000
-          modified: 1785600000000
-          isPrivate: false
-          description: "PUBLIC - No auth required"
-          sortKey: -1745628000060
-        method: PATCH
-        authentication: {}
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/aprovar-servico"
         name: Aprovar Servico Prestado
         meta:

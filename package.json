@@ -51,7 +51,6 @@
     "dotenv": "^17.4.2",
     "helmet": "^8.1.0",
     "kafkajs": "^2.2.4",
-    "mercadopago": "3.6.1",
     "mongodb": "^6.21.0",
     "nestjs-pino": "^4.6.1",
     "newrelic": "^14.3.8",

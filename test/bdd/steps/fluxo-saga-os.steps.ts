@@ -9,6 +9,7 @@ const feature = loadFeature(path.join(__dirname, '..', 'features', 'fluxo-saga-o
 
 const ESTOQUE_INICIAL = 5;
 const PAGAMENTO_ID = 'pagamento-bdd-1';
+const ORCAMENTO_ID = 'orcamento-bdd-1';
 
 let ambiente: AmbienteSaga | undefined;
 
@@ -34,13 +35,9 @@ defineFeature(feature, (test) => {
   }) => {
     let idPeca = '';
     let osId = '';
-    let linkPagamento = '';
 
     given('que o OS Service está no ar com o banco de teste', async () => {
       ambiente = await AmbienteSaga.subir();
-    });
-    and('que o stub do Mercado Pago responde às cobranças', () => {
-      saga().mercadoPago.responderCobrancas();
     });
     and(
       'que o Billing Service e a Execução e Produção são simulados por eventos entregues ao consumidor da saga',
@@ -82,26 +79,21 @@ defineFeature(feature, (test) => {
     then('o evento OrcamentoCalculado é publicado em os.eventos.v1', () => {
       expect(saga().publicadosPelaOs()).toContain('OrcamentoCalculado');
     });
-    and('o Orcamento está em PENDING', async () => {
-      expect((await saga().orcamentoDaOs(osId))?.status).toBe('PENDING');
+
+    when('o Billing publica OrcamentoGerado', async () => {
+      await saga().entregar('billing', osId, 'OrcamentoGerado', { orcamentoId: ORCAMENTO_ID });
     });
-    and('a OS está em AWAITING_APPROVAL', async () => {
+    then('a OS está em AWAITING_APPROVAL', async () => {
       expect(await saga().statusDaOs(osId)).toBe('AWAITING_APPROVAL');
     });
 
-    when(
-      'o cliente aprova o orçamento (PATCH /api/v1/ordens-servico/{id}/orcamento/aprovar)',
-      async () => {
-        linkPagamento = (await saga().aprovarOrcamento(osId)).linkPagamento;
-      }
-    );
-    then('a resposta contém linkPagamento', () => {
-      expect(linkPagamento).toBe(`https://mp.test/checkout/${osId}`);
+    when('o Billing publica OrcamentoAprovado', async () => {
+      await saga().entregar('billing', osId, 'OrcamentoAprovado', {
+        orcamentoId: ORCAMENTO_ID,
+        valorTotalPecas: 60,
+      });
     });
-    and('o Orcamento está em APPROVED', async () => {
-      expect((await saga().orcamentoDaOs(osId))?.status).toBe('APPROVED');
-    });
-    and('as peças da OS são reservadas', async () => {
+    then('as peças da OS são reservadas', async () => {
       expect(await saga().estoqueDaPeca(idPeca)).toBe(ESTOQUE_INICIAL - 1);
     });
     and('a OS continua em AWAITING_APPROVAL', async () => {
@@ -143,7 +135,6 @@ defineFeature(feature, (test) => {
     pending,
   }) => {
     given('que o OS Service está no ar com o banco de teste', () => pending());
-    and('que o stub do Mercado Pago responde às cobranças', () => pending());
     and(
       'que o Billing Service e a Execução e Produção são simulados por eventos entregues ao consumidor da saga',
       () => pending()

@@ -25,6 +25,7 @@ sequenceDiagram
     actor Mecanico
     participant API as Aplicação (ordem-servico BC)
     participant Exec as Execução e Produção
+    participant Bill as Billing Service
     participant DB as PostgreSQL
     participant Obs as Observabilidade [PENDENTE]
 
@@ -43,23 +44,22 @@ sequenceDiagram
 
     Mecanico->>API: PATCH /ordens-servico/:id/servicos-insumos<br/>(lista serviços + peças, papel MECANICO; exige UNDER_DIAGNOSIS)
     API-->>Mecanico: 200 { totais calculados }
-    API->>API: evento OrcamentoCalculado → OrcamentoGerado + OrdemDeServicoAguardandoAprovacao
-    API->>DB: persiste Orçamento, status=AWAITING_APPROVAL
-    API-->>Cliente: notifica orçamento (fora do sistema — e-mail/telefone, não modelado como integração)
+    API-->>Bill: evento OrcamentoCalculado (os.eventos.v1)
+    Bill-->>API: evento OrcamentoGerado (o Orcamento é do Billing)
+    API->>DB: status=AWAITING_APPROVAL
 
     alt Cliente aprova
-        Cliente->>API: PATCH /ordens-servico/:id/orcamento/aprovar (rota @Public, sem token)
-        API->>API: evento OrcamentoAprovado (reserva as peças)
+        Cliente->>Bill: PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar (público; Checkout Pro)
+        Bill-->>API: evento OrcamentoAprovado (reserva as peças)
         Note over API,DB: A OS permanece em AWAITING_APPROVAL.<br/>Peça sem estoque: apenas marca reserva_pecas_pendente.
         Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/iniciar-reparo (papel MECANICO, após PagamentoConfirmado)
         Exec-->>API: evento ExecucaoIniciada
         API->>API: evento OrdemServicoEmExecucao
         API->>DB: status=IN_PROGRESS, iniciada_em=now()
     else Cliente recusa
-        Cliente->>API: PATCH /ordens-servico/:id/orcamento/recusar (rota @Public, sem token)
-        API->>API: evento OrcamentoRejeitado
+        Cliente->>Bill: PATCH /api/v1/orcamentos/{ordemServicoId}/recusar (público)
+        Bill-->>API: evento OrcamentoRecusado
         API->>DB: status=CLOSED_WITHOUT_EXECUTION
-        Note over API,DB: Nenhum evento de domínio nomeado para esta<br/>transição em ddd.md §5.1 — gap já registrado<br/>na auditoria (Fase 3 não introduz nem resolve isso)
     end
 
     opt Reserva de peças pendente (peça sem estoque)
@@ -96,29 +96,22 @@ escrita para `DELIVERED` (exige `FINISHED`, grava `entregue_em` e uma linha
 de histórico), e o webhook `POST /webhooks/service-orders/status` rejeita
 `DELIVERED` com `400`.
 
-**Mercado Pago no monólito (Feature #325, 20/10/2026).** Antes do Billing
-Service existir, a cobrança já roda no módulo `financeiro`:
+**Orçamento e cobrança saíram do OS Service (#330).** O módulo `financeiro`
+(Mercado Pago, `POST /webhooks/mercado-pago`, porta `ICobrancaPagamentoPort`),
+o agregado `Orcamento` e as rotas `PATCH :id/orcamento/aprovar`,
+`PATCH :id/orcamento/recusar` e `POST :id/aprovar-servico` foram removidos;
+o Billing Service é o dono deles. O OS Service:
 
-- `PATCH /ordens-servico/:id/orcamento/aprovar` (e `POST /:id/aprovar-servico`
-  com `APROVADO`) cria a preference do Checkout Pro **antes** de marcar o
-  orçamento `APPROVED` e devolve `linkPagamento`. Falha no Mercado Pago →
-  `502` e o orçamento segue `PENDING`. A chamada passa pela porta
-  `ICobrancaPagamentoPort` (`src/shared/domain/interfaces`). Uma cobrança por
-  OS (`Pagamento.ordemServicoId` único, reservado antes de chamar o Mercado
-  Pago); aprovações concorrentes devolvem o mesmo link e só uma publica
-  `OrcamentoAprovado`.
-- `POST /api/v1/webhooks/mercado-pago` valida o `x-signature`, reconsulta
-  `GET /v1/payments/{id}` e grava a notificação em `webhook_recebido` na mesma
-  transação do `Pagamento`: aprovado com o valor da cobrança → `CONFIRMADO` +
-  `PagamentoConfirmadoEvent`; `rejected`/`cancelled` → `RECUSADO` +
-  `PagamentoRecusadoEvent` (terminal, simplificação da ADR-0022); pendente →
-  sem efeito. Esses eventos in-process do monólito não têm consumidor.
-- O OS Service consome `PagamentoConfirmado` do Billing pelo Kafka
-  (`RegistrarPagamentoConfirmadoHandler`, #331): grava `pago_em` e uma linha
-  em `HistoricoStatusOS`, **sem mudar status**, e não é gatilho da entrega.
-- Diferença em relação ao fluxo da Fase 4 descrito abaixo: a OS não espera o
-  pagamento para sair de `AWAITING_APPROVAL` (só `ExecucaoIniciada` a leva a
-  `IN_PROGRESS`, e ela só chega do Execução).
+- calcula os totais em `servicos-insumos` e publica `OrcamentoCalculado`;
+- consome do Billing, pelo Kafka (#331), `OrcamentoGerado` (vai a
+  `AWAITING_APPROVAL`), `OrcamentoAprovado` (reserva as peças, sem mudar
+  status), `OrcamentoRecusado` e `PagamentoRecusado` (encerram sem execução
+  antes do reparo) e `PagamentoConfirmado` (`RegistrarPagamentoConfirmadoHandler`:
+  grava `pago_em` e uma linha em `HistoricoStatusOS`, **sem mudar status**, e
+  não é gatilho da entrega).
+
+As tabelas `pagamentos`, `Orcamento` e `webhook_recebido` continuam no banco
+do OS Service até a migration destrutiva, em PR separado da #330.
 
 ### Integração com o contexto Financeiro (Fase 4) {#integração-com-o-contexto-financeiro-fase-4}
 
@@ -179,12 +172,12 @@ do orçamento e o pagamento passam a cruzar a fronteira de serviço **somente
 por evento** (Saga coreografada, sem chamada REST entre serviços); o fluxo
 distribuído está em [`saga-flow.md`](./saga-flow.md). O diagrama de sequência
 acima continua correto como fluxo de **negócio** do monólito atual; deixa de
-ser preciso como fluxo de **um único processo** a partir da Fase 4. Na Fase 4
-as rotas públicas `POST /ordens-servico/:id/aprovar-servico` e
-`GET /ordens-servico/:id/rastreamento` são removidas (a primeira era uma
-terceira via de aprovação que pulava o pagamento; a segunda é alias de
-`/status`), e a aprovação/recusa passa a ser
-`PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar|recusar` no Billing Service.
+ser preciso como fluxo de **um único processo** a partir da Fase 4. A rota
+pública `POST /ordens-servico/:id/aprovar-servico` foi removida na #330 (era
+uma terceira via de aprovação que pulava o pagamento), e a aprovação/recusa
+passa a ser `PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar|recusar` no
+Billing Service. `GET /ordens-servico/:id/rastreamento` (alias de `/status`)
+também está prevista para sair, fora do escopo da #330.
 Também migram para o Execução e Produção as ações do mecânico: `assumir` e
 `analisar` viram `PATCH /api/v1/execucoes/{id}/iniciar-diagnostico` e
 `finalizar-execucao` vira `PATCH /api/v1/execucoes/{id}/concluir`, com a

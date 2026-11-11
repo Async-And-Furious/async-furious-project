@@ -37,7 +37,7 @@ Este documento apresenta a aplicação dos princípios de Domain-Driven Design (
 
 ### 3.1. Contexto: Ordem de Serviço (OS)
 
-Este contexto lida com a criação, acompanhamento e gestão do ciclo de vida das Ordens de Serviço, incluindo a geração e aprovação de orçamentos, que representam o aspecto financeiro direto da OS.
+Este contexto lida com a criação, acompanhamento e gestão do ciclo de vida das Ordens de Serviço. Ele calcula os totais de serviços e peças (`OrcamentoCalculado`); o orçamento em si e a sua aprovação são do contexto Financeiro (Billing Service).
 
 ### 3.2. Contexto: Clientes e Veículos
 
@@ -49,7 +49,7 @@ Gerencia o catálogo de serviços oferecidos, o estoque de peças e insumos, e a
 
 ### 3.4. Contexto: Financeiro
 
-No estado atual do projeto, o contexto financeiro está implementado como módulo próprio (`financeiro`), responsável pelo registro de pagamentos e pela integração com o ciclo de entrega da Ordem de Serviço. Esse contexto se integra ao domínio de Ordem de Serviço para concluir o fluxo operacional.
+Desde a #330 o contexto Financeiro vive no Billing Service (repositório `repo-billing`), com banco próprio: orçamento, aprovação ou recusa, cobrança no Mercado Pago (Checkout Pro) e confirmação do pagamento. Ele se integra à Ordem de Serviço só por evento (`event-catalog.md`); o pagamento não dispara a entrega da OS.
 
 ### 3.5. Contexto: Segurança e Autenticação
 
@@ -347,19 +347,17 @@ Hoje trafegam pelo `EmissorEventos` in-process, com o mesmo nome.
 
 ---
 
-### 5.4. BC: Gestão Financeira (`financeiro`)
+### 5.4. BC: Gestão Financeira (`repo-billing`)
 
-#### Eventos de Domínio (3):
+#### Eventos de integração publicados (`billing.eventos.v1`, ver `event-catalog.md`):
 
-*   `PagamentoRegistrado`
-*   `PagamentoProcessado`
-*   `NotaFiscalEmitida`
+*   `OrcamentoGerado`: orçamento criado a partir de `OrcamentoCalculado`; o OS Service leva a OS a Aguardando Aprovação.
+*   `OrcamentoAprovado`: o cliente aprovou; o OS Service reserva as peças, sem mudar o status.
+*   `OrcamentoRecusado`: o cliente recusou; o OS Service encerra a OS sem execução.
+*   `PagamentoConfirmado`: o Mercado Pago confirmou; o OS Service grava `pago_em`.
+*   `PagamentoRecusado`: o Mercado Pago recusou; o OS Service encerra a OS sem execução antes do reparo.
 
-#### Comandos:
-
-*   `RegistrarPagamento`
-*   `ProcessarPagamento`
-*   `EmitirNotaFiscal`
+O antigo módulo `financeiro` do monólito (com `PagamentoRegistrado`, que disparava a entrega) foi removido na #330.
 
 ---
 

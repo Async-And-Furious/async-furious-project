@@ -45,10 +45,6 @@ import {
   DetalharOrdemServicoUseCase,
   DeletarOrdemServicoUseCase,
 } from '../../application/use-cases/ordem-servico.use-cases';
-import {
-  AprovarOrcamentoUseCase,
-  RecusarOrcamentoUseCase,
-} from '../../application/use-cases/orcamento.use-cases';
 import { ConsultarTempoMedioExecucaoUseCase } from '../../application/use-cases/tempo-medio-execucao.use-case';
 
 @ApiTags('Ordens Servico')
@@ -63,10 +59,6 @@ export class OrdemServicoController {
     private readonly listarServicosInsumosUseCase: ListarServicosInsumosNaOsUseCase,
     @Inject(AtualizarOrdemServicoUseCase)
     private readonly atualizarOrdemServicoUseCase: AtualizarOrdemServicoUseCase,
-    @Inject(AprovarOrcamentoUseCase)
-    private readonly aprovarOrcamentoUseCase: AprovarOrcamentoUseCase,
-    @Inject(RecusarOrcamentoUseCase)
-    private readonly recusarOrcamentoUseCase: RecusarOrcamentoUseCase,
     @Inject(AprovarServicoPrestadoUseCase)
     private readonly aprovarServicoPrestadoUseCase: AprovarServicoPrestadoUseCase,
     @Inject(RegistrarEntregaVeiculoUseCase)
@@ -265,49 +257,6 @@ export class OrdemServicoController {
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   listarServicosInsumos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GerarOrcamentoDto) {
     return this.listarServicosInsumosUseCase.execute(id, dto);
-  }
-
-  @Patch(':id/orcamento/aprovar')
-  // Pública no serviço até a extração do financeiro (#330); na borda passa pelo authorizer.
-  @Public()
-  @ApiSecurity({})
-  @ApiOperation({
-    summary: 'Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)',
-    description:
-      'Aprova o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({
-    status: 200,
-    description:
-      'Orçamento aprovado. OS → Em Execução. Resposta inclui linkPagamento (Checkout Pro)',
-  })
-  @ApiResponse({ status: 400, description: 'Orçamento não está pendente ou sem valores' })
-  @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
-  @ApiResponse({
-    status: 502,
-    description: 'Falha ao gerar o link no Mercado Pago. Orçamento continua pendente',
-  })
-  aprovarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
-    return this.aprovarOrcamentoUseCase.execute(id);
-  }
-
-  @Patch(':id/orcamento/recusar')
-  // Pública no serviço até a extração do financeiro (#330); na borda passa pelo authorizer.
-  @Public()
-  @ApiSecurity({})
-  @ApiOperation({
-    summary:
-      'Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)',
-    description:
-      'Recusa o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Orçamento recusado. OS → Encerrada Sem Execução' })
-  @ApiResponse({ status: 400, description: 'Orçamento não está pendente' })
-  @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
-  recusarOrcamento(@Param('id', ParseUUIDPipe) id: string) {
-    return this.recusarOrcamentoUseCase.execute(id);
   }
 
   @Patch(':id/aprovar-servico')

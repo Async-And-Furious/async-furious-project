@@ -1,3 +1,4 @@
+import { RequestMethod } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { OrdemServicoController } from '../../../src/modules/ordem-servico/presentation/controllers/ordem-servico.controller';
 import {
@@ -21,10 +22,6 @@ import {
   DetalharOrdemServicoUseCase,
   DeletarOrdemServicoUseCase,
 } from '../../../src/modules/ordem-servico/application/use-cases/ordem-servico.use-cases';
-import {
-  AprovarOrcamentoUseCase,
-  RecusarOrcamentoUseCase,
-} from '../../../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
 import { ConsultarTempoMedioExecucaoUseCase } from '../../../src/modules/ordem-servico/application/use-cases/tempo-medio-execucao.use-case';
 
 describe('OrdemServicoController', () => {
@@ -32,8 +29,6 @@ describe('OrdemServicoController', () => {
   let criarUseCase: jest.Mocked<CriarOrdemServicoUseCase>;
   let listarServicosInsumosUseCase: jest.Mocked<ListarServicosInsumosNaOsUseCase>;
   let atualizarOrdemServicoUseCase: jest.Mocked<AtualizarOrdemServicoUseCase>;
-  let aprovarOrcamentoUseCase: jest.Mocked<AprovarOrcamentoUseCase>;
-  let recusarOrcamentoUseCase: jest.Mocked<RecusarOrcamentoUseCase>;
   let aprovarServicoPrestadoUseCase: jest.Mocked<AprovarServicoPrestadoUseCase>;
   let registrarEntregaVeiculoUseCase: jest.Mocked<RegistrarEntregaVeiculoUseCase>;
   let consultarStatusUseCase: jest.Mocked<ConsultarStatusOrdemServicoUseCase>;
@@ -46,8 +41,6 @@ describe('OrdemServicoController', () => {
     criarUseCase: { execute: jest.fn() },
     listarServicosInsumosUseCase: { execute: jest.fn() },
     atualizarOrdemServicoUseCase: { execute: jest.fn() },
-    aprovarOrcamentoUseCase: { execute: jest.fn() },
-    recusarOrcamentoUseCase: { execute: jest.fn() },
     aprovarServicoPrestadoUseCase: { execute: jest.fn() },
     registrarEntregaVeiculoUseCase: { execute: jest.fn() },
     consultarStatusUseCase: { execute: jest.fn() },
@@ -84,8 +77,6 @@ describe('OrdemServicoController', () => {
           provide: AtualizarOrdemServicoUseCase,
           useValue: mockUseCases.atualizarOrdemServicoUseCase,
         },
-        { provide: AprovarOrcamentoUseCase, useValue: mockUseCases.aprovarOrcamentoUseCase },
-        { provide: RecusarOrcamentoUseCase, useValue: mockUseCases.recusarOrcamentoUseCase },
         {
           provide: AprovarServicoPrestadoUseCase,
           useValue: mockUseCases.aprovarServicoPrestadoUseCase,
@@ -117,8 +108,6 @@ describe('OrdemServicoController', () => {
     criarUseCase = module.get(CriarOrdemServicoUseCase);
     listarServicosInsumosUseCase = module.get(ListarServicosInsumosNaOsUseCase);
     atualizarOrdemServicoUseCase = module.get(AtualizarOrdemServicoUseCase);
-    aprovarOrcamentoUseCase = module.get(AprovarOrcamentoUseCase);
-    recusarOrcamentoUseCase = module.get(RecusarOrcamentoUseCase);
     aprovarServicoPrestadoUseCase = module.get(AprovarServicoPrestadoUseCase);
     registrarEntregaVeiculoUseCase = module.get(RegistrarEntregaVeiculoUseCase);
     consultarStatusUseCase = module.get(ConsultarStatusOrdemServicoUseCase);
@@ -322,36 +311,29 @@ describe('OrdemServicoController', () => {
     });
   });
 
-  describe('aprovarOrcamento', () => {
-    const osId = 'os-1';
+  describe('rotas que passaram para o Billing (#330)', () => {
+    const rotas = (): string[] => {
+      const prototipo = OrdemServicoController.prototype as unknown as Record<string, object>;
+      return Object.getOwnPropertyNames(prototipo)
+        .filter((nome) => nome !== 'constructor')
+        .map((nome) => {
+          const caminho = Reflect.getMetadata('path', prototipo[nome]) as unknown;
+          const metodo = Reflect.getMetadata('method', prototipo[nome]) as unknown;
+          return typeof caminho === 'string' ? `${RequestMethod[metodo as number]} ${caminho}` : '';
+        })
+        .filter(Boolean);
+    };
 
-    it('deve aprovar orçamento', async () => {
-      const resultadoEsperado = { id: osId, status: 'IN_PROGRESS' } as unknown as Awaited<
-        ReturnType<typeof aprovarOrcamentoUseCase.execute>
-      >;
-      aprovarOrcamentoUseCase.execute.mockResolvedValue(resultadoEsperado);
-
-      const resultado = await controller.aprovarOrcamento(osId);
-
-      expect(aprovarOrcamentoUseCase.execute).toHaveBeenCalledWith(osId);
-      expect(resultado).toEqual(resultadoEsperado);
+    it.each([
+      'PATCH :id/orcamento/aprovar',
+      'PATCH :id/orcamento/recusar',
+      'POST :id/aprovar-servico',
+    ])('não registra %s', (rota) => {
+      expect(rotas()).not.toContain(rota);
     });
-  });
 
-  describe('recusarOrcamento', () => {
-    const osId = 'os-1';
-
-    it('deve recusar orçamento', async () => {
-      const resultadoEsperado = {
-        id: osId,
-        status: 'CLOSED_WITHOUT_EXECUTION',
-      } as unknown as Awaited<ReturnType<typeof recusarOrcamentoUseCase.execute>>;
-      recusarOrcamentoUseCase.execute.mockResolvedValue(resultadoEsperado);
-
-      const resultado = await controller.recusarOrcamento(osId);
-
-      expect(recusarOrcamentoUseCase.execute).toHaveBeenCalledWith(osId);
-      expect(resultado).toEqual(resultadoEsperado);
+    it('mantém PATCH :id/aprovar-servico (aprovação do serviço prestado, autenticada)', () => {
+      expect(rotas()).toContain('PATCH :id/aprovar-servico');
     });
   });
 
@@ -447,8 +429,6 @@ describe('OrdemServicoController', () => {
       expect(criarUseCase).toBeDefined();
       expect(listarServicosInsumosUseCase).toBeDefined();
       expect(atualizarOrdemServicoUseCase).toBeDefined();
-      expect(aprovarOrcamentoUseCase).toBeDefined();
-      expect(recusarOrcamentoUseCase).toBeDefined();
       expect(aprovarServicoPrestadoUseCase).toBeDefined();
       expect(registrarEntregaVeiculoUseCase).toBeDefined();
       expect(consultarStatusUseCase).toBeDefined();

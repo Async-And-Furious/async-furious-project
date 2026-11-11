@@ -191,7 +191,7 @@ describe('OrdemServicoRepository', () => {
 
       expect(prisma.ordemServico.findUnique).toHaveBeenCalledWith({
         where: { id: 'os-123' },
-        include: { veiculo: true, cliente: true, orcamento: true },
+        include: { veiculo: true, cliente: true },
       });
       expect(result).toEqual(expect.objectContaining({ id: 'os-123', veiculoId: 'veiculo-123' }));
     });

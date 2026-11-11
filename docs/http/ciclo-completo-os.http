@@ -134,13 +134,13 @@ Authorization: Bearer {{mecToken}}
 }
 
 # ─────────────────────────────────────────────────────────────
-# PASSO 5 — Cliente aprova o orçamento  (PÚBLICO — sem token)
-# A OS permanece em AWAITING_APPROVAL: só ExecucaoIniciada (iniciar-reparo
-# no serviço de Execução) leva a OS a IN_PROGRESS e preenche iniciada_em.
+# PASSO 5: Orçamento, aprovação e pagamento  (acontecem no Billing Service)
+# O Billing recebe OrcamentoCalculado, cria o Orcamento e publica
+# OrcamentoGerado (a OS vai a AWAITING_APPROVAL). O cliente aprova em
+# PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar no Billing (rota pública)
+# e paga pelo Checkout Pro. A OS segue em AWAITING_APPROVAL: só
+# ExecucaoIniciada (iniciar-reparo no Execução) a leva a IN_PROGRESS.
 # ─────────────────────────────────────────────────────────────
-
-### Aprovar orçamento
-PATCH {{base}}/ordens-servico/{{osId}}/orcamento/aprovar
 
 # ─────────────────────────────────────────────────────────────
 # PASSO 6 — Conclusão da execução  (acontece no serviço de Execução)

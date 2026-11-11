@@ -25,10 +25,6 @@ import {
   RegistrarEntregaVeiculoUseCase,
   AtualizarOrdemServicoUseCase,
 } from '../src/modules/ordem-servico/application/use-cases/ordem-servico.use-cases';
-import {
-  AprovarOrcamentoUseCase,
-  RecusarOrcamentoUseCase,
-} from '../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
 import { ConsultarTempoMedioExecucaoUseCase } from '../src/modules/ordem-servico/application/use-cases/tempo-medio-execucao.use-case';
 
 describe('Gateway JWT authorization over HTTP', () => {
@@ -78,8 +74,6 @@ describe('Gateway JWT authorization over HTTP', () => {
     CriarOrdemServicoUseCase,
     ListarServicosInsumosNaOsUseCase,
     AtualizarOrdemServicoUseCase,
-    AprovarOrcamentoUseCase,
-    RecusarOrcamentoUseCase,
     AprovarServicoPrestadoUseCase,
     RegistrarEntregaVeiculoUseCase,
     ConsultarStatusOrdemServicoUseCase,

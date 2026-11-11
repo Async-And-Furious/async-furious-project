@@ -12,7 +12,6 @@ Funcionalidade: Fluxo da Ordem de Serviço pela Saga entre os três serviços
 
   Contexto:
     Dado que o OS Service está no ar com o banco de teste
-    E que o stub do Mercado Pago responde às cobranças
     E que o Billing Service e a Execução e Produção são simulados por eventos entregues ao consumidor da saga
 
   @caminho-feliz
@@ -27,13 +26,12 @@ Funcionalidade: Fluxo da Ordem de Serviço pela Saga entre os três serviços
 
     Quando o mecânico define os serviços e as peças (PATCH /api/v1/ordens-servico/{id}/servicos-insumos)
     Então o evento OrcamentoCalculado é publicado em os.eventos.v1
-    E o Orcamento está em PENDING
-    E a OS está em AWAITING_APPROVAL
 
-    Quando o cliente aprova o orçamento (PATCH /api/v1/ordens-servico/{id}/orcamento/aprovar)
-    Então a resposta contém linkPagamento
-    E o Orcamento está em APPROVED
-    E as peças da OS são reservadas
+    Quando o Billing publica OrcamentoGerado
+    Então a OS está em AWAITING_APPROVAL
+
+    Quando o Billing publica OrcamentoAprovado
+    Então as peças da OS são reservadas
     E a OS continua em AWAITING_APPROVAL
 
     Quando o Billing publica PagamentoConfirmado

@@ -6,10 +6,11 @@ import { JwtService } from '@nestjs/jwt';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
-import { GATEWAY_PAGAMENTO } from '../src/modules/financeiro/domain/interfaces/pagamento.interface';
 import { DiagnosticoIniciado } from '../src/modules/ordem-servico/domain/events/diagnostico-iniciado.event';
 import { ExecucaoIniciada } from '../src/modules/ordem-servico/domain/events/execucao-iniciada.event';
 import { ExecucaoConcluida } from '../src/modules/ordem-servico/domain/events/execucao-concluida.event';
+import { OrcamentoGerado } from '../src/modules/ordem-servico/domain/events/orcamento-gerado.event';
+import { OrcamentoAprovado } from '../src/modules/ordem-servico/domain/events/orcamento-aprovado.event';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
 import { randomInt } from 'node:crypto';
 
@@ -34,21 +35,9 @@ describe('OrdemServico Happy Flow (e2e)', () => {
   const clienteEmail = 'e2e-os-cliente@example.com';
 
   beforeAll(async () => {
-    // O Mercado Pago é externo: no e2e a cobrança usa um gateway falso.
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    })
-      .overrideProvider(GATEWAY_PAGAMENTO)
-      .useValue({
-        criarCobranca: jest.fn((ordemServicoId: string) =>
-          Promise.resolve({
-            preferenceId: `pref-e2e-${ordemServicoId}`,
-            linkPagamento: `https://mp.test/checkout/${ordemServicoId}`,
-          })
-        ),
-        consultarPagamento: jest.fn().mockResolvedValue(null),
-      })
-      .compile();
+    }).compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -179,8 +168,8 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       return resposta.body.status as string;
     };
 
-    // Os eventos do Execução e Produção são injetados in-process (EventEmitter2), no lugar do
-    // serviço real, que não sobe neste teste. Por isso o fluxo do mecânico não chama mais
+    // Os eventos do Execução e Produção e do Billing são injetados in-process (EventEmitter2), no
+    // lugar dos serviços reais, que não sobem neste teste. Por isso o fluxo do mecânico não chama mais
     // assumir/analisar/finalizar-execucao: essas rotas saíram do OS Service (ver
     // test/ordem-servico/controllers/ordem-servico.controller.spec.ts, "rotas migradas").
 
@@ -209,13 +198,16 @@ describe('OrdemServico Happy Flow (e2e)', () => {
       valorTotalPecas: 0,
       valorTotalGeral: 300,
     });
+    // O Orcamento é do Billing (#330): a OS só vai a AWAITING_APPROVAL com o OrcamentoGerado dele.
+    expect(await statusDaOs()).toBe('UNDER_DIAGNOSIS');
+    await eventEmitter.emitAsync('OrcamentoGerado', new OrcamentoGerado(ordemServicoId, 'orc-e2e'));
     expect(await statusDaOs()).toBe('AWAITING_APPROVAL');
 
-    const aprovacao = await server
-      .patch(`/ordens-servico/${ordemServicoId}/orcamento/aprovar`)
-      .expect(200);
-    expect(aprovacao.body.linkPagamento).toBe(`https://mp.test/checkout/${ordemServicoId}`);
-    // Aprovar/reservar peças não leva mais a OS a IN_PROGRESS: só ExecucaoIniciada.
+    // Aprovação e pagamento acontecem no Billing; OrcamentoAprovado não muda o status da OS.
+    await eventEmitter.emitAsync(
+      'OrcamentoAprovado',
+      new OrcamentoAprovado(ordemServicoId, 'orc-e2e', 0)
+    );
     expect(await statusDaOs()).toBe('AWAITING_APPROVAL');
 
     await eventEmitter.emitAsync('ExecucaoIniciada', new ExecucaoIniciada(ordemServicoId));

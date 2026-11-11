@@ -1480,75 +1480,6 @@
         ]
       }
     },
-    "/api/v1/ordens-servico/{id}/orcamento/aprovar": {
-      "patch": {
-        "description": "Aprova o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).",
-        "operationId": "OrdemServicoController_aprovarOrcamento",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Orçamento aprovado. OS → Em Execução. Resposta inclui linkPagamento (Checkout Pro)"
-          },
-          "400": {
-            "description": "Orçamento não está pendente ou sem valores"
-          },
-          "404": {
-            "description": "OS ou orçamento não encontrado"
-          },
-          "502": {
-            "description": "Falha ao gerar o link no Mercado Pago. Orçamento continua pendente"
-          }
-        },
-        "security": [],
-        "summary": "Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)",
-        "tags": [
-          "Ordens Servico"
-        ]
-      }
-    },
-    "/api/v1/ordens-servico/{id}/orcamento/recusar": {
-      "patch": {
-        "description": "Recusa o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).",
-        "operationId": "OrdemServicoController_recusarOrcamento",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Orçamento recusado. OS → Encerrada Sem Execução"
-          },
-          "400": {
-            "description": "Orçamento não está pendente"
-          },
-          "404": {
-            "description": "OS ou orçamento não encontrado"
-          }
-        },
-        "security": [],
-        "summary": "Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)",
-        "tags": [
-          "Ordens Servico"
-        ]
-      }
-    },
     "/api/v1/ordens-servico/{id}/aprovar-servico": {
       "patch": {
         "description": "Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção.",
@@ -1659,45 +1590,6 @@
           }
         ],
         "summary": "Reprocessar manualmente o status da OS (canal de exceção)",
-        "tags": [
-          "Webhooks"
-        ]
-      }
-    },
-    "/api/v1/webhooks/mercado-pago": {
-      "post": {
-        "description": "Público, autenticado pela assinatura x-signature. O status do pagamento vem da reconsulta ao Mercado Pago, nunca do corpo da notificação.",
-        "operationId": "MercadoPagoWebhookController_receber",
-        "parameters": [
-          {
-            "name": "data.id",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "type",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Notificação recebida."
-          },
-          "401": {
-            "description": "Assinatura ausente ou inválida."
-          },
-          "502": {
-            "description": "Falha ao reconsultar o Mercado Pago (o Mercado Pago reenvia a notificação)."
-          }
-        },
-        "summary": "Receber notificação do Mercado Pago (Checkout Pro)",
         "tags": [
           "Webhooks"
         ]

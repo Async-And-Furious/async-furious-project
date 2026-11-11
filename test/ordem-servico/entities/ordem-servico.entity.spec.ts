@@ -100,32 +100,6 @@ describe('OrdemDeServico Entity', () => {
     });
   });
 
-  it('deve permitir associar um orçamento', () => {
-    const ordemServico = new OrdemDeServico();
-    const orcamento = {
-      id: 'orc-123',
-      id_ordem_servico: 'os-123',
-      valor_total_servicos: 300.0,
-      valor_total_pecas: 200.0,
-      valor_total_geral: 500.0,
-      status: 'PENDING' as const,
-      created_at: new Date(),
-      updated_at: new Date(),
-    };
-
-    ordemServico.orcamento = orcamento;
-
-    expect(ordemServico.orcamento).toBeDefined();
-    expect(ordemServico.orcamento?.id).toBe('orc-123');
-    expect(ordemServico.orcamento?.valor_total_geral).toBe(500.0);
-  });
-
-  it('deve funcionar sem orçamento associado', () => {
-    const ordemServico = new OrdemDeServico();
-
-    expect(ordemServico.orcamento).toBeUndefined();
-  });
-
   it('deve permitir criar com dados completos', () => {
     const agora = new Date();
     const ordemServico = new OrdemDeServico();

@@ -38,14 +38,13 @@ O OS Service roda de verdade. O resto da saga não sobe, e os eventos dele entra
 |---|---|
 | OS Service | App Nest real (`AppModule`), com o prefixo `api/v1` e a `ValidationPipe` de `src/main.ts`. Banco: PostgreSQL de teste. |
 | Execução e Produção | Eventos `DiagnosticoIniciado`, `ExecucaoIniciada` e `ExecucaoConcluida` entregues ao `ProcessadorMensagensSaga`, com os despachantes de `despachantes-saga.ts` e os handlers reais do módulo. O envelope segue a ADR-0018. |
-| Billing Service | Evento `PagamentoConfirmado` entregue da mesma forma, no tópico `billing.eventos.v1`. O webhook do Mercado Pago não é chamado: a confirmação do pagamento é o evento simulado. |
-| Mercado Pago | Stub (`mercadoPago` em `ambiente-saga.ts`) que devolve o link de checkout e não faz chamada de rede. |
+| Billing Service | Eventos `OrcamentoGerado`, `OrcamentoAprovado` e `PagamentoConfirmado` entregues da mesma forma, no tópico `billing.eventos.v1`. Orçamento, cobrança e webhook do Mercado Pago são do Billing desde a #330: a suíte não chama o Mercado Pago. |
 | Kafka | Não sobe. O publicador do OS é substituído por um que registra os eventos publicados (o real grava só `os.eventos.v1`). |
 | mongo | Não é usado: o OS Service não tem read model no código atual (ADR-0019 ainda não implementada no monólito). |
 
 Se o consumidor simulado mandar uma mensagem para retry ou DLT, a entrega falha com o nome do passo. Sem Kafka real, nada reentregaria a mensagem, e o erro passaria despercebido.
 
-Leituras de estado: o status da OS é lido por HTTP (`GET /api/v1/ordens-servico/{id}/status`). O `Orcamento`, o `pago_em` e o estoque são lidos pelo repositório do módulo e pelo Prisma, porque a ADR-0023 (item 3) ainda não decidiu a rota de leitura desses dados.
+Leituras de estado: o status da OS é lido por HTTP (`GET /api/v1/ordens-servico/{id}/status`). O `pago_em` e o estoque são lidos pelo repositório do módulo e pelo Prisma, porque a ADR-0023 (item 3) ainda não decidiu a rota de leitura desses dados.
 
 Esperas: o consumidor simulado é chamado de forma síncrona, então a suíte não tem espera por evento e não usa `sleep`. A regra de consulta em laço com prazo (ADR-0023, seção 3) volta a valer quando o Kafka real entrar.
 
@@ -56,13 +55,13 @@ O texto de [`saga-flow.md`](../../docs/architecture/saga-flow.md) é o alvo. Ond
 | Passo original | Ajuste | Motivo |
 |---|---|---|
 | "o OS Service, o Billing Service e a Execução e Produção estão no ar" | Só o OS Service sobe; Billing e Execução são simulados | Compose fora do escopo reduzido (03/11). |
-| "o Kafka, o PostgreSQL, o mongo e o stub do Mercado Pago estão disponíveis" | "o PostgreSQL de teste e o stub do Mercado Pago" | Sem broker e sem read model no código atual. |
+| "o Kafka, o PostgreSQL, o mongo e o stub do Mercado Pago estão disponíveis" | "o PostgreSQL de teste" | Sem broker. O Mercado Pago saiu do OS Service na #330. |
 | "a Execucao da OS está em AGUARDANDO_DIAGNOSTICO", "a Execucao está em EM_DIAGNOSTICO", "...EM_REPARO", "...CONCLUIDA", "a Execucao está em AGUARDANDO_REPARO" | Removidos | Estado da Execução, que é simulada. A suíte não observa o que ela guarda. |
 | "o evento DiagnosticoIniciado / ExecucaoIniciada / ExecucaoConcluida é publicado em execucao.eventos.v1" | Removidos; o passo vira "a Execução publica ..." | Ver acima: a publicação é a própria entrega simulada. |
 | "o mecânico inicia o diagnóstico / o reparo / conclui (PATCH /api/v1/execucoes/...)" | "a Execução publica ..." | As rotas `/execucoes` são do serviço de Execução, que não sobe. |
-| "o evento OrcamentoGerado é publicado em billing.eventos.v1" | Removido | Hoje o OS gera o orçamento em processo (`GerarOrcamentoHandler`, transitório até a #330). Não há publicação no broker. |
-| "o cliente aprova o orçamento (PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar)" | `PATCH /api/v1/ordens-servico/{id}/orcamento/aprovar` | Rota real do OS Service. |
-| "o Pagamento está em AGUARDANDO_PAGAMENTO" e "o evento OrcamentoAprovado é publicado em billing.eventos.v1" | Removidos | O `Pagamento` é do Billing (simulado). O OS não publica `OrcamentoAprovado` no broker: o `PonteEventosIntegracaoListener` só leva `OrdemServicoRecebida`, `OrcamentoCalculado` e `EtapaDaSagaFalhou`. |
+| "o evento OrcamentoGerado é publicado em billing.eventos.v1" | "o Billing publica OrcamentoGerado" | O orçamento é do Billing (simulado) desde a #330. O efeito no OS é ir a `AWAITING_APPROVAL`. |
+| "o cliente aprova o orçamento (PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar)" e "a resposta contém linkPagamento" | "o Billing publica OrcamentoAprovado" | A rota e o link de pagamento são do Billing, que não sobe. O efeito no OS é a reserva das peças. |
+| "o Pagamento está em AGUARDANDO_PAGAMENTO" | Removido | O `Pagamento` é do Billing (simulado). |
 | "as peças da OS são reservadas" | Mantido, observado pelo estoque da peça (5 → 4) | Efeito real: a reserva debita o estoque em processo. |
 | "o Mercado Pago notifica o pagamento aprovado (POST /api/v1/webhooks/mercado-pago ...)" | "o Billing publica PagamentoConfirmado" | Webhook e reconsulta são do Billing (simulado). |
 | "o Pagamento está em CONFIRMADO" e "o evento PagamentoConfirmado é publicado..." | Removidos | Estado do Billing. |
@@ -78,8 +77,8 @@ A cobertura (ADR-0014, 80%) mede as linhas, ramos e funções de `src/`, com `te
 
 1. **Compose com Kafka, Billing e Execução reais** (ADR-0023, seção 3 e item 1 de "Em aberto"). Hoje os eventos são simulados. Quando o compose existir, o passo do CI passa a subir a stack.
 2. **Cenário de falha** (`@depende-338`): pulado pela tag até a #338. Quando a #338 entrar, remover a tag e o `pending()` do cenário na mesma PR.
-3. **Rota ou acesso de leitura** para `Orcamento`, `pago_em` e reserva (ADR-0023, item 3).
-4. **Publicação de `OrcamentoAprovado` e `OrcamentoGerado` no broker** (ver tabela de ajustes). Quando a #330 e a #338 entrarem, a suíte deve afirmar a publicação, e não o efeito em processo.
+3. **Rota ou acesso de leitura** para `pago_em` e reserva (ADR-0023, item 3).
+4. **Publicação de `OrcamentoGerado` e `OrcamentoAprovado` pelo Billing real**: hoje a suíte entrega esses eventos simulados. Quando o compose existir (item 1), eles devem vir do Billing.
 5. **Duplicação da composição do consumidor**: `ambiente-saga.ts` monta o `ProcessadorMensagensSaga` com os mesmos despachantes de `ordem-servico.module.ts`. Se a fábrica do módulo mudar, o teste precisa acompanhar.
 6. **Verificação do parse** do `# language: pt` só na versão 4.5.0 do `jest-cucumber` (ADR-0023, seção 1). Trocar a versão exige repetir o parse.
 

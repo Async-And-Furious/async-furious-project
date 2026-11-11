@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { OrdemServicoController } from './presentation/controllers/ordem-servico.controller';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
-import { OrcamentoRepository } from './infrastructure/repositories/orcamento.repository';
 import { OsPecaRepository } from './infrastructure/repositories/os-peca.repository';
 import { OsServicoRepository } from './infrastructure/repositories/os-servico.repository';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
@@ -39,17 +38,11 @@ import { OS_STATUS_TRANSITION_LOGGER } from './application/logging/log-os-status
 import { OsStatusTransitionPinoLogger } from './infrastructure/logging/os-status-transition-pino-logger';
 import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
 import { ServiceOrderStatusWebhookController } from './presentation/controllers/service-order-status-webhook.controller';
-import {
-  AprovarOrcamentoUseCase,
-  RecusarOrcamentoUseCase,
-} from './application/use-cases/orcamento.use-cases';
 import { ConsultarTempoMedioExecucaoUseCase } from './application/use-cases/tempo-medio-execucao.use-case';
 // Event handlers
 import { AtualizarStatusRecebidaHandler } from './application/event-handlers/atualizar-status-recebida.handler';
 import { AtualizarStatusEmDiagnosticoHandler } from './application/event-handlers/atualizar-status-em-diagnostico.handler';
 import { NotificarClienteDiagnosticoHandler } from './application/event-handlers/notificar-cliente-diagnostico.handler';
-import { GerarOrcamentoHandler } from './application/event-handlers/gerar-orcamento.handler';
-import { EnviarOrcamentoHandler } from './application/event-handlers/enviar-orcamento.handler';
 import { AtualizarStatusAguardandoAprovacaoHandler } from './application/event-handlers/atualizar-status-aguardando-aprovacao.handler';
 import { VerificarNecessidadePecasHandler } from './application/event-handlers/verificar-necessidade-pecas.handler';
 import { AtualizarStatusExecucaoIniciadaHandler } from './application/event-handlers/atualizar-status-execucao-iniciada.handler';
@@ -74,15 +67,10 @@ import {
 import { NotificacaoClienteStub } from './infrastructure/gateways/notificacao-cliente.stub';
 import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cliente.gateway';
 import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
-import { FinanceiroModule } from '../financeiro/financeiro.module';
 import { CadastroModule } from '../cadastro/cadastro.module';
-import {
-  COBRANCA_PAGAMENTO_PORT,
-  ICobrancaPagamentoPort,
-} from '../../shared/domain/interfaces/cobranca-pagamento.port';
 
 @Module({
-  imports: [FinanceiroModule, CadastroModule],
+  imports: [CadastroModule],
   controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
   providers: [
     // Read model (ADR-0019): write-through pelos repositories, leituras pela query
@@ -93,7 +81,6 @@ import {
       useFactory: () => new OsStatusTransitionPinoLogger(),
     },
     OrdemServicoRepository,
-    OrcamentoRepository,
     OsPecaRepository,
     StatusTransitionService,
     OsServicoRepository,
@@ -164,20 +151,6 @@ import {
       useFactory: (gateway: INotificacaoClienteGateway) =>
         new NotificarClienteDiagnosticoHandler(gateway),
       inject: [NOTIFICACAO_CLIENTE_GATEWAY],
-    },
-    {
-      provide: GerarOrcamentoHandler,
-      useFactory: (
-        osRepo: OrdemServicoRepository,
-        orcRepo: OrcamentoRepository,
-        barramento: IEmissorEventos
-      ) => new GerarOrcamentoHandler(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
-    },
-    {
-      provide: EnviarOrcamentoHandler,
-      useFactory: (barramento: IEmissorEventos) => new EnviarOrcamentoHandler(barramento),
-      inject: [EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusAguardandoAprovacaoHandler,
@@ -305,7 +278,6 @@ import {
           PecaInsumoRepository,
           OsServicoRepository,
           OsPecaRepository,
-          OrcamentoRepository,
           EmissorEventos,
         ]
       ) => new CriarOrdemServicoUseCase(...deps),
@@ -317,7 +289,6 @@ import {
         PecaInsumoRepository,
         OsServicoRepository,
         OsPecaRepository,
-        OrcamentoRepository,
         EmissorEventos,
       ],
     },
@@ -334,30 +305,6 @@ import {
       provide: AtualizarOrdemServicoUseCase,
       useFactory: (osRepo: OrdemServicoRepository) => new AtualizarOrdemServicoUseCase(osRepo),
       inject: [OrdemServicoRepository],
-    },
-    {
-      provide: AprovarOrcamentoUseCase,
-      useFactory: (
-        osRepo: OrdemServicoRepository,
-        orcRepo: OrcamentoRepository,
-        barramento: IEmissorEventos,
-        cobranca: ICobrancaPagamentoPort
-      ) => new AprovarOrcamentoUseCase(osRepo, orcRepo, barramento, cobranca),
-      inject: [
-        OrdemServicoRepository,
-        OrcamentoRepository,
-        EMISSOR_EVENTOS,
-        COBRANCA_PAGAMENTO_PORT,
-      ],
-    },
-    {
-      provide: RecusarOrcamentoUseCase,
-      useFactory: (
-        osRepo: OrdemServicoRepository,
-        orcRepo: OrcamentoRepository,
-        barramento: IEmissorEventos
-      ) => new RecusarOrcamentoUseCase(osRepo, orcRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AprovarServicoPrestadoUseCase,
@@ -422,11 +369,6 @@ import {
       useClass: OrdemServicoBacklogAdapter,
     },
   ],
-  exports: [
-    OrdemServicoRepository,
-    OrcamentoRepository,
-    ORDEM_SERVICO_BACKLOG_PORT,
-    OsServicoRepository,
-  ],
+  exports: [OrdemServicoRepository, ORDEM_SERVICO_BACKLOG_PORT, OsServicoRepository],
 })
 export class OrdemServicoModule {}

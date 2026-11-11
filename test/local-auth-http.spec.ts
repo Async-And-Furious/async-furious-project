@@ -22,10 +22,6 @@ import {
   ListarServicosInsumosNaOsUseCase,
   RegistrarEntregaVeiculoUseCase,
 } from '../src/modules/ordem-servico/application/use-cases/ordem-servico.use-cases';
-import {
-  AprovarOrcamentoUseCase,
-  RecusarOrcamentoUseCase,
-} from '../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
 import { ConsultarTempoMedioExecucaoUseCase } from '../src/modules/ordem-servico/application/use-cases/tempo-medio-execucao.use-case';
 
 describe('Local JWT identity and authorization over HTTP', () => {
@@ -60,8 +56,6 @@ describe('Local JWT identity and authorization over HTTP', () => {
     CriarOrdemServicoUseCase,
     ListarServicosInsumosNaOsUseCase,
     AtualizarOrdemServicoUseCase,
-    AprovarOrcamentoUseCase,
-    RecusarOrcamentoUseCase,
     AprovarServicoPrestadoUseCase,
     RegistrarEntregaVeiculoUseCase,
     ConsultarStatusOrdemServicoUseCase,

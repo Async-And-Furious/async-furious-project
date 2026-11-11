@@ -449,32 +449,6 @@
   mock_body:
     valor_total_servicos: 1
     valor_total_pecas: 1
-- id: route-042
-  method: PATCH
-  path: /api/v1/ordens-servico/{{ordem_id}}/orcamento/aprovar
-  auth: customer
-  role: null
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body: {}
-- id: route-043
-  method: PATCH
-  path: /api/v1/ordens-servico/{{ordem_id}}/orcamento/recusar
-  auth: customer
-  role: null
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body: {}
 - id: route-045
   method: PATCH
   path: /api/v1/ordens-servico/{{ordem_id}}/aprovar-servico
