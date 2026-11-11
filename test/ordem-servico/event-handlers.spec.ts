@@ -113,18 +113,48 @@ describe('OS Event handlers', () => {
   // ─── P-01 ────────────────────────────────────────────────────────────────
 
   describe('P-01 AtualizarStatusRecebidaHandler', () => {
+    afterEach(() => jest.restoreAllMocks());
+
     it('não deve atualizar quando OS já está RECEIVED', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const handler = new AtualizarStatusRecebidaHandler(osRepo);
+      const handler = new AtualizarStatusRecebidaHandler(osRepo, transicao);
 
       await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
       expect(osRepo.update).not.toHaveBeenCalled();
     });
 
-    it('deve forçar status RECEIVED quando OS foi criada em status incorreto', async () => {
+    it.each<OSStatus>(['UNDER_DIAGNOSIS', 'IN_PROGRESS', 'CLOSED_WITHOUT_EXECUTION'])(
+      'com a OS em %s não regride a RECEIVED: a máquina de estados recusa (#332)',
+      async (status) => {
+        jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+        osRepo.findOne.mockResolvedValue(mockOs({ status }));
+        const validar = jest.spyOn(transicao, 'validarTransicao');
+        const handler = new AtualizarStatusRecebidaHandler(osRepo, transicao);
+
+        await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
+
+        expect(validar).toHaveBeenCalledWith(status, 'RECEIVED');
+        expect(osRepo.update).not.toHaveBeenCalled();
+      }
+    );
+
+    it('propaga erro que não é de transição', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
-      const handler = new AtualizarStatusRecebidaHandler(osRepo);
+      jest.spyOn(transicao, 'validarTransicao').mockImplementation(() => {
+        throw new Error('falha inesperada');
+      });
+      const handler = new AtualizarStatusRecebidaHandler(osRepo, transicao);
+
+      await expect(
+        handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'))
+      ).rejects.toThrow('falha inesperada');
+    });
+
+    it('grava RECEIVED se a máquina de estados aceitar a transição', async () => {
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
+      jest.spyOn(transicao, 'validarTransicao').mockImplementation(() => undefined);
+      const handler = new AtualizarStatusRecebidaHandler(osRepo, transicao);
 
       await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
@@ -194,7 +224,8 @@ describe('OS Event handlers', () => {
     it('OrcamentoGerado (Billing) leva UNDER_DIAGNOSIS a AWAITING_APPROVAL, condicionado ao status', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'UNDER_DIAGNOSIS' }));
       osRepo.atualizarSeCondicao.mockResolvedValue(true);
-      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
+      const validar = jest.spyOn(transicao, 'validarTransicao');
+      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo, transicao);
 
       await handler.handleOrcamentoGerado(new OrcamentoGerado('os-1', 'orc-1'));
 
@@ -204,11 +235,12 @@ describe('OS Event handlers', () => {
         { status: 'AWAITING_APPROVAL' }
       );
       expect(osRepo.update).not.toHaveBeenCalled();
+      expect(validar).toHaveBeenCalledWith('UNDER_DIAGNOSIS', 'AWAITING_APPROVAL');
     });
 
     it('OrcamentoGerado com a OS em RECEIVED lança FalhaRetentavelException sem gravar', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'RECEIVED' }));
-      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
+      const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo, transicao);
 
       await expect(
         handler.handleOrcamentoGerado(new OrcamentoGerado('os-1', 'orc-1'))
@@ -220,7 +252,7 @@ describe('OS Event handlers', () => {
       'com a OS já em %s é ack, sem gravar',
       async (status) => {
         osRepo.findOne.mockResolvedValue(mockOs({ status }));
-        const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo);
+        const handler = new AtualizarStatusAguardandoAprovacaoHandler(osRepo, transicao);
 
         await handler.handleOrcamentoGerado(new OrcamentoGerado('os-1', 'orc-1'));
 
