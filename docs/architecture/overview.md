@@ -75,7 +75,7 @@ flowchart TB
     os -->|"Prisma, TLS"| dbOs
     bill -->|"Prisma, TLS"| dbBill
     exec -->|"Prisma, TLS"| dbExec
-    dbOs ==>|"write-through síncrono"| DDB
+    os ==>|"write-through síncrono<br/>(logo após o commit)"| DDB
     os -->|"leituras"| DDB
     bill -->|"cria preference e reconsulta"| mp
 
@@ -104,9 +104,11 @@ flowchart TB
 **Legenda.** Seta contínua é **chamada síncrona** (HTTP, SQL, driver); seta
 tracejada laranja de duas pontas é o **evento assíncrono** no Kafka: o serviço
 publica no seu tópico e consome os tópicos citados no rótulo da seta; a seta
-grossa `os_service → DocumentDB` é o *write-through síncrono* do OS Service
-(grava no PostgreSQL e, logo após o commit, atualiza o documento no DocumentDB
-dentro do mesmo request).
+grossa OS Service → DocumentDB é o *write-through síncrono*. O próprio OS Service
+grava no PostgreSQL e, logo após o commit, atualiza o documento no DocumentDB, dentro
+do mesmo request. Não há replicação de banco para banco. Detalhe do caminho de escrita
+e do que acontece quando o DocumentDB falha em
+[`persistence-model.md`](./persistence-model.md) §5.1.
 
 **Observabilidade (fora do desenho).** APM, logs, métricas do cluster, traces e
 alertas dos três serviços vão para a New Relic, e Lambdas e RDS ficam no
