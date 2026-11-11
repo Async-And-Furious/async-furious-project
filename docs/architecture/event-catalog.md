@@ -108,8 +108,9 @@ ocorre após o commit, sem outbox; webhook redelivered após o commit do
 processamento é considerado já processado e não república o evento. A única
 recuperação por detector é no OS Service para `AWAITING_APPROVAL` com
 `pago_em` nulo. O Billing não altera status da OS. Na compensação,
-`EtapaDaSagaFalhou` só é tratado em `aprovacao-pagamento` e
-`inicio-execucao`: ausência de pagamento e outras etapas são ignoradas;
+`EtapaDaSagaFalhou` é tratado em `aprovacao-pagamento` e
+`inicio-execucao`, e em `orcamento` só encerra o orçamento `PENDING`, sem
+Mercado Pago (repo-billing#9); ausência de pagamento e outras etapas são ignoradas;
 pagamento pendente fica `CANCELADO` sem Mercado Pago, e pagamento confirmado
 é estornado idempotentemente e fica `ESTORNADO`, sem evento de estorno.
 

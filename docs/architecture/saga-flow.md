@@ -303,7 +303,7 @@ Dois tipos de falha:
 | Etapa | Falha | Evento | Compensação | Estorno MP? |
 |---|---|---|---|---|
 | Diagnóstico | Falha técnica ao processar `OrdemServicoRecebida` (Execução) ou `DiagnosticoIniciado` (OS) | `EtapaDaSagaFalhou` (`etapa=diagnostico`) | OS fecha a OS (`CLOSED_WITHOUT_EXECUTION`) se estiver em `RECEIVED`/`UNDER_DIAGNOSIS`; Execução cancela a `Execucao` | Não |
-| Cálculo/geração do orçamento | Falha técnica ao processar `OrcamentoCalculado` (Billing) ou `OrcamentoGerado` (OS) | `EtapaDaSagaFalhou` (`etapa=orcamento`) | OS fecha a OS (`CLOSED_WITHOUT_EXECUTION`); Execução cancela a `Execucao` | Não |
+| Cálculo/geração do orçamento | Falha técnica ao processar `OrcamentoCalculado` (Billing) ou `OrcamentoGerado` (OS) | `EtapaDaSagaFalhou` (`etapa=orcamento`) | OS fecha a OS (`CLOSED_WITHOUT_EXECUTION`); Billing encerra o orçamento `PENDING` (ainda não há pagamento); Execução cancela a `Execucao` | Não |
 | Aprovação | Cliente recusa | `OrcamentoRecusado` | OS fecha a OS; Execução cancela a `Execucao` | Não |
 | Aprovação | Cliente não responde no prazo | `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`), pelo detector | OS fecha a OS; Execução cancela a `Execucao` | Não |
 | Pagamento | Mercado Pago rejeita (terminal) | `PagamentoRecusado` | OS **libera a reserva de peças** e fecha a OS; Execução cancela a `Execucao` | Não — nada foi capturado |
@@ -322,7 +322,8 @@ localmente no mesmo ato. O Execução e Produção ainda não publica
 
 | Linha da matriz | OS Service | Billing | Execução e Produção |
 |---|---|---|---|
-| Diagnóstico / Orçamento (`EtapaDaSagaFalhou`) | `handleEtapaDaSagaFalhou`: fecha a OS a partir de `RECEIVED`/`UNDER_DIAGNOSIS`/`AWAITING_APPROVAL`, com o motivo no histórico | ignora (etapa sem pagamento) | cancela a `Execucao` (repo-execucao-service#4) |
+| Diagnóstico (`EtapaDaSagaFalhou`) | `handleEtapaDaSagaFalhou`: fecha a OS a partir de `RECEIVED`/`UNDER_DIAGNOSIS`/`AWAITING_APPROVAL`, com o motivo no histórico | ignora | cancela a `Execucao` (repo-execucao-service#4) |
+| Orçamento (`EtapaDaSagaFalhou`) | idem | `CompensarFalhaSagaHandler`: encerra o orçamento `PENDING`, sem Mercado Pago (repo-billing#9) | cancela a `Execucao` |
 | Aprovação: `OrcamentoRecusado` | `handle`: fecha a OS | não consome | cancela a `Execucao` |
 | Aprovação/Pagamento: detector | `DetectarOsParadaUseCase`: publica, fecha a OS e **devolve as peças** | `CompensarFalhaSagaHandler`: cancela ou estorna (repo-billing#3) | cancela a `Execucao` |
 | Pagamento: `PagamentoRecusado` | `handlePagamentoRecusado`: fecha a OS e **devolve as peças** | não consome (nada capturado) | cancela a `Execucao` |
