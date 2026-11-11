@@ -1,8 +1,10 @@
 # Infraestrutura AWS
 
-> **[ATUAL]** Este documento descreve a infraestrutura de nuvem efetivamente
-> provisionada por Terraform, não uma proposta. As evidências citadas apontam
-> para arquivos reais nos quatro repositórios do projeto.
+> **[ATUAL — Fase 4/HML e Fase 3/PROD]** Este documento descreve recursos de
+> nuvem provisionados por Terraform: HML é o ambiente-alvo dos três serviços da
+> Fase 4; PROD permanece no monólito da Fase 3. Provisionamento de infraestrutura
+> não constitui evidência de aceite ponta a ponta em HML. As evidências apontam
+> para arquivos reais nos repositórios responsáveis por cada recurso.
 >
 > Fontes: branch `main` de `repo-k8s-infra`, `repo-db-infra` e
 > `repo-auth-serverless`, e este repositório em `develop`.

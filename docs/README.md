@@ -1,6 +1,11 @@
-# Documentação — Async & Furious
+# Documentação: Async & Furious
 
 Índice central da documentação técnica e arquitetural do projeto.
+
+As marcas **[ATUAL]** e **[PENDENTE]** se referem à fase e ao ambiente
+descritos em cada documento. Uma implementação atual da Fase 3 (inclusive
+monólito em PROD) não significa que o alvo da Fase 4 esteja implantado; o
+estado deve ser lido no contexto de fase/ambiente explicitado no documento.
 
 Use o [índice por fase](./phases/README.md) para distinguir requisitos,
 decisões, desenhos, evidências de implementação/live e referências históricas.
@@ -8,7 +13,7 @@ O material da Fase 3 e das fases anteriores permanece disponível abaixo, mas
 não é fonte de requisitos da Fase 4. Rótulos como **[ATUAL]** e **[PENDENTE]**
 são locais aos documentos e não substituem a verificação do estado real.
 
-## Fase 4 — documentação atual
+## Fase 4: documentação atual
 
 | Documento | Conteúdo |
 |---|---|
@@ -47,6 +52,20 @@ requisito da Fase 4.
 | [architecture/service-order-flow.md](./architecture/service-order-flow.md) | Fluxo síncrono atual/legado; não confundir com `saga-flow.md` da Fase 4 |
 | [architecture/os-service-integracao-execucao.md](./architecture/os-service-integracao-execucao.md) | Integração do OS Service com o Execução e Produção: rotas removidas, eventos consumidos e publicados, reserva de peças pendente, janela de corte |
 
+## Fase 4: serviços
+
+| Serviço | Arquitetura |
+|---|---|
+| OS Service | [architecture.md](./architecture.md) |
+| Billing Service | [repo-billing/docs/architecture.md](https://github.com/Async-And-Furious/repo-billing/blob/main/docs/architecture.md) |
+| Execução e Produção | [repo-execucao-service/docs/architecture.md](https://github.com/Async-And-Furious/repo-execucao-service/blob/develop/docs/architecture.md) |
+
+ADRs transversais aos serviços permanecem centralizadas neste repositório;
+ADRs locais pertencem aos repositórios de cada serviço. Este repositório OS
+continua sendo a casa da documentação central e é dono da suíte BDD da Saga e
+do read model DocumentDB. Essa assimetria é deliberada e pode ser citada no
+PDF de submissão.
+
 ## Infraestrutura
 
 | Documento | Conteúdo |
@@ -70,9 +89,9 @@ requisito da Fase 4.
 
 ## Decisões
 
-- **ADRs**: ver [adr/README.md](./adr/README.md) para fase e status de cada
-  decisão; ADRs 0016–0021 estão aceitas na Fase 4 e 0022–0023 são propostas.
-  ADRs antigas e [notas das fases anteriores](./adr/notas-fases-anteriores.md)
+- **ADRs**: ver [adr/README.md](./adr/README.md), que lista 23 decisões e
+  indica fase e status; ADRs 0016–0021 estão aceitas na Fase 4 e 0022–0023 são
+  propostas. ADRs antigas e [notas das fases anteriores](./adr/notas-fases-anteriores.md)
   são contexto, não autoridade da Fase 4.
 - **RFCs**: ver [rfcs/README.md](./rfcs/README.md). RFC-003 (integração API
   Gateway e EKS), RFC-004 (ownership de VPC), RFC-006 (segredos e assinatura

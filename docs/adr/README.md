@@ -18,10 +18,10 @@ seguido pelas próximas ADRs.
 
 | ADR | Título | Status |
 |---|---|---|
-| [ADR-0001](./0001-separacao-quatro-repositorios.md) | Separação da solução em quatro repositórios | Aceita |
+| [ADR-0001](./0001-separacao-quatro-repositorios.md) | Separação da solução em quatro repositórios | Parcialmente substituída pela ADR-0017 para a topologia dos serviços de negócio; divisão de repositórios de infraestrutura/autenticação permanece |
 | [ADR-0002](./0002-autenticacao-centralizada-api-gateway-serverless.md) | Autenticação centralizada via API Gateway + Function Serverless | Aceita e parcialmente implementada (fluxo de cliente/CPF) |
 | [ADR-0003](./0003-kubernetes-eks-orquestracao.md) | Kubernetes/EKS como plataforma de orquestração | Aceita |
-| [ADR-0004](./0004-banco-dados-gerenciado.md) | Banco de dados gerenciado (RDS PostgreSQL) | Proposta (RFC do trigo em PR aberto) |
+| [ADR-0004](./0004-banco-dados-gerenciado.md) | Banco de dados gerenciado (RDS PostgreSQL) | Aceita (decisão; aplicação em infraestrutura não concluída) |
 | [ADR-0005](./0005-observabilidade.md) | Estratégia de observabilidade | Aceita (implementação em código, pendente validação — issue #163) |
 | [ADR-0006](./0006-clean-architecture-ddd.md) | Clean Architecture + DDD como estilo arquitetural | Aceita |
 | [ADR-0007](./0007-stack-tecnologica-aplicacao.md) | Stack tecnológica da aplicação: NestJS + PostgreSQL + Prisma | Aceita |
@@ -45,7 +45,8 @@ seguido pelas próximas ADRs.
 ADRs 0006-0015 registram decisões das Fases 1 e 2 (retroativas — a solução
 já estava construída), a partir do rascunho de descoberta em
 [`notas-fases-anteriores.md`](./notas-fases-anteriores.md). ADRs a partir da
-0016 registram decisões da Fase 4.
+0016 registram decisões da Fase 4. O índice contém 23 ADRs; ADR-0022 e
+ADR-0023 permanecem propostas.
 
 ## Template
 

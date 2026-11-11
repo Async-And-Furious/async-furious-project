@@ -330,7 +330,7 @@ Detalhes em [`docs/architecture/os-service-integracao-execucao.md`](docs/archite
 
 ---
 
-## Fase 4 — Transação Distribuída (Saga)
+## Estratégia de Saga
 
 A partir da Fase 4, este monólito é refatorado em três microsserviços
 independentes — **OS Service** (este repositório), **Billing Service** e
