@@ -1,16 +1,24 @@
 import 'newrelic';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { SwaggerModule } from '@nestjs/swagger';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import type { Request, Response, NextFunction } from 'express';
 import { AppModule } from './app.module';
+import {
+  API_PREFIX,
+  buildSwaggerDocument,
+  SWAGGER_PATH,
+} from './shared/infrastructure/swagger/swagger.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  // SIGTERM do Kubernetes chama os onModuleDestroy: o consumer da saga sai do grupo e o
+  // publicador desconecta, em vez de deixar as partições paradas até o sessionTimeout.
+  app.enableShutdownHooks();
 
   app.use(cookieParser());
 
@@ -47,7 +55,7 @@ async function bootstrap() {
   // Redirect root to API entry point (fixes ZAP spider on /)
   app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path === '/' && req.method === 'GET') {
-      res.redirect(302, '/api/v1');
+      res.redirect(302, `/${API_PREFIX}`);
       return;
     }
     next();
@@ -63,17 +71,10 @@ async function bootstrap() {
     credentials: true,
   });
 
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix(API_PREFIX);
 
   // Swagger Documentation
-  const config = new DocumentBuilder()
-    .setTitle('Async Furious API')
-    .setDescription('RESTful API for managing service orders, customers, vehicles, and parts')
-    .setVersion('1.0.0')
-    .addBearerAuth()
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+  SwaggerModule.setup(SWAGGER_PATH, app, buildSwaggerDocument(app));
 
   app.useGlobalPipes(
     new ValidationPipe({

@@ -1,5 +1,10 @@
 import { Cliente } from '../../domain/entities/cliente.entity';
+import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
 import type { IClienteRepository } from '../../domain/interfaces/cliente.interface';
+import type {
+  ClienteLeitura,
+  IClienteReadModelQuery,
+} from '../../domain/interfaces/cliente-read-model.interface';
 import type {
   CreateClienteInput,
   UpdateClienteInput,
@@ -28,11 +33,14 @@ export class ListClientesUseCase {
   }
 }
 
+// GET /clientes/:id é servido pelo read model (DocumentDB).
 export class GetClienteUseCase {
-  constructor(private readonly repository: IClienteRepository) {}
+  constructor(private readonly readModel: IClienteReadModelQuery) {}
 
-  async execute(id: string): Promise<Cliente> {
-    return this.repository.findById(id);
+  async execute(id: string): Promise<ClienteLeitura> {
+    const cliente = await this.readModel.findById(id);
+    if (!cliente) throw new EntityNotFoundException('Cliente', id);
+    return cliente;
   }
 }
 

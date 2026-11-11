@@ -24,7 +24,6 @@ Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech 
 | **Veículos** | CRUD com validação de placa brasileira. |
 | **Serviços** | Catálogo de serviços oferecidos pela oficina. |
 | **Peças e Insumos** | CRUD com controle de estoque e pedidos a fornecedores. |
-| **Pagamentos** | Registro de pagamentos com disparo automático da entrega. |
 | **Autenticação** | JWT com papéis `ADMIN`, `RECEPCIONISTA` e `MECANICO`. |
 
 ---
@@ -132,7 +131,7 @@ Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na se
 
 - Python 3 (para o orquestrador de stack)
 - GitHub CLI (`gh`), autenticado com `gh auth login` (para o orquestrador de stack)
-- Node.js 20+
+- Node.js 22
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
 - Terraform 1.6+
@@ -167,6 +166,12 @@ SEED_ADMIN_EMAIL="admin@oficina.com"
 SEED_ADMIN_PASSWORD="changeme123"
 ```
 
+Orçamento, aprovação e cobrança (Mercado Pago) são do Billing Service; as credenciais do Mercado Pago ficam lá.
+
+Sem `KAFKA_BROKERS`, o OS Service sobe sem publicar os eventos de integração (`OrdemServicoRecebida`, `OrcamentoCalculado` e `EtapaDaSagaFalhou` em `os.eventos.v1`) e só registra um aviso no log. Em HML, o `deploy-eks.yml` preenche o broker e as credenciais SASL.
+
+O detector de OS parada roda como CronJob (`k8s/app/detector-os-parada-cronjob.yaml`, a cada 5 minutos) com a mesma imagem da API: `node dist/detector-os-parada.js`. Ele fecha as OS em `AWAITING_APPROVAL` sem pagamento além de `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (padrão 2880, ou seja, 48 h) e publica `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`). Para a demonstração, baixe o prazo no ConfigMap para alguns minutos.
+
 ### 3. Iniciar com Docker para desenvolvimento
 
 ```bash
@@ -198,6 +203,19 @@ Depois de iniciar o projeto, acesse o Swagger em:
 http://localhost:3000/api/docs
 ```
 
+O Swagger descreve só o OS Service (título `Async Furious - OS Service`). O esquema `bearer` (JWT) vale para todas as rotas, exceto as públicas (`/status`, `auth/login`, `health`, o webhook do Mercado Pago e, até a #330, `PATCH /ordens-servico/:id/orcamento/aprovar|recusar`), que saem com `security: []`. O webhook de status exige `bearer` e `webhook-secret` (header `x-webhook-secret`) juntos, em um único requisito. Evidência: o export do OpenAPI fica versionado em [`docs/http/openapi/os-service.openapi.json`](docs/http/openapi/os-service.openapi.json) e é regenerado com `pnpm docs:openapi` (não sobe o servidor nem conecta no banco). O CI (`tests.yml`) regenera o arquivo e falha se ele divergir do código.
+
+### Superfície HTTP do OS Service (#332)
+
+- **Sem REST entre serviços.** Nenhuma rota deste serviço é consumida por Billing ou Execução; tudo o que eles precisam chega por evento ([`saga-flow.md`](docs/architecture/saga-flow.md)).
+- **Rota pública de consulta:** `GET /api/v1/ordens-servico/{id}/status`, sem Bearer, com resposta mínima (`ordemServicoId`, `status` e `marcos` de tempo, sem dados do cliente). Na borda é a única rota pública do OS Service: `ordens-servico/*` passa pelo Lambda Authorizer. **No serviço, `PATCH /ordens-servico/:id/orcamento/aprovar` e `/recusar` ainda são `@Public()` até a extração do financeiro (#330)**, além de `auth/login`, `health` e o webhook do Mercado Pago; as demais rotas sem token respondem `401`.
+- **Removidas, sem proxy:** `GET /ordens-servico/:id/rastreamento` (alias de `/status`) e `POST /ordens-servico/:id/aprovar-servico` (aprovação pública duplicada do orçamento) respondem `404`. `PATCH /ordens-servico/:id/aprovar-servico` continua, autenticada.
+- **RBAC inalterado:** `JwtAuthGuard` e `RolesGuard` seguem validando o token localmente, como segunda camada depois do Lambda Authorizer da borda (ADR-0021).
+- **Webhook de status como exceção:** `POST /webhooks/service-orders/status` é um canal de reprocesso manual (JWT + `x-webhook-secret`). A transição é validada pelo `StatusTransitionService`, e `DELIVERED` é rejeitado com `400` (fora do enum do DTO): a entrega só acontece por `registrar-entrega`.
+- **Versionamento:** o prefixo continua `api/v1`. Durante a Fase 4 quebras de contrato são aceitas dentro de `v1`, sem `v2` em paralelo: todos os consumidores nascem nesta fase e não há cliente externo a preservar. Cada quebra é registrada nesta seção e na ADR correspondente.
+- **Read model (#335, ADR-0019):** `GET /ordens-servico` (fila), `GET /ordens-servico/:id`, `/status` e `GET /clientes/:id` leem do DocumentDB (MongoDB local e no CI), alimentado por write-through síncrono nos repositories; `tempo-medio`, `GET /clientes` e `GET /veiculos/:id` seguem no Postgres. A fila pagina por cursor (`?limit=&cursor=`, resposta `{ data, pagination: { limit, nextCursor } }`) e não inclui `CLOSED_WITHOUT_EXECUTION`; a OS lida do read model não traz `orcamento`. Rebuild: `pnpm read-model:rebuild` (no deploy, um Job depois da migration). Modelo em [`persistence-model.md`](docs/architecture/persistence-model.md).
+- **Pendências de outras features:** `pagamentos` e as rotas de aprovação/recusa de orçamento (ainda públicas no serviço) saem do serviço na extração do financeiro (#330); os consumidores de evento (`atualizar-status-*.handler.ts`) ainda checam o status atual sem `StatusTransitionService` (o histórico é gravado pelo repository), então webhook e consumidores ainda não compartilham a mesma máquina de estados.
+
 A coleção completa das APIs (formato Insomnia v5) fica versionada no repositório e pode ser importada diretamente pelo link:
 
 [docs/http/insomnia.yaml](https://github.com/Async-And-Furious/async-furious-project/blob/develop/docs/http/insomnia.yaml)
@@ -219,7 +237,7 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | ------ | -------- | ------ | --------- |
 | POST | `/clientes` | RECEPCIONISTA | Criar cliente. |
 | GET | `/clientes` | Autenticado | Listar clientes. |
-| GET | `/clientes/:id` | Autenticado | Detalhar cliente. |
+| GET | `/clientes/:id` | Autenticado | Detalhar cliente (read model). |
 | PATCH | `/clientes/:id` | RECEPCIONISTA | Atualizar cliente. |
 | DELETE | `/clientes/:id` | ADMIN | Deletar cliente. |
 
@@ -248,19 +266,14 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
 | POST | `/ordens-servico` | RECEPCIONISTA | Criar OS. |
-| GET | `/ordens-servico` | Autenticado | Listar OSs. |
-| GET | `/ordens-servico/:id` | Autenticado | Detalhar OS. |
-| GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
+| GET | `/ordens-servico` | Autenticado | Fila de OS ativas por prioridade (read model, cursor). |
+| GET | `/ordens-servico/:id` | Autenticado | Detalhar OS (read model, sem orçamento). |
+| GET | `/ordens-servico/:id/status` | Público | Consultar status da OS (resposta mínima, sem dados do cliente). |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. |
-| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orçamento. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento. |
-| PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. |
-| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
+| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Lançar serviços e insumos (OS em `UNDER_DIAGNOSIS`): responde `200` com os totais calculados e publica `OrcamentoCalculado`. O início do diagnóstico e a conclusão da execução agora são do serviço de Execução (`PATCH /execucoes/:id/iniciar-diagnostico` e `/concluir`) e chegam aqui por evento. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Autenticado | Aprovar o serviço prestado (OS segue Finalizada). |
+| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega (OS `FINISHED` → `DELIVERED`). Único caminho para `DELIVERED`: o webhook de status rejeita esse valor. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
 #### Peças e Insumos (`/api/v1/pecas`)
@@ -276,11 +289,13 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar peças a fornecedor. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de peças. |
 
-#### Pagamentos (`/api/v1/pagamentos`)
+Aprovar ou recusar o orçamento e o webhook do Mercado Pago ficam no Billing Service (`/api/v1/orcamentos/*` e `/api/v1/webhooks/mercado-pago`).
+
+#### Webhook de status da OS (`/api/v1/webhooks/service-orders`)
 
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/pagamentos/registrar` | Autenticado | Registrar pagamento e disparar entrega da OS. |
+| POST | `/webhooks/service-orders/status` | Autenticado + `x-webhook-secret` | Reprocesso manual do status da OS pela máquina de estados. `DELIVERED` é rejeitado (`400`). |
 
 ---
 
@@ -288,15 +303,68 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 
 ```text
 RECEIVED
-  -> UNDER_DIAGNOSIS
+  -> UNDER_DIAGNOSIS  (evento DiagnosticoIniciado, do servico de Execucao)
       -> AWAITING_APPROVAL
           -> CLOSED_WITHOUT_EXECUTION  (orcamento recusado)
-          -> IN_PROGRESS
-              -> AWAITING_PARTS  (pecas indisponiveis)
+          -> IN_PROGRESS  (evento ExecucaoIniciada, do servico de Execucao)
+              -> AWAITING_PARTS  (reserva de pecas pendente, logo apos IN_PROGRESS)
                   -> IN_PROGRESS  (pecas reservadas)
-              -> FINISHED
+              -> FINISHED  (evento ExecucaoConcluida, do servico de Execucao)
                   -> DELIVERED
 ```
+
+As acoes do mecanico (`assumir`/`analisar` e `finalizar-execucao`) deixaram de ser
+rotas deste servico: viram rotas do servico de Execucao e chegam aqui por evento.
+Detalhes em [`docs/architecture/os-service-integracao-execucao.md`](docs/architecture/os-service-integracao-execucao.md).
+
+---
+
+## Estratégia de Saga
+
+A partir da Fase 4, este monólito é refatorado em três microsserviços
+independentes — **OS Service** (este repositório), **Billing Service** e
+**Execução e Produção** — e o fluxo acima passa a atravessar fronteiras de
+serviço via eventos assíncronos (Kafka).
+
+**Estratégia escolhida: Saga coreografada.** Não existe orquestrador
+central nem um serviço/repositório coordenador — cada serviço publica os
+eventos de sua própria fronteira e reage aos eventos dos outros dois,
+executando a própria compensação quando algo falha. Consideramos e
+recusamos um orquestrador central com repositório próprio (custo de
+infraestrutura e de ponto único de falha não compensado pelo requisito, que
+trata orquestração e coreografia como opções equivalentes) e um
+orquestrador embutido no OS Service sem repositório separado (acoplaria os
+outros dois serviços a decisões tomadas por este).
+
+O fluxo coberto pela saga é `Abrir OS → orçamento → aprovação → pagamento →
+execução iniciada` — o pagamento acontece logo após a aprovação do
+orçamento e **antes** do início da execução, como etapa obrigatória para
+que o Billing Service participe da transação distribuída. A entrega fica
+fora do escopo da saga por ser um ato presencial, sem contrapartida
+assíncrona a coordenar; `registrar-entrega` não checa pagamento, porque
+`FINISHED` só é alcançável depois de `PagamentoConfirmado`
+([`saga-flow.md` §4](./docs/architecture/saga-flow.md)). O OS Service só grava
+o marcador `pago_em` ao receber `PagamentoConfirmado`, sem mudar status. Compensação é lógica por padrão (reverter status
+da OS, encerrar orçamento sem execução); o estorno real no Mercado Pago só
+é acionado se o pagamento já tiver sido capturado antes da falha.
+
+Sem orquestrador, não há um "estado único da saga" — a rastreabilidade do
+fluxo distribuído combina trace no New Relic, o `correlationId` propagado
+no envelope de evento e o `HistoricoStatusOS.motivo` já existente no banco.
+
+Detalhamento completo (diagrama de sequência, mapa de responsabilidade por
+etapa e matriz `etapa → falha → compensação`):
+[ADR-0016](./docs/adr/0016-saga-coreografada.md) e
+[`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md).
+
+### Observabilidade do OS Service
+
+- **APM:** agente `newrelic` carregado na primeira linha do `src/main.ts`, configurado só por ambiente. Em HML o app se chama `async-furious-project-hml`, a mesma entidade da Fase 3 (histórico preservado). Os outros serviços aparecem como `af-billing-hml` e `af-execucao-hml`. O CronJob `detector-os-parada` roda com `NEW_RELIC_ENABLED=false`: não abre transação e sairia antes do envio dos dados.
+- **Variáveis:** `NEW_RELIC_APP_NAME` e `NEW_RELIC_NO_CONFIG_FILE` (aplicadas pelo `deploy-eks.yml`), `NEW_RELIC_LICENSE_KEY` (secret do repositório) e, no `k8s/config/configmap.yaml`, as de log. A feature flag `kafkajs_instrumentation` do agente fica **desligada de propósito**: na versão 14.x, o wrapper do `eachMessage` não devolve a promise do handler, e o kafkajs confirmaria o offset antes do processamento.
+- **Trace distribuído:** começa no OS (a borda API Gateway → Lambda não entra). O trace atravessa o Kafka por propagação manual (#344): o publicador grava `traceparent`, `tracestate` e `newrelic` nos headers da mensagem, dentro da transação ativa, e o consumidor abre uma background transaction `Kafka/<tópico>` que aceita esses headers e registra o erro quando o processamento falha. Retry e DLT também levam os headers.
+- **Sem agente ativo** (testes, `NEW_RELIC_ENABLED=false`): as chamadas do agente viram no-op e a publicação e o consumo seguem normalmente.
+- **Correlação:** cada evento leva no envelope `eventId` e `correlationId`, que é igual ao `ordemServicoId` e à chave da mensagem (ADR-0018). Isso permite buscar nos logs a sequência de uma OS. O `correlationId` não é o `trace.id`.
+- **Dashboard e alertas:** `tc3-observability-hml` no New Relic, mantido como código no `repo-k8s-infra`. Detalhes em [`docs/infrastructure/observability.md`](./docs/infrastructure/observability.md).
 
 ---
 
@@ -358,9 +426,8 @@ src/
 │   │   ├── application/     # Use cases
 │   │   ├── infrastructure/  # Repositorios Prisma
 │   │   └── presentation/    # Controllers, DTOs
-│   ├── ordem-servico/       # Ordens de Servico + Orcamentos
-│   ├── pecas-insumos/       # Pecas, estoque, pedidos a fornecedores
-│   └── financeiro/          # Pagamentos
+│   ├── ordem-servico/       # Ordens de Servico
+│   └── pecas-insumos/       # Pecas, estoque, pedidos a fornecedores
 └── shared/
     ├── domain/              # DomainEvent base, excecoes, interfaces
     └── infrastructure/      # PrismaService, EmissorEventos, filtros

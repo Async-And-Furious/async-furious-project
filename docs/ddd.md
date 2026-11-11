@@ -37,7 +37,7 @@ Este documento apresenta a aplicação dos princípios de Domain-Driven Design (
 
 ### 3.1. Contexto: Ordem de Serviço (OS)
 
-Este contexto lida com a criação, acompanhamento e gestão do ciclo de vida das Ordens de Serviço, incluindo a geração e aprovação de orçamentos, que representam o aspecto financeiro direto da OS.
+Este contexto lida com a criação, acompanhamento e gestão do ciclo de vida das Ordens de Serviço. Ele calcula os totais de serviços e peças (`OrcamentoCalculado`); o orçamento em si e a sua aprovação são do contexto Financeiro (Billing Service).
 
 ### 3.2. Contexto: Clientes e Veículos
 
@@ -49,7 +49,7 @@ Gerencia o catálogo de serviços oferecidos, o estoque de peças e insumos, e a
 
 ### 3.4. Contexto: Financeiro
 
-No estado atual do projeto, o contexto financeiro está implementado como módulo próprio (`financeiro`), responsável pelo registro de pagamentos e pela integração com o ciclo de entrega da Ordem de Serviço. Esse contexto se integra ao domínio de Ordem de Serviço para concluir o fluxo operacional.
+Desde a #330 o contexto Financeiro vive no Billing Service (repositório `repo-billing`), com banco próprio: orçamento, aprovação ou recusa, cobrança no Mercado Pago (Checkout Pro) e confirmação do pagamento. Ele se integra à Ordem de Serviço só por evento (`event-catalog.md`); o pagamento não dispara a entrega da OS.
 
 ### 3.5. Contexto: Segurança e Autenticação
 
@@ -59,6 +59,8 @@ Trata da autenticação de usuários administrativos e da validação de dados s
 
 
 ### 4.1. Contexto: Gestão de Ordem de Serviço
+
+> **Fase 4 (#320):** diagnóstico e reparo saem deste contexto e vão para o contexto de Execução e Produção (§4.5), em serviço próprio. A `OrdemDeServico` continua dona do status canônico (`StatusOS`) e só muda para Em Diagnóstico, Em Execução e Finalizada ao consumir os marcos publicados por aquele contexto.
 
 #### Agregados:
 
@@ -206,13 +208,47 @@ Trata da autenticação de usuários administrativos e da validação de dados s
     *   Token JWT
     *   Data de Expiração
 
+### 4.5. Contexto: Execução e Produção
+
+Serviço próprio (`repo-execucao-service`, banco `execucao_producao`). Referencia a OS só pelo id, sem FK e sem réplica de cliente, veículo, orçamento ou valores.
+
+#### Agregados:
+
+*   **Execucao**
+    *   **Raiz do Agregado:** Execucao
+    *   **Value Objects:** StatusExecucao
+
+#### Entidades:
+
+*   **Execucao**
+    *   ID da Execução
+    *   ID da OS (referência sem FK, única por execução)
+    *   Status (Value Object: StatusExecucao)
+    *   Responsável (`sub` do JWT de quem iniciou o diagnóstico; sem cadastro de mecânicos)
+    *   Início do Diagnóstico, Início do Reparo e Conclusão (marcos de tempo)
+
+#### Value Objects:
+
+*   **StatusExecucao**
+    *   Ciclo: Aguardando Diagnóstico, Em Diagnóstico, Aguardando Reparo, Em Reparo e Concluída. Cancelada só a partir de Aguardando Diagnóstico, Em Diagnóstico ou Aguardando Reparo; reparo iniciado não é cancelado. Concluída e Cancelada são terminais.
+    *   A fila de execução é a lista de execuções em Aguardando Diagnóstico e Aguardando Reparo, por ordem de entrada.
+
 ## 5. Event Storming — Eventos por Bounded Context
 
 Os eventos de domínio estão organizados por BC, refletindo a estrutura de módulos definida em `src/modules/`.
 
+> **Fronteira de integração (Fase 4):** os eventos financeiros listados em
+> §5.4 são exemplos legados de domínio/in-process do monólito, não contratos
+> de integração Kafka. O catálogo Kafka vigente, incluindo os eventos
+> publicados e consumidos pelo Billing Service, está em
+> [`event-catalog.md`](./architecture/event-catalog.md) e segue a
+> [ADR-0018](./adr/0018-mensageria-contratos-eventos.md).
+
 ---
 
 ### 5.1. BC: Criação e Acompanhamento da OS (`ordem-servico`)
+
+> **Fase 4 (#320):** `OrdemDeServicoEmDiagnostico`, `OrdemDeServicoEmExecucao` e `OrdemDeServicoFinalizada` continuam neste BC, mas os comandos `MudarStatusParaEmDiagnostico`, `MudarStatusParaEmExecucao` e `MudarStatusParaFinalizada` passam a ser disparados pelo consumo dos eventos do BC de Execução e Produção (§5.5), não por rota do mecânico neste serviço.
 
 #### Eventos de Domínio (9):
 
@@ -225,6 +261,21 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `OrcamentoGerado`
 *   `OrcamentoAprovado`
 *   `OrcamentoRejeitado`
+
+**Eventos de integração com o Execução e Produção (Fase 4, Feature #334).** Não
+são eventos de domínio do BC: atravessam a fronteira entre serviços
+(contrato em [`architecture/event-catalog.md`](./architecture/event-catalog.md);
+tratamento no código em
+[`architecture/os-service-integracao-execucao.md`](./architecture/os-service-integracao-execucao.md)).
+Hoje trafegam pelo `EmissorEventos` in-process, com o mesmo nome.
+
+*   Publicados pelo OS Service: `OrdemServicoRecebida` (entrada na fila de
+    diagnóstico do Execução), `OrcamentoCalculado` (renomeado a partir de
+    `ServicosEInsumosListados`; carrega `valorTotalServicos`,
+    `valorTotalPecas` e `valorTotalGeral`) e `EtapaDaSagaFalhou`.
+*   Consumidos pelo OS Service: `DiagnosticoIniciado` (`UNDER_DIAGNOSIS`),
+    `ExecucaoIniciada` (`IN_PROGRESS` e, com a reserva de peças pendente,
+    `AWAITING_PARTS`) e `ExecucaoConcluida` (`FINISHED`).
 
 #### Comandos:
 
@@ -240,14 +291,15 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `ConsultarProgressoOS`
 *   `AdicionarServicoAOS`
 *   `AdicionarPecaAOS`
-*   `FinalizarOrdemDeServico`
+*   `FinalizarOrdemDeServico` (disparado pelo evento `ExecucaoConcluida`; a
+    rota `finalizar-execucao` saiu do OS Service)
 *   `EntregarOrdemDeServico`
 
 ---
 
 ### 5.2. BC: Gestão Cadastral (`cadastro`)
 
-#### Eventos de Domínio (9):
+#### Eventos de Domínio (8):
 
 *   `ClienteCadastrado`
 *   `ClienteAtualizado`
@@ -257,7 +309,6 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `VeiculoRemovido`
 *   `ClienteIdentificado`
 *   `DadosClienteInformados`
-*   `VeiculoAnalisado`
 
 #### Comandos:
 
@@ -269,7 +320,6 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `RemoverVeiculo`
 *   `IdentificarCliente`
 *   `InformarDadosCliente`
-*   `AnalisarVeiculo`
 
 ---
 
@@ -297,19 +347,34 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 
 ---
 
-### 5.4. BC: Gestão Financeira (`financeiro`)
+### 5.4. BC: Gestão Financeira (`repo-billing`)
+
+#### Eventos de integração publicados (`billing.eventos.v1`, ver `event-catalog.md`):
+
+*   `OrcamentoGerado`: orçamento criado a partir de `OrcamentoCalculado`; o OS Service leva a OS a Aguardando Aprovação.
+*   `OrcamentoAprovado`: o cliente aprovou; o OS Service reserva as peças, sem mudar o status.
+*   `OrcamentoRecusado`: o cliente recusou; o OS Service encerra a OS sem execução.
+*   `PagamentoConfirmado`: o Mercado Pago confirmou; o OS Service grava `pago_em`.
+*   `PagamentoRecusado`: o Mercado Pago recusou; o OS Service encerra a OS sem execução antes do reparo.
+
+O antigo módulo `financeiro` do monólito (com `PagamentoRegistrado`, que disparava a entrega) foi removido na #330.
+
+---
+
+### 5.5. BC: Execução e Produção (`repo-execucao-service`)
 
 #### Eventos de Domínio (3):
 
-*   `PagamentoRegistrado`
-*   `PagamentoProcessado`
-*   `NotaFiscalEmitida`
+*   `DiagnosticoIniciado`: o mecânico iniciou o diagnóstico; o OS Service leva a OS a Em Diagnóstico.
+*   `ExecucaoIniciada`: o mecânico iniciou o reparo; o OS Service leva a OS a Em Execução (ou Aguardando Peças).
+*   `ExecucaoConcluida`: o mecânico concluiu o reparo; o OS Service leva a OS a Finalizada.
 
 #### Comandos:
 
-*   `RegistrarPagamento`
-*   `ProcessarPagamento`
-*   `EmitirNotaFiscal`
+*   `IniciarDiagnostico`
+*   `IniciarReparo`
+*   `ConcluirExecucao`
+*   `ListarFilaExecucao`
 
 ## 6. Diagramas
 
@@ -347,5 +412,4 @@ As imagens abaixo representam cenários complementares levantados na etapa de mo
 *   Cadastro de peças: ![](./static/domainstorytelling.Peças_2026-03-27.png)
 *   Remoção de peças: ![](./static/domainstorytelling.PeçasRemover_2026-03-27.png)
 *   Cadastro de serviços: ![](./static/domainstorytelling.Servico_2026-03-27 (1).png)
-
 

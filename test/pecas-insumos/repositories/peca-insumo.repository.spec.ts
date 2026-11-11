@@ -74,6 +74,25 @@ describe('PecaInsumoRepository', () => {
       expect(result.nome).toBe('Óleo Lubrificante');
     });
 
+    it('should convert a decimal-like price to a number', async () => {
+      mockPrismaService.peca.findUnique.mockResolvedValue({
+        ...mockPecaData,
+        preco: { toNumber: () => 49.9 },
+      });
+
+      const result = await repository.findOne('peca-1');
+
+      expect(result.preco).toBe(49.9);
+    });
+
+    it('should convert a price received as text to a number', async () => {
+      mockPrismaService.peca.findUnique.mockResolvedValue({ ...mockPecaData, preco: '12.5' });
+
+      const result = await repository.findOne('peca-1');
+
+      expect(result.preco).toBe(12.5);
+    });
+
     it('should throw EntityNotFoundException when not found', async () => {
       mockPrismaService.peca.findUnique.mockResolvedValue(null);
 

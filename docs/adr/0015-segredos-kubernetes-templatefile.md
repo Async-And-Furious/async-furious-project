@@ -66,6 +66,17 @@ não sensíveis como `cluster_name`, `app_replicas`).
   de aplicação (ZAP) e de imagem (Trivy), nenhum cobre segredo em
   código-fonte ou state do Terraform (ver [ADR-0013](./0013-seguranca-pipeline-zap-trivy.md)).
 
+## Atualização (Fase 4: escopo restrito ao ambiente local)
+
+Revisão da Feature #316. O `templatefile()` desta ADR é o padrão **só do
+cluster `kind` local**. Nos serviços da Fase 4, o segredo vive no AWS
+Secrets Manager e o `deploy-eks.yml` de cada serviço o materializa como
+`Secret` no namespace do próprio serviço (banco, Kafka, New Relic), já que
+`Secret` não cruza namespace
+([template-servico.md](../infrastructure/template-servico.md#secrets-por-namespace)).
+Os serviços novos não copiam `infra/modules/kubernetes-apps/` nem este
+padrão.
+
 ## Referências
 
 - `infra/modules/kubernetes-apps/` (uso de `templatefile()`)

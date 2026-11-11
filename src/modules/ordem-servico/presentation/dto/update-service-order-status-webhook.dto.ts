@@ -2,6 +2,17 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validato
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as ordemServicoEntity from '../../domain/entities/ordem-servico.entity';
 
+// DELIVERED fica de fora: a entrega só é gravada por PATCH /ordens-servico/:id/registrar-entrega.
+export const WEBHOOK_STATUS_PERMITIDOS: ordemServicoEntity.OSStatus[] = [
+  'RECEIVED',
+  'UNDER_DIAGNOSIS',
+  'AWAITING_APPROVAL',
+  'IN_PROGRESS',
+  'AWAITING_PARTS',
+  'FINISHED',
+  'CLOSED_WITHOUT_EXECUTION',
+];
+
 export class UpdateServiceOrderStatusWebhookDto {
   @ApiProperty({
     description: 'ID da Ordem de Serviço (UUID)',
@@ -12,29 +23,12 @@ export class UpdateServiceOrderStatusWebhookDto {
   osId!: string;
 
   @ApiProperty({
-    description: 'Novo status da Ordem de Serviço',
-    enum: [
-      'RECEIVED',
-      'UNDER_DIAGNOSIS',
-      'AWAITING_APPROVAL',
-      'IN_PROGRESS',
-      'AWAITING_PARTS',
-      'FINISHED',
-      'DELIVERED',
-      'CLOSED_WITHOUT_EXECUTION',
-    ],
+    description:
+      'Novo status da Ordem de Serviço. DELIVERED não é aceito: use PATCH /ordens-servico/:id/registrar-entrega.',
+    enum: WEBHOOK_STATUS_PERMITIDOS,
     example: 'UNDER_DIAGNOSIS',
   })
-  @IsEnum([
-    'RECEIVED',
-    'UNDER_DIAGNOSIS',
-    'AWAITING_APPROVAL',
-    'IN_PROGRESS',
-    'AWAITING_PARTS',
-    'FINISHED',
-    'DELIVERED',
-    'CLOSED_WITHOUT_EXECUTION',
-  ])
+  @IsEnum(WEBHOOK_STATUS_PERMITIDOS)
   @IsNotEmpty()
   status!: ordemServicoEntity.OSStatus;
 

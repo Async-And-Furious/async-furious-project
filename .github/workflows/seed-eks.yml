@@ -7,7 +7,7 @@ on:
         description: Protected target environment
         required: true
         type: choice
-        options: [hml, prod]
+        options: [hml]
         default: hml
 
 permissions:
@@ -15,8 +15,20 @@ permissions:
   id-token: write
 
 jobs:
+  # Protege chamadas manuais legadas: a Fase 4 não permite seed em PROD.
+  prod-guard:
+    name: Enforce HML-only seed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse PROD seed in Phase 4
+        if: ${{ inputs.environment == 'prod' }}
+        run: |
+          echo "Phase 4 is HML-only; PROD seeding is disabled." >&2
+          exit 1
+
   first-run:
     name: Seed ${{ inputs.environment }} (first run)
+    needs: prod-guard
     uses: ./.github/workflows/deploy-eks.yml
     with:
       environment: ${{ inputs.environment }}

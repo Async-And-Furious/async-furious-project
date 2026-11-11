@@ -6,6 +6,7 @@ on:
       - main
       - develop
   pull_request:
+    types: [opened, synchronize, reopened]
   schedule:
     - cron: '0 4 * * 1'
   workflow_dispatch:
@@ -17,7 +18,8 @@ permissions:
 
 jobs:
   docker-image-scan:
-    name: Docker Image Vulnerability Scan
+    # Nome do check de proteção de branch (ver progresso-I-333.md).
+    name: trivy
     runs-on: ubuntu-latest
 
     env:

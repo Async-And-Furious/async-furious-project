@@ -2,7 +2,6 @@
 name: Epic
 about: Planejamento de um módulo ou grande entrega do projeto.
 title: "[EPIC] "
-labels: epic
 assignees: ''
 ---
 
@@ -94,10 +93,10 @@ Exemplo:
 
 ## 📚 Referências
 
-- Tech Challenge — Fase 3
-- ADRs relacionadas
-- RFCs relacionadas
-- Documentação técnica
+- Tech Challenge
+- ADRs relacionadas (`docs/adr/`)
+- RFCs relacionadas (`docs/rfcs/`)
+- Documento DDD (`docs/ddd.md`)
 
 ---
 

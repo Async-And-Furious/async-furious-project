@@ -1,5 +1,108 @@
 # Log de agentes
 
+## 2026-11-10 — Ajustes de documentação OS Service (PR #384)
+
+- Atualizada a tabela de rotas a partir dos controllers, explicitado Kafka como contrato-alvo, detalhados os bancos e riscos do setup local, e alinhados links/ADRs da arquitetura. Conferidos os heads remotos `main` do Billing e `develop` do Execução; nenhuma alteração de aplicação ou operação de deploy/AWS foi feita.
+
+## 2026-11-09 — Segurança SonarCloud no PR #381
+
+- Anotação do check Sonar em `k8s/database/read-model.yaml:16` apontou o token
+  de ServiceAccount montado automaticamente no Pod do Mongo. Desativada a
+  montagem; esse workload não precisa acessar a API do Kubernetes. Quality
+  Gate remoto ainda precisa ser reavaliado.
+- No rerun, unitários/typecheck passaram, mas o E2E ficou pendente porque o
+  `app.e2e-spec.ts` não fechava a aplicação. Adicionado `app.close()` no
+  `afterEach` para liberar conexões antes de reavaliar o Sonar.
+- Nenhum gate foi alterado e nenhuma operação de cluster foi executada.
+## 2026-11-10 — Revisão documental do PR #379
+
+- Removida a comparação temporal vencida do overview preliminar e corrigida a
+  classificação da ADR-0003, que propõe EKS na Fase 3. A especificação do desafio
+  citada no índice existe no workspace (`docs/specs/tech-challenge-fase4.md`).
+- O PR #384 permanece aberto e requer harmonização do índice antes de sua
+  integração em `develop`.
+
+## 2026-11-09 — Cobertura SonarCloud no PR #396
+
+- Corrigida a classificação Sonar dos testes `src/**/*.spec.ts` para não serem
+  contados como código de produção; a coleta de cobertura passou a incluir a
+  `JwtStrategy`, com casos para claims inválidas e fallback legado. O gate
+  remoto ainda precisa de uma nova análise.
+- Validação: 96 suítes/1.129 testes passaram; cobertura global 97,02% statements,
+  83,56% branches, 92,98% funções e 97,15% linhas. Typecheck, ESLint focado e
+  build passaram. A estratégia JWT ficou com 95,23% linhas e 84,21% branches.
+  Execução local usou Node 26 (projeto/CI exige Node 22); gate Sonar remoto pendente.
+  Nenhum gate foi afrouxado.
+
+## 2026-10-28 — Índice documental por fase
+
+- Adicionado `docs/phases/README.md` para separar fontes da Fase 4,
+  referências históricas e tipos de evidência; atualizado `docs/README.md`.
+- Nenhuma implementação, ADR ou documento existente foi movido ou alterado.
+
+## 2026-11-07 — Publicação autorizada #345
+
+- Após autorização explícita, este incremento de logs OS será publicado em PR;
+  a abertura executará o diagnóstico HML automático. Esperado: adição temporária
+  do IP `/32` do runner e restauração do endpoint privado. Sem deploy ou merge.
+- A cobertura é parcial/best-effort para os quatro caminhos terminais atuais;
+  não é ledger, contagem exata nem resultado completo da Saga.
+
+## 2026-11-06 — Cobertura de caminhos terminais #345
+
+- Inventariados os caminhos que persistem `FINISHED` e
+  `CLOSED_WITHOUT_EXECUTION`: handler ExecucaoConcluida, handler de recusas
+  chamado por fluxo local HTTP ou Kafka, detector e caso de uso genérico usado
+  pelo webhook de status. Nenhuma outra escrita terminal de status foi
+  encontrada nos casos de uso da aplicação.
+- Incluído o caso genérico sem mudar sua atualização incondicional; o status
+  anterior logado é a leitura pré-update e pode estar desatualizado sob corrida.
+  O registro segue best-effort, não é ledger ou contagem exata.
+- Atualizados spec e documentação; testes focados, typecheck, lint, build e
+  `git diff --check` são executados nesta revisão. Sem push, HML ou AWS.
+
+## 2026-10-28 — Ajustes da pipeline Fase 4 (#333)
+
+- A decisão vigente da Fase 4 é HML-only: `deploy-prod` fica inerte, e os
+  disparos manuais de deploy/seed aceitam HML. Os recursos PROD existentes da
+  Fase 3 permanecem intocados. Nenhum deploy, apply ou acesso AWS foi feito.
+- Removido o bypass por label `Documentação` nos workflows `tests`, `trivy`,
+  `zap` e `terraform`; adicionado o agregado `validate` para reprovar quando
+  testes falham ou Sonar é ignorado em `main`. A proteção de branch ainda
+  precisa exigir esse check (passo externo).
+- Removidos casts `any` do teste do filtro global e adicionados contratos de
+  workflow. A action do Sonar foi fixada ao SHA verificado de `v8.4.0`.
+  Coverage permanece 80/80/80/80.
+- SonarCloud HTTP 403 permanece bloqueio externo de autorização; não houve
+  leitura ou alteração de `SONAR_TOKEN`. HML/DocumentDB/CA, Kafka consumer,
+  baseline pós-read-model e itens da etapa 2 seguem pendentes.
+
+## 2026-10-20 — Mercado Pago Checkout Pro no monólito (#325)
+
+- Aprovar o orçamento cria a preference do Checkout Pro (SDK oficial
+  `mercadopago@3.6.1`) e devolve `linkPagamento`; falha no Mercado Pago dá
+  `502` e o orçamento segue `PENDING`. Migração aditiva em `pagamentos`
+  (`preference_id`, `link_pagamento`, índice em `ordemServicoId`).
+- `POST /api/v1/webhooks/mercado-pago` valida o `x-signature` com o validador
+  do SDK (`data.id` da query string), reconsulta o pagamento e confirma o
+  `Pagamento` aprovado (`CONFIRMADO` + `PagamentoConfirmadoEvent`).
+- Validação: 779 testes, type-check e build passando; fluxo testado localmente
+  com conta de teste (preference real, pagamento aprovado com cartão de teste,
+  notificação assinada simulada). A entrega real do webhook pelo Mercado Pago
+  ainda não foi testada. Nenhum deploy, apply ou alteração na AWS.
+- Alinhamento com o escopo da #325: `Pagamento.ordemServicoId` único com
+  reserva antes de chamar o Mercado Pago (que ignora `X-Idempotency-Key` em
+  preferences, testado), aprovação atômica do orçamento, `rejected` terminal
+  (`RECUSADO` + `PagamentoRecusadoEvent`), `webhook_recebido` na mesma
+  transação, timeout de 5 s com 1 retry, e `POST /pagamentos/registrar` só
+  dispara a entrega com pagamento `CONFIRMADO`. Concorrência validada contra o
+  banco local (duas aprovações → um pagamento e o mesmo link; três
+  notificações → uma atualização).
+- Decisões registradas na ADR-0022 (Proposta). Pendente: estorno, segredos
+  `MP_*` no k8s/Terraform de HML, rota do
+  webhook em `docs/http/routes.yaml` (precisa de um tipo de autenticação novo
+  no `route-matrix.py`).
+
 ## 2026-09-14 — Fortalecimento da atualização de capacidade do node group em HML
 
 - Fortalecido o passo de capacidade em HML para esperar um nodegroup ACTIVE,

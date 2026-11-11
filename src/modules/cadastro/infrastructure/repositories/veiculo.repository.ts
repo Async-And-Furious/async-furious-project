@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import {
   formatPaginatedResponse,
   buildSearchWhere,
+  isUniqueConstraintViolation,
 } from '../../../../shared/infrastructure/database/repository.utils';
+import { ConflitoException } from '../../../../shared/domain/exceptions/conflito.exception';
+import { PlacaVeiculoVo } from '../../domain/value-objects/placa-veiculo.vo';
 import { Veiculo } from '../../domain/entities/veiculo.entity';
 import {
   IVeiculoRepository,
@@ -12,10 +15,15 @@ import {
   UpdateVeiculoInput,
 } from '../../domain/interfaces/veiculo.interface';
 import { VeiculoMapper, VeiculoORMEntity } from '../persistence/veiculo.orm-entity';
+import { CLIENTE_READ_MODEL_PROJECTOR } from '../../domain/interfaces/cliente-read-model.interface';
+import type { IClienteReadModelProjector } from '../../domain/interfaces/cliente-read-model.interface';
 
 @Injectable()
 export class VeiculoRepository implements IVeiculoRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CLIENTE_READ_MODEL_PROJECTOR) private readonly projector: IClienteReadModelProjector
+  ) {}
 
   async create(data: CreateVeiculoInput): Promise<Veiculo> {
     const veiculo = Veiculo.criar({
@@ -29,16 +37,23 @@ export class VeiculoRepository implements IVeiculoRepository {
     });
 
     const ormData = VeiculoMapper.toOrm(veiculo);
-    const ormEntity = await this.prisma.veiculo.create({
-      data: {
-        placa: ormData.placa,
-        marca: ormData.marca,
-        modelo: ormData.modelo,
-        ano: ormData.ano,
-        cor: ormData.cor,
-        id_cliente: ormData.id_cliente,
-      },
-    });
+    const ormEntity = await this.prisma.veiculo
+      .create({
+        data: {
+          placa: ormData.placa,
+          marca: ormData.marca,
+          modelo: ormData.modelo,
+          ano: ormData.ano,
+          cor: ormData.cor,
+          id_cliente: ormData.id_cliente,
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflitoException('Já existe um veículo com esta placa');
+        }
+        throw error;
+      });
 
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -84,7 +99,9 @@ export class VeiculoRepository implements IVeiculoRepository {
   }
 
   async findByPlaca(placa: string): Promise<Veiculo | null> {
-    const ormEntity = await this.prisma.veiculo.findUnique({ where: { placa } });
+    const ormEntity = await this.prisma.veiculo.findUnique({
+      where: { placa: PlacaVeiculoVo.normalizar(placa) },
+    });
     if (!ormEntity) return null;
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -111,6 +128,7 @@ export class VeiculoRepository implements IVeiculoRepository {
     const ormEntity = await this.prisma.veiculo.delete({
       where: { id },
     });
+    await this.projector.removerOrdensServicoEmCascata({ veiculoId: id });
 
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }

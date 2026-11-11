@@ -4,6 +4,10 @@
 
 Versao em portugues: [README.md](./README.md)
 
+> **Frozen at Phase 3.** This English mirror is historical and does not describe
+> the current Phase 4 microservice architecture. Use the Portuguese README and
+> [`docs/README.md`](./docs/README.md) for current Phase 4 documentation.
+
 ## Project Goal
 
 Backend for **integrated auto repair shop management**, built as the FIAP Software Architecture graduate Tech Challenge (15SOAT). The architecture combines Clean Architecture and DDD.
@@ -24,7 +28,6 @@ Backend for **integrated auto repair shop management**, built as the FIAP Softwa
 | **Vehicles** | CRUD with Brazilian plate validation. |
 | **Services** | Catalog of services offered by the shop. |
 | **Parts and Supplies** | CRUD with inventory control and supplier requests. |
-| **Payments** | Payment registration with automatic delivery trigger. |
 | **Authentication** | JWT with `ADMIN`, `RECEPCIONISTA`, and `MECANICO` roles. |
 
 ---
@@ -53,7 +56,7 @@ We use Node.js with NestJS for modular architecture and native dependency inject
 
 - Python 3 (for the stack orchestrator)
 - GitHub CLI (`gh`), authenticated with `gh auth login` (for the stack orchestrator)
-- Node.js 20+
+- Node.js 22
 - pnpm (`npm install -g pnpm`)
 - Docker and Docker Compose
 - Terraform 1.6+
@@ -115,6 +118,12 @@ SEED_ADMIN_EMAIL="admin@oficina.com"
 SEED_ADMIN_PASSWORD="changeme123"
 ```
 
+Estimates, approval and charging (Mercado Pago) belong to the Billing Service; the Mercado Pago credentials live there.
+
+Without `KAFKA_BROKERS`, the OS Service starts without publishing the integration events (`OrdemServicoRecebida`, `OrcamentoCalculado` and `EtapaDaSagaFalhou` on `os.eventos.v1`) and only logs a warning. In HML, `deploy-eks.yml` fills in the broker and the SASL credentials.
+
+The stalled-order detector runs as a CronJob (`k8s/app/detector-os-parada-cronjob.yaml`, every 5 minutes) with the same image as the API: `node dist/detector-os-parada.js`. It closes orders in `AWAITING_APPROVAL` with no payment beyond `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (default 2880, i.e. 48 h) and publishes `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`). For the demo, lower the deadline in the ConfigMap to a few minutes.
+
 ### 3. Start with Docker for development
 
 ```bash
@@ -144,6 +153,19 @@ After starting the project, open Swagger at:
 http://localhost:3000/api/docs
 ```
 
+Swagger describes only the OS Service (title `Async Furious - OS Service`). The `bearer` (JWT) scheme applies to every route except the public ones (`/status`, `auth/login`, `health`, the Mercado Pago webhook and, until #330, `PATCH /ordens-servico/:id/orcamento/aprovar|recusar`), which are exported with `security: []`. The status webhook requires `bearer` and `webhook-secret` (`x-webhook-secret` header) together, in a single requirement. Evidence: the OpenAPI export is versioned at [`docs/http/openapi/os-service.openapi.json`](docs/http/openapi/os-service.openapi.json) and regenerated with `pnpm docs:openapi` (it does not start the server or connect to the database). CI (`tests.yml`) regenerates the file and fails if it diverges from the code.
+
+### OS Service HTTP surface (#332)
+
+- **No REST between services.** Billing and Execution consume no route of this service; everything they need arrives as events ([`saga-flow.md`](docs/architecture/saga-flow.md)).
+- **Public lookup route:** `GET /api/v1/ordens-servico/{id}/status`, no Bearer, minimal response (`ordemServicoId`, `status` and time `marcos`, no customer data). At the edge it is the only public OS Service route: `ordens-servico/*` goes through the Lambda Authorizer. **Inside the service, `PATCH /ordens-servico/:id/orcamento/aprovar` and `/recusar` are still `@Public()` until the financial extraction (#330)**, besides `auth/login`, `health` and the Mercado Pago webhook; every other route without a token returns `401`.
+- **Removed, no proxy:** `GET /ordens-servico/:id/rastreamento` (alias of `/status`) and `POST /ordens-servico/:id/aprovar-servico` (duplicate public budget approval) return `404`. `PATCH /ordens-servico/:id/aprovar-servico` stays, authenticated.
+- **RBAC unchanged:** `JwtAuthGuard` and `RolesGuard` keep validating the token locally, as the second layer after the edge Lambda Authorizer (ADR-0021).
+- **Status webhook as an exception:** `POST /webhooks/service-orders/status` is a manual reprocessing channel (JWT + `x-webhook-secret`). Transitions are validated by `StatusTransitionService`, and `DELIVERED` is rejected with `400` (not in the DTO enum): delivery only happens through `registrar-entrega`.
+- **Versioning:** the prefix stays `api/v1`. During Phase 4 breaking changes are accepted inside `v1`, with no parallel `v2`: every consumer is born in this phase and there is no external client to preserve. Each break is recorded in this section and in the related ADR.
+- **Read model (#335, ADR-0019):** `GET /ordens-servico` (queue), `GET /ordens-servico/:id`, `/status` and `GET /clientes/:id` read from DocumentDB (MongoDB locally and in CI), fed by a synchronous write-through in the repositories; `tempo-medio`, `GET /clientes` and `GET /veiculos/:id` stay on Postgres. The queue uses cursor pagination (`?limit=&cursor=`, response `{ data, pagination: { limit, nextCursor } }`) and excludes `CLOSED_WITHOUT_EXECUTION`; the OS read from the read model has no `orcamento`. Rebuild: `pnpm read-model:rebuild` (on deploy, a Job right after the migration). Model in [`persistence-model.md`](docs/architecture/persistence-model.md).
+- **Pending on other features:** `pagamentos` and the budget approve/reject routes (still public inside the service) leave the service with the financial extraction (#330); the event consumers (`atualizar-status-*.handler.ts`) still check the current status without `StatusTransitionService` (history is written by the repository), so the webhook and the consumers do not share the same state machine yet.
+
 The Insomnia collection with configured routes is available at:
 
 ```text
@@ -165,7 +187,7 @@ docs/http/insomnia.yaml
 | ------ | -------- | ------ | ----------- |
 | POST | `/clientes` | RECEPCIONISTA | Create customer. |
 | GET | `/clientes` | Authenticated | List customers. |
-| GET | `/clientes/:id` | Authenticated | Get customer details. |
+| GET | `/clientes/:id` | Authenticated | Get customer details (read model). |
 | PATCH | `/clientes/:id` | RECEPCIONISTA | Update customer. |
 | DELETE | `/clientes/:id` | ADMIN | Delete customer. |
 
@@ -194,19 +216,14 @@ docs/http/insomnia.yaml
 | Method | Endpoint | Access | Description |
 | ------ | -------- | ------ | ----------- |
 | POST | `/ordens-servico` | RECEPCIONISTA | Create service order. |
-| GET | `/ordens-servico` | Authenticated | List service orders. |
-| GET | `/ordens-servico/:id` | Authenticated | Get service order details. |
-| GET | `/ordens-servico/:id/status` | Authenticated | Check service order status. |
+| GET | `/ordens-servico` | Authenticated | Active service order queue by priority (read model, cursor). |
+| GET | `/ordens-servico/:id` | Authenticated | Get service order details (read model, no budget). |
+| GET | `/ordens-servico/:id/status` | Public | Check service order status (minimal response, no customer data). |
 | PATCH | `/ordens-servico/:id` | ADMIN | Update service order. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Delete service order. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mechanic takes ownership. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Register diagnostic analysis. |
-| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Generate estimate. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Public | Customer approves estimate. |
-| PATCH | `/ordens-servico/:id/orcamento/recusar` | Public | Customer rejects estimate. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Public | Customer approves performed service. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mechanic finishes execution. |
-| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery. |
+| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Submit services and supplies (service order in `UNDER_DIAGNOSIS`): responds `200` with the calculated totals and publishes `OrcamentoCalculado`. Diagnosis start and execution completion now belong to the Execution service (`PATCH /execucoes/:id/iniciar-diagnostico` and `/concluir`) and reach this service as events. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Authenticated | Approve the performed service (OS stays Finished). |
+| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery (`FINISHED` → `DELIVERED`). The only path to `DELIVERED`: the status webhook rejects that value. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Check average execution time. |
 
 #### Parts and Supplies (`/api/v1/pecas`)
@@ -222,11 +239,13 @@ docs/http/insomnia.yaml
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Request parts from supplier. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirm receipt of parts. |
 
-#### Payments (`/api/v1/pagamentos`)
+Approving or rejecting the estimate and the Mercado Pago webhook live in the Billing Service (`/api/v1/orcamentos/*` and `/api/v1/webhooks/mercado-pago`).
+
+#### Service order status webhook (`/api/v1/webhooks/service-orders`)
 
 | Method | Endpoint | Access | Description |
 | ------ | -------- | ------ | ----------- |
-| POST | `/pagamentos/registrar` | Authenticated | Register payment and trigger service order delivery. |
+| POST | `/webhooks/service-orders/status` | Authenticated + `x-webhook-secret` | Manual reprocessing of the OS status through the state machine. `DELIVERED` is rejected (`400`). |
 
 ---
 
@@ -234,15 +253,63 @@ docs/http/insomnia.yaml
 
 ```text
 RECEIVED
-  -> UNDER_DIAGNOSIS
+  -> UNDER_DIAGNOSIS  (DiagnosticoIniciado event, from the Execution service)
       -> AWAITING_APPROVAL
           -> CLOSED_WITHOUT_EXECUTION  (estimate rejected)
-          -> IN_PROGRESS
-              -> AWAITING_PARTS  (parts unavailable)
+          -> IN_PROGRESS  (ExecucaoIniciada event, from the Execution service)
+              -> AWAITING_PARTS  (parts reservation pending, right after IN_PROGRESS)
                   -> IN_PROGRESS  (parts reserved)
-              -> FINISHED
+              -> FINISHED  (ExecucaoConcluida event, from the Execution service)
                   -> DELIVERED
 ```
+
+The mechanic actions (`assumir`/`analisar` and `finalizar-execucao`) are no longer
+routes of this service: they became routes of the Execution service and reach this
+service as events. Details (in Portuguese) in
+[`docs/architecture/os-service-integracao-execucao.md`](docs/architecture/os-service-integracao-execucao.md).
+
+---
+
+## Phase 4 — Distributed Transaction (Saga)
+
+Starting in Phase 4, this monolith is refactored into three independent
+microservices — **OS Service** (this repository), **Billing Service**, and
+**Execução e Produção** (Execution and Production) — and the flow above
+starts crossing service boundaries via asynchronous events (Kafka).
+
+**Chosen strategy: choreographed Saga.** There is no central orchestrator
+and no dedicated coordinator service/repository — each service publishes
+the events belonging to its own boundary and reacts to the events published
+by the other two, running its own compensation whenever something fails. We
+considered and rejected a central orchestrator with its own repository
+(infrastructure cost and single point of failure not justified, since the
+assignment treats orchestration and choreography as equivalent options) and
+an orchestrator embedded in the OS Service without a separate repository
+(it would couple the other two services to decisions made by this one).
+
+The flow covered by the saga is `Open OS → estimate → approval → payment →
+execution started` — payment happens right after estimate approval and
+**before** execution starts, as a mandatory step so that the Billing
+Service participates in the distributed transaction. Delivery is left out
+of the saga's scope because it is an in-person act with no asynchronous
+counterpart to coordinate; `registrar-entrega` does not check payment,
+because `FINISHED` is only reachable after `PagamentoConfirmado`
+([`saga-flow.md` §4](./docs/architecture/saga-flow.md)). The OS Service only
+records the `pago_em` marker when it receives `PagamentoConfirmado`, without
+changing status. Compensation is logical by default (revert OS status, close the
+estimate without execution); a real Mercado Pago refund is only triggered
+if the payment had already been captured before the failure.
+
+With no orchestrator, there is no single "saga state" — traceability of the
+distributed flow combines a New Relic trace, the `correlationId` carried in
+the event envelope, and the `HistoricoStatusOS.motivo` field already
+present in the database.
+
+Full detail (sequence diagram, per-step responsibility map, and the
+`step → failure → compensation` matrix):
+[ADR-0016](./docs/adr/0016-saga-coreografada.md) and
+[`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md)
+(Portuguese only, following the project's ADR/architecture doc convention).
 
 ---
 
@@ -304,9 +371,8 @@ src/
 │   │   ├── application/     # Use cases
 │   │   ├── infrastructure/  # Prisma repositories
 │   │   └── presentation/    # Controllers, DTOs
-│   ├── ordem-servico/       # Service Orders + Estimates
-│   ├── pecas-insumos/       # Parts, stock, supplier requests
-│   └── financeiro/          # Payments
+│   ├── ordem-servico/       # Service Orders
+│   └── pecas-insumos/       # Parts, stock, supplier requests
 └── shared/
     ├── domain/              # DomainEvent base, exceptions, interfaces
     └── infrastructure/      # PrismaService, EventEmitter, filters

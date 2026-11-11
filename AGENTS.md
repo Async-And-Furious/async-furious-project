@@ -2,6 +2,8 @@
 
 > Compact operational guide for agents. Each line answers: "Would I likely miss this?"
 
+> **Revisão de 30/09/2026 (`rev/Epic_1`).** Node 22 em tudo (`.nvmrc`; os workflows `tests.yml` e `zap.yml` usam `node-version-file: .nvmrc`); enum `SOStatus` e tabela de módulos (inclui `financeiro`) corrigidos para refletir `prisma/schema.prisma` e `src/modules`.
+
 ---
 
 ## 🚦 Commands
@@ -71,7 +73,7 @@ kind load docker-image async-furious-api:latest --name async-furious
 |--------|------|----------|
 | `cadastro` | `src/modules/cadastro/` | Cliente, Veiculo, Servico |
 | `pecas-insumos` | `src/modules/pecas-insumos/` | Peca |
-| `ordem-servico` | `src/modules/ordem-servico/` | OrdemServico, Orcamento |
+| `ordem-servico` | `src/modules/ordem-servico/` | OrdemServico (Orcamento and Pagamento live in the Billing Service since #330, code and tables) |
 | `auth` | `src/auth/` | User (JWT) |
 
 ### Shared
@@ -106,7 +108,7 @@ presentation → application → domain
 | Concern | Tool |
 |---------|------|
 | Framework | NestJS 10.x |
-| Runtime | Node.js 20 (.nvmrc) |
+| Runtime | Node.js 22 (.nvmrc) |
 | Package manager | pnpm (Dockerfile uses pnpm, not npm) |
 | Database | PostgreSQL 15 locally; AWS RDS in HML/PROD |
 | ORM | Prisma 5.x |
@@ -134,14 +136,12 @@ npx prisma migrate deploy # Production
 - `Cliente` → `Customer` table (with `nome`, `documento`, `tipo_documento`)
 - `Veiculo` → `Vehicle` table (with `placa`, `marca`, `modelo`, `ano`)
 - `OrdemServico` → `ServiceOrder` table (with `id_veiculo`, `id_cliente`)
-- `Orcamento` → `Estimate` table (1:1 with OrdemServico)
 - `Peca` → `Part` table
 - `Servico` → `Service` table
 
 ### Enums
 - `TaxIdType`: `CPF`, `CNPJ`
-- `SOStatus`: `RECEIVED`, `UNDER_DIAGNOSIS`, `AWAITING_APPROVAL`, `IN_PROGRESS`, `FINISHED`, `DELIVERED`
-- `EstimateStatus`: `PENDING`, `APPROVED`, `REJECTED`
+- `SOStatus`: `RECEIVED`, `UNDER_DIAGNOSIS`, `AWAITING_APPROVAL`, `IN_PROGRESS`, `AWAITING_PARTS`, `FINISHED`, `DELIVERED`, `CLOSED_WITHOUT_EXECUTION`
 
 ---
 
@@ -266,7 +266,7 @@ transform: true            // Auto-transform payloads
 ## 🔧 Dev Setup
 
 ### Requirements
-- Node.js 20 (see `.nvmrc`)
+- Node.js 22 (see `.nvmrc`)
 - Docker + Docker Compose
 - PostgreSQL 15
 

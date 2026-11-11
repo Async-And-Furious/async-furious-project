@@ -24,12 +24,6 @@ enum SOStatus {
   CLOSED_WITHOUT_EXECUTION
 }
 
-enum EstimateStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 model User {
   id         String   @id @default(uuid())
   email      String   @unique
@@ -71,36 +65,27 @@ model Veiculo {
 }
 
 model OrdemServico {
-  id            String    @id @default(uuid())
-  id_veiculo    String
-  id_cliente    String
-  status        SOStatus  @default(RECEIVED)
-  descricao     String?
-  iniciada_em   DateTime?
-  finalizada_em DateTime?
-  entregue_em   DateTime?
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  id                     String    @id @default(uuid())
+  id_veiculo             String
+  id_cliente             String
+  status                 SOStatus  @default(RECEIVED)
+  descricao              String?
+  iniciada_em            DateTime?
+  finalizada_em          DateTime?
+  entregue_em            DateTime?
+  // Reserva de peças pendente (sem estoque): decide AWAITING_PARTS ao consumir ExecucaoIniciada
+  reserva_pecas_pendente Boolean   @default(false)
+  // Pagamento confirmado pelo Billing (PagamentoConfirmado): não muda o status; o detector de
+  // OS parada só considera OS em AWAITING_APPROVAL com pago_em nulo (ADR-0018)
+  pago_em                DateTime?
+  created_at             DateTime  @default(now())
+  updated_at             DateTime  @updatedAt
 
   veiculo         Veiculo             @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
   cliente         Cliente             @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
-  orcamento       Orcamento?
   osPecas         OsPeca[]
   osServicos      OsServico[]
   historicoStatus HistoricoStatusOS[]
-}
-
-model Orcamento {
-  id                   String         @id @default(uuid())
-  id_ordem_servico     String         @unique
-  valor_total_servicos Decimal        @default(0) @db.Decimal(10, 2)
-  valor_total_pecas    Decimal        @default(0) @db.Decimal(10, 2)
-  valor_total_geral    Decimal        @default(0) @db.Decimal(10, 2)
-  status               EstimateStatus @default(PENDING)
-  created_at           DateTime       @default(now())
-  updated_at           DateTime       @updatedAt
-
-  ordem_servico OrdemServico @relation(fields: [id_ordem_servico], references: [id], onDelete: Cascade)
 }
 
 model Peca {
@@ -190,16 +175,6 @@ model ReservaEstoque {
   reservado_em DateTime @default(now())
 
   @@unique([ordem_id, peca_id])
-}
-
-model Pagamento {
-  id             String   @id @default(uuid())
-  ordemServicoId String
-  valor          Decimal  @db.Decimal(10, 2)
-  status         String
-  createdAt      DateTime @default(now())
-
-  @@map("pagamentos")
 }
 
 model HistoricoStatusOS {

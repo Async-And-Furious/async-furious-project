@@ -21,7 +21,7 @@ o `StatefulSet` do Kubernetes local ainda não foi atualizado.
 
 ## Diagrama ER
 
-Gerado a partir do `prisma/schema.prisma` real (17 models, 3 enums), não de
+Gerado a partir do `prisma/schema.prisma` real (12 models, 2 enums), não de
 um rascunho manual. Mostra apenas colunas de identidade (PK/FK/UK); o
 detalhamento completo de colunas está na seção
 [Modelo relacional](#modelo-relacional).
@@ -52,12 +52,6 @@ erDiagram
         string id_veiculo FK
         string id_cliente FK
         string status "enum SOStatus"
-    }
-
-    ORCAMENTO {
-        string id PK
-        string id_ordem_servico "FK, UK"
-        string status "enum EstimateStatus"
     }
 
     PECA {
@@ -98,11 +92,6 @@ erDiagram
         string peca_id "sem FK declarada"
     }
 
-    PAGAMENTO {
-        string id PK
-        string ordemServicoId "sem FK declarada"
-    }
-
     HISTORICO_STATUS_OS {
         string id PK
         string ordem_servico_id FK
@@ -112,7 +101,6 @@ erDiagram
     CLIENTE ||--o{ VEICULO : "1 cliente tem N veiculos"
     CLIENTE ||--o{ ORDEM_SERVICO : "1 cliente abre N OS"
     VEICULO ||--o{ ORDEM_SERVICO : "1 veiculo tem N OS"
-    ORDEM_SERVICO ||--o| ORCAMENTO : "1 OS tem 0..1 orcamento"
     ORDEM_SERVICO ||--o{ OS_PECA : "1 OS tem N itens de peca"
     ORDEM_SERVICO ||--o{ OS_SERVICO : "1 OS tem N itens de servico"
     ORDEM_SERVICO ||--o{ HISTORICO_STATUS_OS : "1 OS tem N eventos de status"
@@ -122,7 +110,7 @@ erDiagram
     PEDIDO_FORNECEDOR ||--o{ PEDIDO_FORNECEDOR_ITEM : "1 pedido tem N itens"
 ```
 
-Três entidades ficam fora das linhas de relacionamento do diagrama porque o
+Duas entidades ficam fora das linhas de relacionamento do diagrama porque o
 schema não declara `@relation` nelas, mesmo guardando um ID de outra
 entidade:
 
@@ -131,8 +119,10 @@ entidade:
 - `ReservaEstoque.ordem_id` e `ReservaEstoque.peca_id`: apontam
   conceitualmente para `OrdemServico` e `Peca`, mas sem `@relation` nem FK
   real no Postgres.
-- `Pagamento.ordemServicoId`: mesma situação, aponta para `OrdemServico`
-  sem FK declarada.
+
+`Orcamento`, `Pagamento` e `WebhookRecebido` saíram do banco do OS Service na
+#330 (migration `20261103180000_remover_contexto_financeiro`): são do Billing
+Service, com banco próprio.
 
 `User` também fica isolado no diagrama: é a entidade de autenticação, sem
 nenhum relacionamento com o domínio de negócio.
@@ -143,7 +133,6 @@ nenhum relacionamento com o domínio de negócio.
 - `SOStatus`: `RECEIVED`, `UNDER_DIAGNOSIS`, `AWAITING_APPROVAL`,
   `IN_PROGRESS`, `AWAITING_PARTS`, `FINISHED`, `DELIVERED`,
   `CLOSED_WITHOUT_EXECUTION`.
-- `EstimateStatus`: `PENDING`, `APPROVED`, `REJECTED`.
 
 ## Modelo relacional
 
@@ -214,22 +203,6 @@ aponta pra um cliente único via `Veiculo.id_cliente`), mas ambos ficam
 gravados direto na OS. Isso evita um join extra pra achar o dono da OS e
 permite, em tese, uma OS registrar um cliente diferente do dono atual do
 veículo (não validado em nenhum lugar do código auditado aqui).
-
-### `Orcamento`
-
-| Coluna | Tipo | Constraints |
-| --- | --- | --- |
-| id | text | PK |
-| id_ordem_servico | text | FK -> `OrdemServico.id`, `ON DELETE CASCADE`, UNIQUE, not null |
-| valor_total_servicos | numeric(10,2) | not null, default 0 |
-| valor_total_pecas | numeric(10,2) | not null, default 0 |
-| valor_total_geral | numeric(10,2) | not null, default 0 |
-| status | `EstimateStatus` (enum) | not null, default `PENDING` |
-| created_at | timestamp | default now() |
-| updated_at | timestamp | auto-update |
-
-O `UNIQUE` em `id_ordem_servico` é o que torna a relação 1:0..1 com
-`OrdemServico` (uma OS tem no máximo um orçamento).
 
 ### `Peca`
 
@@ -330,20 +303,6 @@ referencial garantida pelo banco.
 Postgres não impede inserir uma reserva com `ordem_id`/`peca_id` que não
 existem em `OrdemServico`/`Peca`.
 
-### `Pagamento` (tabela física: `pagamentos`, via `@@map`)
-
-| Coluna | Tipo | Constraints |
-| --- | --- | --- |
-| id | text | PK |
-| ordemServicoId | text | not null, **sem FK** (aponta conceitualmente pra `OrdemServico.id`) |
-| valor | numeric(10,2) | not null |
-| status | text | not null (sem enum do Prisma) |
-| createdAt | timestamp | default now() |
-
-Única tabela sem `updated_at`, e a única com colunas em camelCase
-(`ordemServicoId`, `createdAt`) em vez do `snake_case` usado no resto do
-schema.
-
 ### `HistoricoStatusOS` (tabela física: `historico_status_os`, via `@@map`)
 
 | Coluna | Tipo | Constraints |
@@ -365,7 +324,6 @@ Log de eventos, imutável por natureza: só tem `data_hora`, sem
 | `Veiculo` | `id_cliente` | `Cliente` | CASCADE | N:1 |
 | `OrdemServico` | `id_veiculo` | `Veiculo` | CASCADE | N:1 |
 | `OrdemServico` | `id_cliente` | `Cliente` | CASCADE | N:1 |
-| `Orcamento` | `id_ordem_servico` | `OrdemServico` | CASCADE | 1:1 (UNIQUE) |
 | `OsPeca` | `id_ordem_servico` | `OrdemServico` | CASCADE | N:1 |
 | `OsPeca` | `id_peca` | `Peca` | RESTRICT | N:1 |
 | `OsServico` | `id_ordem_servico` | `OrdemServico` | CASCADE | N:1 |
@@ -394,34 +352,32 @@ Comparado com a linguagem ubíqua descrita em [`ddd.md`](../ddd.md) §2-4:
 | Veículo | `Veiculo` | `Veiculo` | Igual |
 | Serviço | `Servico` | `Servico` | Igual |
 | Peça/Insumo | `PecaInsumo` | `Peca` | Nome diverge: `ddd.md` usa "PecaInsumo", o schema usa "Peca" |
-| Orçamento | `Orcamento` (Value Object da OS, em `ddd.md` §4.1) | `Orcamento` (entidade própria, tabela e FK dedicadas) | `ddd.md` modela como Value Object; a persistência real é uma entidade com identidade própria (`id`, tabela, relação 1:1 com `OrdemServico`) |
+| Orçamento | `Orcamento` (Value Object da OS, em `ddd.md` §4.1) | (nenhuma no OS Service) | Desde a #330 o orçamento é persistido no Billing Service; o OS Service só calcula os totais |
 | Status da OS | `status` (campo simples) | `OrdemServico.status` (enum) + tabela `historico_status_os` | `ddd.md` não menciona o histórico de status como algo persistido à parte |
 | Estoque | `quantidade_estoque` | `Peca.quantidade_estoque` | Igual |
 
 Tabelas sem entrada correspondente na linguagem ubíqua de `ddd.md` (são
 tabelas de suporte/junção, não conceitos de negócio nomeados no documento):
 `User`, `OsPeca`, `OsServico`, `PedidoFornecedor`, `PedidoFornecedorItem`,
-`ReservaEstoque`, `Pagamento`, `HistoricoStatusOS`.
+`ReservaEstoque`, `HistoricoStatusOS`.
 
 ## Convenções observadas (e onde elas quebram)
 
-- **Nomenclatura de tabela**: 15 dos 17 models não usam `@@map`, então a
+- **Nomenclatura de tabela**: 11 dos 12 models não usam `@@map`, então a
   tabela física tem o mesmo nome do model, em PascalCase (`Cliente`,
   `OrdemServico`, `OsPeca` etc.) e precisa de aspas duplas no Postgres.
-  Só `Pagamento` (-> `pagamentos`) e `HistoricoStatusOS` (->
-  `historico_status_os`) usam `@@map` para `snake_case`. Não há
-  justificativa registrada em nenhum commit para essa divergência.
+  Só `HistoricoStatusOS` (-> `historico_status_os`) usa `@@map` para
+  `snake_case`. Não há justificativa registrada em nenhum commit para essa
+  divergência.
 - **Nomenclatura de coluna de timestamp**: a maioria usa
   `created_at`/`updated_at` em `snake_case`. Exceções: `PedidoFornecedor`
-  usa `criado_em`/`atualizado_em` (português), `Pagamento` usa
-  `createdAt` (camelCase) e não tem `updated_at`, e
+  usa `criado_em`/`atualizado_em` (português), e
   `PedidoFornecedorItem`/`ReservaEstoque`/`HistoricoStatusOS` não têm
   `updated_at` nenhum.
-- **Enums do Prisma vs. `status` como texto livre**: `SOStatus` e
-  `EstimateStatus` são enums reais do Prisma (com constraint no banco). Já
-  `PedidoFornecedor.status` e `Pagamento.status` são `text` livre, com os
-  valores válidos garantidos só por convenção no código da aplicação, não
-  pelo banco.
+- **Enums do Prisma vs. `status` como texto livre**: `SOStatus` é enum real
+  do Prisma (com constraint no banco). Já `PedidoFornecedor.status` é `text`
+  livre, com os valores válidos garantidos só por convenção no código da
+  aplicação, não pelo banco.
 
 ## Justificativa do PostgreSQL
 
@@ -491,6 +447,9 @@ do schema até o momento desta tarefa):
 | 2026-05-01 | `41179b6` | Módulo Financeiro: tabela `Pagamento` adicionada, já com `@@map("pagamentos")` (snake_case) — quebrando a convenção fixada três dias antes em `7ff1656`. | "Criação de módulo Financeiro", sem justificativa da escolha de nomenclatura na mensagem do commit. |
 | 2026-06-02 | `f85cdc4` | Tabela de junção `OsServico` adicionada, espelhando o padrão de `OsPeca` para o par `OrdemServico`/`Servico`. | "Criação de fluxo de os-servico". |
 | 2026-07-07 | `03693e9` | Tabela `HistoricoStatusOS` adicionada, também com `@@map("historico_status_os")` (snake_case), repetindo a divergência de `Pagamento`. | "implementação de módulo webhook de status da ordem". |
+| 2026-10-20 | `406ebcf` | `Pagamento` ganha `preference_id` e `link_pagamento` (nulas, snake_case via `@map`) e índice em `ordemServicoId`. Migração aditiva `20261020120000_pagamento_cobranca_mercado_pago`. | Integração com o Mercado Pago Checkout Pro (#325): a aprovação do orçamento cria a cobrança e devolve o link. |
+| 2026-10-20 | — | `Pagamento.ordemServicoId` passa a ser único, ganha `mercado_pago_payment_id` (único) e é criada a tabela `webhook_recebido`. Migração `20261020150000_pagamento_idempotencia_mercado_pago` (falha se já houver dois pagamentos para a mesma OS). | Idempotência da cobrança e do webhook exigida pela #325; o Mercado Pago ignora `X-Idempotency-Key` em preferences. |
+| 2026-11-03 | — | `Orcamento`, `Pagamento` e `WebhookRecebido` removidos, junto com o enum `EstimateStatus` e a FK `Orcamento -> OrdemServico` (`ON DELETE CASCADE`). Migração destrutiva `20261103180000_remover_contexto_financeiro`, com `DROP ... IF EXISTS`. | Extração do contexto Financeiro para o Billing Service (#330); o Billing nasce com banco vazio, sem migração de dados. |
 
 A divergência de nomenclatura registrada na seção
 [Convenções observadas](#convenções-observadas-e-onde-elas-quebram) tem

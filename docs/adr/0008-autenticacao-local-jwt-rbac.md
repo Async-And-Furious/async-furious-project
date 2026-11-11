@@ -2,7 +2,12 @@
 
 ## Status
 
-Aceita
+**Parcialmente substituída** por [ADR-0021](./0021-borda-sem-bff.md) (30/09/2026).
+Na Fase 4 o Lambda Authorizer da borda é a primeira camada de validação do
+token, mas a validação local e o RBAC por papel **permanecem** como segunda
+camada, replicados nos serviços novos (não há `NetworkPolicy`, Feature #313). O
+login de staff e o `User` continuam no OS Service. O conteúdo abaixo descreve a
+autenticação local das Fases 1 a 3 e não é reescrito nem removido.
 
 ## Contexto
 
@@ -70,5 +75,4 @@ dentro dessa exigência.
   `src/auth/strategies/jwt.strategy.ts`, `src/auth/decorators/public.decorator.ts`
 - `README.md` (seção "Autenticacao e Papeis")
 - `docs/context-map/suggestions/context-map.suggestion.vic.mmd`
-- `docs/contexto-tecnico-consolidado.md` §8
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #5)

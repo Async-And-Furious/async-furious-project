@@ -3,8 +3,14 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import type { Application } from 'express';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
+import { DiagnosticoIniciado } from '../src/modules/ordem-servico/domain/events/diagnostico-iniciado.event';
+import { ExecucaoIniciada } from '../src/modules/ordem-servico/domain/events/execucao-iniciada.event';
+import { ExecucaoConcluida } from '../src/modules/ordem-servico/domain/events/execucao-concluida.event';
+import { OrcamentoGerado } from '../src/modules/ordem-servico/domain/events/orcamento-gerado.event';
+import { OrcamentoAprovado } from '../src/modules/ordem-servico/domain/events/orcamento-aprovado.event';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
 import { randomInt } from 'node:crypto';
 
@@ -13,6 +19,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
   let server: ReturnType<typeof request>;
   let prismaService: PrismaService;
   let jwtService: JwtService;
+  let eventEmitter: EventEmitter2;
 
   let recepcionistaToken: string;
   let mecanicoToken: string;
@@ -45,6 +52,7 @@ describe('OrdemServico Happy Flow (e2e)', () => {
     server = request(app.getHttpServer() as unknown as Application);
     prismaService = moduleFixture.get<PrismaService>(PrismaService);
     jwtService = moduleFixture.get<JwtService>(JwtService);
+    eventEmitter = app.get(EventEmitter2);
 
     await prismaService.ordemServico.deleteMany({});
     await prismaService.veiculo.deleteMany({});
@@ -152,17 +160,31 @@ describe('OrdemServico Happy Flow (e2e)', () => {
 
     ordemServicoId = osResponse.body.id;
 
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/assumir`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(200);
+    const statusDaOs = async (): Promise<string> => {
+      const resposta = await server
+        .get(`/ordens-servico/${ordemServicoId}/status`)
+        .set('Authorization', `Bearer ${recepcionistaToken}`)
+        .expect(200);
+      return resposta.body.status as string;
+    };
 
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/analisar`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(200);
+    // Os eventos do Execução e Produção e do Billing são injetados in-process (EventEmitter2), no
+    // lugar dos serviços reais, que não sobem neste teste. Por isso o fluxo do mecânico não chama mais
+    // assumir/analisar/finalizar-execucao: essas rotas saíram do OS Service (ver
+    // test/ordem-servico/controllers/ordem-servico.controller.spec.ts, "rotas migradas").
 
+    // Sem DiagnosticoIniciado a OS segue RECEIVED e servicos-insumos responde erro de estado.
     await server
+      .patch(`/ordens-servico/${ordemServicoId}/servicos-insumos`)
+      .set('Authorization', `Bearer ${mecanicoToken}`)
+      .send({ valor_total_servicos: 300, valor_total_pecas: 0 })
+      .expect(400);
+
+    await eventEmitter.emitAsync('DiagnosticoIniciado', new DiagnosticoIniciado(ordemServicoId));
+    expect(await statusDaOs()).toBe('UNDER_DIAGNOSIS');
+
+    // A resposta devolve só os totais; o Orcamento passa a ser do Billing (OrcamentoCalculado).
+    const totais = await server
       .patch(`/ordens-servico/${ordemServicoId}/servicos-insumos`)
       .set('Authorization', `Bearer ${mecanicoToken}`)
       .send({
@@ -170,13 +192,30 @@ describe('OrdemServico Happy Flow (e2e)', () => {
         valor_total_pecas: 0,
       })
       .expect(200);
+    expect(totais.body).toEqual({
+      ordemServicoId,
+      valorTotalServicos: 300,
+      valorTotalPecas: 0,
+      valorTotalGeral: 300,
+    });
+    // O Orcamento é do Billing (#330): a OS só vai a AWAITING_APPROVAL com o OrcamentoGerado dele.
+    expect(await statusDaOs()).toBe('UNDER_DIAGNOSIS');
+    await eventEmitter.emitAsync('OrcamentoGerado', new OrcamentoGerado(ordemServicoId, 'orc-e2e'));
+    expect(await statusDaOs()).toBe('AWAITING_APPROVAL');
 
-    await server.patch(`/ordens-servico/${ordemServicoId}/orcamento/aprovar`).expect(200);
+    // Aprovação e pagamento acontecem no Billing; OrcamentoAprovado não muda o status da OS.
+    await eventEmitter.emitAsync(
+      'OrcamentoAprovado',
+      new OrcamentoAprovado(ordemServicoId, 'orc-e2e', 0)
+    );
+    expect(await statusDaOs()).toBe('AWAITING_APPROVAL');
 
-    await server
-      .patch(`/ordens-servico/${ordemServicoId}/finalizar-execucao`)
-      .set('Authorization', `Bearer ${mecanicoToken}`)
-      .expect(200);
+    await eventEmitter.emitAsync('ExecucaoIniciada', new ExecucaoIniciada(ordemServicoId));
+    expect(await statusDaOs()).toBe('IN_PROGRESS');
+
+    // A conclusão vem do Execução (PATCH /execucoes/{id}/concluir -> ExecucaoConcluida).
+    await eventEmitter.emitAsync('ExecucaoConcluida', new ExecucaoConcluida(ordemServicoId));
+    expect(await statusDaOs()).toBe('FINISHED');
 
     await server
       .patch(`/ordens-servico/${ordemServicoId}/aprovar-servico`)
@@ -196,6 +235,12 @@ describe('OrdemServico Happy Flow (e2e)', () => {
     expect(statusResponse.body).toEqual({
       ordemServicoId,
       status: 'DELIVERED',
+      marcos: {
+        createdAt: expect.any(String),
+        iniciadaEm: expect.any(String),
+        finalizadaEm: expect.any(String),
+        entregueEm: expect.any(String),
+      },
     });
   });
 });

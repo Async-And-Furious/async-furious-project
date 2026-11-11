@@ -2,6 +2,7 @@ name: Terraform & Kubernetes
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     paths:
       - "infra/**"
       - "k8s/**"
@@ -20,7 +21,7 @@ jobs:
   # PRs: apenas valida e planeja, sem provisionar nada (rapido, seguro para rodar em toda PR)
   plan:
     name: Terraform Validate & Plan
-    if: github.event_name == 'pull_request'
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
 
     steps:

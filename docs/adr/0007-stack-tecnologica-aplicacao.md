@@ -58,5 +58,4 @@ registro de descarte de outras opções.
 
 - `README.md` (seção "Tecnologias")
 - `prisma/schema.prisma`
-- `docs/contexto-tecnico-consolidado.md` §8 (decisões consolidadas de stack)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (pontos #2, #3, #4)
