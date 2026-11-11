@@ -151,6 +151,48 @@ describe('Gateway JWT authorization over HTTP', () => {
       .expect(403);
   });
 
+  // #360: o token da Lambda authenticate-customer (só `sub`, sem `role`) era mapeado para
+  // RECEPCIONISTA. Também com claims de staff forjadas, o cliente recebe 403 nas rotas de staff.
+  const OS_ID = '00000000-0000-4000-8000-000000000001';
+  const rotasDeStaff: Array<[string, (bearer: string) => request.Test]> = [
+    [
+      'POST /ordens-servico (RECEPCIONISTA)',
+      (bearer) => server.post('/ordens-servico').set('Authorization', bearer).send({}),
+    ],
+    [
+      'PATCH /ordens-servico/:id/registrar-entrega (RECEPCIONISTA)',
+      (bearer) =>
+        server.patch(`/ordens-servico/${OS_ID}/registrar-entrega`).set('Authorization', bearer),
+    ],
+    [
+      'PATCH /ordens-servico/:id (ADMIN)',
+      (bearer) => server.patch(`/ordens-servico/${OS_ID}`).set('Authorization', bearer).send({}),
+    ],
+    [
+      'DELETE /ordens-servico/:id (ADMIN)',
+      (bearer) => server.delete(`/ordens-servico/${OS_ID}`).set('Authorization', bearer),
+    ],
+    [
+      'GET /ordens-servico/tempo-medio (ADMIN)',
+      (bearer) => server.get('/ordens-servico/tempo-medio').set('Authorization', bearer),
+    ],
+    [
+      'PATCH /ordens-servico/:id/servicos-insumos (MECANICO)',
+      (bearer) =>
+        server
+          .patch(`/ordens-servico/${OS_ID}/servicos-insumos`)
+          .set('Authorization', bearer)
+          .send({}),
+    ],
+  ];
+
+  it.each(rotasDeStaff)('customer token is denied %s', async (_rota, chamar) => {
+    await chamar(`Bearer ${token({ sub: customer.id })}`).expect(403);
+    await chamar(
+      `Bearer ${token({ sub: customer.id, role: 'RECEPCIONISTA', email: staff.email })}`
+    ).expect(403);
+  });
+
   it('preserves database-backed staff access despite token role claims', async () => {
     const bearer = `Bearer ${token({ sub: staff.id, role: 'ADMIN', email: 'forged@invalid.test' })}`;
     await server.get('/ordens-servico').set('Authorization', bearer).expect(200);
