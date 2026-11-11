@@ -1141,7 +1141,7 @@
         ]
       },
       "get": {
-        "description": "Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.",
+        "description": "Requer role ADMIN, RECEPCIONISTA ou MECANICO. Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.",
         "operationId": "OrdemServicoController_listar",
         "parameters": [
           {
@@ -1205,6 +1205,9 @@
           },
           "401": {
             "description": "Não autorizado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO"
           }
         },
         "security": [
@@ -1257,6 +1260,7 @@
     },
     "/api/v1/ordens-servico/{id}": {
       "get": {
+        "description": "Requer role ADMIN, RECEPCIONISTA ou MECANICO.",
         "operationId": "OrdemServicoController_detalhar",
         "parameters": [
           {
@@ -1275,6 +1279,9 @@
           },
           "401": {
             "description": "Não autorizado"
+          },
+          "403": {
+            "description": "Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO"
           },
           "404": {
             "description": "Ordem de serviço não encontrada"
@@ -1409,85 +1416,9 @@
         ]
       }
     },
-    "/api/v1/ordens-servico/{id}/assumir": {
-      "patch": {
-        "deprecated": true,
-        "description": "Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334). Lá o {id} é o da Execução (listar em GET /api/v1/execucoes), não o da OS.",
-        "operationId": "OrdemServicoController_assumir",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OS assumida. Status → Em Diagnóstico"
-          },
-          "400": {
-            "description": "OS não está no status Recebida"
-          },
-          "404": {
-            "description": "Ordem de serviço não encontrada"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)",
-        "tags": [
-          "Ordens Servico"
-        ]
-      }
-    },
-    "/api/v1/ordens-servico/{id}/analisar": {
-      "patch": {
-        "deprecated": true,
-        "description": "Deprecated: sem rota equivalente; o registro da análise é absorvido por PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334), onde o {id} é o da Execução, não o da OS.",
-        "operationId": "OrdemServicoController_analisarVeiculo",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Análise registrada"
-          },
-          "400": {
-            "description": "OS não está Em Diagnóstico"
-          },
-          "404": {
-            "description": "Ordem de serviço não encontrada"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Registrar análise do veículo (UNDER_DIAGNOSIS)",
-        "tags": [
-          "Ordens Servico"
-        ]
-      }
-    },
     "/api/v1/ordens-servico/{id}/servicos-insumos": {
       "patch": {
-        "description": "Registra valores de serviços e peças. Gera orçamento e atualiza OS para Aguardando Aprovação.",
+        "description": "Registra valores de serviços e peças, calcula os totais e publica OrcamentoCalculado. Exige a OS em Em Diagnóstico (se DiagnosticoIniciado ainda não foi processado, responde 400 e o mecânico repete). O orçamento é gerado de forma assíncrona; a resposta traz apenas os totais calculados.",
         "operationId": "OrdemServicoController_listarServicosInsumos",
         "parameters": [
           {
@@ -1512,10 +1443,22 @@
         },
         "responses": {
           "200": {
-            "description": "Orçamento gerado. OS → Aguardando Aprovação"
+            "description": "Totais calculados e OrcamentoCalculado publicado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "ordemServicoId": "uuid",
+                    "valorTotalServicos": 450,
+                    "valorTotalPecas": 320.5,
+                    "valorTotalGeral": 770.5
+                  }
+                }
+              }
+            }
           },
           "400": {
-            "description": "OS não está em status válido ou orçamento já aprovado"
+            "description": "OS não está Em Diagnóstico"
           },
           "404": {
             "description": "Ordem de serviço não encontrada"
@@ -1526,7 +1469,7 @@
             "bearer": []
           }
         ],
-        "summary": "Listar serviços e insumos — gera orçamento (UNDER_DIAGNOSIS → AWAITING_APPROVAL)",
+        "summary": "Lançar serviços e insumos — calcula o orçamento (OS em UNDER_DIAGNOSIS)",
         "tags": [
           "Ordens Servico"
         ]
@@ -1601,47 +1544,9 @@
         ]
       }
     },
-    "/api/v1/ordens-servico/{id}/finalizar-execucao": {
-      "patch": {
-        "deprecated": true,
-        "description": "Deprecated: migra para PATCH /api/v1/execucoes/{id}/concluir no serviço de Execução e Produção (#334). Lá o {id} é o da Execução, não o da OS.",
-        "operationId": "OrdemServicoController_finalizarExecucao",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Execução finalizada. OS → Finalizada"
-          },
-          "400": {
-            "description": "OS não está Em Execução"
-          },
-          "404": {
-            "description": "Ordem de serviço não encontrada"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Mecânico finaliza execução do serviço (IN_PROGRESS → FINISHED)",
-        "tags": [
-          "Ordens Servico"
-        ]
-      }
-    },
     "/api/v1/ordens-servico/{id}/aprovar-servico": {
       "patch": {
-        "description": "Confirma que o serviço finalizado está de acordo. A OS permanece Finalizada; a entrega é registrada separadamente pela recepção.",
+        "description": "Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção.",
         "operationId": "OrdemServicoController_aprovarServicoPrestado",
         "parameters": [
           {
@@ -1678,7 +1583,7 @@
     },
     "/api/v1/ordens-servico/{id}/registrar-entrega": {
       "patch": {
-        "description": "Registra a entrega do veículo e move a OS para Entregue.",
+        "description": "Ato de balcão: registra a retirada do veículo e move a OS de Finalizada para Entregue. Único caminho para Entregue.",
         "operationId": "OrdemServicoController_registrarEntrega",
         "parameters": [
           {
@@ -1751,35 +1656,6 @@
         "summary": "Reprocessar manualmente o status da OS (canal de exceção)",
         "tags": [
           "Webhooks"
-        ]
-      }
-    },
-    "/api/v1/pagamentos/registrar": {
-      "post": {
-        "operationId": "PagamentoController_registrar",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RegistrarPagamentoDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "tags": [
-          "Pagamento"
         ]
       }
     },
@@ -2479,7 +2355,7 @@
           },
           "status": {
             "type": "string",
-            "description": "Novo status da Ordem de Serviço",
+            "description": "Novo status da Ordem de Serviço. DELIVERED não é aceito: use PATCH /ordens-servico/:id/registrar-entrega.",
             "enum": [
               "RECEIVED",
               "UNDER_DIAGNOSIS",
@@ -2500,25 +2376,6 @@
         "required": [
           "osId",
           "status"
-        ]
-      },
-      "RegistrarPagamentoDto": {
-        "type": "object",
-        "properties": {
-          "ordemServicoId": {
-            "type": "string",
-            "example": "uuid-da-ordem-de-servico",
-            "description": "ID da Ordem de Serviço vinculada ao pagamento"
-          },
-          "valor": {
-            "type": "number",
-            "example": 150.5,
-            "description": "Ignorado: o valor vem da cobrança do Mercado Pago. Mantido opcional por compatibilidade.",
-            "deprecated": true
-          }
-        },
-        "required": [
-          "ordemServicoId"
         ]
       },
       "HealthResponseDto": {

@@ -180,11 +180,11 @@ describe('Gateway JWT authorization over HTTP', () => {
     }
   );
 
-  it('keeps order status and tracking public', async () => {
+  it('keeps order status public and the removed tracking alias returns 404', async () => {
     await server.get('/ordens-servico/00000000-0000-4000-8000-000000000001/status').expect(200);
     await server
       .get('/ordens-servico/00000000-0000-4000-8000-000000000001/rastreamento')
-      .expect(200);
+      .expect(404);
   });
 
   it.each(['missing-customer', 'inactive-customer'])('%s cannot authenticate', async (sub) => {

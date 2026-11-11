@@ -113,5 +113,4 @@ describe('UpdateServiceOrderStatusUseCase', () => {
     expect(historyRepo.create).toHaveBeenCalledTimes(1);
     expect(emissor.emitir).toHaveBeenCalledTimes(1);
   });
-
 });
