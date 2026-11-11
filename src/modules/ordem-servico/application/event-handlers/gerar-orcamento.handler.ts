@@ -5,10 +5,14 @@ import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emiss
 import type { IOrcamentoRepository } from '../../domain/interfaces/orcamento.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { OrcamentoVo } from '../../domain/value-objects/orcamento.vo';
-import { ServicosEInsumosListados } from '../../domain/events/servicos-e-insumos-listados.event';
+import { OrcamentoCalculado } from '../../domain/events/orcamento-calculado.event';
 import { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event';
 import type { Orcamento } from '../../domain/entities/orcamento.entity';
 
+/**
+ * Transitório: enquanto o Billing Service não assume o Orcamento, este handler faz in-process o
+ * papel de consumidor de OrcamentoCalculado (persiste o Orcamento e emite OrcamentoGerado).
+ */
 @Injectable()
 export class GerarOrcamentoHandler {
   constructor(
@@ -17,8 +21,8 @@ export class GerarOrcamentoHandler {
     private readonly emissor: IEmissorEventos
   ) {}
 
-  @OnEvent('ServicosEInsumosListados')
-  async handle(evento: ServicosEInsumosListados): Promise<void> {
+  @OnEvent('OrcamentoCalculado')
+  async handle(evento: OrcamentoCalculado): Promise<void> {
     const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
 
     if (!['UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'].includes(os.status)) {

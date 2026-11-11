@@ -171,23 +171,22 @@ mesmo use case de `/status`).
 - **Refresh por id:** a projeção relê o agregado do Postgres e faz `replaceOne` com
   `upsert` do documento inteiro. O **mesmo builder** de documento serve ao job de rebuild (§6).
   Mudança em `Cliente` reprojeta o `cliente_read_model` daquele cliente.
-- **Histórico de status no repository:** `OrdemServicoRepository.update`
-  passa a gravar `HistoricoStatusOS` **sempre que `data.status` muda**, no
-  mesmo `$transaction` da atualização da OS; `OrdemServicoUpdateData` ganha o
-  campo opcional `motivo`. Hoje só `UpdateServiceOrderStatusUseCase` grava
-  histórico, enquanto 8 handlers de `atualizar-status-*` e o
-  `AtualizarOrdemServicoUseCase` gravam o status direto sem histórico; a
-  mudança garante o histórico em **todos** os caminhos. O
-  `UpdateServiceOrderStatusUseCase` **deixa de gravar** o histórico por conta
-  própria (senão a linha duplicaria) e só repassa o `motivo`. O
-  `new PrismaClient()` extra de `status-history.repository.ts` é removido.
-  Exceção deliberada: ao consumir `PagamentoConfirmado`, o OS Service grava
-  `pago_em` e uma linha de histórico (motivo "pagamento confirmado") **sem
-  mudar o status**; `pago_em` não entra no `os_read_model`.
-- **Ponto exato:** **depois** da transação do repository (OS + histórico) —
-  nunca antes, para nunca projetar um estado que pode ainda ser revertido.
-  Hoje não existe `prisma.$transaction` no código; "após o commit" significa
-  "após a transação do repository".
+- **Histórico de status — estado atual:** a criação em
+  `OrdemServicoRepository.create` grava diretamente o registro inicial
+  `RECEIVED`. Nas demais escritas, handlers/use cases que precisam registrar
+  histórico o fazem explicitamente por meio do `StatusHistoryRepository`;
+  `OrdemServicoRepository.update` não o grava automaticamente. A cobertura
+  depende do caminho de escrita e não se presume universal. Também não se
+  presume atomicidade entre atualização da OS e gravação do histórico.
+- **Proposta (não descrever como implementação atual):** centralizar no
+  repository a gravação de `HistoricoStatusOS` para mudanças de status e
+  associá-la à atualização da OS numa transação, evitando dependência dos
+  callers. Isso requer mudança de código e validação antes de ser tratado como
+  comportamento implementado. O caso `PagamentoConfirmado` grava `pago_em` e
+  histórico sem mudar o status; `pago_em` não entra no `os_read_model`.
+- **Ponto proposto:** projetar **depois** da transação do repository (OS +
+  histórico), nunca antes. Essa transação ainda não está implementada; o
+  comportamento atual não garante atomicidade entre OS e histórico.
 - **Atualização desde `RECEIVED`:** a criação da OS (`POST
   /ordens-servico`) já escreve o primeiro documento em `os_read_model`.
 - **Comportamento em caso de falha na escrita do read model:** o Postgres
@@ -232,6 +231,14 @@ recriadas:
 - `itens` (peças/serviços) e `historico` da OS, `veiculos` e
   `resumoOrdensServico` do cliente — cortados do escopo inicial
   (30/09/2026); continuam só no Postgres.
+- Colunas de coordenação da saga em `OrdemServico`: existem só para o OS Service
+  decidir a próxima transição e não entram no `os_read_model`. `pago_em` ainda não
+  existe no schema (a criar na Feature que consome `PagamentoConfirmado`).
+  `reserva_pecas_pendente` (`BOOLEAN NOT NULL DEFAULT false`, migration
+  `20261027120000_os_reserva_pecas_pendente`) é ligada por `PecasIndisponiveis`
+  e desligada por `PecasReservadas`; a migration é aditiva e idempotente, sem
+  backfill (OS existentes assumem `false`). Detalhe em
+  [`os-service-integracao-execucao.md`](./os-service-integracao-execucao.md).
 - O estado do Execução e Produção — serviço com Postgres próprio, sem
   NoSQL (`service-boundaries.md`, §1.3).
 - Nenhuma escrita de negócio vai direto para o DocumentDB — toda escrita

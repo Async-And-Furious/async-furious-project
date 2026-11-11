@@ -36,11 +36,8 @@ import { CurrentUser } from '../../../../auth/decorators/current-user.decorator'
 import type { AuthUser } from '../../../../auth/types/auth.types';
 import {
   CriarOrdemServicoUseCase,
-  AssumirOrdemServicoUseCase,
-  AnalisarVeiculoUseCase,
   ListarServicosInsumosNaOsUseCase,
   AtualizarOrdemServicoUseCase,
-  FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
   RegistrarEntregaVeiculoUseCase,
   ConsultarStatusOrdemServicoUseCase,
@@ -62,10 +59,6 @@ export class OrdemServicoController {
   constructor(
     @Inject(CriarOrdemServicoUseCase)
     private readonly criarUseCase: CriarOrdemServicoUseCase,
-    @Inject(AssumirOrdemServicoUseCase)
-    private readonly assumirUseCase: AssumirOrdemServicoUseCase,
-    @Inject(AnalisarVeiculoUseCase)
-    private readonly analisarVeiculoUseCase: AnalisarVeiculoUseCase,
     @Inject(ListarServicosInsumosNaOsUseCase)
     private readonly listarServicosInsumosUseCase: ListarServicosInsumosNaOsUseCase,
     @Inject(AtualizarOrdemServicoUseCase)
@@ -74,8 +67,6 @@ export class OrdemServicoController {
     private readonly aprovarOrcamentoUseCase: AprovarOrcamentoUseCase,
     @Inject(RecusarOrcamentoUseCase)
     private readonly recusarOrcamentoUseCase: RecusarOrcamentoUseCase,
-    @Inject(FinalizarExecucaoUseCase)
-    private readonly finalizarExecucaoUseCase: FinalizarExecucaoUseCase,
     @Inject(AprovarServicoPrestadoUseCase)
     private readonly aprovarServicoPrestadoUseCase: AprovarServicoPrestadoUseCase,
     @Inject(RegistrarEntregaVeiculoUseCase)
@@ -111,10 +102,12 @@ export class OrdemServicoController {
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
   @ApiOperation({
     summary: 'Listar ordens de serviço ativas por prioridade',
     description:
-      'Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
+      'Requer role ADMIN, RECEPCIONISTA ou MECANICO. Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
   })
   @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
@@ -138,6 +131,10 @@ export class OrdemServicoController {
     },
   })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO',
+  })
   listar(@Query() query: ListQueryDto) {
     return this.listarUseCase.execute(Number(query.page) || 1, Number(query.limit) || 10);
   }
@@ -164,10 +161,19 @@ export class OrdemServicoController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalhar ordem de serviço' })
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
+  @ApiOperation({
+    summary: 'Detalhar ordem de serviço',
+    description: 'Requer role ADMIN, RECEPCIONISTA ou MECANICO.',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Ordem de serviço encontrada' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO',
+  })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   detalhar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
     return this.detalharUseCase.execute(id);
@@ -223,55 +229,31 @@ export class OrdemServicoController {
     return this.deletarUseCase.execute(id);
   }
 
-  @Patch(':id/assumir')
-  @UseGuards(RolesGuard)
-  @Roles(Role.MECANICO)
-  @ApiOperation({
-    summary: 'Mecânico assume a OS — inicia diagnóstico (RECEIVED → UNDER_DIAGNOSIS)',
-    description:
-      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334). Lá o {id} é o da Execução (listar em GET /api/v1/execucoes), não o da OS.',
-    deprecated: true,
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'OS assumida. Status → Em Diagnóstico' })
-  @ApiResponse({ status: 400, description: 'OS não está no status Recebida' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  assumir(@Param('id', ParseUUIDPipe) id: string) {
-    return this.assumirUseCase.execute(id);
-  }
-
-  @Patch(':id/analisar')
-  @UseGuards(RolesGuard)
-  @Roles(Role.MECANICO)
-  @ApiOperation({
-    summary: 'Registrar análise do veículo (UNDER_DIAGNOSIS)',
-    description:
-      'Deprecated: sem rota equivalente; o registro da análise é absorvido por PATCH /api/v1/execucoes/{id}/iniciar-diagnostico no serviço de Execução e Produção (#334), onde o {id} é o da Execução, não o da OS.',
-    deprecated: true,
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Análise registrada' })
-  @ApiResponse({ status: 400, description: 'OS não está Em Diagnóstico' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  analisarVeiculo(@Param('id', ParseUUIDPipe) id: string) {
-    return this.analisarVeiculoUseCase.execute(id);
-  }
-
   @Patch(':id/servicos-insumos')
   @UseGuards(RolesGuard)
   @Roles(Role.MECANICO)
   @ApiOperation({
-    summary: 'Listar serviços e insumos — gera orçamento (UNDER_DIAGNOSIS → AWAITING_APPROVAL)',
+    summary: 'Lançar serviços e insumos — calcula o orçamento (OS em UNDER_DIAGNOSIS)',
     description:
-      'Registra valores de serviços e peças. Gera orçamento e atualiza OS para Aguardando Aprovação.',
+      'Registra valores de serviços e peças, calcula os totais e publica OrcamentoCalculado. ' +
+      'Exige a OS em Em Diagnóstico (se DiagnosticoIniciado ainda não foi processado, responde 400 e o mecânico repete). ' +
+      'O orçamento é gerado de forma assíncrona; a resposta traz apenas os totais calculados.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiBody({ type: GerarOrcamentoDto })
-  @ApiResponse({ status: 200, description: 'Orçamento gerado. OS → Aguardando Aprovação' })
   @ApiResponse({
-    status: 400,
-    description: 'OS não está em status válido ou orçamento já aprovado',
+    status: 200,
+    description: 'Totais calculados e OrcamentoCalculado publicado',
+    schema: {
+      example: {
+        ordemServicoId: 'uuid',
+        valorTotalServicos: 450,
+        valorTotalPecas: 320.5,
+        valorTotalGeral: 770.5,
+      },
+    },
   })
+  @ApiResponse({ status: 400, description: 'OS não está Em Diagnóstico' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   listarServicosInsumos(@Param('id', ParseUUIDPipe) id: string, @Body() dto: GerarOrcamentoDto) {
     return this.listarServicosInsumosUseCase.execute(id, dto);
@@ -320,28 +302,11 @@ export class OrdemServicoController {
     return this.recusarOrcamentoUseCase.execute(id);
   }
 
-  @Patch(':id/finalizar-execucao')
-  @UseGuards(RolesGuard)
-  @Roles(Role.MECANICO)
-  @ApiOperation({
-    summary: 'Mecânico finaliza execução do serviço (IN_PROGRESS → FINISHED)',
-    description:
-      'Deprecated: migra para PATCH /api/v1/execucoes/{id}/concluir no serviço de Execução e Produção (#334). Lá o {id} é o da Execução, não o da OS.',
-    deprecated: true,
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Execução finalizada. OS → Finalizada' })
-  @ApiResponse({ status: 400, description: 'OS não está Em Execução' })
-  @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
-  finalizarExecucao(@Param('id', ParseUUIDPipe) id: string) {
-    return this.finalizarExecucaoUseCase.execute(id);
-  }
-
   @Patch(':id/aprovar-servico')
   @ApiOperation({
     summary: 'Aprovar o serviço prestado (requer JWT)',
     description:
-      'Confirma que o serviço finalizado está de acordo. A OS permanece Finalizada; a entrega é registrada separadamente pela recepção.',
+      'Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Serviço aprovado. OS permanece Finalizada' })
@@ -356,7 +321,8 @@ export class OrdemServicoController {
   @Roles(Role.RECEPCIONISTA)
   @ApiOperation({
     summary: 'Registrar entrega do veículo',
-    description: 'Registra a entrega do veículo e move a OS para Entregue.',
+    description:
+      'Ato de balcão: registra a retirada do veículo e move a OS de Finalizada para Entregue. Único caminho para Entregue.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Entrega registrada. OS → Entregue' })

@@ -17,11 +17,8 @@ import { OrdemServicoBacklogAdapter } from './infrastructure/adapters/ordem-serv
 import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
 import {
   CriarOrdemServicoUseCase,
-  AssumirOrdemServicoUseCase,
-  AnalisarVeiculoUseCase,
   ListarServicosInsumosNaOsUseCase,
   AtualizarOrdemServicoUseCase,
-  FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
   RegistrarEntregaVeiculoUseCase,
   ConsultarStatusOrdemServicoUseCase,
@@ -31,6 +28,8 @@ import {
 } from './application/use-cases/ordem-servico.use-cases';
 import { UpdateServiceOrderStatusUseCase } from './application/use-cases/update-service-order-status.use-case';
 import { StatusTransitionService } from './domain/services/status-transition.service';
+import { OS_STATUS_TRANSITION_LOGGER } from './application/logging/log-os-status-transition';
+import { OsStatusTransitionPinoLogger } from './infrastructure/logging/os-status-transition-pino-logger';
 import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
 import { ServiceOrderStatusWebhookController } from './presentation/controllers/service-order-status-webhook.controller';
 import {
@@ -46,14 +45,25 @@ import { GerarOrcamentoHandler } from './application/event-handlers/gerar-orcame
 import { EnviarOrcamentoHandler } from './application/event-handlers/enviar-orcamento.handler';
 import { AtualizarStatusAguardandoAprovacaoHandler } from './application/event-handlers/atualizar-status-aguardando-aprovacao.handler';
 import { VerificarNecessidadePecasHandler } from './application/event-handlers/verificar-necessidade-pecas.handler';
+import { AtualizarStatusExecucaoIniciadaHandler } from './application/event-handlers/atualizar-status-execucao-iniciada.handler';
 import { AtualizarStatusEmExecucaoHandler } from './application/event-handlers/atualizar-status-em-execucao.handler';
 import { IniciarMonitoramentoTempoHandler } from './application/event-handlers/iniciar-monitoramento-tempo.handler';
 import { AtualizarStatusFinalizadaHandler } from './application/event-handlers/atualizar-status-finalizada.handler';
 import { FinalizarMonitoramentoTempoHandler } from './application/event-handlers/finalizar-monitoramento-tempo.handler';
 import { NotificarClienteConclusaoHandler } from './application/event-handlers/notificar-cliente-conclusao.handler';
-import { AtualizarStatusEntregueHandler } from './application/event-handlers/atualizar-status-entregue.handler';
 import { AtualizarStatusEncerradaSemExecucaoHandler } from './application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { AtualizarStatusAguardandoPecasHandler } from './application/event-handlers/atualizar-status-aguardando-pecas.handler';
+import { RegistrarPagamentoConfirmadoHandler } from './application/event-handlers/registrar-pagamento-confirmado.handler';
+import { PonteEventosIntegracaoListener } from './infrastructure/messaging/ponte-eventos-integracao.listener';
+import { KafkaConsumidorSaga } from './infrastructure/messaging/kafka-consumidor-saga';
+import {
+  despachantesBilling,
+  despachantesExecucao,
+} from './infrastructure/messaging/despachantes-saga';
+import {
+  PUBLICADOR_INTEGRACAO,
+  IPublicadorIntegracao,
+} from '../../shared/domain/interfaces/publicador-integracao.interface';
 import { NotificacaoClienteStub } from './infrastructure/gateways/notificacao-cliente.stub';
 import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cliente.gateway';
 import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
@@ -67,6 +77,10 @@ import {
   imports: [FinanceiroModule],
   controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
   providers: [
+    {
+      provide: OS_STATUS_TRANSITION_LOGGER,
+      useFactory: () => new OsStatusTransitionPinoLogger(),
+    },
     OrdemServicoRepository,
     OrcamentoRepository,
     OsPecaRepository,
@@ -82,6 +96,47 @@ import {
     OsPecaRepository,
     EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
+    {
+      provide: PonteEventosIntegracaoListener,
+      useFactory: (publicador: IPublicadorIntegracao) =>
+        new PonteEventosIntegracaoListener(publicador),
+      inject: [PUBLICADOR_INTEGRACAO],
+    },
+    {
+      provide: KafkaConsumidorSaga,
+      useFactory: (
+        emDiagnostico: AtualizarStatusEmDiagnosticoHandler,
+        execucaoIniciada: AtualizarStatusExecucaoIniciadaHandler,
+        finalizada: AtualizarStatusFinalizadaHandler,
+        aguardandoAprovacao: AtualizarStatusAguardandoAprovacaoHandler,
+        verificarNecessidadePecas: VerificarNecessidadePecasHandler,
+        encerradaSemExecucao: AtualizarStatusEncerradaSemExecucaoHandler,
+        pagamentoConfirmado: RegistrarPagamentoConfirmadoHandler,
+        publicador: IPublicadorIntegracao
+      ) =>
+        new KafkaConsumidorSaga(
+          {
+            ...despachantesExecucao({ emDiagnostico, execucaoIniciada, finalizada }),
+            ...despachantesBilling({
+              aguardandoAprovacao,
+              verificarNecessidadePecas,
+              encerradaSemExecucao,
+              pagamentoConfirmado,
+            }),
+          },
+          publicador
+        ),
+      inject: [
+        AtualizarStatusEmDiagnosticoHandler,
+        AtualizarStatusExecucaoIniciadaHandler,
+        AtualizarStatusFinalizadaHandler,
+        AtualizarStatusAguardandoAprovacaoHandler,
+        VerificarNecessidadePecasHandler,
+        AtualizarStatusEncerradaSemExecucaoHandler,
+        RegistrarPagamentoConfirmadoHandler,
+        PUBLICADOR_INTEGRACAO,
+      ],
+    },
     { provide: NOTIFICACAO_CLIENTE_GATEWAY, useClass: NotificacaoClienteStub },
 
     // Event handlers (registered as NestJS providers — @OnEvent listeners)
@@ -92,9 +147,12 @@ import {
     },
     {
       provide: AtualizarStatusEmDiagnosticoHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEmDiagnosticoHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusEmDiagnosticoHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
     {
       provide: NotificarClienteDiagnosticoHandler,
@@ -124,20 +182,39 @@ import {
     },
     {
       provide: AtualizarStatusAguardandoPecasHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusAguardandoPecasHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusAguardandoPecasHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
     {
       provide: VerificarNecessidadePecasHandler,
-      useFactory: (barramento: IEmissorEventos) => new VerificarNecessidadePecasHandler(barramento),
-      inject: [EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        historicoRepo: StatusHistoryRepository,
+        barramento: IEmissorEventos
+      ) => new VerificarNecessidadePecasHandler(osRepo, historicoRepo, barramento),
+      inject: [OrdemServicoRepository, StatusHistoryRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarStatusEmExecucaoHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEmExecucaoHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusEmExecucaoHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
+    },
+    {
+      provide: AtualizarStatusExecucaoIniciadaHandler,
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService
+      ) => new AtualizarStatusExecucaoIniciadaHandler(osRepo, barramento, transicaoSvc),
+      inject: [OrdemServicoRepository, EMISSOR_EVENTOS, StatusTransitionService],
     },
     {
       provide: IniciarMonitoramentoTempoHandler,
@@ -146,9 +223,27 @@ import {
     },
     {
       provide: AtualizarStatusFinalizadaHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusFinalizadaHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        historyRepo: StatusHistoryRepository,
+        barramento: IEmissorEventos,
+        transicaoSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) =>
+        new AtualizarStatusFinalizadaHandler(
+          osRepo,
+          historyRepo,
+          barramento,
+          transicaoSvc,
+          transitionLogger
+        ),
+      inject: [
+        OrdemServicoRepository,
+        StatusHistoryRepository,
+        EMISSOR_EVENTOS,
+        StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
+      ],
     },
     {
       provide: FinalizarMonitoramentoTempoHandler,
@@ -163,16 +258,34 @@ import {
       inject: [NOTIFICACAO_CLIENTE_GATEWAY, EMISSOR_EVENTOS],
     },
     {
-      provide: AtualizarStatusEntregueHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEntregueHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      provide: AtualizarStatusEncerradaSemExecucaoHandler,
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        barramento: IEmissorEventos,
+        historicoRepo: StatusHistoryRepository,
+        transicaoSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) =>
+        new AtualizarStatusEncerradaSemExecucaoHandler(
+          osRepo,
+          barramento,
+          historicoRepo,
+          transicaoSvc,
+          transitionLogger
+        ),
+      inject: [
+        OrdemServicoRepository,
+        EMISSOR_EVENTOS,
+        StatusHistoryRepository,
+        StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
+      ],
     },
     {
-      provide: AtualizarStatusEncerradaSemExecucaoHandler,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AtualizarStatusEncerradaSemExecucaoHandler(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      provide: RegistrarPagamentoConfirmadoHandler,
+      useFactory: (osRepo: OrdemServicoRepository, historicoRepo: StatusHistoryRepository) =>
+        new RegistrarPagamentoConfirmadoHandler(osRepo, historicoRepo),
+      inject: [OrdemServicoRepository, StatusHistoryRepository],
     },
 
     // Use Cases
@@ -204,26 +317,13 @@ import {
       ],
     },
     {
-      provide: AssumirOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AssumirOrdemServicoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
-    },
-    {
-      provide: AnalisarVeiculoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new AnalisarVeiculoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
-    },
-    {
       provide: ListarServicosInsumosNaOsUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
-        orcRepo: OrcamentoRepository,
         osPecaRepo: OsPecaRepository,
         barramento: IEmissorEventos
-      ) => new ListarServicosInsumosNaOsUseCase(osRepo, orcRepo, osPecaRepo, barramento),
-      inject: [OrdemServicoRepository, OrcamentoRepository, OsPecaRepository, EMISSOR_EVENTOS],
+      ) => new ListarServicosInsumosNaOsUseCase(osRepo, osPecaRepo, barramento),
+      inject: [OrdemServicoRepository, OsPecaRepository, EMISSOR_EVENTOS],
     },
     {
       provide: AtualizarOrdemServicoUseCase,
@@ -255,12 +355,6 @@ import {
       inject: [OrdemServicoRepository, OrcamentoRepository, EMISSOR_EVENTOS],
     },
     {
-      provide: FinalizarExecucaoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new FinalizarExecucaoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
-    },
-    {
       provide: AprovarServicoPrestadoUseCase,
       useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
         new AprovarServicoPrestadoUseCase(osRepo, barramento),
@@ -268,9 +362,11 @@ import {
     },
     {
       provide: RegistrarEntregaVeiculoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository, barramento: IEmissorEventos) =>
-        new RegistrarEntregaVeiculoUseCase(osRepo, barramento),
-      inject: [OrdemServicoRepository, EMISSOR_EVENTOS],
+      useFactory: (
+        osRepo: OrdemServicoRepository,
+        atualizarStatus: UpdateServiceOrderStatusUseCase
+      ) => new RegistrarEntregaVeiculoUseCase(osRepo, atualizarStatus),
+      inject: [OrdemServicoRepository, UpdateServiceOrderStatusUseCase],
     },
     {
       provide: ConsultarStatusOrdemServicoUseCase,
@@ -305,13 +401,22 @@ import {
         osRepo: OrdemServicoRepository,
         historyRepo: StatusHistoryRepository,
         barramento: IEmissorEventos,
-        transitionSvc: StatusTransitionService
-      ) => new UpdateServiceOrderStatusUseCase(osRepo, historyRepo, barramento, transitionSvc),
+        transitionSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) =>
+        new UpdateServiceOrderStatusUseCase(
+          osRepo,
+          historyRepo,
+          barramento,
+          transitionSvc,
+          transitionLogger
+        ),
       inject: [
         OrdemServicoRepository,
         StatusHistoryRepository,
         EMISSOR_EVENTOS,
         StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
       ],
     },
 

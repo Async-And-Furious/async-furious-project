@@ -37,12 +37,17 @@ export class CpfCnpjVo {
     return `${nums.slice(0, 2)}.${nums.slice(2, 5)}.${nums.slice(5, 8)}/${nums.slice(8, 12)}-${nums.slice(12, 14)}`;
   }
 
+  // Forma persistida do documento (só dígitos): busca e gravação usam a mesma.
+  static normalizar(valor: string): string {
+    return valor.replace(/\D/g, '');
+  }
+
   static criar(valor: string, tipo: TipoDocumento): CpfCnpjVo {
     if (!valor || (tipo !== 'CPF' && tipo !== 'CNPJ')) {
       throw new DomainException('Tipo de documento invalido');
     }
 
-    const numeros = valor.replace(/\D/g, '');
+    const numeros = CpfCnpjVo.normalizar(valor);
 
     if (tipo === 'CPF' && !cpf.isValid(numeros)) {
       throw new DomainException('CPF invalido');

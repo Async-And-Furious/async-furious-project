@@ -317,48 +317,6 @@ collection:
             send: true
             store: true
           rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/assumir"
-        name: Assumir Ordem Servico
-        meta:
-          id: req_os_assumir
-          created: 1785600000000
-          modified: 1785600000000
-          isPrivate: false
-          description: "Requires MECANICO role — RECEIVED → UNDER_DIAGNOSIS"
-          sortKey: -1745628000056
-        method: PATCH
-        authentication:
-          type: bearer
-          token: "{{ mecanico_token }}"
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/analisar"
-        name: Analisar Veiculo
-        meta:
-          id: req_os_analisar
-          created: 1785600000000
-          modified: 1785600000000
-          isPrivate: false
-          description: "Requires MECANICO role — registers vehicle analysis"
-          sortKey: -1745628000057
-        method: PATCH
-        authentication:
-          type: bearer
-          token: "{{ mecanico_token }}"
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
       - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/servicos-insumos"
         name: Gerar Orcamento (servicos e insumos)
         meta:
@@ -366,7 +324,7 @@ collection:
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "Requires MECANICO role — generates quote (UNDER_DIAGNOSIS → AWAITING_APPROVAL)"
+          description: "Requires MECANICO role — calcula os totais e publica OrcamentoCalculado (OS em UNDER_DIAGNOSIS); o orçamento é gerado pelo Billing"
           sortKey: -1745628000058
         method: PATCH
         body:
@@ -420,27 +378,6 @@ collection:
           sortKey: -1745628000060
         method: PATCH
         authentication: {}
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
-      - url: "{{ base_url }}/ordens-servico/{{ ordem_id }}/finalizar-execucao"
-        name: Finalizar Execucao
-        meta:
-          id: req_os_finalizar_execucao
-          created: 1785600000000
-          modified: 1785600000000
-          isPrivate: false
-          description: "Requires MECANICO role — IN_PROGRESS → FINISHED"
-          sortKey: -1745628000061
-        method: PATCH
-        authentication:
-          type: bearer
-          token: "{{ mecanico_token }}"
         settings:
           renderRequestBody: true
           encodeUrl: true
@@ -1335,43 +1272,6 @@ collection:
         authentication:
           type: bearer
           token: "{{ admin_token }}"
-        settings:
-          renderRequestBody: true
-          encodeUrl: true
-          followRedirects: global
-          cookies:
-            send: true
-            store: true
-          rebuildPath: true
-  - name: Pagamentos
-    meta:
-      id: fld_pagamentos
-      created: 1785600000010
-      modified: 1785600000010
-      sortKey: -1745628000055
-      description: Payment registration endpoints
-    children:
-      - url: "{{ base_url }}/pagamentos/registrar"
-        name: Registrar Pagamento
-        meta:
-          id: req_pagamento_registrar
-          created: 1785600000010
-          modified: 1785600000010
-          isPrivate: false
-          description: "PUBLIC - No auth required — registers payment for an OS"
-          sortKey: -1745628000055
-        method: POST
-        body:
-          mimeType: application/json
-          text: |-
-            {
-              "ordemServicoId": "{{ ordem_id }}",
-              "valor": 330.00
-            }
-        headers:
-          - name: Content-Type
-            value: application/json
-        authentication: {}
         settings:
           renderRequestBody: true
           encodeUrl: true

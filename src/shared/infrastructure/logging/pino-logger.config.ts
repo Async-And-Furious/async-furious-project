@@ -6,7 +6,7 @@ import type { Options } from 'pino-http';
 const CORRELATION_ID_HEADER = 'x-correlation-id';
 const CORRELATION_ID_PATTERN = /^[a-zA-Z0-9._:-]{1,128}$/;
 // Nome do serviço em todo log (contrato de log, docs/infrastructure/observability.md).
-const SERVICE_NAME = process.env.SERVICE_NAME ?? 'os-service';
+export const SERVICE_NAME = process.env.SERVICE_NAME ?? 'os-service';
 
 /** Campos do envelope do evento consumido (ADR-0018). */
 export interface MessageLogContext {
@@ -51,8 +51,16 @@ export const pinoHttpOptions: Options = {
     if (response.statusCode >= 400) return 'warn';
     return 'info';
   },
+  // Segredos de webhook (status da OS e Mercado Pago) também saem do log: quem
+  // lê o log não pode reusar o header para alterar status ou forjar notificação.
   redact: {
-    paths: ['req.headers.authorization', 'req.headers.cookie', 'res.headers["set-cookie"]'],
+    paths: [
+      'req.headers.authorization',
+      'req.headers.cookie',
+      'req.headers["x-webhook-secret"]',
+      'req.headers["x-signature"]',
+      'res.headers["set-cookie"]',
+    ],
     censor: '[REDACTED]',
   },
 };

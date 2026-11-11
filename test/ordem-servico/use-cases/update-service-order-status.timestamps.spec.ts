@@ -4,7 +4,6 @@ import type { OrdemDeServico } from '../../../src/modules/ordem-servico/domain/e
 import type { IOrdemServicoRepository } from '../../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IStatusHistoryRepository } from '../../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import type { IEmissorEventos } from '../../../src/shared/domain/interfaces/emissor-eventos.interface';
-import { DomainException } from '../../../src/shared/domain/exceptions/domain.exception';
 
 describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
   let repository: { findOne: jest.Mock; update: jest.Mock };
@@ -34,7 +33,8 @@ describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
       repository as unknown as IOrdemServicoRepository,
       historyRepository as unknown as IStatusHistoryRepository,
       emissor as unknown as IEmissorEventos,
-      new StatusTransitionService()
+      new StatusTransitionService(),
+      { log: jest.fn() }
     );
   });
 
@@ -49,12 +49,14 @@ describe('UpdateServiceOrderStatusUseCase (carimbos de data)', () => {
     expect(emissor.emitir).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects DELIVERED instead of stamping entregue_em (delivery goes through registrar-entrega)', async () => {
+  it('stamps entregue_em when the order is delivered', async () => {
     repository.findOne.mockResolvedValue(ordemEm('FINISHED'));
 
-    await expect(useCase.execute('os-1', 'DELIVERED')).rejects.toThrow(DomainException);
+    await useCase.execute('os-1', 'DELIVERED');
 
-    expect(repository.update).not.toHaveBeenCalled();
+    const [, payload] = repository.update.mock.calls[0];
+    expect(payload).toEqual({ status: 'DELIVERED', entregue_em: expect.any(Date) });
+    expect(payload).not.toHaveProperty('finalizada_em');
   });
 
   it('sends only the status for transitions that carry no timestamp', async () => {

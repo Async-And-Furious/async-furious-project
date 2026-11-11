@@ -1,5 +1,52 @@
 # Log de agentes
 
+## 2026-11-10 — Revisão documental do PR #379
+
+- Removida a comparação temporal vencida do overview preliminar e corrigida a
+  classificação da ADR-0003, que propõe EKS na Fase 3. A especificação do desafio
+  citada no índice existe no workspace (`docs/specs/tech-challenge-fase4.md`).
+- O PR #384 permanece aberto e requer harmonização do índice antes de sua
+  integração em `develop`.
+
+## 2026-11-09 — Cobertura SonarCloud no PR #396
+
+- Corrigida a classificação Sonar dos testes `src/**/*.spec.ts` para não serem
+  contados como código de produção; a coleta de cobertura passou a incluir a
+  `JwtStrategy`, com casos para claims inválidas e fallback legado. O gate
+  remoto ainda precisa de uma nova análise.
+- Validação: 96 suítes/1.129 testes passaram; cobertura global 97,02% statements,
+  83,56% branches, 92,98% funções e 97,15% linhas. Typecheck, ESLint focado e
+  build passaram. A estratégia JWT ficou com 95,23% linhas e 84,21% branches.
+  Execução local usou Node 26 (projeto/CI exige Node 22); gate Sonar remoto pendente.
+  Nenhum gate foi afrouxado.
+
+## 2026-10-28 — Índice documental por fase
+
+- Adicionado `docs/phases/README.md` para separar fontes da Fase 4,
+  referências históricas e tipos de evidência; atualizado `docs/README.md`.
+- Nenhuma implementação, ADR ou documento existente foi movido ou alterado.
+
+## 2026-11-07 — Publicação autorizada #345
+
+- Após autorização explícita, este incremento de logs OS será publicado em PR;
+  a abertura executará o diagnóstico HML automático. Esperado: adição temporária
+  do IP `/32` do runner e restauração do endpoint privado. Sem deploy ou merge.
+- A cobertura é parcial/best-effort para os quatro caminhos terminais atuais;
+  não é ledger, contagem exata nem resultado completo da Saga.
+
+## 2026-11-06 — Cobertura de caminhos terminais #345
+
+- Inventariados os caminhos que persistem `FINISHED` e
+  `CLOSED_WITHOUT_EXECUTION`: handler ExecucaoConcluida, handler de recusas
+  chamado por fluxo local HTTP ou Kafka, detector e caso de uso genérico usado
+  pelo webhook de status. Nenhuma outra escrita terminal de status foi
+  encontrada nos casos de uso da aplicação.
+- Incluído o caso genérico sem mudar sua atualização incondicional; o status
+  anterior logado é a leitura pré-update e pode estar desatualizado sob corrida.
+  O registro segue best-effort, não é ledger ou contagem exata.
+- Atualizados spec e documentação; testes focados, typecheck, lint, build e
+  `git diff --check` são executados nesta revisão. Sem push, HML ou AWS.
+
 ## 2026-10-28 — Ajustes da pipeline Fase 4 (#333)
 
 - A decisão vigente da Fase 4 é HML-only: `deploy-prod` fica inerte, e os

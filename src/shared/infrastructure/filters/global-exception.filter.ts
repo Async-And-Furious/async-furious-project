@@ -61,9 +61,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
 
       error = this.normalizeErrorName(error);
-    } else if (exception instanceof Error) {
-      message = exception.message;
     }
+    // Erro não tratado: a resposta leva só a mensagem fixa; o detalhe (host do
+    // banco, tabela, campo) fica no log abaixo.
 
     const errorResponse: ErrorResponse = {
       statusCode,

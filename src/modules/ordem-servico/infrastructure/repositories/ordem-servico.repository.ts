@@ -8,6 +8,7 @@ import {
 import { OrdemDeServico } from '../../domain/entities/ordem-servico.entity';
 import {
   IOrdemServicoRepository,
+  OrdemServicoCondicao,
   OrdemServicoUpdateData,
 } from '../../domain/interfaces/ordem-servico.interface';
 import { EntityNotFoundException } from '../../../../shared/domain/exceptions/entity-not-found.exception';
@@ -29,6 +30,8 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     iniciada_em: Date | null;
     finalizada_em: Date | null;
     entregue_em: Date | null;
+    reserva_pecas_pendente: boolean;
+    pago_em: Date | null;
     created_at: Date;
     updated_at: Date;
     orcamento?: unknown;
@@ -44,6 +47,8 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     entity.iniciada_em = record.iniciada_em;
     entity.finalizada_em = record.finalizada_em;
     entity.entregue_em = record.entregue_em;
+    entity.reservaPecasPendente = record.reserva_pecas_pendente;
+    entity.pago_em = record.pago_em;
     entity.created_at = record.created_at;
     entity.updated_at = record.updated_at;
     if (record.orcamento !== undefined) {
@@ -140,15 +145,50 @@ export class OrdemServicoRepository implements IOrdemServicoRepository {
     await this.findOne(id);
     const record = await this.prisma.ordemServico.update({
       where: { id },
-      data: {
-        ...(data.status && { status: data.status }),
-        ...(data.descricao !== undefined && { descricao: data.descricao }),
-        ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
-        ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
-        ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
-      },
+      data: this.paraDadosPrisma(data),
     });
     return this.mapToEntity(record);
+  }
+
+  async atualizarSeCondicao(
+    id: string,
+    condicao: OrdemServicoCondicao,
+    data: OrdemServicoUpdateData
+  ): Promise<boolean> {
+    const { count } = await this.prisma.ordemServico.updateMany({
+      where: {
+        id,
+        ...(condicao.status !== undefined && { status: condicao.status }),
+        ...(condicao.reserva_pecas_pendente !== undefined && {
+          reserva_pecas_pendente: condicao.reserva_pecas_pendente,
+        }),
+        ...(condicao.pago_em !== undefined && { pago_em: condicao.pago_em }),
+      },
+      data: this.paraDadosPrisma(data),
+    });
+    return count > 0;
+  }
+
+  async findParadasAguardandoAprovacao(limite: Date): Promise<OrdemDeServico[]> {
+    const records = await this.prisma.ordemServico.findMany({
+      where: { status: 'AWAITING_APPROVAL', pago_em: null, updated_at: { lt: limite } },
+      orderBy: { updated_at: 'asc' },
+    });
+    return records.map((record) => this.mapToEntity(record));
+  }
+
+  private paraDadosPrisma(data: OrdemServicoUpdateData) {
+    return {
+      ...(data.status && { status: data.status }),
+      ...(data.descricao !== undefined && { descricao: data.descricao }),
+      ...(data.iniciada_em !== undefined && { iniciada_em: data.iniciada_em }),
+      ...(data.finalizada_em !== undefined && { finalizada_em: data.finalizada_em }),
+      ...(data.entregue_em !== undefined && { entregue_em: data.entregue_em }),
+      ...(data.reserva_pecas_pendente !== undefined && {
+        reserva_pecas_pendente: data.reserva_pecas_pendente,
+      }),
+      ...(data.pago_em !== undefined && { pago_em: data.pago_em }),
+    };
   }
 
   async remove(id: string): Promise<OrdemDeServico> {

@@ -16,6 +16,9 @@ import {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  // SIGTERM do Kubernetes chama os onModuleDestroy: o consumer da saga sai do grupo e o
+  // publicador desconecta, em vez de deixar as partições paradas até o sessionTimeout.
+  app.enableShutdownHooks();
 
   app.use(cookieParser());
 
