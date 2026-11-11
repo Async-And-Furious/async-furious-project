@@ -154,6 +154,18 @@ After starting the project, open Swagger at:
 http://localhost:3000/api/docs
 ```
 
+Swagger describes only the OS Service (title `Async Furious - OS Service`). The `bearer` (JWT) scheme applies to every route except the public ones (`/status`, `auth/login`, `health`, the Mercado Pago webhook and, until #330, `PATCH /ordens-servico/:id/orcamento/aprovar|recusar`), which are exported with `security: []`. The status webhook requires `bearer` and `webhook-secret` (`x-webhook-secret` header) together, in a single requirement. Evidence: the OpenAPI export is versioned at [`docs/http/openapi/os-service.openapi.json`](docs/http/openapi/os-service.openapi.json) and regenerated with `pnpm docs:openapi` (it does not start the server or connect to the database). CI (`tests.yml`) regenerates the file and fails if it diverges from the code.
+
+### OS Service HTTP surface (#332)
+
+- **No REST between services.** Billing and Execution consume no route of this service; everything they need arrives as events ([`saga-flow.md`](docs/architecture/saga-flow.md)).
+- **Public lookup route:** `GET /api/v1/ordens-servico/{id}/status`, no Bearer, minimal response (`ordemServicoId` and `status`, no customer data). At the edge it is the only public OS Service route: `ordens-servico/*` goes through the Lambda Authorizer. **Inside the service, `PATCH /ordens-servico/:id/orcamento/aprovar` and `/recusar` are still `@Public()` until the financial extraction (#330)**, besides `auth/login`, `health` and the Mercado Pago webhook; every other route without a token returns `401`.
+- **Removed, no proxy:** `GET /ordens-servico/:id/rastreamento` (alias of `/status`) and `POST /ordens-servico/:id/aprovar-servico` (duplicate public budget approval) return `404`. `PATCH /ordens-servico/:id/aprovar-servico` stays, authenticated.
+- **RBAC unchanged:** `JwtAuthGuard` and `RolesGuard` keep validating the token locally, as the second layer after the edge Lambda Authorizer (ADR-0021).
+- **Status webhook as an exception:** `POST /webhooks/service-orders/status` is a manual reprocessing channel (JWT + `x-webhook-secret`). Transitions are validated by `StatusTransitionService`, and `DELIVERED` is rejected with `400` (not in the DTO enum): delivery only happens through `registrar-entrega`.
+- **Versioning:** the prefix stays `api/v1`. During Phase 4 breaking changes are accepted inside `v1`, with no parallel `v2`: every consumer is born in this phase and there is no external client to preserve. Each break is recorded in this section and in the related ADR.
+- **Pending on other features:** `pagamentos`, the budget approve/reject routes (still public inside the service) and the `orcamento` field in the OS response leave the service with the financial extraction (#330); the event consumers (`atualizar-status-*.handler.ts`) still check the current status and write directly, without `StatusTransitionService` or history, so the webhook and the consumers do not share the same state machine yet; reading `/status`, `GET /ordens-servico/:id` and `GET /clientes/:id` from the DocumentDB read model comes with #335.
+
 The Insomnia collection with configured routes is available at:
 
 ```text
@@ -206,13 +218,13 @@ docs/http/insomnia.yaml
 | POST | `/ordens-servico` | RECEPCIONISTA | Create service order. |
 | GET | `/ordens-servico` | Authenticated | List service orders. |
 | GET | `/ordens-servico/:id` | Authenticated | Get service order details. |
-| GET | `/ordens-servico/:id/status` | Authenticated | Check service order status. |
+| GET | `/ordens-servico/:id/status` | Public | Check service order status (minimal response, no customer data). |
 | PATCH | `/ordens-servico/:id` | ADMIN | Update service order. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Delete service order. |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Submit services and supplies (service order in `UNDER_DIAGNOSIS`): responds `200` with the calculated totals and publishes `OrcamentoCalculado`. Diagnosis start and execution completion now belong to the Execution service (`PATCH /execucoes/:id/iniciar-diagnostico` and `/concluir`) and reach this service as events. |
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Public | Customer approves estimate; the response includes `linkPagamento` (Mercado Pago Checkout Pro). `502` if Mercado Pago fails (estimate stays pending). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Public | Customer rejects estimate. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Public | Customer approves performed service. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Authenticated | Approve the performed service (OS stays Finished). |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Register delivery (`FINISHED` → `DELIVERED`). The only path to `DELIVERED`: the status webhook rejects that value. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Check average execution time. |
 
@@ -228,6 +240,12 @@ docs/http/insomnia.yaml
 | DELETE | `/pecas/:id` | ADMIN | Delete part or supply. |
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Request parts from supplier. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirm receipt of parts. |
+
+#### Service order status webhook (`/api/v1/webhooks/service-orders`)
+
+| Method | Endpoint | Access | Description |
+| ------ | -------- | ------ | ----------- |
+| POST | `/webhooks/service-orders/status` | Authenticated + `x-webhook-secret` | Manual reprocessing of the OS status through the state machine. `DELIVERED` is rejected (`400`). |
 
 #### Mercado Pago webhook (`/api/v1/webhooks/mercado-pago`)
 

@@ -19,13 +19,13 @@ import {
   ApiQuery,
   ApiBody,
   ApiBearerAuth,
+  ApiSecurity,
 } from '@nestjs/swagger';
 import {
   CreateOrdemServicoDto,
   UpdateOrdemServicoDto,
   ListQueryDto,
   GerarOrcamentoDto,
-  NotificacaoAprovacaoOrcamentoDto,
 } from '../dto/ordem-servico.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../../auth/guards/roles.guard';
@@ -181,21 +181,16 @@ export class OrdemServicoController {
 
   @Get(':id/status')
   @Public()
-  @ApiOperation({ summary: 'Consultar status da OS (para o cliente)' })
+  @ApiSecurity({})
+  @ApiOperation({
+    summary: 'Consultar status da OS (rota pública, sem token)',
+    description:
+      'Rota pública de consulta da OS. Resposta mínima: id e status da OS, sem dados do cliente.',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   consultarStatus(@Param('id', ParseUUIDPipe) id: string) {
-    return this.consultarStatusUseCase.execute(id);
-  }
-
-  @Get(':id/rastreamento')
-  @Public()
-  @ApiOperation({ summary: 'Rastreamento público da ordem de serviço' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Status atual da OS' })
-  rastrear(@Param('id', ParseUUIDPipe) id: string) {
     return this.consultarStatusUseCase.execute(id);
   }
 
@@ -265,10 +260,13 @@ export class OrdemServicoController {
   }
 
   @Patch(':id/orcamento/aprovar')
+  // Pública no serviço até a extração do financeiro (#330); na borda passa pelo authorizer.
   @Public()
+  @ApiSecurity({})
   @ApiOperation({
     summary: 'Aprovar orçamento (cliente) — inicia execução (AWAITING_APPROVAL → IN_PROGRESS)',
-    description: 'Aprova o orçamento da ordem de serviço. Público.',
+    description:
+      'Aprova o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({
@@ -287,11 +285,14 @@ export class OrdemServicoController {
   }
 
   @Patch(':id/orcamento/recusar')
+  // Pública no serviço até a extração do financeiro (#330); na borda passa pelo authorizer.
   @Public()
+  @ApiSecurity({})
   @ApiOperation({
     summary:
       'Recusar orçamento (cliente) — encerra sem execução (AWAITING_APPROVAL → CLOSED_WITHOUT_EXECUTION)',
-    description: 'Recusa o orçamento da ordem de serviço. Público.',
+    description:
+      'Recusa o orçamento da ordem de serviço. Pública no serviço até a extração do financeiro (#330).',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Orçamento recusado. OS → Encerrada Sem Execução' })
@@ -303,7 +304,7 @@ export class OrdemServicoController {
 
   @Patch(':id/aprovar-servico')
   @ApiOperation({
-    summary: 'Cliente aprova o serviço prestado',
+    summary: 'Aprovar o serviço prestado (requer JWT)',
     description:
       'Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção.',
   })
@@ -313,32 +314,6 @@ export class OrdemServicoController {
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   aprovarServicoPrestado(@Param('id', ParseUUIDPipe) id: string) {
     return this.aprovarServicoPrestadoUseCase.execute(id);
-  }
-
-  @Post(':id/aprovar-servico')
-  @Public()
-  @ApiOperation({
-    summary:
-      'Webhook: aprovação ou recusa de orçamento pelo cliente (AWAITING_APPROVAL → IN_PROGRESS | CLOSED_WITHOUT_EXECUTION)',
-    description:
-      'Endpoint público para receber notificações externas de aprovação ou recusa do orçamento. Aprovação move a OS para Em Execução; recusa encerra sem execução.',
-  })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiBody({ type: NotificacaoAprovacaoOrcamentoDto })
-  @ApiResponse({ status: 201, description: 'Decisão registrada. OS atualizada conforme decisão' })
-  @ApiResponse({
-    status: 400,
-    description: 'OS não está em Aguardando Aprovação ou orçamento inválido',
-  })
-  @ApiResponse({ status: 404, description: 'OS ou orçamento não encontrado' })
-  notificarAprovacaoOrcamento(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: NotificacaoAprovacaoOrcamentoDto
-  ) {
-    if (dto.decisao === 'APROVADO') {
-      return this.aprovarOrcamentoUseCase.execute(id);
-    }
-    return this.recusarOrcamentoUseCase.execute(id);
   }
 
   @Patch(':id/registrar-entrega')

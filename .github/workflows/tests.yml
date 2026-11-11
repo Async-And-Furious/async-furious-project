@@ -68,6 +68,9 @@ jobs:
       - name: Type check
         run: pnpm run type:check
 
+      - name: OpenAPI versionado em dia com o código
+        run: pnpm docs:openapi && git diff --exit-code docs/http/openapi
+
       - name: Testes unitários com gate de cobertura (80/80/80/80)
         run: pnpm run test:cov
         env:

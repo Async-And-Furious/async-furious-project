@@ -73,7 +73,7 @@ sequenceDiagram
     API->>API: evento OrdemDeServicoFinalizada
     API->>DB: status=FINISHED, finalizada_em=now()
 
-    Cliente->>API: PATCH /ordens-servico/:id/aprovar-servico (rota @Public, sem token)
+    Cliente->>API: PATCH /ordens-servico/:id/aprovar-servico (autenticada, JWT)
 
     Cliente->>Recepcionista: Retira o veículo (fora do sistema)
     Recepcionista->>API: PATCH /ordens-servico/:id/registrar-entrega (papel RECEPCIONISTA)
@@ -230,6 +230,5 @@ completo, a matriz de falhas e os contratos de eventos estão em
 > integração com o Financeiro e de arquitetura da Fase 4, alinhadas a
 > [`saga-flow.md`](./saga-flow.md) (fonte única do fluxo distribuído). O
 > diagrama descrevia o monólito antes da Feature #334 e foi atualizado por
-> ela (ações do mecânico via Execução e Produção). Observação: o diagrama mostra `PATCH .../aprovar-servico` como
-> `@Public`, mas no código esse `PATCH` é autenticado (a rota pública é o
-> `POST` de mesmo path).
+> ela (ações do mecânico via Execução e Produção). O `PATCH .../aprovar-servico`
+> do diagrama é autenticado; o `POST` público de mesmo path foi removido na #332.

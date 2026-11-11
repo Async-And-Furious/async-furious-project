@@ -208,6 +208,18 @@ Depois de iniciar o projeto, acesse o Swagger em:
 http://localhost:3000/api/docs
 ```
 
+O Swagger descreve só o OS Service (título `Async Furious - OS Service`). O esquema `bearer` (JWT) vale para todas as rotas, exceto as públicas (`/status`, `auth/login`, `health`, o webhook do Mercado Pago e, até a #330, `PATCH /ordens-servico/:id/orcamento/aprovar|recusar`), que saem com `security: []`. O webhook de status exige `bearer` e `webhook-secret` (header `x-webhook-secret`) juntos, em um único requisito. Evidência: o export do OpenAPI fica versionado em [`docs/http/openapi/os-service.openapi.json`](docs/http/openapi/os-service.openapi.json) e é regenerado com `pnpm docs:openapi` (não sobe o servidor nem conecta no banco). O CI (`tests.yml`) regenera o arquivo e falha se ele divergir do código.
+
+### Superfície HTTP do OS Service (#332)
+
+- **Sem REST entre serviços.** Nenhuma rota deste serviço é consumida por Billing ou Execução; tudo o que eles precisam chega por evento ([`saga-flow.md`](docs/architecture/saga-flow.md)).
+- **Rota pública de consulta:** `GET /api/v1/ordens-servico/{id}/status`, sem Bearer, com resposta mínima (`ordemServicoId` e `status`, sem dados do cliente). Na borda é a única rota pública do OS Service: `ordens-servico/*` passa pelo Lambda Authorizer. **No serviço, `PATCH /ordens-servico/:id/orcamento/aprovar` e `/recusar` ainda são `@Public()` até a extração do financeiro (#330)**, além de `auth/login`, `health` e o webhook do Mercado Pago; as demais rotas sem token respondem `401`.
+- **Removidas, sem proxy:** `GET /ordens-servico/:id/rastreamento` (alias de `/status`) e `POST /ordens-servico/:id/aprovar-servico` (aprovação pública duplicada do orçamento) respondem `404`. `PATCH /ordens-servico/:id/aprovar-servico` continua, autenticada.
+- **RBAC inalterado:** `JwtAuthGuard` e `RolesGuard` seguem validando o token localmente, como segunda camada depois do Lambda Authorizer da borda (ADR-0021).
+- **Webhook de status como exceção:** `POST /webhooks/service-orders/status` é um canal de reprocesso manual (JWT + `x-webhook-secret`). A transição é validada pelo `StatusTransitionService`, e `DELIVERED` é rejeitado com `400` (fora do enum do DTO): a entrega só acontece por `registrar-entrega`.
+- **Versionamento:** o prefixo continua `api/v1`. Durante a Fase 4 quebras de contrato são aceitas dentro de `v1`, sem `v2` em paralelo: todos os consumidores nascem nesta fase e não há cliente externo a preservar. Cada quebra é registrada nesta seção e na ADR correspondente.
+- **Pendências de outras features:** `pagamentos`, as rotas de aprovação/recusa de orçamento (ainda públicas no serviço) e o campo `orcamento` na resposta da OS saem do serviço na extração do financeiro (#330); os consumidores de evento (`atualizar-status-*.handler.ts`) ainda checam o status atual e gravam direto, sem `StatusTransitionService` nem histórico, então webhook e consumidores ainda não compartilham a mesma máquina de estados; a leitura de `/status`, `GET /ordens-servico/:id` e `GET /clientes/:id` pelo read model em DocumentDB vem com a #335.
+
 A coleção completa das APIs (formato Insomnia v5) fica versionada no repositório e pode ser importada diretamente pelo link:
 
 [docs/http/insomnia.yaml](https://github.com/Async-And-Furious/async-furious-project/blob/develop/docs/http/insomnia.yaml)
@@ -260,13 +272,13 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | POST | `/ordens-servico` | RECEPCIONISTA | Criar OS. |
 | GET | `/ordens-servico` | Autenticado | Listar OSs. |
 | GET | `/ordens-servico/:id` | Autenticado | Detalhar OS. |
-| GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
+| GET | `/ordens-servico/:id/status` | Público | Consultar status da OS (resposta mínima, sem dados do cliente). |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
 | PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Lançar serviços e insumos (OS em `UNDER_DIAGNOSIS`): responde `200` com os totais calculados e publica `OrcamentoCalculado`. O início do diagnóstico e a conclusão da execução agora são do serviço de Execução (`PATCH /execucoes/:id/iniciar-diagnostico` e `/concluir`) e chegam aqui por evento. |
 | PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento; a resposta traz `linkPagamento` (Checkout Pro do Mercado Pago). `502` se o Mercado Pago falhar (orçamento segue pendente). |
 | PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Autenticado | Aprovar o serviço prestado (OS segue Finalizada). |
 | PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega (OS `FINISHED` → `DELIVERED`). Único caminho para `DELIVERED`: o webhook de status rejeita esse valor. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
@@ -282,6 +294,12 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | DELETE | `/pecas/:id` | ADMIN | Deletar peça ou insumo. |
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar peças a fornecedor. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de peças. |
+
+#### Webhook de status da OS (`/api/v1/webhooks/service-orders`)
+
+| Método | Endpoint | Acesso | Descrição |
+| ------ | -------- | ------ | --------- |
+| POST | `/webhooks/service-orders/status` | Autenticado + `x-webhook-secret` | Reprocesso manual do status da OS pela máquina de estados. `DELIVERED` é rejeitado (`400`). |
 
 #### Webhook do Mercado Pago (`/api/v1/webhooks/mercado-pago`)
 
