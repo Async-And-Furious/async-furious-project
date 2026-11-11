@@ -14,7 +14,10 @@ const p2002 = (): Prisma.PrismaClientKnownRequestError =>
 
 describe('ClienteRepository: normalização e conflito', () => {
   const prisma = { cliente: { findUnique: jest.fn(), create: jest.fn() } };
-  const repository = new ClienteRepository(prisma as unknown as PrismaService);
+  const repository = new ClienteRepository(prisma as unknown as PrismaService, {
+    project: jest.fn(),
+    removerOrdensServicoEmCascata: jest.fn(),
+  });
   const input = {
     nome: 'Maria',
     email: 'maria@example.com',
@@ -50,7 +53,10 @@ describe('ClienteRepository: normalização e conflito', () => {
 
 describe('VeiculoRepository: normalização e conflito', () => {
   const prisma = { veiculo: { findUnique: jest.fn(), create: jest.fn() } };
-  const repository = new VeiculoRepository(prisma as unknown as PrismaService);
+  const repository = new VeiculoRepository(prisma as unknown as PrismaService, {
+    project: jest.fn(),
+    removerOrdensServicoEmCascata: jest.fn(),
+  });
   const input = { placa: 'abc-1d23', marca: 'Fiat', modelo: 'Uno', ano: 2015, clienteId: 'cli-1' };
 
   beforeEach(() => jest.clearAllMocks());

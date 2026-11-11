@@ -11,7 +11,13 @@ export const STATUS_PRIORIDADE: Record<OSStatus, number> = {
   DELIVERED: 8,
 };
 
-export const STATUS_EXCLUIDOS_DA_LISTAGEM: OSStatus[] = ['FINISHED', 'DELIVERED'];
+// Saem da fila (filtro status $nin na consulta do read model); continuam
+// acessíveis por GET /ordens-servico/:id.
+export const STATUS_EXCLUIDOS_DA_LISTAGEM: OSStatus[] = [
+  'FINISHED',
+  'DELIVERED',
+  'CLOSED_WITHOUT_EXECUTION',
+];
 
 export function getPrioridadeStatus(status: OSStatus): number {
   return STATUS_PRIORIDADE[status] ?? 9;

@@ -1,6 +1,5 @@
 import { UpdateServiceOrderStatusUseCase } from '../../../src/modules/ordem-servico/application/use-cases/update-service-order-status.use-case';
 import { IOrdemServicoRepository } from '../../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
-import { IStatusHistoryRepository } from '../../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import { IEmissorEventos } from '../../../src/shared/domain/interfaces/emissor-eventos.interface';
 import { StatusTransitionService } from '../../../src/modules/ordem-servico/domain/services/status-transition.service';
 import { OrdemDeServico } from '../../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
@@ -10,7 +9,6 @@ import type { IOSStatusTransitionLogger } from '../../../src/modules/ordem-servi
 describe('UpdateServiceOrderStatusUseCase', () => {
   let useCase: UpdateServiceOrderStatusUseCase;
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
-  let historyRepo: jest.Mocked<IStatusHistoryRepository>;
   let emissor: jest.Mocked<IEmissorEventos>;
   let transitionService: StatusTransitionService;
   let transitionLogger: jest.Mocked<IOSStatusTransitionLogger>;
@@ -21,10 +19,6 @@ describe('UpdateServiceOrderStatusUseCase', () => {
       update: jest.fn(),
     } as unknown as jest.Mocked<IOrdemServicoRepository>;
 
-    historyRepo = {
-      create: jest.fn(),
-    } as unknown as jest.Mocked<IStatusHistoryRepository>;
-
     emissor = {
       emitir: jest.fn(),
     } as unknown as jest.Mocked<IEmissorEventos>;
@@ -34,7 +28,6 @@ describe('UpdateServiceOrderStatusUseCase', () => {
 
     useCase = new UpdateServiceOrderStatusUseCase(
       osRepo,
-      historyRepo,
       emissor,
       transitionService,
       transitionLogger
@@ -63,11 +56,11 @@ describe('UpdateServiceOrderStatusUseCase', () => {
       'Iniciando diagnóstico via webhook'
     );
 
+    // o histórico é gravado pelo repository: o use case só repassa o motivo
     expect(osRepo.update).toHaveBeenCalledWith(
       'os-1',
       expect.objectContaining({ status: 'UNDER_DIAGNOSIS' })
     );
-    expect(historyRepo.create).toHaveBeenCalled();
     expect(emissor.emitir).toHaveBeenCalled();
     expect(result.status).toBe('UNDER_DIAGNOSIS');
     expect(transitionLogger.log).not.toHaveBeenCalled();
@@ -99,7 +92,7 @@ describe('UpdateServiceOrderStatusUseCase', () => {
     expect(transitionLogger.log).not.toHaveBeenCalled();
   });
 
-  it('does not let a synchronous transition logger failure interrupt history or event work', async () => {
+  it('does not let a synchronous transition logger failure interrupt event work', async () => {
     const mockOs = { id: 'os-1', status: 'IN_PROGRESS' } as OrdemDeServico;
     osRepo.findOne.mockResolvedValue(mockOs);
     osRepo.update.mockResolvedValue({ ...mockOs, status: 'FINISHED' } as OrdemDeServico);
@@ -110,7 +103,18 @@ describe('UpdateServiceOrderStatusUseCase', () => {
     await expect(useCase.execute('os-1', 'FINISHED')).resolves.toMatchObject({
       status: 'FINISHED',
     });
-    expect(historyRepo.create).toHaveBeenCalledTimes(1);
     expect(emissor.emitir).toHaveBeenCalledTimes(1);
+  });
+
+  it('repassa o motivo ao repository, que grava o histórico na mesma transação', async () => {
+    osRepo.findOne.mockResolvedValue({ id: 'os-1', status: 'RECEIVED' } as OrdemDeServico);
+    osRepo.update.mockResolvedValue({ id: 'os-1', status: 'UNDER_DIAGNOSIS' } as OrdemDeServico);
+
+    await useCase.execute('os-1', 'UNDER_DIAGNOSIS', 'Reprocesso manual');
+
+    expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+      status: 'UNDER_DIAGNOSIS',
+      motivo: 'Reprocesso manual',
+    });
   });
 });

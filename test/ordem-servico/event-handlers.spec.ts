@@ -155,7 +155,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'RECEIVED' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'RECEIVED',
+        motivo: 'Status reconfirmado como RECEIVED',
+      });
     });
   });
 
@@ -1356,18 +1359,13 @@ describe('OS Event handlers', () => {
 
           await consumir(handler);
 
+          // o repository grava o histórico com o motivo na mesma transação
           expect(osRepo.atualizarSeCondicao).toHaveBeenCalledWith(
             'os-1',
             { status },
-            { status: 'CLOSED_WITHOUT_EXECUTION' }
+            { status: 'CLOSED_WITHOUT_EXECUTION', motivo }
           );
-          expect(historyRepo.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-              statusAnterior: status,
-              statusNovo: 'CLOSED_WITHOUT_EXECUTION',
-              motivo,
-            })
-          );
+          expect(historyRepo.create).not.toHaveBeenCalled();
           expect(emissor.emitir.mock.calls[0][0]).toBeInstanceOf(
             StatusAtualizadoEncerradaSemExecucao
           );
@@ -1403,16 +1401,12 @@ describe('OS Event handlers', () => {
         );
       });
 
-      it('continua gravando histórico e publicando após falha síncrona do logger', async () => {
+      it('continua publicando após falha síncrona do logger', async () => {
         const order: string[] = [];
         osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
         osRepo.atualizarSeCondicao.mockImplementation(() => {
           order.push('cas');
           return Promise.resolve(true);
-        });
-        historyRepo.create.mockImplementation((historico) => {
-          order.push('history');
-          return Promise.resolve(historico);
         });
         emissor.emitir.mockImplementation(() => {
           order.push('publish');
@@ -1425,7 +1419,7 @@ describe('OS Event handlers', () => {
 
         await consumir(handler);
 
-        expect(order).toEqual(['cas', 'log', 'history', 'publish']);
+        expect(order).toEqual(['cas', 'log', 'publish']);
       });
 
       it.each<OSStatus>(['IN_PROGRESS', 'AWAITING_PARTS'])(

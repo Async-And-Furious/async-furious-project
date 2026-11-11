@@ -24,7 +24,7 @@ import {
 import {
   CreateOrdemServicoDto,
   UpdateOrdemServicoDto,
-  ListQueryDto,
+  FilaQueryDto,
   GerarOrcamentoDto,
 } from '../dto/ordem-servico.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
@@ -105,38 +105,45 @@ export class OrdemServicoController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
   @ApiOperation({
-    summary: 'Listar ordens de serviço ativas por prioridade',
+    summary: 'Fila de ordens de serviço ativas por prioridade (read model)',
     description:
-      'Requer role ADMIN, RECEPCIONISTA ou MECANICO. Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
+      'Requer role ADMIN, RECEPCIONISTA ou MECANICO. Servida pelo read model (DocumentDB). Exclui FINISHED, DELIVERED e CLOSED_WITHOUT_EXECUTION e ordena por prioridade de status (IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED → AWAITING_PARTS); dentro do mesmo status, as mais antigas primeiro. Paginação por cursor: envie pagination.nextCursor no parâmetro cursor para a próxima página.',
   })
-  @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
+  @ApiQuery({ name: 'cursor', type: String, required: false })
   @ApiResponse({
     status: 200,
-    description: 'Lista de OS ativas ordenadas por prioridade',
+    description: 'Página da fila de OS ativas',
     schema: {
       example: {
         data: [
           {
             id: 'uuid',
-            veiculoId: 'uuid',
             clienteId: 'uuid',
+            veiculoId: 'uuid',
             status: 'IN_PROGRESS',
             descricao: 'Troca de óleo',
+            iniciada_em: '2024-01-01T01:00:00.000Z',
+            finalizada_em: null,
+            entregue_em: null,
             created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T01:00:00.000Z',
+            cliente: { id: 'uuid', nome: 'João Silva', documento: '12345678909' },
+            veiculo: { id: 'uuid', placa: 'ABC1D23', marca: 'Honda', modelo: 'Fit' },
           },
         ],
-        pagination: { page: 1, limit: 10, total: 5, totalPages: 1 },
+        pagination: { limit: 10, nextCursor: 'eyJwIjoxLCJjIjoi...' },
       },
     },
   })
+  @ApiResponse({ status: 400, description: 'Cursor ou limite inválido' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({
     status: 403,
     description: 'Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO',
   })
-  listar(@Query() query: ListQueryDto) {
-    return this.listarUseCase.execute(Number(query.page) || 1, Number(query.limit) || 10);
+  listar(@Query() query: FilaQueryDto) {
+    return this.listarUseCase.execute(query.limit ?? 10, query.cursor);
   }
 
   @Get('tempo-medio')
@@ -164,8 +171,9 @@ export class OrdemServicoController {
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
   @ApiOperation({
-    summary: 'Detalhar ordem de serviço',
-    description: 'Requer role ADMIN, RECEPCIONISTA ou MECANICO.',
+    summary: 'Detalhar ordem de serviço (read model)',
+    description:
+      'Requer role ADMIN, RECEPCIONISTA ou MECANICO. Servida pelo read model: status, marcos, cliente e veículo embutidos. Não inclui orçamento, itens nem histórico.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Ordem de serviço encontrada' })
@@ -185,7 +193,7 @@ export class OrdemServicoController {
   @ApiOperation({
     summary: 'Consultar status da OS (rota pública, sem token)',
     description:
-      'Rota pública de consulta da OS. Resposta mínima: id e status da OS, sem dados do cliente.',
+      'Rota pública de consulta da OS, servida pelo read model. Resposta mínima: id, status e marcos de tempo da OS, sem dados do cliente.',
   })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })

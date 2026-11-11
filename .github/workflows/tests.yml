@@ -97,6 +97,8 @@ jobs:
           JWT_SECRET: ci-disposable-jwt-secret
           JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
+          DOCDB_URI: mongodb://127.0.0.1:27017
+          DOCDB_NAME: os_read_model_e2e
 
       # Fluxo da Saga em BDD (ADR-0023). Fica no job "test" de propósito: o check obrigatório da main
       # é "Run All Tests", e falhar aqui reprova o build. Execução e Billing são simulados (ver test/bdd/README.md).

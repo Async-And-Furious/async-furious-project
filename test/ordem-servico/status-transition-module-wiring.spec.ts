@@ -220,7 +220,7 @@ describe('status transition logging Nest provider wiring', () => {
       expect(repo.atualizarSeCondicao).toHaveBeenCalledWith(
         'sensitive-order-id',
         { status: 'AWAITING_APPROVAL', pago_em: null },
-        { status: 'CLOSED_WITHOUT_EXECUTION' }
+        expect.objectContaining({ status: 'CLOSED_WITHOUT_EXECUTION' })
       );
       expectTransitionJson(output.lines, 'AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION');
       expect(output.lines.join('')).not.toContain('sensitive-order-id');

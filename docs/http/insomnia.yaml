@@ -171,13 +171,10 @@ collection:
           sortKey: -1745628000052
         method: GET
         parameters:
-          - name: page
-            value: "1"
-            disabled: true
           - name: limit
-            value: "10"
+            value: "20"
             disabled: true
-          - name: search
+          - name: cursor
             value: ""
             disabled: true
         authentication:

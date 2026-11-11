@@ -58,22 +58,15 @@ export class AtualizarStatusEncerradaSemExecucaoHandler {
       const encerrou = await this.ordemServicoRepository.atualizarSeCondicao(
         ordemServicoId,
         { status: os.status },
-        { status: 'CLOSED_WITHOUT_EXECUTION' }
+        { status: 'CLOSED_WITHOUT_EXECUTION', motivo }
       );
       if (!encerrou) {
         throw new FalhaRetentavelException(
           `[P-14] ${origem}: OS ${ordemServicoId} saiu de ${os.status} durante a gravação`
         );
       }
+      // O repository grava o histórico (com o motivo) na mesma transação.
       logOsStatusTransition(this.transitionLogger, os.status, 'CLOSED_WITHOUT_EXECUTION');
-      await this.statusHistoryRepository.create(
-        HistoricoStatus.create({
-          ordemServicoId,
-          statusAnterior: os.status,
-          statusNovo: 'CLOSED_WITHOUT_EXECUTION',
-          motivo,
-        })
-      );
       await this.emissor.emitir(new StatusAtualizadoEncerradaSemExecucao(ordemServicoId));
       return;
     }

@@ -7,7 +7,9 @@ import {
   type IPublicadorIntegracao,
 } from '../../shared/domain/interfaces/publicador-integracao.interface';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
-import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
+import { ReadModelModule } from '../../shared/infrastructure/read-model/read-model.module';
+import { OsReadModelProjector } from './infrastructure/read-model/os-read-model.projector';
+import { OS_READ_MODEL_PROJECTOR } from './domain/interfaces/os-read-model.interface';
 import { OS_STATUS_TRANSITION_LOGGER } from './application/logging/log-os-status-transition';
 import { OsStatusTransitionPinoLogger } from './infrastructure/logging/os-status-transition-pino-logger';
 import {
@@ -26,40 +28,39 @@ export function prazoDetectorMinutos(env: NodeJS.ProcessEnv = process.env): numb
 }
 
 /**
- * Contexto mínimo do CronJob do detector: banco, publicador Kafka e o caso de uso. Sem HTTP,
+ * Contexto mínimo do CronJob do detector: banco, read model, publicador Kafka e o caso de uso. Sem HTTP,
  * sem consumidor e sem os handlers in-process da API.
  */
 @Module({
-  imports: [ConfigModule.forRoot({ isGlobal: true }), DatabaseModule, MensageriaModule],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    DatabaseModule,
+    MensageriaModule,
+    ReadModelModule,
+  ],
   providers: [
     {
       provide: OS_STATUS_TRANSITION_LOGGER,
       useFactory: () => new OsStatusTransitionPinoLogger(),
     },
+    // O repository projeta no read model a OS encerrada pelo detector (ADR-0019).
+    { provide: OS_READ_MODEL_PROJECTOR, useClass: OsReadModelProjector },
     OrdemServicoRepository,
-    StatusHistoryRepository,
     {
       provide: DetectarOsParadaUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
-        historicoRepo: StatusHistoryRepository,
         publicador: IPublicadorIntegracao,
         transitionLogger: OsStatusTransitionPinoLogger
       ) =>
         new DetectarOsParadaUseCase(
           osRepo,
-          historicoRepo,
           publicador,
           transitionLogger,
           prazoDetectorMinutos(),
           () => new Date()
         ),
-      inject: [
-        OrdemServicoRepository,
-        StatusHistoryRepository,
-        PUBLICADOR_INTEGRACAO,
-        OS_STATUS_TRANSITION_LOGGER,
-      ],
+      inject: [OrdemServicoRepository, PUBLICADOR_INTEGRACAO, OS_STATUS_TRANSITION_LOGGER],
     },
   ],
 })

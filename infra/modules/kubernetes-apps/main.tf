@@ -128,6 +128,7 @@ resource "kubectl_manifest" "secret" {
     seed_admin_password         = var.seed_admin_password
     seed_recepcionista_password = var.seed_recepcionista_password
     seed_mecanico_password      = var.seed_mecanico_password
+    docdb_uri                   = var.enable_local_database ? "mongodb://read-model-service.async-furious.svc.cluster.local:27017" : ""
   })
   depends_on = [kubectl_manifest.namespace]
 }
@@ -148,6 +149,12 @@ resource "kubectl_manifest" "db_statefulset" {
   count      = var.enable_local_database ? 1 : 0
   yaml_body  = file("${var.k8s_manifests_path}/database/statefulset.yaml")
   depends_on = [kubectl_manifest.configmap, kubectl_manifest.secret, kubectl_manifest.db_pvc]
+}
+
+resource "kubectl_manifest" "read_model" {
+  for_each   = var.enable_local_database ? { for i, doc in split("\n---\n", file("${var.k8s_manifests_path}/database/read-model.yaml")) : i => doc } : {}
+  yaml_body  = each.value
+  depends_on = [kubectl_manifest.namespace]
 }
 
 resource "kubectl_manifest" "app_deployment" {

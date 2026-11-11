@@ -1,5 +1,15 @@
 # Log de agentes
 
+## 2026-11-09 — Segurança SonarCloud no PR #381
+
+- Anotação do check Sonar em `k8s/database/read-model.yaml:16` apontou o token
+  de ServiceAccount montado automaticamente no Pod do Mongo. Desativada a
+  montagem; esse workload não precisa acessar a API do Kubernetes. Quality
+  Gate remoto ainda precisa ser reavaliado.
+- No rerun, unitários/typecheck passaram, mas o E2E ficou pendente porque o
+  `app.e2e-spec.ts` não fechava a aplicação. Adicionado `app.close()` no
+  `afterEach` para liberar conexões antes de reavaliar o Sonar.
+- Nenhum gate foi alterado e nenhuma operação de cluster foi executada.
 ## 2026-11-10 — Revisão documental do PR #379
 
 - Removida a comparação temporal vencida do overview preliminar e corrigida a

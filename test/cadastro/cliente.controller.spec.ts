@@ -157,13 +157,26 @@ describe('ClienteController', () => {
   });
 
   describe('findOne', () => {
-    it('should get a cliente by id', async () => {
-      mockGetUseCase.execute.mockResolvedValue(mockCliente);
+    it('should get a cliente by id from the read model', async () => {
+      mockGetUseCase.execute.mockResolvedValue({
+        id: '123',
+        nome: 'Test Client',
+        email: 'test@test.com',
+        telefone: '11999999999',
+        documento: '529.982.247-25',
+        tipoDocumento: 'CPF',
+      });
 
       const result = await controller.findOne('123', mockAuthUser);
 
-      expect(result.id).toBe('123');
-      expect(result.email).toBe('test@test.com');
+      expect(result).toEqual({
+        id: '123',
+        nome: 'Test Client',
+        email: 'test@test.com',
+        telefone: '11999999999',
+        documento: '529.982.247-25',
+        tipoDocumento: 'CPF',
+      });
       expect(mockGetUseCase.execute).toHaveBeenCalledWith('123');
     });
   });

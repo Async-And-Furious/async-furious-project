@@ -14,6 +14,7 @@ export default {
     'src/**/*.(t|j)s',
     '!src/**/*module.ts',
     '!src/main.ts',
+    '!src/jobs/*.job.ts',
     '!src/detector-os-parada.ts',
     '!src/**/events/*.ts',
     '!src/**/value-objects/index.ts',
