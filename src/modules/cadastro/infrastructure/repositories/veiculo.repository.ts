@@ -4,7 +4,10 @@ import { PrismaService } from '../../../../shared/infrastructure/database/prisma
 import {
   formatPaginatedResponse,
   buildSearchWhere,
+  isUniqueConstraintViolation,
 } from '../../../../shared/infrastructure/database/repository.utils';
+import { ConflitoException } from '../../../../shared/domain/exceptions/conflito.exception';
+import { PlacaVeiculoVo } from '../../domain/value-objects/placa-veiculo.vo';
 import { Veiculo } from '../../domain/entities/veiculo.entity';
 import {
   IVeiculoRepository,
@@ -34,16 +37,23 @@ export class VeiculoRepository implements IVeiculoRepository {
     });
 
     const ormData = VeiculoMapper.toOrm(veiculo);
-    const ormEntity = await this.prisma.veiculo.create({
-      data: {
-        placa: ormData.placa,
-        marca: ormData.marca,
-        modelo: ormData.modelo,
-        ano: ormData.ano,
-        cor: ormData.cor,
-        id_cliente: ormData.id_cliente,
-      },
-    });
+    const ormEntity = await this.prisma.veiculo
+      .create({
+        data: {
+          placa: ormData.placa,
+          marca: ormData.marca,
+          modelo: ormData.modelo,
+          ano: ormData.ano,
+          cor: ormData.cor,
+          id_cliente: ormData.id_cliente,
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflitoException('Já existe um veículo com esta placa');
+        }
+        throw error;
+      });
 
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -89,7 +99,9 @@ export class VeiculoRepository implements IVeiculoRepository {
   }
 
   async findByPlaca(placa: string): Promise<Veiculo | null> {
-    const ormEntity = await this.prisma.veiculo.findUnique({ where: { placa } });
+    const ormEntity = await this.prisma.veiculo.findUnique({
+      where: { placa: PlacaVeiculoVo.normalizar(placa) },
+    });
     if (!ormEntity) return null;
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }

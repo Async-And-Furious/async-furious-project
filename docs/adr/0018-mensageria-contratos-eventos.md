@@ -57,7 +57,7 @@ todos os três serviços adotam desde o primeiro evento.
 **Imagem e chart do Kafka (decidido na revisão de 30/09/2026).** Chart
 Bitnami `kafka` (OCI) com **versão fixa** e imagens sobrescritas para
 `bitnamilegacy/*` (o catálogo gratuito `bitnami/*` foi descontinuado em 2025). O chart
-cobre por values o que a ADR exige: KRaft, SASL/SCRAM, provisionamento de
+cobre por values o que a ADR exige: KRaft, SASL (mecanismo adotado: PLAIN, não SCRAM; ver Revisão de 02/11), provisionamento de
 tópicos e persistência.
 
 - **Go/no-go**: `docker pull` do tag exato (broker e imagens auxiliares do
@@ -224,7 +224,8 @@ dead-letter-exchange nativo:
    registrada na #314 — "DLT → evento de falha → compensação"), no tópico
    `*.eventos.v1` do próprio serviço que falhou, com o campo `etapa`
    indicando onde a saga parou, para que os demais serviços interessados
-   possam compensar. O **detector de OS parada** (ver "Garantias de
+   possam compensar. Esta publicação de falha técnica é distinta dos cinco
+   eventos de negócio listados no catálogo. O **detector de OS parada** (ver "Garantias de
    publicação") publica o mesmo evento quando uma OS passa do prazo numa
    etapa. Payload: ver "Eventos de falha da saga" abaixo.
 
@@ -306,6 +307,26 @@ na #314, implementado no épico do OS Service):
   perda de eventos **só na etapa de aprovação/pagamento**. Nas demais
   etapas, um evento perdido é **risco aceito** em HML, recuperado por
   replay manual.
+
+**Limite da recuperação no Billing.** A publicação após commit deixa uma
+janela de perda: o Billing não usa outbox nem republish automático. O
+detector do OS Service só recupera o caso de OS em `AWAITING_APPROVAL` com
+`pago_em` nulo; não cobre as demais etapas. Além disso, se a confirmação do
+webhook já foi commitada no banco do Billing, uma redelivery é reconhecida
+como já processada e não publica novamente `PagamentoConfirmado`.
+
+**Eventos e compensações do Billing.** O Billing publica somente
+`OrcamentoGerado`, `OrcamentoAprovado`, `OrcamentoRecusado`,
+`PagamentoConfirmado` e `PagamentoRecusado`; consome `OrcamentoCalculado` e
+`EtapaDaSagaFalhou`. Na compensação, atua apenas em `etapa=aprovacao-pagamento`
+ou `etapa=inicio-execucao`; ignora pagamento ausente e outras etapas. Um
+pagamento ainda pendente é marcado `CANCELADO`, sem chamada ao Mercado Pago;
+um pagamento confirmado é estornado de forma idempotente e marcado
+`ESTORNADO`, sem publicar evento de estorno. Não são eventos Kafka
+`OrcamentoAprovadoComPecas`, `SagaCompleted` nem `PagamentoEstornado`.
+`SagaStep` é evento customizado do New Relic, não evento Kafka. Nenhum evento
+do Billing altera o status da OS: isso é responsabilidade do OS Service ao
+consumir os eventos.
 
 ### Duplicação de tipos de evento por serviço (sem pacote npm compartilhado)
 
@@ -425,7 +446,7 @@ sem JVM (ex.: Redpanda — licença **não verificada**).
 - **Médio, aceito em HML**: imagem `bitnamilegacy/*` congelada, sem patches
   e sujeita a remoção (ver "Decisão"); mitigado pelo go/no-go (`docker pull`
   na Sprint 7) e pelo plano B (`apache/kafka` com SASL/PLAIN).
-- **Baixo, aceito conscientemente**: um único usuário Kafka (SASL/SCRAM)
+- **Baixo, aceito conscientemente**: um único usuário Kafka (SASL/PLAIN)
   compartilhado pelos três serviços por ambiente — isolamento fica no nível
   de tópico e consumer group, não de credencial (ACL por tópico registrada
   como evolução futura na #314, não avaliada nesta entrega).
@@ -469,6 +490,165 @@ topologia e o envelope **continuam valendo**. Mudou:
   etapa" em `saga-flow.md` §3; no detector, `eventTypeOriginal = null` e
   `servicoOrigem = "os-service"`; o detector ignora OS com `pago_em`
   preenchido.
+
+## Revisão de 02/11/2026 (implementação no OS Service, #331)
+
+O OS Service passou a publicar e consumir pelo Kafka (PRs #385, #386, #388 e a parte 4,
+empilhados sobre o #371). A topologia, o envelope e a classificação acima **continuam
+valendo**. Esta seção registra como cada item foi implementado e o que a implementação
+precisou decidir.
+
+- **Integração versus in-process.** Só cruzam o broker os eventos de integração: três
+  publicados em `os.eventos.v1` e nove consumidos de `billing.eventos.v1` e
+  `execucao.eventos.v1`. Todo o resto continua no `EmissorEventos`. A lista nominal está
+  na [ADR-0009](./0009-eventos-dominio-in-process.md).
+- **Publicador separado.** `IPublicadorIntegracao` no domínio e `KafkaPublicadorIntegracao`
+  na infraestrutura, com `acks: -1`, produtor idempotente, sem criação automática de
+  tópico e com o particionador por hash da chave (`ordemServicoId`). O `EmissorEventos`
+  não mudou. Uma ponte em `infrastructure/messaging` leva os três eventos ao broker. Ela
+  só republica a `EtapaDaSagaFalhou` com `servicoOrigem = "os-service"`, para não
+  devolver ao broker a falha recebida de outro serviço.
+- **Broker fora não derruba a API.** A ponte dispara a publicação sem aguardá-la (a
+  falha vai para o log), e o produtor tem retry finito (5): com o produtor idempotente
+  sem `retry`, o kafkajs tentaria indefinidamente. O custo é o aviso do kafkajs de que
+  limitar o retry pode quebrar o exatamente-uma-vez, coerente com a perda já aceita sem
+  outbox. O publicador e o consumidor conectam em segundo plano; o consumidor tenta de
+  novo a cada 15 s e reconecta no `CRASH` sem restart. O `main.ts` liga
+  `enableShutdownHooks` para o consumidor sair do grupo no SIGTERM.
+- **Consumidor.** O `os-consumer` chama os handlers de aplicação **diretamente**. O
+  `@OnEvent` do `@nestjs/event-emitter` suprime a rejeição do listener, e o consumidor
+  precisa dela para escolher entre ack, retry e DLT. A classificação ficou assim:
+  - **"Já-passou":** o handler termina sem erro, e a mensagem recebe ack.
+  - **"Ainda-não":** `FalhaRetentavelException` ou erro técnico vai para `os.retry.v1`.
+    - São 3 entregas no total, com backoff de 30 s e 60 s.
+    - A espera **não** fica dentro do `eachMessage` (esperas longas derrubariam o
+      consumidor do grupo). Antes do `notBefore`, o consumidor pausa só a partição de
+      `os.retry.v1`, faz `seek` para a própria mensagem e retoma por timer; o
+      `execucao.eventos.v1` e o `billing.eventos.v1` seguem consumindo. Se o pod cair
+      entre o `seek` e o próximo fetch, a mensagem pode se perder (risco aceito, como o
+      outbox ausente).
+  - **Erro de negócio:** `DomainException` (inclusive OS inexistente e payload sem campo
+    do contrato) vai direto para `os.dlt.v1`.
+  - **Na DLT:** a mensagem vira `EtapaDaSagaFalhou`, com a `etapa` da tabela de
+    `saga-flow.md` §3, exceto `PagamentoConfirmado` e `EtapaDaSagaFalhou`.
+- **Guardas de estado.** Cada consumidor decide pelo estado atual da OS, com gravação
+  condicionada no próprio `UPDATE` (`atualizarSeCondicao`).
+  - **Efeito não naturalmente idempotente** (reservar peças em `OrcamentoAprovado`): o
+    marcador é uma linha de `HistoricoStatusOS`, gravada antes da reserva. Continua não
+    havendo tabela de mensagens processadas.
+  - **`PagamentoConfirmado`:** grava `pago_em` (coluna nova) condicionado a `pago_em`
+    nulo.
+- **Detector de OS parada.** O CronJob `detector-os-parada` usa a mesma imagem e o mesmo
+  ambiente da API, roda a cada 5 minutos com `concurrencyPolicy: Forbid`, e o prazo vem
+  de `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (padrão 2880).
+  - **Critério de "parada":** a OS não tem coluna com o instante de entrada em
+    `AWAITING_APPROVAL`, então a varredura usa a última atualização da linha
+    (`updated_at`) como aproximação.
+  - **Ordem das ações:** para cada OS, o detector publica a `EtapaDaSagaFalhou` **antes**
+    de fechá-la. Se o fechamento falhar, a próxima execução publica de novo, e as
+    compensações são idempotentes.
+  - **Compensação local:** o detector fecha a OS como `CLOSED_WITHOUT_EXECUTION`,
+    condicionado a `AWAITING_APPROVAL` e `pago_em` nulo, no mesmo ato da publicação
+    (`saga-flow.md`, "Origem da falha e assinaturas"). Fechada, a OS sai das próximas
+    varreduras.
+  - **Fica fora:** a devolução ao estoque das peças reservadas é compensação da #338.
+- **Os dois dual-writes do OS Service.** Depois do commit no Postgres, o mesmo caso de
+  uso pode escrever em dois lugares fora da transação. Nenhuma das duas escritas desfaz
+  o commit, e elas falham de formas diferentes:
+  - **Evento no Kafka:** publicação pós-commit, sem outbox. Um evento perdido na etapa de
+    aprovação/pagamento é coberto pelo detector. Nas demais etapas, é recuperado por
+    replay manual, que é o risco já aceito acima.
+  - **Read model no DocumentDB:** write-through da #335. Uma projeção perdida deixa a
+    leitura desatualizada até o rebuild da coleção.
+
+  O teste conjunto dos dois depende de a #335 (PR #381) entrar nesta pilha. Hoje o teste
+  de consumo cobre só o lado do evento.
+- **SASL.** A plataforma (`repo-k8s-infra`, #314) entregou SASL/PLAIN, o plano B desta
+  ADR, e os três serviços usam o mesmo mecanismo, com a senha vinda do Secrets Manager
+  (`tc3/kafka/hml`). Fica registrada a troca do SCRAM previsto em "Decisão" pelo PLAIN.
+
+## Revisão de 09/11/2026 (#339, fechamento da política de falha)
+
+Esta revisão não muda a decisão. Ela registra como a política de falha está implementada hoje nos três serviços, onde cada parte é testada e o que diverge. Base: OS Service em `develop` (9f3f61c); Billing na branch do PR #3 (`feat/I-326_BillingKafkaEvents`, ainda não mergeado em `main`); Execução e Produção em `develop`. Divergências entre os serviços aparecem como dívida, não como cumprimento.
+
+### Guarda de estado como mecanismo padrão
+
+A idempotência dos consumidores da saga é a guarda de estado: o consumidor só produz efeito se o estado atual da OS (ou do agregado local) ainda permitir, e a gravação é condicionada ao estado lido, no próprio `UPDATE` (OS: `atualizarSeCondicao`; Billing: atualização condicionada; Execução: `save` com o status lido). Reentrega não acumula efeito. Não há tabela de mensagens processadas nos consumidores da saga, nem no OS Service.
+
+Para efeito que não é naturalmente idempotente, o marcador é uma linha ou coluna do próprio agregado: a reserva de peças em `OrcamentoAprovado` grava antes a linha de `HistoricoStatus` que a marca; `PagamentoConfirmado` grava `pago_em` condicionado a `pago_em` nulo.
+
+**Exceção única: webhook do Mercado Pago (Billing, #325).** `webhook_recebido`, com `@@unique(providerEventId, tipo)`, é gravada na mesma transação que atualiza o `Pagamento`. É a única tabela de deduplicação do projeto.
+
+**Desvios de tabela:**
+
+- Billing: o schema e a migração inicial (`20261002000000_init`) criam `processed_events` (model `ProcessedEvent`), mas nenhum código a grava ou lê. É tabela ociosa e contraria o critério. A remoção fica como dívida.
+- Execução e Produção: a tabela legada `processed_events` vinha da migração inicial. A migração `20261103000000_drop_empty_processed_events` a remove só se estiver vazia, e recusa o deploy caso contrário. Antes de subir em HML, é preciso confirmar que ela está vazia.
+
+### Classificação de falha, como cada serviço aplica
+
+| Situação | OS Service | Billing | Execução e Produção |
+|---|---|---|---|
+| Ainda-não (retry) | Sim. Estados anteriores à aprovação lançam `FalhaRetentavelException`. Erro técnico também vai ao retry. | Não há caso modelado. Erro técnico também vai ao retry. | Só `PagamentoConfirmado` sem Execução, ou com a Execução em `AGUARDANDO_DIAGNOSTICO`, é `retryable`. Os outros eventos sem Execução são ack (`ignore`). |
+| Já-passou (ack, com log) | Sim, em cada handler. | Sim. `OrcamentoCalculado` repetido depois da decisão é `IGNORADO`, sem `DomainException`. | Sim, por status (`ignore`). |
+| Irrecuperável | `DomainException` vai direto à DLT, e a DLT publica `EtapaDaSagaFalhou`. | `DomainException` vai à poison DLT (`InvalidEnvelope`, sem payload original) e **não** publica `EtapaDaSagaFalhou`. Desvio, com teste explícito. | `business-error` vai à DLT e **não** publica `EtapaDaSagaFalhou`. Desvio. |
+
+### Retry e DLT: números e mecanismo
+
+- **Três entregas no total** (a original e duas pelo retry topic), com backoff de **30 s e 60 s**. Confirmado no código dos três serviços: OS (`MAX_TENTATIVAS` e `backoffMs` em `kafka.config.ts`), Billing (`MAX_TENTATIVAS` e `BACKOFF_MS`), Execução (`MAX_ATTEMPTS` e `RETRY_DELAYS_MS`).
+- **Tópicos:** `os.retry.v1` e `os.dlt.v1`; `billing.retry.v1` e `billing.dlt.v1`; `execucao.retry.v1` e `execucao.dlt.v1`.
+- **Espera do retry (divergente):**
+  - OS: pausa só a partição de `os.retry.v1` e faz `seek` para a própria mensagem. Nada bloqueia o `eachMessage`, como pede o requisito de não bloquear o consumer group.
+  - Execução: pausa a partição do retry e espera dentro do `eachMessage`, com heartbeat. Ocupa um dos quatro slots de `partitionsConsumedConcurrently`.
+  - Billing: espera dentro do `eachMessage`, com heartbeat, sem pausar. Com a concorrência padrão do kafkajs (1), o retry bloqueia o consumidor inteiro do pod durante a espera, de até 60 s.
+- **O que a DLT faz:**
+  - OS: publica `EtapaDaSagaFalhou`, exceto para `PagamentoConfirmado` e `EtapaDaSagaFalhou`, que ficam na DLT para replay manual.
+  - Billing: publica `EtapaDaSagaFalhou` só para `OrcamentoCalculado` (etapa `orcamento`). Na DLT de `EtapaDaSagaFalhou`, a compensação fica pendente para correção manual.
+  - Execução e Produção: não tem consumidor do próprio DLT. A mensagem fica em `execucao.dlt.v1` sem `EtapaDaSagaFalhou`. Desvio.
+
+### Sem outbox
+
+Confirmado: nenhum dos três serviços tem tabela de outbox nem publicador transacional. A publicação sai depois do commit local, com `acks=-1` e produtor idempotente.
+
+### Janela entre commit e publicação (dívida assumida)
+
+O commit no banco e a publicação no Kafka não são atômicos nos três serviços. Uma queda entre os dois perde o evento. A mitigação é o detector de OS parada, e só para `aprovacao-pagamento`. Nas demais etapas, o evento perdido é risco aceito em HML, recuperado por replay manual. No OS há uma janela própria: se o pod cair entre o `seek` do retry e o próximo fetch, a mensagem pode se perder. Risco aceito.
+
+### Detector de OS parada
+
+Implementado no OS Service (`DetectarOsParadaUseCase`), como CronJob a cada 5 min, com prazo em `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (padrão 2880 min). Varre só `AWAITING_APPROVAL` com `pago_em` nulo. A data de entrada na etapa não é gravada, e a varredura usa `updated_at` como aproximação. OS paradas em `RECEIVED`, `UNDER_DIAGNOSIS` ou `AWAITING_PARTS` não são varridas. Dívida.
+
+### Compensação do lado do OS Service (dívida, #338)
+
+O OS Service não consome `EtapaDaSagaFalhou` de outros serviços: `despachantes-saga.ts` a deixa de fora. Por isso, as compensações do próprio OS da matriz de `saga-flow.md` §3 (fechar a OS e liberar a reserva de peças, para falhas de outros serviços) ainda não existem. Billing e Execução já reagem a `EtapaDaSagaFalhou`. A devolução ao estoque é a #338.
+
+### Outros desvios e riscos
+
+- **Guarda de `OrcamentoAprovado` no OS (`VerificarNecessidadePecasHandler`):** a checagem da linha de histórico é leitura seguida de gravação, sem condição atômica. A proteção depende de a mesma OS não ser processada em paralelo. No OS, o consumidor é sequencial dentro de cada pod, mas entre réplicas do HPA, mensagens da mesma OS em tópicos diferentes (principal e retry) podem rodar em paralelo. Risco aberto.
+- **Execução:** consome `os.eventos.v1` e `billing.eventos.v1` com `fromBeginning: true`; o OS usa `false`. Um consumer group novo reprocessa o histórico do tópico. A guarda evita efeito duplicado, mas gera ruído.
+- **Comentário desatualizado:** `src/shared/infrastructure/mensageria/kafka.config.ts` do OS diz que a deduplicação é por `eventId`. O código não faz isso: a idempotência é a guarda de estado. Corrigir o comentário é pendência.
+- **Estado do Billing:** o que está descrito aqui é a branch do PR #3, ainda não mergeada. Revisar depois do merge.
+
+### Replay de offset em HML (fora deste fechamento, dívida)
+
+O critério "reprocessamento por replay de offset testado em HML" não foi executado. Ele saiu do escopo mínimo de #339 (comentário de 03/11). Até lá, o replay manual da DLT e do `etapa=reparo` não está validado em HML.
+
+### Mecanismo × serviço → arquivo de teste
+
+Caminhos relativos ao repo de cada serviço. OS: `async-furious-project`. Billing: `repo-billing`, na branch do PR #3. Execução: `repo-execucao-service`, em `develop`.
+
+| Mecanismo | OS Service | Billing | Execução e Produção |
+|---|---|---|---|
+| Guarda de estado; já-passou → ack | `test/ordem-servico/event-handlers.spec.ts` (P-06 a P-15); `test/ordem-servico/consumo-eventos-execucao.spec.ts`; `test/ordem-servico/consumo-eventos-billing.spec.ts` | `test/kafka-consumidor-eventos.spec.ts` ("re-delivers messages to the business state guard…"); `src/modules/financeiro/application/event-handlers/gerar-orcamento.handler.spec.ts` | `test/saga-event.handler.spec.ts` ("creates once and ignores duplicate orders…"; "retries missing/early payment…") |
+| Ainda-não → retry | `test/ordem-servico/consumo-eventos-execucao.spec.ts`; `test/ordem-servico/consumo-eventos-billing.spec.ts` | `test/kafka-consumidor-eventos.spec.ts` ("schedules the first retry with backoff…") | `test/kafka-saga-event.consumer.spec.ts` ("sends retry metadata and handles retry backlog") |
+| Irrecuperável → DLT | `test/ordem-servico/consumo-eventos-execucao.spec.ts` ("irrecuperável…"); `test/ordem-servico/processador-mensagens-saga.spec.ts` | `test/kafka-consumidor-eventos.spec.ts` ("routes business validation errors to poison DLT…") | `test/kafka-saga-event.consumer.spec.ts` ("sends business errors immediately to DLT") |
+| Backoff 30 s e 60 s; 3 entregas | `test/ordem-servico/processador-mensagens-saga.spec.ts` ("…backoff de 30 s"; "…backoff de 60 s"; "a terceira falha vai à DLT…") | `test/kafka-consumidor-eventos.spec.ts` ("routes the third failed attempt to the DLT…") | `test/retry-policy.spec.ts`; `test/kafka-saga-event.consumer.spec.ts` ("propagates the original envelope and schedules the second retry after 60 seconds") |
+| Espera do retry | `test/ordem-servico/kafka-consumidor-saga.spec.ts` ("retry antes do notBefore: pausa a partição…") | `test/kafka-consumidor-eventos.spec.ts` ("heartbeats during backoff…") | `test/kafka-saga-event.consumer.spec.ts` ("pauses and resumes a retry partition until notBefore") |
+| DLT → EtapaDaSagaFalhou | `test/ordem-servico/processador-mensagens-saga.spec.ts` (bloco "consumidor da DLT") | `test/kafka-consumidor-eventos.spec.ts` ("publishes a saga failure from DLT…") | não implementado |
+| Exceção: dedup do webhook MP | não se aplica | `src/modules/financeiro/application/use-cases/processar-notificacao-pagamento.use-case.spec.ts` | não se aplica |
+| Produtor com `acks=-1` e idempotente | `test/shared/mensageria/kafka-publicador-integracao.spec.ts` | `test/kafka-publicador-eventos.spec.ts` | `test/kafka-execucao-event.publisher.spec.ts` ("…idempotence and acks=-1") |
+| Detector de OS parada | `test/ordem-servico/detectar-os-parada.use-case.spec.ts` | não se aplica | não se aplica |
+| Sem outbox | ausência, verificada por busca no código | ausência, verificada por busca no código | ausência, verificada por busca no código |
+| Tabela de mensagens processadas | ausente | `ProcessedEvent` sem uso (desvio) | removida por migração guardada; `test/processed-events-migration.spec.ts` |
 
 ## Referências
 

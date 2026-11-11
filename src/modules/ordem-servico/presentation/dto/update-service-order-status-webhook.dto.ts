@@ -2,8 +2,7 @@ import { IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validato
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as ordemServicoEntity from '../../domain/entities/ordem-servico.entity';
 
-// DELIVERED fica de fora: a entrega tem caminho próprio, então o ValidationPipe
-// barra o valor na borda e o Swagger não anuncia um status sempre rejeitado.
+// DELIVERED fica de fora: a entrega só é gravada por PATCH /ordens-servico/:id/registrar-entrega.
 export const WEBHOOK_STATUS_PERMITIDOS: ordemServicoEntity.OSStatus[] = [
   'RECEIVED',
   'UNDER_DIAGNOSIS',
@@ -24,7 +23,8 @@ export class UpdateServiceOrderStatusWebhookDto {
   osId!: string;
 
   @ApiProperty({
-    description: 'Novo status da Ordem de Serviço',
+    description:
+      'Novo status da Ordem de Serviço. DELIVERED não é aceito: use PATCH /ordens-servico/:id/registrar-entrega.',
     enum: WEBHOOK_STATUS_PERMITIDOS,
     example: 'UNDER_DIAGNOSIS',
   })

@@ -27,6 +27,8 @@
 
 ---
 
+> **Estado de implementação:** este documento preserva o desenho alvo aprovado e não afirma que todas as etapas estejam operacionais. Em `origin/develop` (`f175716`), a compensação OS para `EtapaDaSagaFalhou` publicada pelo Billing depende de #338: `despachantesBilling` não despacha esse evento.
+
 ## 1. Diagrama de sequência
 
 ```mermaid
@@ -196,7 +198,7 @@ do Checkout Pro com `external_reference=ordemServicoId` e `notification_url`;
 | OS finalizada | OS Service | — | `ExecucaoConcluida` |
 | Fechamento por recusa de orçamento ou pagamento | OS Service | — | `OrcamentoRecusado`, `PagamentoRecusado` |
 | Cancelamento da `Execucao` (sai da fila) por recusa de orçamento ou pagamento | Execução e Produção | — | `OrcamentoRecusado`, `PagamentoRecusado` |
-| Compensação por falha técnica | Os três (ver §3) | `EtapaDaSagaFalhou` | `EtapaDaSagaFalhou` |
+| Compensação por falha técnica (desenho alvo; implementação parcial) | Os três (ver §3) | `EtapaDaSagaFalhou` | `EtapaDaSagaFalhou` |
 
 **Fronteira do Execução e Produção (modelo híbrido mínimo).** O enunciado
 (p.3) atribui ao serviço "gerenciar a fila de execução da OS", "atualizar
@@ -308,6 +310,16 @@ Dois tipos de falha:
 | Pagamento | Cliente não paga no prazo (`pago_em` nulo) | `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`), pelo detector | OS libera a reserva e fecha a OS; Execução cancela a `Execucao`; Billing estorna **se** houver pagamento confirmado | Só se capturado |
 | Início da execução | Falha técnica do Execução ao processar `PagamentoConfirmado` (a OS paga nunca entrou na fila de reparo) | `EtapaDaSagaFalhou` (`etapa=inicio-execucao`) | Billing estorna; OS libera a reserva e fecha a OS (ainda está em `AWAITING_APPROVAL`); Execução cancela a `Execucao` | **Sim** |
 | Reparo | Falha técnica do OS ao processar `ExecucaoIniciada` ou `ExecucaoConcluida` | `EtapaDaSagaFalhou` (`etapa=reparo`) | **Nenhuma compensação automática** — o mecânico já iniciou (ou concluiu) o reparo; a `Execucao` segue seu ciclo, OS registra o motivo e o caso é tratado manualmente (replay do offset) | Não |
+
+**Estado do código (09/11/2026, #339).** A matriz é a regra alvo. Hoje:
+(a) o OS Service não consome `EtapaDaSagaFalhou` de outros serviços, então as
+compensações do OS nas linhas acima para falhas de outros serviços (fechar a
+OS, liberar a reserva de peças) são a #338 e ainda não existem; Billing e
+Execução e Produção já reagem a ela; (b) a linha de Reparo está implementada
+(o OS registra o motivo e emite `EtapaDaSagaFalhou` com `etapa=reparo`); (c) o
+Execução e Produção ainda não publica `EtapaDaSagaFalhou` a partir da própria
+DLT. Detalhes, testes e dívidas: [ADR-0018](../adr/0018-mensageria-contratos-eventos.md),
+seção "Revisão de 09/11/2026".
 
 **Evento original → `etapa` (DLT).** O consumidor da DLT de cada serviço
 deriva a `etapa` do `eventType` da mensagem que esgotou o retry, pela tabela
@@ -442,16 +454,19 @@ combinadas (detalhado na [ADR-0016](../adr/0016-saga-coreografada.md)):
    está na [ADR-0018](../adr/0018-mensageria-contratos-eventos.md).
 3. **`HistoricoStatusOS.motivo`** (model já existente em
    `prisma/schema.prisma`) — continua sendo, dentro do OS Service, o
-   registro textual de por que cada transição de status aconteceu,
-   incluindo as motivadas por compensação. A gravação fica no
-   `OrdemServicoRepository.update` sempre que o status muda (ver
-   [`persistence-model.md`](./persistence-model.md) §5), cobrindo todos os
-   caminhos de escrita.
+    registro textual usado por caminhos específicos para explicar mudanças
+    de status e outros marcos, incluindo alguns motivados por compensação. A
+    gravação é feita explicitamente por handlers/use cases via
+    `StatusHistoryRepository`; `OrdemServicoRepository.update` atualiza a OS,
+    mas não grava automaticamente o histórico. Não se presume cobertura
+    universal nem atomicidade/transação entre a atualização da OS e o
+    histórico (ver [`persistence-model.md`](./persistence-model.md) §5).
 
-Para reconstruir o histórico completo de uma OS que sofreu compensação, o
-caminho é: partir do `ordemServicoId` (que é o `correlationId`), buscar o
-trace correspondente no New Relic e ler, em ordem, os eventos publicados por
-cada serviço sob aquele identificador.
+É possível reconstruir parcialmente o histórico de uma OS que sofreu
+compensação: partir do `ordemServicoId` (o `correlationId`) e consultar os
+logs, traces e eventos correlacionados que existam e tenham sido retidos.
+Disponibilidade e retenção dessas evidências condicionam o que pode ser
+reconstruído; este documento não garante um histórico completo.
 
 ---
 

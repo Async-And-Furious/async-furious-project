@@ -339,21 +339,6 @@
   - 409
   mutating: true
   mock_body: {}
-- id: route-029
-  method: POST
-  path: /api/v1/pagamentos/registrar
-  auth: customer
-  role: null
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body:
-    ordemServicoId: '{{ordem_id}}'
-    valor: 1
 - id: route-030
   method: POST
   path: /api/v1/webhooks/service-orders/status
@@ -449,32 +434,6 @@
   - 404
   mutating: true
   mock_body: {}
-- id: route-039
-  method: PATCH
-  path: /api/v1/ordens-servico/{{ordem_id}}/assumir
-  auth: staff
-  role: MECANICO
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body: {}
-- id: route-040
-  method: PATCH
-  path: /api/v1/ordens-servico/{{ordem_id}}/analisar
-  auth: staff
-  role: MECANICO
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body: {}
 - id: route-041
   method: PATCH
   path: /api/v1/ordens-servico/{{ordem_id}}/servicos-insumos
@@ -508,19 +467,6 @@
   path: /api/v1/ordens-servico/{{ordem_id}}/orcamento/recusar
   auth: customer
   role: null
-  allowed_status:
-  - 200
-  - 201
-  - 400
-  - 404
-  - 409
-  mutating: true
-  mock_body: {}
-- id: route-044
-  method: PATCH
-  path: /api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao
-  auth: staff
-  role: MECANICO
   allowed_status:
   - 200
   - 201

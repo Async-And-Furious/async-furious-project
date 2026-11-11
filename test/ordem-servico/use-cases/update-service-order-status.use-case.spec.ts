@@ -4,13 +4,14 @@ import { IEmissorEventos } from '../../../src/shared/domain/interfaces/emissor-e
 import { StatusTransitionService } from '../../../src/modules/ordem-servico/domain/services/status-transition.service';
 import { OrdemDeServico } from '../../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import { EntityNotFoundException } from '../../../src/shared/domain/exceptions/entity-not-found.exception';
-import { DomainException } from '../../../src/shared/domain/exceptions/domain.exception';
+import type { IOSStatusTransitionLogger } from '../../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 
 describe('UpdateServiceOrderStatusUseCase', () => {
   let useCase: UpdateServiceOrderStatusUseCase;
   let osRepo: jest.Mocked<IOrdemServicoRepository>;
   let emissor: jest.Mocked<IEmissorEventos>;
   let transitionService: StatusTransitionService;
+  let transitionLogger: jest.Mocked<IOSStatusTransitionLogger>;
 
   beforeEach(() => {
     osRepo = {
@@ -23,18 +24,24 @@ describe('UpdateServiceOrderStatusUseCase', () => {
     } as unknown as jest.Mocked<IEmissorEventos>;
 
     transitionService = new StatusTransitionService();
+    transitionLogger = { log: jest.fn() };
 
-    useCase = new UpdateServiceOrderStatusUseCase(osRepo, emissor, transitionService);
+    useCase = new UpdateServiceOrderStatusUseCase(
+      osRepo,
+      emissor,
+      transitionService,
+      transitionLogger
+    );
   });
 
   it('deve lançar EntityNotFoundException se OS não existir', async () => {
-    osRepo.findOne.mockResolvedValue(null as any);
+    osRepo.findOne.mockResolvedValue(null as unknown as OrdemDeServico);
     await expect(useCase.execute('invalid-id', 'UNDER_DIAGNOSIS')).rejects.toThrow(
       EntityNotFoundException
     );
   });
 
-  it('deve atualizar o status com o motivo (o histórico é do repository) e emitir evento', async () => {
+  it('deve atualizar o status, salvar histórico e emitir evento', async () => {
     const mockOs = {
       id: 'os-1',
       status: 'RECEIVED',
@@ -49,19 +56,65 @@ describe('UpdateServiceOrderStatusUseCase', () => {
       'Iniciando diagnóstico via webhook'
     );
 
-    expect(osRepo.update).toHaveBeenCalledWith('os-1', {
-      status: 'UNDER_DIAGNOSIS',
-      motivo: 'Iniciando diagnóstico via webhook',
-    });
+    // o histórico é gravado pelo repository: o use case só repassa o motivo
+    expect(osRepo.update).toHaveBeenCalledWith(
+      'os-1',
+      expect.objectContaining({ status: 'UNDER_DIAGNOSIS' })
+    );
     expect(emissor.emitir).toHaveBeenCalled();
     expect(result.status).toBe('UNDER_DIAGNOSIS');
+    expect(transitionLogger.log).not.toHaveBeenCalled();
   });
 
-  it('deve rejeitar a transição para DELIVERED sem gravar nada', async () => {
-    await expect(useCase.execute('os-1', 'DELIVERED')).rejects.toThrow(DomainException);
+  it.each([
+    ['IN_PROGRESS', 'FINISHED'],
+    ['AWAITING_APPROVAL', 'CLOSED_WITHOUT_EXECUTION'],
+  ] as const)('logs successful generic terminal update %s -> %s', async (from, to) => {
+    const mockOs = { id: 'sensitive-order-id', status: from } as OrdemDeServico;
+    osRepo.findOne.mockResolvedValue(mockOs);
+    osRepo.update.mockResolvedValue({ ...mockOs, status: to } as OrdemDeServico);
 
-    expect(osRepo.findOne).not.toHaveBeenCalled();
-    expect(osRepo.update).not.toHaveBeenCalled();
-    expect(emissor.emitir).not.toHaveBeenCalled();
+    await useCase.execute(mockOs.id, to);
+
+    expect(transitionLogger.log).toHaveBeenCalledTimes(1);
+    expect(transitionLogger.log).toHaveBeenCalledWith({
+      logType: 'os.status.transition',
+      previousStatus: from,
+      newStatus: to,
+    });
+  });
+
+  it('does not log if the generic repository update rejects', async () => {
+    osRepo.findOne.mockResolvedValue({ id: 'os-1', status: 'IN_PROGRESS' } as OrdemDeServico);
+    osRepo.update.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(useCase.execute('os-1', 'FINISHED')).rejects.toThrow('database unavailable');
+    expect(transitionLogger.log).not.toHaveBeenCalled();
+  });
+
+  it('does not let a synchronous transition logger failure interrupt event work', async () => {
+    const mockOs = { id: 'os-1', status: 'IN_PROGRESS' } as OrdemDeServico;
+    osRepo.findOne.mockResolvedValue(mockOs);
+    osRepo.update.mockResolvedValue({ ...mockOs, status: 'FINISHED' } as OrdemDeServico);
+    transitionLogger.log.mockImplementation(() => {
+      throw new Error('logger unavailable');
+    });
+
+    await expect(useCase.execute('os-1', 'FINISHED')).resolves.toMatchObject({
+      status: 'FINISHED',
+    });
+    expect(emissor.emitir).toHaveBeenCalledTimes(1);
+  });
+
+  it('repassa o motivo ao repository, que grava o histórico na mesma transação', async () => {
+    osRepo.findOne.mockResolvedValue({ id: 'os-1', status: 'RECEIVED' } as OrdemDeServico);
+    osRepo.update.mockResolvedValue({ id: 'os-1', status: 'UNDER_DIAGNOSIS' } as OrdemDeServico);
+
+    await useCase.execute('os-1', 'UNDER_DIAGNOSIS', 'Reprocesso manual');
+
+    expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+      status: 'UNDER_DIAGNOSIS',
+      motivo: 'Reprocesso manual',
+    });
   });
 });

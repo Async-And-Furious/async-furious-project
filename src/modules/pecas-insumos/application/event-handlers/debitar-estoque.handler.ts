@@ -5,6 +5,8 @@ import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emiss
 import { PecasEmEstoqueConfirmadas } from '../../domain/events/pecas-em-estoque-confirmadas.event';
 import { EstoqueDebitado } from '../../domain/events/estoque-debitado.event';
 import { PecasReservadas } from '../../domain/events/pecas-reservadas.event';
+import { PecasNaoExistem } from '../../domain/events/pecas-nao-existem.event';
+import { DomainException } from '../../../../shared/domain/exceptions/domain.exception';
 
 @Injectable()
 export class DebitarEstoqueHandler {
@@ -15,16 +17,21 @@ export class DebitarEstoqueHandler {
 
   @OnEvent('PecasEmEstoqueConfirmadas')
   async handle(evento: PecasEmEstoqueConfirmadas): Promise<void> {
-    for (const item of evento.pecas) {
-      const peca = await this.pecaInsumoRepository.findOne(item.id_peca);
-      peca.debitarEstoque(item.quantidade);
-      await this.pecaInsumoRepository.updateEstoque(peca.id, peca.quantidade_estoque);
-    }
-
     const itensDebitados = evento.pecas.map((item) => ({
       id_peca: item.id_peca,
       quantidade: item.quantidade,
     }));
+    if (itensDebitados.some((item) => item.quantidade <= 0)) {
+      throw new DomainException('Quantidade a debitar deve ser positiva');
+    }
+
+    // Débito tudo ou nada. Se o saldo acabou entre a verificação e o débito
+    // (outra OS levou a peça), segue o mesmo caminho de peça indisponível.
+    const { indisponiveis } = await this.pecaInsumoRepository.debitarEstoqueAtomico(itensDebitados);
+    if (indisponiveis.length > 0) {
+      await this.emissor.emitir(new PecasNaoExistem(evento.ordemServicoId, indisponiveis));
+      return;
+    }
 
     await this.emissor.emitir(new EstoqueDebitado(evento.ordemServicoId, itensDebitados));
     await this.emissor.emitir(new PecasReservadas(evento.ordemServicoId, itensDebitados));
