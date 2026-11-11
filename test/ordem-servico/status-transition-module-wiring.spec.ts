@@ -24,6 +24,7 @@ import { OrcamentoRecusado } from '../../src/modules/ordem-servico/domain/events
 import { ExecucaoConcluida } from '../../src/modules/ordem-servico/domain/events/execucao-concluida.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
+import { RESERVA_ESTOQUE_PORT } from '../../src/shared/domain/interfaces/reserva-estoque.port';
 
 function providersFrom(module: Type<unknown>): Provider[] {
   return Reflect.getMetadata(MODULE_METADATA.PROVIDERS, module) as Provider[];
@@ -78,6 +79,8 @@ function expectTransitionJson(lines: string[], previousStatus: string, newStatus
   expect(record).not.toHaveProperty('correlationId');
 }
 
+const reservaEstoque = { releaseByOrdemId: jest.fn().mockResolvedValue(0) };
+
 describe('status transition logging Nest provider wiring', () => {
   it('uses effective API module providers for an HTTP-callable refusal transition', async () => {
     let status = 'AWAITING_APPROVAL';
@@ -110,6 +113,7 @@ describe('status transition logging Nest provider wiring', () => {
         { provide: OrdemServicoRepository, useValue: repo },
         { provide: StatusHistoryRepository, useValue: history },
         { provide: EMISSOR_EVENTOS, useValue: emitter },
+        { provide: RESERVA_ESTOQUE_PORT, useValue: reservaEstoque },
       ],
     }).compile();
     try {
@@ -147,6 +151,7 @@ describe('status transition logging Nest provider wiring', () => {
         { provide: OrdemServicoRepository, useValue: repo },
         { provide: StatusHistoryRepository, useValue: history },
         { provide: PUBLICADOR_INTEGRACAO, useValue: publisher },
+        { provide: RESERVA_ESTOQUE_PORT, useValue: reservaEstoque },
       ],
     }).compile();
     try {

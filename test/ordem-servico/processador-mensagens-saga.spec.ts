@@ -251,6 +251,69 @@ describe('ProcessadorMensagensSaga', () => {
       expect(publicador.publicar).not.toHaveBeenCalled();
     });
 
+    describe('compensação local (#338)', () => {
+      let compensar: jest.Mock<Promise<void>, [Record<string, unknown>]>;
+      const order: string[] = [];
+
+      beforeEach(() => {
+        order.length = 0;
+        compensar = jest.fn<Promise<void>, [Record<string, unknown>]>(() => {
+          order.push('compensar');
+          return Promise.resolve();
+        });
+        publicador.publicar.mockImplementation(() => {
+          order.push('publicar');
+          return Promise.resolve();
+        });
+        processador = new ProcessadorMensagensSaga({
+          despachantes: { EtapaDaSagaFalhou: compensar },
+          publicador,
+          enviar,
+          agora: () => AGORA,
+        });
+      });
+
+      it('depois de publicar, aplica a compensação do OS com o payload da falha', async () => {
+        await processador.processar(
+          OS_DLT_TOPIC,
+          OS_ID,
+          json(envelope('OrcamentoAprovado', { lastError: 'deadlock' }))
+        );
+
+        expect(order).toEqual(['publicar', 'compensar']);
+        expect(compensar).toHaveBeenCalledWith({
+          ordemServicoId: OS_ID,
+          servicoOrigem: 'os-service',
+          eventTypeOriginal: 'OrcamentoAprovado',
+          etapa: 'aprovacao-pagamento',
+          motivo: 'deadlock',
+        });
+      });
+
+      it('sem EtapaDaSagaFalhou (PagamentoConfirmado), não compensa', async () => {
+        await processador.processar(OS_DLT_TOPIC, OS_ID, json(envelope('PagamentoConfirmado')));
+
+        expect(compensar).not.toHaveBeenCalled();
+      });
+
+      it('erro de negócio na compensação fica no log, sem reentrega', async () => {
+        compensar.mockRejectedValue(new EntityNotFoundException('OrdemDeServico', OS_ID));
+
+        await expect(
+          processador.processar(OS_DLT_TOPIC, OS_ID, json(envelope('OrcamentoGerado')))
+        ).resolves.toBeNull();
+        expect(publicador.publicar).toHaveBeenCalledTimes(1);
+      });
+
+      it('falha técnica na compensação sobe, para o kafkajs entregar a mensagem de novo', async () => {
+        compensar.mockRejectedValue(new Error('deadlock'));
+
+        await expect(
+          processador.processar(OS_DLT_TOPIC, OS_ID, json(envelope('OrcamentoGerado')))
+        ).rejects.toThrow('deadlock');
+      });
+    });
+
     it('falha ao publicar a EtapaDaSagaFalhou sobe, para o kafkajs entregar a mensagem de novo', async () => {
       publicador.publicar.mockRejectedValue(new Error('broker indisponível'));
 

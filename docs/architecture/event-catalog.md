@@ -153,7 +153,9 @@ O `eventId` e o `occurredAt` do envelope são os do próprio evento de domínio.
 **Consumo pelo `os-consumer`.** Os handlers de aplicação são chamados diretamente, com a
 classificação de falha da ADR-0018. Os oito eventos de `execucao.eventos.v1` e
 `billing.eventos.v1` estão ligados. A `EtapaDaSagaFalhou` recebida dos outros serviços
-recebe ack sem efeito até a compensação (#338).
+dispara a compensação do OS (#338): fecha a OS antes do reparo, registra o motivo e devolve
+as peças reservadas. Com `etapa=reparo`, só registra o motivo. Detalhes na matriz de
+`saga-flow.md` §3.
 
 **Defasagem do catálogo interno.** O `docs/ddd.md` §5 cataloga 28 eventos de domínio nos
 BCs do OS Service. O código tem 42 classes em `src/modules/*/domain/events/`: 30 em

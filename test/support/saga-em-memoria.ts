@@ -1,6 +1,7 @@
 import { ProcessadorMensagensSaga } from '../../src/modules/ordem-servico/infrastructure/messaging/processador-mensagens-saga';
 import {
   despachantesBilling,
+  despachantesCompensacao,
   despachantesExecucao,
 } from '../../src/modules/ordem-servico/infrastructure/messaging/despachantes-saga';
 import { AtualizarStatusEmDiagnosticoHandler } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-em-diagnostico.handler';
@@ -20,6 +21,7 @@ import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/do
 import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import type { IEmissorEventos } from '../../src/shared/domain/interfaces/emissor-eventos.interface';
 import type { IPublicadorIntegracao } from '../../src/shared/domain/interfaces/publicador-integracao.interface';
+import type { IReservaEstoquePort } from '../../src/shared/domain/interfaces/reserva-estoque.port';
 import type { DomainEvent } from '../../src/shared/domain/events/domain-event.base';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
 
@@ -42,9 +44,10 @@ const CAMPOS: Record<string, keyof EstadoOs> = {
 /**
  * OS Service em memória para os testes de consumo: envelope → processador → handlers reais →
  * repositório em que cada gravação condicionada avalia a condição no estado do momento, como o
- * UPDATE ... WHERE no banco. `null` = OS inexistente.
+ * UPDATE ... WHERE no banco. `null` = OS inexistente. `reservas` = linhas de `ReservaEstoque` da OS
+ * (peças debitadas na aprovação), que a compensação devolve ao estoque.
  */
-export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
+export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null, { reservas = 0 } = {}) {
   let estado: EstadoOs | null = inicial && {
     status: 'RECEIVED',
     reserva: false,
@@ -119,6 +122,16 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
       return Promise.resolve();
     }),
   };
+  let reservasPendentes = reservas;
+  let reservasDevolvidas = 0;
+  const reservaEstoque: jest.Mocked<IReservaEstoquePort> = {
+    releaseByOrdemId: jest.fn((_ordemId: string) => {
+      const devolvidas = reservasPendentes;
+      reservasPendentes = 0;
+      reservasDevolvidas += devolvidas;
+      return Promise.resolve(devolvidas);
+    }),
+  };
   const transicao = new StatusTransitionService();
   const transitionLogger = { log: jest.fn() };
   const enviar = jest
@@ -128,6 +141,14 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
     publicar: jest.fn().mockResolvedValue(undefined),
   };
 
+  const encerradaSemExecucao = new AtualizarStatusEncerradaSemExecucaoHandler(
+    osRepo,
+    emissor,
+    historicoRepo,
+    transicao,
+    transitionLogger,
+    reservaEstoque
+  );
   const processador = new ProcessadorMensagensSaga({
     despachantes: {
       ...despachantesExecucao({
@@ -148,15 +169,10 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
           historicoRepo,
           emissor
         ),
-        encerradaSemExecucao: new AtualizarStatusEncerradaSemExecucaoHandler(
-          osRepo,
-          emissor,
-          historicoRepo,
-          transicao,
-          transitionLogger
-        ),
+        encerradaSemExecucao,
         pagamentoConfirmado: new RegistrarPagamentoConfirmadoHandler(osRepo, historicoRepo),
       }),
+      ...despachantesCompensacao({ encerradaSemExecucao }),
     },
     publicador,
     enviar,
@@ -181,6 +197,11 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
 
   return {
     consumir,
+    processador,
+    publicador,
+    reservaEstoque,
+    reservasPendentes: () => reservasPendentes,
+    reservasDevolvidas: () => reservasDevolvidas,
     estado: () => estado,
     historico,
     emissor,

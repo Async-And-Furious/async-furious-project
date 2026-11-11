@@ -311,15 +311,32 @@ Dois tipos de falha:
 | Início da execução | Falha técnica do Execução ao processar `PagamentoConfirmado` (a OS paga nunca entrou na fila de reparo) | `EtapaDaSagaFalhou` (`etapa=inicio-execucao`) | Billing estorna; OS libera a reserva e fecha a OS (ainda está em `AWAITING_APPROVAL`); Execução cancela a `Execucao` | **Sim** |
 | Reparo | Falha técnica do OS ao processar `ExecucaoIniciada` ou `ExecucaoConcluida` | `EtapaDaSagaFalhou` (`etapa=reparo`) | **Nenhuma compensação automática** — o mecânico já iniciou (ou concluiu) o reparo; a `Execucao` segue seu ciclo, OS registra o motivo e o caso é tratado manualmente (replay do offset) | Não |
 
-**Estado do código (09/11/2026, #339).** A matriz é a regra alvo. Hoje:
-(a) o OS Service não consome `EtapaDaSagaFalhou` de outros serviços, então as
-compensações do OS nas linhas acima para falhas de outros serviços (fechar a
-OS, liberar a reserva de peças) são a #338 e ainda não existem; Billing e
-Execução e Produção já reagem a ela; (b) a linha de Reparo está implementada
-(o OS registra o motivo e emite `EtapaDaSagaFalhou` com `etapa=reparo`); (c) o
-Execução e Produção ainda não publica `EtapaDaSagaFalhou` a partir da própria
-DLT. Detalhes, testes e dívidas: [ADR-0018](../adr/0018-mensageria-contratos-eventos.md),
-seção "Revisão de 09/11/2026".
+**Estado do código (11/11/2026, #338).** Cada linha da matriz tem
+implementação apontada. No OS Service, a compensação vive no
+`AtualizarStatusEncerradaSemExecucaoHandler` e cobre as recusas e a
+`EtapaDaSagaFalhou` recebida de `billing.eventos.v1` e `execucao.eventos.v1`.
+A falha publicada pela própria DLT do OS, ou pelo detector, é compensada
+localmente no mesmo ato. O Execução e Produção ainda não publica
+`EtapaDaSagaFalhou` a partir da própria DLT (ADR-0018, "Revisão de
+09/11/2026").
+
+| Linha da matriz | OS Service | Billing | Execução e Produção |
+|---|---|---|---|
+| Diagnóstico / Orçamento (`EtapaDaSagaFalhou`) | `handleEtapaDaSagaFalhou`: fecha a OS a partir de `RECEIVED`/`UNDER_DIAGNOSIS`/`AWAITING_APPROVAL`, com o motivo no histórico | ignora (etapa sem pagamento) | cancela a `Execucao` (repo-execucao-service#4) |
+| Aprovação: `OrcamentoRecusado` | `handle`: fecha a OS | não consome | cancela a `Execucao` |
+| Aprovação/Pagamento: detector | `DetectarOsParadaUseCase`: publica, fecha a OS e **devolve as peças** | `CompensarFalhaSagaHandler`: cancela ou estorna (repo-billing#3) | cancela a `Execucao` |
+| Pagamento: `PagamentoRecusado` | `handlePagamentoRecusado`: fecha a OS e **devolve as peças** | não consome (nada capturado) | cancela a `Execucao` |
+| Início da execução (`EtapaDaSagaFalhou`) | `handleEtapaDaSagaFalhou`: fecha a OS e **devolve as peças** | estorna o pagamento confirmado | cancela a `Execucao` |
+| Reparo (`EtapaDaSagaFalhou`) | só registra o motivo no histórico, sem fechar nem devolver | ignora | ignora |
+
+A **devolução das peças** é o `ReservaEstoqueRepository.releaseByOrdemId`,
+exposto ao OS pela porta `IReservaEstoquePort`. O débito na aprovação
+(`DebitarEstoqueHandler`) passou a gravar a `ReservaEstoque` na mesma
+transação. A devolução apaga a linha antes de devolver ao estoque, então
+reentregas não devolvem em dobro. Ela roda só **depois** de a OS fechar:
+uma OS que entrou em reparo nunca perde as peças. Se a devolução falhar, a
+reentrega encontra a OS em `CLOSED_WITHOUT_EXECUTION` e tenta de novo.
+Testes: `test/ordem-servico/compensacao-saga.spec.ts`.
 
 **Evento original → `etapa` (DLT).** O consumidor da DLT de cada serviço
 deriva a `etapa` do `eventType` da mensagem que esgotou o retry, pela tabela
@@ -367,8 +384,8 @@ O detector de OS parada publica `etapa=aprovacao-pagamento` com
   criada com `expiration_date_to` igual ao prazo do detector.
 - Toda compensação é idempotente: receber o mesmo `EtapaDaSagaFalhou` duas
   vezes não estorna nem libera reserva duas vezes.
-- **Liberar reserva de peças** é operação nova no `pecas-insumos` (hoje
-  `reserva-estoque.repository.ts` não tem). É a compensação de negócio
+- **Liberar reserva de peças** é o `releaseByOrdemId` do
+  `reserva-estoque.repository.ts` (#338). É a compensação de negócio
   mais fácil de demonstrar no vídeo: aprovar o orçamento e recusar o
   pagamento no sandbox.
 
