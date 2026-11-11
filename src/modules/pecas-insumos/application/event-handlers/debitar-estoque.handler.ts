@@ -26,8 +26,12 @@ export class DebitarEstoqueHandler {
     }
 
     // Débito tudo ou nada. Se o saldo acabou entre a verificação e o débito
-    // (outra OS levou a peça), segue o mesmo caminho de peça indisponível.
-    const { indisponiveis } = await this.pecaInsumoRepository.debitarEstoqueAtomico(itensDebitados);
+    // (outra OS levou a peça), segue o mesmo caminho de peça indisponível. O débito grava a
+    // reserva da OS, que a compensação da saga devolve ao estoque (#338).
+    const { indisponiveis } = await this.pecaInsumoRepository.debitarEstoqueAtomico(
+      evento.ordemServicoId,
+      itensDebitados
+    );
     if (indisponiveis.length > 0) {
       await this.emissor.emitir(new PecasNaoExistem(evento.ordemServicoId, indisponiveis));
       return;

@@ -145,8 +145,11 @@ export class ProcessadorMensagensSaga {
     });
   }
 
-  // A DLT não é o fim da linha (ADR-0018): a mensagem esgotada vira EtapaDaSagaFalhou. Se a
-  // publicação falhar, o erro sobe e o kafkajs entrega a mensagem da DLT de novo.
+  // A DLT não é o fim da linha (ADR-0018): a mensagem esgotada vira EtapaDaSagaFalhou. Como o OS
+  // não assina o próprio tópico, aplica a compensação local no mesmo ato (`saga-flow.md` §3,
+  // "Origem da falha e assinaturas"). Se a publicação ou a compensação falhar, o erro sobe e o
+  // kafkajs entrega a mensagem da DLT de novo; as duas pontas são idempotentes. Erro de negócio
+  // na compensação (ex.: OS inexistente) não se resolve com reentrega: fica no log, sem laço.
   private async processarDlt(bruto: unknown): Promise<void> {
     const mensagem = (bruto ?? {}) as Partial<EnvelopeRecebido>;
     const eventType = mensagem.eventType ?? 'desconhecido';
@@ -160,15 +163,31 @@ export class ProcessadorMensagensSaga {
       return;
     }
 
-    await this.deps.publicador.publicar(
-      new EtapaDaSagaFalhou(
-        'os-service',
-        eventType,
-        ordemServicoId,
-        etapa,
-        mensagem.lastError ?? 'retry esgotado'
-      )
+    const falha = new EtapaDaSagaFalhou(
+      'os-service',
+      eventType,
+      ordemServicoId,
+      etapa,
+      mensagem.lastError ?? 'retry esgotado'
     );
+    await this.deps.publicador.publicar(falha);
+
+    const compensar = this.deps.despachantes.EtapaDaSagaFalhou;
+    if (!compensar) return;
+    try {
+      await compensar({
+        ordemServicoId,
+        servicoOrigem: falha.servicoOrigem,
+        eventTypeOriginal: falha.eventTypeOriginal,
+        etapa: falha.etapa,
+        motivo: falha.motivo,
+      });
+    } catch (erro) {
+      if (!(erro instanceof DomainException)) throw erro;
+      this.logger.error(
+        `Compensação local de ${eventType} da OS ${ordemServicoId} não aplicada (replay manual): ${mensagemDeErro(erro)}`
+      );
+    }
   }
 
   private async enviarEnvelopeInvalido(topic: string, chave: string | null): Promise<void> {
