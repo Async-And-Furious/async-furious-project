@@ -171,13 +171,10 @@ collection:
           sortKey: -1745628000052
         method: GET
         parameters:
-          - name: page
-            value: "1"
-            disabled: true
           - name: limit
-            value: "10"
+            value: "20"
             disabled: true
-          - name: search
+          - name: cursor
             value: ""
             disabled: true
         authentication:
@@ -355,10 +352,12 @@ collection:
           created: 1785600000000
           modified: 1785600000000
           isPrivate: false
-          description: "PUBLIC - No auth required (client approval)"
+          description: "Requires JWT - approves the finished service (OS stays FINISHED)"
           sortKey: -1745628000062
         method: PATCH
-        authentication: {}
+        authentication:
+          type: bearer
+          token: "{{ receptionist_token }}"
         settings:
           renderRequestBody: true
           encodeUrl: true

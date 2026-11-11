@@ -1,5 +1,7 @@
 # ADR-0017: Divisão em três microsserviços e ownership de dados por serviço
 
+Esta decisão substitui parcialmente a [ADR-0001](./0001-separacao-quatro-repositorios.md) quanto à topologia dos serviços de negócio; a divisão de repositórios de infraestrutura e autenticação permanece vigente.
+
 ## Status
 
 Aceita

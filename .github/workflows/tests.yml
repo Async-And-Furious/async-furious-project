@@ -68,6 +68,9 @@ jobs:
       - name: Type check
         run: pnpm run type:check
 
+      - name: OpenAPI versionado em dia com o código
+        run: pnpm docs:openapi && git diff --exit-code docs/http/openapi
+
       - name: Testes unitários com gate de cobertura (80/80/80/80)
         run: pnpm run test:cov
         env:
@@ -90,6 +93,17 @@ jobs:
 
       - name: Run e2e tests
         run: pnpm run test:e2e
+        env:
+          JWT_SECRET: ci-disposable-jwt-secret
+          JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/workshop
+          DOCDB_URI: mongodb://127.0.0.1:27017
+          DOCDB_NAME: os_read_model_e2e
+
+      # Fluxo da Saga em BDD (ADR-0023). Fica no job "test" de propósito: o check obrigatório da main
+      # é "Run All Tests", e falhar aqui reprova o build. Execução e Billing são simulados (ver test/bdd/README.md).
+      - name: Run BDD tests (fluxo da Saga)
+        run: pnpm run test:bdd
         env:
           JWT_SECRET: ci-disposable-jwt-secret
           JWT_CUSTOMER_PUBLIC_KEY: test-jwt-customer-public-key

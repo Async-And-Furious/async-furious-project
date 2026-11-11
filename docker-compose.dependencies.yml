@@ -16,5 +16,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+  # Stand-in local do DocumentDB (read model, ADR-0019): API compatível com MongoDB 5.0
+  read-model:
+    image: mongo:5.0
+    container_name: workshop-read-model
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    healthcheck:
+      test: ['CMD', 'mongo', '--quiet', '--eval', 'db.runCommand({ ping: 1 })']
+      interval: 10s
+      timeout: 5s
+      retries: 5
 volumes:
   postgres_data:

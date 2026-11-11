@@ -20,6 +20,9 @@ data:
   NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED: "false"
   NEW_RELIC_APPLICATION_LOGGING_LOCAL_DECORATING_ENABLED: "true"
   NEW_RELIC_LOG: "stdout"
+  # NÃO ligar NEW_RELIC_FEATURE_FLAG_KAFKAJS_INSTRUMENTATION: no newrelic 14.x o wrapper do eachMessage
+  # não devolve a promise do handler (client-constructor.js), e o kafkajs confirma o offset antes do
+  # processamento. O trace pelo broker deve propagar os headers no código (#344).
   KAFKA_CLIENT_ID: "os-service"
   KAFKA_CONSUMER_GROUP: "os-consumer"
   # Prazo do detector de OS parada (CronJob), em minutos. Padrão 48 h; na demonstração, alguns minutos.

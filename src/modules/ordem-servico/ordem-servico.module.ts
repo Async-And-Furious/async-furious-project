@@ -27,6 +27,15 @@ import {
 } from './application/use-cases/ordem-servico.use-cases';
 import { UpdateServiceOrderStatusUseCase } from './application/use-cases/update-service-order-status.use-case';
 import { StatusTransitionService } from './domain/services/status-transition.service';
+import { OsReadModelProjector } from './infrastructure/read-model/os-read-model.projector';
+import { OsReadModelQuery } from './infrastructure/read-model/os-read-model.query';
+import {
+  IOsReadModelQuery,
+  OS_READ_MODEL_PROJECTOR,
+  OS_READ_MODEL_QUERY,
+} from './domain/interfaces/os-read-model.interface';
+import { OS_STATUS_TRANSITION_LOGGER } from './application/logging/log-os-status-transition';
+import { OsStatusTransitionPinoLogger } from './infrastructure/logging/os-status-transition-pino-logger';
 import { StatusHistoryRepository } from './infrastructure/repositories/status-history.repository';
 import { ServiceOrderStatusWebhookController } from './presentation/controllers/service-order-status-webhook.controller';
 import { ConsultarTempoMedioExecucaoUseCase } from './application/use-cases/tempo-medio-execucao.use-case';
@@ -58,18 +67,24 @@ import {
 import { NotificacaoClienteStub } from './infrastructure/gateways/notificacao-cliente.stub';
 import { NOTIFICACAO_CLIENTE_GATEWAY } from './application/ports/notificacao-cliente.gateway';
 import type { INotificacaoClienteGateway } from './application/ports/notificacao-cliente.gateway';
+import { CadastroModule } from '../cadastro/cadastro.module';
 
 @Module({
+  imports: [CadastroModule],
   controllers: [OrdemServicoController, ServiceOrderStatusWebhookController],
   providers: [
+    // Read model (ADR-0019): write-through pelos repositories, leituras pela query
+    { provide: OS_READ_MODEL_PROJECTOR, useClass: OsReadModelProjector },
+    { provide: OS_READ_MODEL_QUERY, useClass: OsReadModelQuery },
+    {
+      provide: OS_STATUS_TRANSITION_LOGGER,
+      useFactory: () => new OsStatusTransitionPinoLogger(),
+    },
     OrdemServicoRepository,
     OsPecaRepository,
-    StatusHistoryRepository,
     StatusTransitionService,
     OsServicoRepository,
-    ClienteRepository,
-    VeiculoRepository,
-    ServicoRepository,
+    StatusHistoryRepository,
     PecaInsumoRepository,
     EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
@@ -190,13 +205,22 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
         osRepo: OrdemServicoRepository,
         historyRepo: StatusHistoryRepository,
         barramento: IEmissorEventos,
-        transicaoSvc: StatusTransitionService
-      ) => new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, barramento, transicaoSvc),
+        transicaoSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) =>
+        new AtualizarStatusFinalizadaHandler(
+          osRepo,
+          historyRepo,
+          barramento,
+          transicaoSvc,
+          transitionLogger
+        ),
       inject: [
         OrdemServicoRepository,
         StatusHistoryRepository,
         EMISSOR_EVENTOS,
         StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
       ],
     },
     {
@@ -217,19 +241,22 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
         osRepo: OrdemServicoRepository,
         barramento: IEmissorEventos,
         historicoRepo: StatusHistoryRepository,
-        transicaoSvc: StatusTransitionService
+        transicaoSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
       ) =>
         new AtualizarStatusEncerradaSemExecucaoHandler(
           osRepo,
           barramento,
           historicoRepo,
-          transicaoSvc
+          transicaoSvc,
+          transitionLogger
         ),
       inject: [
         OrdemServicoRepository,
         EMISSOR_EVENTOS,
         StatusHistoryRepository,
         StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
       ],
     },
     {
@@ -295,19 +322,19 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
     },
     {
       provide: ConsultarStatusOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository) =>
-        new ConsultarStatusOrdemServicoUseCase(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (readModel: IOsReadModelQuery) =>
+        new ConsultarStatusOrdemServicoUseCase(readModel),
+      inject: [OS_READ_MODEL_QUERY],
     },
     {
       provide: ListarOrdensServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository) => new ListarOrdensServicoUseCase(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (readModel: IOsReadModelQuery) => new ListarOrdensServicoUseCase(readModel),
+      inject: [OS_READ_MODEL_QUERY],
     },
     {
       provide: DetalharOrdemServicoUseCase,
-      useFactory: (osRepo: OrdemServicoRepository) => new DetalharOrdemServicoUseCase(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (readModel: IOsReadModelQuery) => new DetalharOrdemServicoUseCase(readModel),
+      inject: [OS_READ_MODEL_QUERY],
     },
     {
       provide: DeletarOrdemServicoUseCase,
@@ -324,15 +351,15 @@ import type { INotificacaoClienteGateway } from './application/ports/notificacao
       provide: UpdateServiceOrderStatusUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
-        historyRepo: StatusHistoryRepository,
         barramento: IEmissorEventos,
-        transitionSvc: StatusTransitionService
-      ) => new UpdateServiceOrderStatusUseCase(osRepo, historyRepo, barramento, transitionSvc),
+        transitionSvc: StatusTransitionService,
+        transitionLogger: OsStatusTransitionPinoLogger
+      ) => new UpdateServiceOrderStatusUseCase(osRepo, barramento, transitionSvc, transitionLogger),
       inject: [
         OrdemServicoRepository,
-        StatusHistoryRepository,
         EMISSOR_EVENTOS,
         StatusTransitionService,
+        OS_STATUS_TRANSITION_LOGGER,
       ],
     },
 

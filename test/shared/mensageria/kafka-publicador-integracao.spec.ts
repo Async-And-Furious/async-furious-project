@@ -15,6 +15,16 @@ import { EtapaDaSagaFalhou } from '../../../src/modules/ordem-servico/domain/eve
 
 const OS_ID = '3fa85f64-5717-4562-b3fc-2c963f66afa6';
 const ENV = { KAFKA_BROKERS: 'kafka:9092' } as NodeJS.ProcessEnv;
+const TRACEPARENT = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01';
+const mockTransacao = {
+  insertDistributedTraceHeaders: jest.fn<void, [Record<string, string>]>(),
+  acceptDistributedTraceHeaders: jest.fn(),
+};
+
+jest.mock('newrelic', () => ({
+  getTransaction: () => mockTransacao,
+  startBackgroundTransaction: (_nome: string, _grupo: string, handle: () => unknown) => handle(),
+}));
 
 function kafkaFake() {
   const producer = {
@@ -103,6 +113,56 @@ describe('Envelope de integração (ADR-0018)', () => {
 });
 
 describe('KafkaPublicadorIntegracao', () => {
+  beforeEach(() => {
+    // Sem transação ativa o agente insere nada: o padrão do teste é o stub.
+    mockTransacao.insertDistributedTraceHeaders.mockImplementation(() => undefined);
+  });
+
+  it('grava na mensagem os headers de trace da transação ativa', async () => {
+    mockTransacao.insertDistributedTraceHeaders.mockImplementation((headers) => {
+      headers.traceparent = TRACEPARENT;
+    });
+    const { producer, kafka } = kafkaFake();
+    const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
+    publicador.onModuleInit();
+
+    await publicador.publicar(new OrdemServicoRecebida(OS_ID));
+
+    expect(producer.send.mock.calls[0][0].messages[0].headers).toEqual({
+      traceparent: TRACEPARENT,
+    });
+  });
+
+  it('lê os headers de trace antes de conectar: a transação HTTP pode terminar durante o connect', async () => {
+    let transacaoAtiva = true;
+    mockTransacao.insertDistributedTraceHeaders.mockImplementation((headers) => {
+      if (transacaoAtiva) headers.traceparent = TRACEPARENT;
+    });
+    const { producer, kafka } = kafkaFake();
+    producer.connect.mockImplementation(() => {
+      transacaoAtiva = false;
+      return Promise.resolve();
+    });
+    const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
+
+    await publicador.publicar(new OrdemServicoRecebida(OS_ID));
+
+    expect(producer.send.mock.calls[0][0].messages[0].headers).toEqual({
+      traceparent: TRACEPARENT,
+    });
+    mockTransacao.insertDistributedTraceHeaders.mockReset();
+  });
+
+  it('sem transação ativa publica com headers vazios, sem quebrar', async () => {
+    const { producer, kafka } = kafkaFake();
+    const publicador = new KafkaPublicadorIntegracao(ENV, kafka);
+    publicador.onModuleInit();
+
+    await publicador.publicar(new OrdemServicoRecebida(OS_ID));
+
+    expect(producer.send.mock.calls[0][0].messages[0].headers).toEqual({});
+  });
+
   it('publica em os.eventos.v1 com chave e correlationId iguais ao ordemServicoId', async () => {
     const { producer, kafka } = kafkaFake();
     const publicador = new KafkaPublicadorIntegracao(ENV, kafka);

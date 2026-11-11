@@ -19,11 +19,12 @@ import {
   ApiQuery,
   ApiBody,
   ApiBearerAuth,
+  ApiSecurity,
 } from '@nestjs/swagger';
 import {
   CreateOrdemServicoDto,
   UpdateOrdemServicoDto,
-  ListQueryDto,
+  FilaQueryDto,
   GerarOrcamentoDto,
 } from '../dto/ordem-servico.dto';
 import { JwtAuthGuard } from '../../../../auth/guards/jwt-auth.guard';
@@ -93,35 +94,48 @@ export class OrdemServicoController {
   }
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
   @ApiOperation({
-    summary: 'Listar ordens de serviço ativas por prioridade',
+    summary: 'Fila de ordens de serviço ativas por prioridade (read model)',
     description:
-      'Retorna apenas OS operacionais ativas (exclui FINISHED e DELIVERED), ordenadas por prioridade de status: IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED. Dentro do mesmo status, as mais antigas aparecem primeiro.',
+      'Requer role ADMIN, RECEPCIONISTA ou MECANICO. Servida pelo read model (DocumentDB). Exclui FINISHED, DELIVERED e CLOSED_WITHOUT_EXECUTION e ordena por prioridade de status (IN_PROGRESS → AWAITING_APPROVAL → UNDER_DIAGNOSIS → RECEIVED → AWAITING_PARTS); dentro do mesmo status, as mais antigas primeiro. Paginação por cursor: envie pagination.nextCursor no parâmetro cursor para a próxima página.',
   })
-  @ApiQuery({ name: 'page', type: Number, required: false, example: 1 })
   @ApiQuery({ name: 'limit', type: Number, required: false, example: 10 })
+  @ApiQuery({ name: 'cursor', type: String, required: false })
   @ApiResponse({
     status: 200,
-    description: 'Lista de OS ativas ordenadas por prioridade',
+    description: 'Página da fila de OS ativas',
     schema: {
       example: {
         data: [
           {
             id: 'uuid',
-            veiculoId: 'uuid',
             clienteId: 'uuid',
+            veiculoId: 'uuid',
             status: 'IN_PROGRESS',
             descricao: 'Troca de óleo',
+            iniciada_em: '2024-01-01T01:00:00.000Z',
+            finalizada_em: null,
+            entregue_em: null,
             created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T01:00:00.000Z',
+            cliente: { id: 'uuid', nome: 'João Silva', documento: '12345678909' },
+            veiculo: { id: 'uuid', placa: 'ABC1D23', marca: 'Honda', modelo: 'Fit' },
           },
         ],
-        pagination: { page: 1, limit: 10, total: 5, totalPages: 1 },
+        pagination: { limit: 10, nextCursor: 'eyJwIjoxLCJjIjoi...' },
       },
     },
   })
+  @ApiResponse({ status: 400, description: 'Cursor ou limite inválido' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
-  listar(@Query() query: ListQueryDto) {
-    return this.listarUseCase.execute(Number(query.page) || 1, Number(query.limit) || 10);
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO',
+  })
+  listar(@Query() query: FilaQueryDto) {
+    return this.listarUseCase.execute(query.limit ?? 10, query.cursor);
   }
 
   @Get('tempo-medio')
@@ -146,10 +160,20 @@ export class OrdemServicoController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalhar ordem de serviço' })
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.RECEPCIONISTA, Role.MECANICO)
+  @ApiOperation({
+    summary: 'Detalhar ordem de serviço (read model)',
+    description:
+      'Requer role ADMIN, RECEPCIONISTA ou MECANICO. Servida pelo read model: status, marcos, cliente e veículo embutidos. Não inclui orçamento, itens nem histórico.',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Ordem de serviço encontrada' })
   @ApiResponse({ status: 401, description: 'Não autorizado' })
+  @ApiResponse({
+    status: 403,
+    description: 'Acesso negado - requer role ADMIN, RECEPCIONISTA ou MECANICO',
+  })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   detalhar(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() _user: AuthUser) {
     return this.detalharUseCase.execute(id);
@@ -157,21 +181,16 @@ export class OrdemServicoController {
 
   @Get(':id/status')
   @Public()
-  @ApiOperation({ summary: 'Consultar status da OS (para o cliente)' })
+  @ApiSecurity({})
+  @ApiOperation({
+    summary: 'Consultar status da OS (rota pública, sem token)',
+    description:
+      'Rota pública de consulta da OS, servida pelo read model. Resposta mínima: id, status e marcos de tempo da OS, sem dados do cliente.',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Status retornado com sucesso' })
-  @ApiResponse({ status: 401, description: 'Não autorizado' })
   @ApiResponse({ status: 404, description: 'Ordem de serviço não encontrada' })
   consultarStatus(@Param('id', ParseUUIDPipe) id: string) {
-    return this.consultarStatusUseCase.execute(id);
-  }
-
-  @Get(':id/rastreamento')
-  @Public()
-  @ApiOperation({ summary: 'Rastreamento público da ordem de serviço' })
-  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  @ApiResponse({ status: 200, description: 'Status atual da OS' })
-  rastrear(@Param('id', ParseUUIDPipe) id: string) {
     return this.consultarStatusUseCase.execute(id);
   }
 
@@ -242,7 +261,7 @@ export class OrdemServicoController {
 
   @Patch(':id/aprovar-servico')
   @ApiOperation({
-    summary: 'Cliente aprova o serviço prestado',
+    summary: 'Aprovar o serviço prestado (requer JWT)',
     description:
       'Confirma que o serviço finalizado está de acordo. A entrega é registrada separadamente pela recepção.',
   })

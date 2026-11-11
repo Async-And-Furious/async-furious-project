@@ -410,16 +410,6 @@
   - 404
   mutating: false
   mock_body: {}
-- id: route-036
-  method: GET
-  path: /api/v1/ordens-servico/{{ordem_id}}/rastreamento
-  auth: customer
-  role: null
-  allowed_status:
-  - 200
-  - 404
-  mutating: false
-  mock_body: {}
 - id: route-037
   method: PATCH
   path: /api/v1/ordens-servico/{{ordem_id}}

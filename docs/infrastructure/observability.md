@@ -111,6 +111,21 @@ Regras:
   todo log emitido ali, inclusive depois de `await`, sai com os três campos
   de rastreio. Não use o helper dentro de requisição HTTP: o log já tem o
   `correlationId` da requisição e o campo sairia duplicado.
+- **Exceção restrita — log de transição #345.** `logType: "os.status.transition"`
+  registra apenas `previousStatus` e `newStatus` como dados da transição. Um
+  logger Pino independente, sem o mixin Kafka ou bindings HTTP, impede que IDs
+  desses contextos sejam incluídos. Isso não altera os demais logs; o teste
+  serializa via Pino real e confirma a ausência desses campos.
+- **Cobertura #345 é best-effort por caminho de código.** As transições
+  terminais (`FINISHED`, `CLOSED_WITHOUT_EXECUTION`) são observadas no handler
+  de conclusão, no handler de recusas, no detector de OS parada e no caso de uso
+  genérico usado pelo webhook de status. Os três produtores dedicados registram
+  somente após CAS bem-sucedido; o caso genérico registra após o update existente
+  (não condicional) e seu `previousStatus` pode estar desatualizado sob corrida.
+  Isto não cobre transições não terminais, escrita direta fora da aplicação ou
+  caminhos futuros. Crash pode perder logs e replay/collector pode duplicá-los;
+  nunca trate a contagem como total exato, auditoria ou cobertura completa da
+  Saga.
 - **No HTTP, `correlationId` é só o id da requisição.** O rastreio da saga
   entre serviços é pelo `ordemServicoId` (ADR-0018). Para seguir uma OS de
   ponta a ponta, filtre por `ordemServicoId` ou pelo `correlationId` dos

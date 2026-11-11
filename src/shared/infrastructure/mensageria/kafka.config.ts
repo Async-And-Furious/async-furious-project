@@ -41,16 +41,20 @@ export function osKafkaConfig(env: NodeJS.ProcessEnv = process.env): KafkaConfig
   };
 }
 
-/** Chave do registro = `ordemServicoId`: garante a ordem dos eventos da mesma OS no tópico. */
+/**
+ * Chave do registro = `ordemServicoId`: garante a ordem dos eventos da mesma OS no tópico.
+ * `headers` leva o trace de Kafka (New Relic) até o consumidor.
+ */
 export function osKafkaSendRequest(
   topic: string,
   key: string | null,
-  envelope: unknown
+  envelope: unknown,
+  headers?: Record<string, string>
 ): ProducerRecord {
   return {
     topic,
     acks: -1,
-    messages: [{ key, value: JSON.stringify(envelope) }],
+    messages: [{ key, value: JSON.stringify(envelope), headers }],
   };
 }
 

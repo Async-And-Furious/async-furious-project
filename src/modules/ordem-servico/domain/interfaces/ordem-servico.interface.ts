@@ -6,6 +6,8 @@ export type OrdemServicoUpdateData = {
   iniciada_em?: Date | null;
   finalizada_em?: Date | null;
   entregue_em?: Date | null;
+  // Registrado em HistoricoStatusOS quando a escrita muda o status.
+  motivo?: string;
   reserva_pecas_pendente?: boolean;
   pago_em?: Date | null;
 };
@@ -23,21 +25,6 @@ export interface IOrdemServicoRepository {
     clienteId: string;
     descricao?: string;
   }): Promise<OrdemDeServico>;
-  findAll(
-    page?: number,
-    limit?: number,
-    search?: string
-  ): Promise<{
-    data: OrdemDeServico[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
-  }>;
-  findAllAtivas(
-    page?: number,
-    limit?: number
-  ): Promise<{
-    data: OrdemDeServico[];
-    pagination: { page: number; limit: number; total: number; totalPages: number };
-  }>;
   findOne(id: string): Promise<OrdemDeServico>;
   update(id: string, data: OrdemServicoUpdateData): Promise<OrdemDeServico>;
   /** Grava só se a OS ainda satisfaz a condição; devolve false se nenhuma linha casou. */

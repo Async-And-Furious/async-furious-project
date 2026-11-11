@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
 import type { IPublicadorIntegracao } from '../../../../shared/domain/interfaces/publicador-integracao.interface';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
-import type { IStatusHistoryRepository } from '../../domain/interfaces/status-history.interface';
-import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 import { EtapaDaSagaFalhou } from '../../domain/events/etapa-da-saga-falhou.event';
+import { logOsStatusTransition } from '../logging/log-os-status-transition';
+import type { IOSStatusTransitionLogger } from '../logging/log-os-status-transition';
 
 export const PRAZO_PADRAO_MINUTOS = 48 * 60;
 
@@ -33,8 +33,8 @@ export class DetectarOsParadaUseCase {
 
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly statusHistoryRepository: IStatusHistoryRepository,
     private readonly publicador: IPublicadorIntegracao,
+    private readonly transitionLogger: IOSStatusTransitionLogger,
     private readonly prazoMinutos: number = PRAZO_PADRAO_MINUTOS,
     private readonly agora: () => Date = () => new Date()
   ) {}
@@ -53,19 +53,16 @@ export class DetectarOsParadaUseCase {
         const encerrou = await this.ordemServicoRepository.atualizarSeCondicao(
           os.id,
           { status: 'AWAITING_APPROVAL', pago_em: null },
-          { status: 'CLOSED_WITHOUT_EXECUTION' }
+          { status: 'CLOSED_WITHOUT_EXECUTION', motivo }
         );
         if (!encerrou) {
           this.logger.warn(`OS ${os.id} mudou entre a busca e o fechamento: segue como está`);
           continue;
         }
-        await this.statusHistoryRepository.create(
-          HistoricoStatus.create({
-            ordemServicoId: os.id,
-            statusAnterior: 'AWAITING_APPROVAL',
-            statusNovo: 'CLOSED_WITHOUT_EXECUTION',
-            motivo,
-          })
+        logOsStatusTransition(
+          this.transitionLogger,
+          'AWAITING_APPROVAL',
+          'CLOSED_WITHOUT_EXECUTION'
         );
         resultado.encerradas += 1;
       } catch (erro) {

@@ -145,18 +145,21 @@ export class UpdateOrdemServicoDto {
   descricao?: string;
 }
 
-export class ListQueryDto {
-  @ApiPropertyOptional({ example: 1, description: 'Número da página' })
+export class FilaQueryDto {
+  @ApiPropertyOptional({ example: 10, description: 'Quantidade por página (1 a 100)' })
   @IsOptional()
-  page?: number;
-
-  @ApiPropertyOptional({ example: 10, description: 'Quantidade por página' })
-  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit?: number;
 
-  @ApiPropertyOptional({ example: 'troca', description: 'Buscar por descrição' })
+  @ApiPropertyOptional({
+    description: 'Cursor opaco devolvido em pagination.nextCursor da página anterior',
+  })
   @IsOptional()
-  search?: string;
+  @IsString()
+  cursor?: string;
 }
 
 export class ItemPecaDto {

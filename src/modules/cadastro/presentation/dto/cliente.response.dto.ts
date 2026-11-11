@@ -1,4 +1,5 @@
 import { Cliente } from '../../domain/entities/cliente.entity';
+import type { ClienteLeitura } from '../../domain/interfaces/cliente-read-model.interface';
 
 export class ClienteResponseDto {
   id: string;
@@ -17,6 +18,10 @@ export class ClienteResponseDto {
     dto.documento = cliente.cpfCnpj.formato;
     dto.tipoDocumento = cliente.cpfCnpj.tipo;
     return dto;
+  }
+
+  static fromLeitura(cliente: ClienteLeitura): ClienteResponseDto {
+    return Object.assign(new ClienteResponseDto(), cliente);
   }
 }
 

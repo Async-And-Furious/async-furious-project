@@ -3,7 +3,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as ordemServicoEntity from '../../domain/entities/ordem-servico.entity';
 
 // DELIVERED fica de fora: a entrega só é gravada por PATCH /ordens-servico/:id/registrar-entrega.
-const STATUS_ACEITOS_NO_WEBHOOK: ordemServicoEntity.OSStatus[] = [
+export const WEBHOOK_STATUS_PERMITIDOS: ordemServicoEntity.OSStatus[] = [
   'RECEIVED',
   'UNDER_DIAGNOSIS',
   'AWAITING_APPROVAL',
@@ -25,10 +25,10 @@ export class UpdateServiceOrderStatusWebhookDto {
   @ApiProperty({
     description:
       'Novo status da Ordem de Serviço. DELIVERED não é aceito: use PATCH /ordens-servico/:id/registrar-entrega.',
-    enum: STATUS_ACEITOS_NO_WEBHOOK,
+    enum: WEBHOOK_STATUS_PERMITIDOS,
     example: 'UNDER_DIAGNOSIS',
   })
-  @IsEnum(STATUS_ACEITOS_NO_WEBHOOK)
+  @IsEnum(WEBHOOK_STATUS_PERMITIDOS)
   @IsNotEmpty()
   status!: ordemServicoEntity.OSStatus;
 

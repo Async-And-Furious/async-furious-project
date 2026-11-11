@@ -15,7 +15,7 @@ import {
   OrdemDeServico,
   type OSStatus,
 } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
-import type { HistoricoStatus } from '../../src/modules/ordem-servico/domain/entities/historico-status.entity';
+import { HistoricoStatus } from '../../src/modules/ordem-servico/domain/entities/historico-status.entity';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IStatusHistoryRepository } from '../../src/modules/ordem-servico/domain/interfaces/status-history.interface';
 import type { IEmissorEventos } from '../../src/shared/domain/interfaces/emissor-eventos.interface';
@@ -64,8 +64,20 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
       pago_em: estado.pagoEm,
     });
   };
+  // Como o repository real: uma linha de histórico (com o motivo) sempre que a
+  // escrita muda o status.
   const aplicar = (data: Record<string, unknown>) => {
     if (!estado) return;
+    if (typeof data.status === 'string' && data.status !== estado.status) {
+      historico.push(
+        HistoricoStatus.create({
+          ordemServicoId: OS_ID,
+          statusAnterior: estado.status,
+          statusNovo: data.status as OSStatus,
+          motivo: data.motivo as string | undefined,
+        })
+      );
+    }
     for (const [coluna, valor] of Object.entries(data)) {
       const campo = CAMPOS[coluna];
       if (campo) estado = { ...estado, [campo]: valor };
@@ -108,6 +120,7 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
     }),
   };
   const transicao = new StatusTransitionService();
+  const transitionLogger = { log: jest.fn() };
   const enviar = jest
     .fn<Promise<void>, [string, string | null, unknown]>()
     .mockResolvedValue(undefined);
@@ -120,7 +133,13 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
       ...despachantesExecucao({
         emDiagnostico: new AtualizarStatusEmDiagnosticoHandler(osRepo, emissor, transicao),
         execucaoIniciada: new AtualizarStatusExecucaoIniciadaHandler(osRepo, emissor, transicao),
-        finalizada: new AtualizarStatusFinalizadaHandler(osRepo, historicoRepo, emissor, transicao),
+        finalizada: new AtualizarStatusFinalizadaHandler(
+          osRepo,
+          historicoRepo,
+          emissor,
+          transicao,
+          transitionLogger
+        ),
       }),
       ...despachantesBilling({
         aguardandoAprovacao: new AtualizarStatusAguardandoAprovacaoHandler(osRepo),
@@ -133,7 +152,8 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null) {
           osRepo,
           emissor,
           historicoRepo,
-          transicao
+          transicao,
+          transitionLogger
         ),
         pagamentoConfirmado: new RegistrarPagamentoConfirmadoHandler(osRepo, historicoRepo),
       }),

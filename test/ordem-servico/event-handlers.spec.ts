@@ -45,6 +45,7 @@ import {
   type OSStatus,
 } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { INotificacaoClienteGateway } from '../../src/modules/ordem-servico/application/ports/notificacao-cliente.gateway';
+import type { IOSStatusTransitionLogger } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 
 const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => {
   const os = new OrdemDeServico();
@@ -86,9 +87,11 @@ describe('OS Event handlers', () => {
   let emissor: jest.Mocked<EmissorEventos>;
   let notificacaoGateway: jest.Mocked<INotificacaoClienteGateway>;
   let transicao: StatusTransitionService;
+  let transitionLogger: jest.Mocked<IOSStatusTransitionLogger>;
 
   beforeEach(() => {
     transicao = new StatusTransitionService();
+    transitionLogger = { log: jest.fn() };
     osRepo = {
       findOne: jest.fn(),
       create: jest.fn(),
@@ -125,7 +128,10 @@ describe('OS Event handlers', () => {
 
       await handler.handle(new OrdemServicoCriada('os-1', 'cli-1', 'veh-1'));
 
-      expect(osRepo.update).toHaveBeenCalledWith('os-1', { status: 'RECEIVED' });
+      expect(osRepo.update).toHaveBeenCalledWith('os-1', {
+        status: 'RECEIVED',
+        motivo: 'Status reconfirmado como RECEIVED',
+      });
     });
   });
 
@@ -514,6 +520,7 @@ describe('OS Event handlers', () => {
 
     it('ExecucaoIniciada repetida (OS já em IN_PROGRESS) é log informativo, não warn', async () => {
       const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+      log.mockClear();
       const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
 
@@ -527,6 +534,7 @@ describe('OS Event handlers', () => {
 
     it('PecasReservadas tardia (OS já em IN_PROGRESS) é log informativo, não warn', async () => {
       const log = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+      log.mockClear();
       const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
 
@@ -554,7 +562,8 @@ describe('OS Event handlers', () => {
         osRepo,
         { create: jest.fn(), findByOrdemServicoId: jest.fn() },
         emissor,
-        transicao
+        transicao,
+        transitionLogger
       ).handle(new ExecucaoConcluida('os-1'));
 
       expect(log).toHaveBeenCalledTimes(1);
@@ -878,7 +887,8 @@ describe('OS Event handlers', () => {
         repoComIntercalacao,
         historico,
         emissor,
-        transicao
+        transicao,
+        transitionLogger
       );
 
       await finalizada.handle(new ExecucaoConcluida('os-1'));
@@ -896,7 +906,8 @@ describe('OS Event handlers', () => {
         repo,
         historicoVazio(),
         emissor,
-        transicao
+        transicao,
+        transitionLogger
       );
 
       await Promise.all([
@@ -953,9 +964,16 @@ describe('OS Event handlers', () => {
     });
 
     it('grava FINISHED condicionado a IN_PROGRESS e emite OrdemServicoFinalizada', async () => {
+      const log = transitionLogger.log;
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
       osRepo.atualizarSeCondicao.mockResolvedValue(true);
-      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor, transicao);
+      const handler = new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        historyRepo,
+        emissor,
+        transicao,
+        transitionLogger
+      );
 
       await handler.handle(new ExecucaoConcluida('os-1'));
 
@@ -967,30 +985,101 @@ describe('OS Event handlers', () => {
       expect(osRepo.update).not.toHaveBeenCalled();
       expect(emissor.emitir).toHaveBeenCalledWith(expect.any(OrdemServicoFinalizada));
       expect(historyRepo.create).not.toHaveBeenCalled();
+      expect(log).toHaveBeenCalledWith({
+        logType: 'os.status.transition',
+        previousStatus: 'IN_PROGRESS',
+        newStatus: 'FINISHED',
+      });
     });
 
     it('a condição não casa e a releitura mostra FINISHED (entrega concorrente): não emite de novo', async () => {
+      const log = transitionLogger.log;
       osRepo.findOne
         .mockResolvedValueOnce(mockOs({ status: 'IN_PROGRESS' }))
         .mockResolvedValueOnce(mockOs({ status: 'FINISHED' }));
       osRepo.atualizarSeCondicao.mockResolvedValue(false);
-      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor, transicao);
+      const handler = new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        historyRepo,
+        emissor,
+        transicao,
+        transitionLogger
+      );
 
       await handler.handle(new ExecucaoConcluida('os-1'));
 
       expect(emissor.emitir).not.toHaveBeenCalled();
       expect(historyRepo.create).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalledWith(
+        expect.objectContaining({ logType: 'os.status.transition' })
+      );
     });
 
     it('a condição não casa e a releitura ainda mostra IN_PROGRESS: falha retentável, sem emitir', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
       osRepo.atualizarSeCondicao.mockResolvedValue(false);
-      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor, transicao);
+      const handler = new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        historyRepo,
+        emissor,
+        transicao,
+        transitionLogger
+      );
 
       await expect(handler.handle(new ExecucaoConcluida('os-1'))).rejects.toBeInstanceOf(
         FalhaRetentavelException
       );
       expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+
+    it('não registra transição se a atualização condicional falhar', async () => {
+      const log = transitionLogger.log;
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
+      osRepo.atualizarSeCondicao.mockRejectedValue(new Error('database unavailable'));
+      const handler = new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        historyRepo,
+        emissor,
+        transicao,
+        transitionLogger
+      );
+
+      await expect(handler.handle(new ExecucaoConcluida('os-1'))).rejects.toThrow(
+        'database unavailable'
+      );
+
+      expect(log).not.toHaveBeenCalledWith(
+        expect.objectContaining({ logType: 'os.status.transition' })
+      );
+      expect(emissor.emitir).not.toHaveBeenCalled();
+    });
+
+    it('continua publicando após falha síncrona do logger', async () => {
+      const order: string[] = [];
+      osRepo.findOne.mockResolvedValue(mockOs({ status: 'IN_PROGRESS' }));
+      osRepo.atualizarSeCondicao.mockImplementation(() => {
+        order.push('cas');
+        return Promise.resolve(true);
+      });
+      emissor.emitir.mockImplementation(() => {
+        order.push('publish');
+        return Promise.resolve();
+      });
+      transitionLogger.log.mockImplementationOnce(() => {
+        order.push('log');
+        throw new Error('logger unavailable');
+      });
+      const handler = new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        historyRepo,
+        emissor,
+        transicao,
+        transitionLogger
+      );
+
+      await handler.handle(new ExecucaoConcluida('os-1'));
+
+      expect(order).toEqual(['cas', 'log', 'publish']);
     });
 
     it.each<OSStatus>(['FINISHED', 'DELIVERED', 'CLOSED_WITHOUT_EXECUTION'])(
@@ -1000,7 +1089,8 @@ describe('OS Event handlers', () => {
           osRepo,
           historyRepo,
           emissor,
-          transicao
+          transicao,
+          transitionLogger
         );
         await shouldNotUpdateWhenStatusIs(osRepo, handler, status, new ExecucaoConcluida('os-1'));
         expect(emissor.emitir).not.toHaveBeenCalled();
@@ -1016,7 +1106,8 @@ describe('OS Event handlers', () => {
           osRepo,
           historyRepo,
           emissor,
-          transicao
+          transicao,
+          transitionLogger
         );
 
         await expect(handler.handle(new ExecucaoConcluida('os-1'))).rejects.toBeInstanceOf(
@@ -1030,7 +1121,13 @@ describe('OS Event handlers', () => {
 
     it('com a OS em AWAITING_PARTS registra o motivo e emite EtapaDaSagaFalhou (reparo), sem finalizar', async () => {
       osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_PARTS' }));
-      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor, transicao);
+      const handler = new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        historyRepo,
+        emissor,
+        transicao,
+        transitionLogger
+      );
 
       await handler.handle(new ExecucaoConcluida('os-1'));
 
@@ -1064,7 +1161,13 @@ describe('OS Event handlers', () => {
           motivo: motivoFalhaReparo,
         }),
       ]);
-      const handler = new AtualizarStatusFinalizadaHandler(osRepo, historyRepo, emissor, transicao);
+      const handler = new AtualizarStatusFinalizadaHandler(
+        osRepo,
+        historyRepo,
+        emissor,
+        transicao,
+        transitionLogger
+      );
 
       await handler.handle(new ExecucaoConcluida('os-1'));
 
@@ -1146,7 +1249,8 @@ describe('OS Event handlers', () => {
         osRepo,
         emissor,
         historyRepo,
-        transicao
+        transicao,
+        transitionLogger
       );
     });
 
@@ -1154,35 +1258,73 @@ describe('OS Event handlers', () => {
       it.each<OSStatus>(['RECEIVED', 'UNDER_DIAGNOSIS', 'AWAITING_APPROVAL'])(
         'em %s fecha a OS condicionado ao status lido, registra o motivo e emite',
         async (status) => {
+          const log = transitionLogger.log;
           osRepo.findOne.mockResolvedValue(mockOs({ status }));
           osRepo.atualizarSeCondicao.mockResolvedValue(true);
 
           await consumir(handler);
 
+          // o repository grava o histórico com o motivo na mesma transação
           expect(osRepo.atualizarSeCondicao).toHaveBeenCalledWith(
             'os-1',
             { status },
-            { status: 'CLOSED_WITHOUT_EXECUTION' }
+            { status: 'CLOSED_WITHOUT_EXECUTION', motivo }
           );
-          expect(historyRepo.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-              statusAnterior: status,
-              statusNovo: 'CLOSED_WITHOUT_EXECUTION',
-              motivo,
-            })
-          );
+          expect(historyRepo.create).not.toHaveBeenCalled();
           expect(emissor.emitir.mock.calls[0][0]).toBeInstanceOf(
             StatusAtualizadoEncerradaSemExecucao
           );
+          expect(log).toHaveBeenCalledWith({
+            logType: 'os.status.transition',
+            previousStatus: status,
+            newStatus: 'CLOSED_WITHOUT_EXECUTION',
+          });
         }
       );
 
       it('se a OS mudou entre a leitura e a gravação, lança FalhaRetentavelException', async () => {
+        const log = transitionLogger.log;
         osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
         osRepo.atualizarSeCondicao.mockResolvedValue(false);
 
         await expect(consumir(handler)).rejects.toBeInstanceOf(FalhaRetentavelException);
         expect(emissor.emitir).not.toHaveBeenCalled();
+        expect(log).not.toHaveBeenCalledWith(
+          expect.objectContaining({ logType: 'os.status.transition' })
+        );
+      });
+
+      it('não registra transição se a atualização condicional falhar', async () => {
+        const log = transitionLogger.log;
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+        osRepo.atualizarSeCondicao.mockRejectedValue(new Error('database unavailable'));
+
+        await expect(consumir(handler)).rejects.toThrow('database unavailable');
+
+        expect(log).not.toHaveBeenCalledWith(
+          expect.objectContaining({ logType: 'os.status.transition' })
+        );
+      });
+
+      it('continua publicando após falha síncrona do logger', async () => {
+        const order: string[] = [];
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+        osRepo.atualizarSeCondicao.mockImplementation(() => {
+          order.push('cas');
+          return Promise.resolve(true);
+        });
+        emissor.emitir.mockImplementation(() => {
+          order.push('publish');
+          return Promise.resolve();
+        });
+        transitionLogger.log.mockImplementationOnce(() => {
+          order.push('log');
+          throw new Error('logger unavailable');
+        });
+
+        await consumir(handler);
+
+        expect(order).toEqual(['cas', 'log', 'publish']);
       });
 
       it.each<OSStatus>(['IN_PROGRESS', 'AWAITING_PARTS'])(
