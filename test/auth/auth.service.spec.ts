@@ -128,12 +128,13 @@ describe('AuthService', () => {
   });
 
   describe('validateTokenSubject', () => {
-    it('resolves staff users without looking up customers', async () => {
+    it('resolves non-colliding staff users after checking for a customer match', async () => {
       prisma.user.findUnique.mockResolvedValue({
         id: 'user-1',
         email: 'mecanico@example.com',
         role: Role.MECANICO,
       });
+      prisma.cliente.findUnique.mockResolvedValue(null);
       const service = buildService({});
 
       await expect(service.validateTokenSubject({ sub: 'user-1' })).resolves.toEqual({
@@ -141,7 +142,10 @@ describe('AuthService', () => {
         email: 'mecanico@example.com',
         role: Role.MECANICO,
       });
-      expect(prisma.cliente.findUnique).not.toHaveBeenCalled();
+      expect(prisma.cliente.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        select: { id: true, email: true, ativo: true },
+      });
     });
 
     it('falls back to an active customer with the CLIENTE role', async () => {

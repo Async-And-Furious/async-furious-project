@@ -237,6 +237,13 @@ Serviço próprio (`repo-execucao-service`, banco `execucao_producao`). Referenc
 
 Os eventos de domínio estão organizados por BC, refletindo a estrutura de módulos definida em `src/modules/`.
 
+> **Fronteira de integração (Fase 4):** os eventos financeiros listados em
+> §5.4 são exemplos legados de domínio/in-process do monólito, não contratos
+> de integração Kafka. O catálogo Kafka vigente, incluindo os eventos
+> publicados e consumidos pelo Billing Service, está em
+> [`event-catalog.md`](./architecture/event-catalog.md) e segue a
+> [ADR-0018](./adr/0018-mensageria-contratos-eventos.md).
+
 ---
 
 ### 5.1. BC: Criação e Acompanhamento da OS (`ordem-servico`)
@@ -255,6 +262,21 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `OrcamentoAprovado`
 *   `OrcamentoRejeitado`
 
+**Eventos de integração com o Execução e Produção (Fase 4, Feature #334).** Não
+são eventos de domínio do BC: atravessam a fronteira entre serviços
+(contrato em [`architecture/event-catalog.md`](./architecture/event-catalog.md);
+tratamento no código em
+[`architecture/os-service-integracao-execucao.md`](./architecture/os-service-integracao-execucao.md)).
+Hoje trafegam pelo `EmissorEventos` in-process, com o mesmo nome.
+
+*   Publicados pelo OS Service: `OrdemServicoRecebida` (entrada na fila de
+    diagnóstico do Execução), `OrcamentoCalculado` (renomeado a partir de
+    `ServicosEInsumosListados`; carrega `valorTotalServicos`,
+    `valorTotalPecas` e `valorTotalGeral`) e `EtapaDaSagaFalhou`.
+*   Consumidos pelo OS Service: `DiagnosticoIniciado` (`UNDER_DIAGNOSIS`),
+    `ExecucaoIniciada` (`IN_PROGRESS` e, com a reserva de peças pendente,
+    `AWAITING_PARTS`) e `ExecucaoConcluida` (`FINISHED`).
+
 #### Comandos:
 
 *   `IniciarOrdemDeServico`
@@ -269,14 +291,15 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `ConsultarProgressoOS`
 *   `AdicionarServicoAOS`
 *   `AdicionarPecaAOS`
-*   `FinalizarOrdemDeServico`
+*   `FinalizarOrdemDeServico` (disparado pelo evento `ExecucaoConcluida`; a
+    rota `finalizar-execucao` saiu do OS Service)
 *   `EntregarOrdemDeServico`
 
 ---
 
 ### 5.2. BC: Gestão Cadastral (`cadastro`)
 
-#### Eventos de Domínio (9):
+#### Eventos de Domínio (8):
 
 *   `ClienteCadastrado`
 *   `ClienteAtualizado`
@@ -286,7 +309,6 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `VeiculoRemovido`
 *   `ClienteIdentificado`
 *   `DadosClienteInformados`
-*   `VeiculoAnalisado`
 
 #### Comandos:
 
@@ -298,7 +320,6 @@ Os eventos de domínio estão organizados por BC, refletindo a estrutura de mód
 *   `RemoverVeiculo`
 *   `IdentificarCliente`
 *   `InformarDadosCliente`
-*   `AnalisarVeiculo`
 
 ---
 
@@ -393,5 +414,4 @@ As imagens abaixo representam cenários complementares levantados na etapa de mo
 *   Cadastro de peças: ![](./static/domainstorytelling.Peças_2026-03-27.png)
 *   Remoção de peças: ![](./static/domainstorytelling.PeçasRemover_2026-03-27.png)
 *   Cadastro de serviços: ![](./static/domainstorytelling.Servico_2026-03-27 (1).png)
-
 

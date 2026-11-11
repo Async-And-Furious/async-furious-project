@@ -4,15 +4,18 @@ metadata:
   name: async-furious-migrate
   namespace: async-furious
   labels:
-    app: async-furious-api
+    app.kubernetes.io/part-of: async-furious
+    app.kubernetes.io/component: migration
     job: migration
 spec:
   backoffLimit: 3
   ttlSecondsAfterFinished: 86400
   template:
     metadata:
+      # Sem app: async-furious-api: com ele o pod entraria no Service e no target group do ALB.
       labels:
-        app: async-furious-api
+        app.kubernetes.io/part-of: async-furious
+        app.kubernetes.io/component: migration
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false

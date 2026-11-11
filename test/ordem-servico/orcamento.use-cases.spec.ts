@@ -1,17 +1,15 @@
 import { Prisma } from '@prisma/client';
 import { DomainException } from '../../src/shared/domain/exceptions/domain.exception';
 import { EntityNotFoundException } from '../../src/shared/domain/exceptions/entity-not-found.exception';
+import { ConflitoException } from '../../src/shared/domain/exceptions/conflito.exception';
 import {
   AprovarOrcamentoUseCase,
   RecusarOrcamentoUseCase,
 } from '../../src/modules/ordem-servico/application/use-cases/orcamento.use-cases';
 import {
   CriarOrdemServicoUseCase,
-  AssumirOrdemServicoUseCase,
-  AnalisarVeiculoUseCase,
   ListarServicosInsumosNaOsUseCase,
   AtualizarOrdemServicoUseCase,
-  FinalizarExecucaoUseCase,
   AprovarServicoPrestadoUseCase,
   RegistrarEntregaVeiculoUseCase,
   ConsultarStatusOrdemServicoUseCase,
@@ -19,6 +17,10 @@ import {
   DetalharOrdemServicoUseCase,
   DeletarOrdemServicoUseCase,
 } from '../../src/modules/ordem-servico/application/use-cases/ordem-servico.use-cases';
+import type { UpdateServiceOrderStatusUseCase } from '../../src/modules/ordem-servico/application/use-cases/update-service-order-status.use-case';
+import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-criada.event';
+import { OrdemServicoRecebida } from '../../src/modules/ordem-servico/domain/events/ordem-servico-recebida.event';
+import { OrcamentoCalculado } from '../../src/modules/ordem-servico/domain/events/orcamento-calculado.event';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IOrcamentoRepository } from '../../src/modules/ordem-servico/domain/interfaces/orcamento.interface';
 import type { IOsPecaRepository } from '../../src/modules/ordem-servico/domain/interfaces/os-peca.interface';
@@ -30,6 +32,8 @@ import type { IOsServicoRepository } from '../../src/modules/ordem-servico/domai
 import type { IOsReadModelQuery } from '../../src/modules/ordem-servico/domain/interfaces/os-read-model.interface';
 import type { EmissorEventos } from '../../src/shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import type { ICobrancaPagamentoPort } from '../../src/shared/domain/interfaces/cobranca-pagamento.port';
+import type { Cliente } from '../../src/modules/cadastro/domain/entities/cliente.entity';
+import type { Veiculo } from '../../src/modules/cadastro/domain/entities/veiculo.entity';
 import type { Orcamento } from '../../src/modules/ordem-servico/domain/entities/orcamento.entity';
 import {
   OrdemDeServico,
@@ -46,6 +50,7 @@ const makeOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico =>
     iniciada_em: null,
     finalizada_em: null,
     entregue_em: null,
+    reservaPecasPendente: false,
     created_at: new Date(),
     updated_at: new Date(),
     ...overrides,
@@ -81,8 +86,10 @@ describe('OS + Orçamento Use Cases', () => {
       findOne: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      atualizarSeCondicao: jest.fn(),
       remove: jest.fn(),
       calcularTempoMedioExecucao: jest.fn(),
+      findParadasAguardandoAprovacao: jest.fn(),
     } as jest.Mocked<IOrdemServicoRepository>;
     mockClienteRepository = {
       create: jest.fn(),
@@ -114,6 +121,7 @@ describe('OS + Orçamento Use Cases', () => {
       findByOrdemServicoId: jest.fn(),
       update: jest.fn(),
       updateEstoque: jest.fn(),
+      debitarEstoqueAtomico: jest.fn(),
       remove: jest.fn(),
     };
     mockOsServicoRepository = {
@@ -139,9 +147,14 @@ describe('OS + Orçamento Use Cases', () => {
   });
 
   describe('CriarOrdemServicoUseCase', () => {
-    it('deve criar OS e emitir OrdemServicoCriada', async () => {
-      mockClienteRepository.findByDocumento.mockResolvedValue({ id: 'cli-1' } as any);
-      mockVeiculoRepository.findByPlaca.mockResolvedValue({ id: 'veh-1' } as any);
+    it('deve criar OS e emitir OrdemServicoCriada e OrdemServicoRecebida (entrada na fila do Execução)', async () => {
+      mockClienteRepository.findByDocumento.mockResolvedValue({
+        id: 'cli-1',
+      } as unknown as Cliente);
+      mockVeiculoRepository.findByPlaca.mockResolvedValue({
+        id: 'veh-1',
+        clienteId: 'cli-1',
+      } as unknown as Veiculo);
       mockOsRepository.create.mockResolvedValue(mockOs);
       mockOsRepository.findOne.mockResolvedValue(mockOs);
 
@@ -178,92 +191,128 @@ describe('OS + Orçamento Use Cases', () => {
         descricao: 'Teste',
       });
       expect(mockOrcamentoRepository.create).toHaveBeenCalled();
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
+      expect(mockBarramento.emitir).toHaveBeenCalledTimes(2);
+      expect(mockBarramento.emitir.mock.calls[0][0]).toBeInstanceOf(OrdemServicoCriada);
+      expect(mockBarramento.emitir.mock.calls[1][0]).toBeInstanceOf(OrdemServicoRecebida);
+      expect(mockBarramento.emitir.mock.calls[1][0]).toMatchObject({ ordemServicoId: 'os-1' });
       expect(result.id).toBe('os-1');
     });
-  });
 
-  describe('AssumirOrdemServicoUseCase', () => {
-    it('deve emitir OrdemServicoAssumida quando OS está RECEIVED', async () => {
-      const osUpdated = makeOs({ status: 'UNDER_DIAGNOSIS' });
-      mockOsRepository.findOne.mockResolvedValueOnce(mockOs).mockResolvedValueOnce(osUpdated);
+    it('recusa com ConflitoException a placa de um veículo de outro cliente (#378, item 6)', async () => {
+      mockClienteRepository.findByDocumento.mockResolvedValue({ id: 'cli-1' } as any);
+      mockVeiculoRepository.findByPlaca.mockResolvedValue({
+        id: 'veh-9',
+        clienteId: 'cli-9',
+      } as any);
 
-      const uc = new AssumirOrdemServicoUseCase(mockOsRepository, mockBarramento);
-      const result = await uc.execute('os-1');
-
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('UNDER_DIAGNOSIS');
-    });
-
-    it('deve lançar DomainException quando OS não está RECEIVED', async () => {
-      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'UNDER_DIAGNOSIS' }));
-
-      const uc = new AssumirOrdemServicoUseCase(mockOsRepository, mockBarramento);
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
-
-    it('deve lançar EntityNotFoundException quando OS não existe', async () => {
-      mockOsRepository.findOne.mockRejectedValue(
-        new EntityNotFoundException('OrdemDeServico', 'invalid')
+      const uc = new CriarOrdemServicoUseCase(
+        mockOsRepository,
+        mockClienteRepository,
+        mockVeiculoRepository,
+        mockServicoRepository,
+        mockPecaInsumoRepository,
+        mockOsServicoRepository,
+        mockOsPecaRepository,
+        mockOrcamentoRepository,
+        mockBarramento
       );
 
-      const uc = new AssumirOrdemServicoUseCase(mockOsRepository, mockBarramento);
-      await expect(uc.execute('invalid')).rejects.toThrow(EntityNotFoundException);
-    });
-  });
-
-  describe('AnalisarVeiculoUseCase', () => {
-    it('deve emitir VeiculoAnalisado quando OS está UNDER_DIAGNOSIS', async () => {
-      const osEmDiagnostico = makeOs({ status: 'UNDER_DIAGNOSIS' });
-      mockOsRepository.findOne
-        .mockResolvedValueOnce(osEmDiagnostico)
-        .mockResolvedValueOnce(osEmDiagnostico);
-
-      const uc = new AnalisarVeiculoUseCase(mockOsRepository, mockBarramento);
-      await uc.execute('os-1');
-
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-    });
-
-    it('deve lançar DomainException quando OS não está UNDER_DIAGNOSIS', async () => {
-      mockOsRepository.findOne.mockResolvedValue(mockOs);
-
-      const uc = new AnalisarVeiculoUseCase(mockOsRepository, mockBarramento);
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+      await expect(
+        uc.execute({
+          cliente: { nome: 'Joao', email: 'joao@a.com', documento: '123', tipoDocumento: 'CPF' },
+          veiculo: { placa: 'ABC1234', marca: 'Ford', modelo: 'Ka', ano: 2020 },
+          servicos: [],
+          pecas: [],
+        })
+      ).rejects.toThrow(ConflitoException);
+      expect(mockOsRepository.create).not.toHaveBeenCalled();
+      expect(mockBarramento.emitir).not.toHaveBeenCalled();
     });
   });
 
   describe('ListarServicosInsumosNaOsUseCase', () => {
-    it('deve emitir ServicosEInsumosListados e retornar orçamento', async () => {
-      const osEmDiagnostico = makeOs({ status: 'UNDER_DIAGNOSIS' });
-      mockOsRepository.findOne.mockResolvedValue(osEmDiagnostico);
-      mockOrcamentoRepository.findByOrdemServicoId.mockResolvedValue(mockOrcamento);
+    const criarUseCase = () =>
+      new ListarServicosInsumosNaOsUseCase(mockOsRepository, mockOsPecaRepository, mockBarramento);
 
-      const uc = new ListarServicosInsumosNaOsUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockOsPecaRepository,
-        mockBarramento
-      );
-      const result = await uc.execute('os-1', { valor_total_servicos: 100, valor_total_pecas: 50 });
+    it('deve emitir OrcamentoCalculado com os três totais e retorná-los (sem Orcamento)', async () => {
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'UNDER_DIAGNOSIS' }));
 
+      const result = await criarUseCase().execute('os-1', {
+        valor_total_servicos: 450,
+        valor_total_pecas: 320.5,
+      });
+
+      expect(result).toEqual({
+        ordemServicoId: 'os-1',
+        valorTotalServicos: 450,
+        valorTotalPecas: 320.5,
+        valorTotalGeral: 770.5,
+      });
+      expect(result).not.toHaveProperty('status');
       expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('PENDING');
+      const evento = mockBarramento.emitir.mock.calls[0][0] as OrcamentoCalculado;
+      expect(evento).toBeInstanceOf(OrcamentoCalculado);
+      expect(evento).toMatchObject({
+        ordemServicoId: 'os-1',
+        valorTotalServicos: 450,
+        valorTotalPecas: 320.5,
+        valorTotalGeral: 770.5,
+      });
+      expect(mockOrcamentoRepository.findByOrdemServicoId).not.toHaveBeenCalled();
     });
 
-    it('deve lançar DomainException quando OS está em status inválido', async () => {
-      mockOsRepository.findOne.mockResolvedValue(mockOs);
+    it('soma sem erro de ponto flutuante (0.1 + 0.2)', async () => {
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'UNDER_DIAGNOSIS' }));
 
-      const uc = new ListarServicosInsumosNaOsUseCase(
-        mockOsRepository,
-        mockOrcamentoRepository,
-        mockOsPecaRepository,
-        mockBarramento
-      );
+      const result = await criarUseCase().execute('os-1', {
+        valor_total_servicos: 0.1,
+        valor_total_pecas: 0.2,
+      });
+
+      expect(result.valorTotalGeral).toBe(0.3);
+    });
+
+    it('persiste OsPeca antes de publicar quando há peças', async () => {
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'UNDER_DIAGNOSIS' }));
+
+      await criarUseCase().execute('os-1', {
+        valor_total_servicos: 100,
+        valor_total_pecas: 150,
+        pecas: [{ id_peca: 'peca-1', quantidade: 2, preco_unitario: 75 }],
+      });
+
+      expect(mockOsPecaRepository.replaceAll).toHaveBeenCalledWith('os-1', [
+        { id_peca: 'peca-1', quantidade: 2, preco_unitario: 75, valor_total: 150 },
+      ]);
+      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
+    });
+
+    it('valor negativo é rejeitado antes de gravar OsPeca ou publicar', async () => {
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'UNDER_DIAGNOSIS' }));
+
       await expect(
-        uc.execute('os-1', { valor_total_servicos: 100, valor_total_pecas: 50 })
-      ).rejects.toThrow(DomainException);
+        criarUseCase().execute('os-1', {
+          valor_total_servicos: -1,
+          valor_total_pecas: 0,
+          pecas: [{ id_peca: 'peca-1', quantidade: 1, preco_unitario: 10 }],
+        })
+      ).rejects.toThrow('negativos');
+      expect(mockOsPecaRepository.replaceAll).not.toHaveBeenCalled();
+      expect(mockBarramento.emitir).not.toHaveBeenCalled();
     });
+
+    it.each<OSStatus>(['RECEIVED', 'AWAITING_APPROVAL', 'IN_PROGRESS'])(
+      'exige OS em UNDER_DIAGNOSIS: com a OS em %s lança DomainException e não publica',
+      async (status) => {
+        mockOsRepository.findOne.mockResolvedValue(makeOs({ status }));
+
+        await expect(
+          criarUseCase().execute('os-1', { valor_total_servicos: 100, valor_total_pecas: 50 })
+        ).rejects.toThrow(DomainException);
+        expect(mockBarramento.emitir).not.toHaveBeenCalled();
+        expect(mockOsPecaRepository.replaceAll).not.toHaveBeenCalled();
+      }
+    );
   });
 
   describe('AtualizarOrdemServicoUseCase', () => {
@@ -552,29 +601,6 @@ describe('OS + Orçamento Use Cases', () => {
     });
   });
 
-  describe('FinalizarExecucaoUseCase', () => {
-    it('deve emitir ServicoConcluidoPeloMecanico quando OS está IN_PROGRESS', async () => {
-      const osEmExecucao = makeOs({ status: 'IN_PROGRESS' });
-      const osFinalizada = makeOs({ status: 'FINISHED' });
-      mockOsRepository.findOne
-        .mockResolvedValueOnce(osEmExecucao)
-        .mockResolvedValueOnce(osFinalizada);
-
-      const uc = new FinalizarExecucaoUseCase(mockOsRepository, mockBarramento);
-      const result = await uc.execute('os-1');
-
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('FINISHED');
-    });
-
-    it('deve lançar DomainException quando OS não está IN_PROGRESS', async () => {
-      mockOsRepository.findOne.mockResolvedValue(mockOs);
-
-      const uc = new FinalizarExecucaoUseCase(mockOsRepository, mockBarramento);
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
-  });
-
   describe('AprovarServicoPrestadoUseCase', () => {
     it('deve emitir ServicoAprovadoPeloCliente quando OS está FINISHED e manter o status', async () => {
       const osFinalizada = makeOs({ status: 'FINISHED' });
@@ -598,26 +624,34 @@ describe('OS + Orçamento Use Cases', () => {
   });
 
   describe('RegistrarEntregaVeiculoUseCase', () => {
-    it('deve emitir PagamentoRegistrado e retornar a OS entregue', async () => {
-      const osFinalizada = makeOs({ status: 'FINISHED' });
-      const osEntregue = makeOs({ status: 'DELIVERED' });
-      mockOsRepository.findOne
-        .mockResolvedValueOnce(osFinalizada)
-        .mockResolvedValueOnce(osEntregue);
+    const makeAtualizarStatus = () =>
+      ({ execute: jest.fn() }) as unknown as jest.Mocked<UpdateServiceOrderStatusUseCase>;
 
-      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, mockBarramento);
+    it('deve gravar DELIVERED pelo caso de uso de status, sem evento de pagamento', async () => {
+      const osEntregue = makeOs({ status: 'DELIVERED' });
+      mockOsRepository.findOne.mockResolvedValue(makeOs({ status: 'FINISHED' }));
+      const atualizarStatus = makeAtualizarStatus();
+      atualizarStatus.execute.mockResolvedValue(osEntregue);
+
+      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, atualizarStatus);
       const result = await uc.execute('os-1');
 
-      expect(mockBarramento.emitir).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('DELIVERED');
+      expect(atualizarStatus.execute).toHaveBeenCalledWith('os-1', 'DELIVERED');
+      expect(mockBarramento.emitir).not.toHaveBeenCalled();
+      expect(result).toBe(osEntregue);
     });
 
-    it('deve lançar DomainException quando OS não está FINISHED', async () => {
-      mockOsRepository.findOne.mockResolvedValue(mockOs);
+    it.each<OSStatus>(['IN_PROGRESS', 'AWAITING_APPROVAL', 'DELIVERED'])(
+      'deve rejeitar a entrega quando a OS está %s',
+      async (status) => {
+        mockOsRepository.findOne.mockResolvedValue(makeOs({ status }));
+        const atualizarStatus = makeAtualizarStatus();
 
-      const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, mockBarramento);
-      await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
-    });
+        const uc = new RegistrarEntregaVeiculoUseCase(mockOsRepository, atualizarStatus);
+        await expect(uc.execute('os-1')).rejects.toThrow(DomainException);
+        expect(atualizarStatus.execute).not.toHaveBeenCalled();
+      }
+    );
   });
 
   describe('leituras pelo read model', () => {

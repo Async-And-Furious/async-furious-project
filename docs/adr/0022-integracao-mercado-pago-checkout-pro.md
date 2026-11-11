@@ -324,7 +324,10 @@ painel do vendedor de teste.
   - `POST /pagamentos/registrar` deixa de criar ou marcar pagamento como
     `PAGO`: só dispara a entrega quando o `Pagamento` da OS está `CONFIRMADO`
     pelo Mercado Pago (`409` caso contrário). Esse evento próprio
-    (`PagamentoRegistrado`, fluxo da Fase 3) não é reaproveitado pelo webhook;
+    (`PagamentoRegistrado`, fluxo da Fase 3) não é reaproveitado pelo webhook.
+    **Atualização (#330, 03/11/2026):** `POST /pagamentos/registrar` e o
+    `PagamentoRegistrado` foram removidos; a entrega só passa por
+    `registrar-entrega`;
   - a migração `20261020150000_pagamento_idempotencia_mercado_pago` cria o
     índice único por OS e falha se um ambiente já tiver mais de um
     `Pagamento` para a mesma OS. O Billing começa vazio e não tem esse risco.

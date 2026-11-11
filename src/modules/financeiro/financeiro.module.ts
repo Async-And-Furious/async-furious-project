@@ -1,9 +1,6 @@
 import { Module } from '@nestjs/common';
-import { PagamentoController } from './presentation/controllers/pagamento.controller';
 import { MercadoPagoWebhookController } from './presentation/controllers/mercado-pago-webhook.controller';
 import { PagamentoRepository } from './infrastructure/repositories/pagamento.repository';
-import { RegistrarPagamentoUseCase } from './application/use-cases/registrar-pagamento.use-case';
-import { AcionarEntregaOrdemServicoHandler } from './application/event-handlers/acionar-entrega-ordem-servico.handler';
 import { EmissorEventos } from '../../shared/infrastructure/emissor-eventos/emissor-eventos.service';
 import {
   EMISSOR_EVENTOS,
@@ -22,24 +19,13 @@ import { CobrancaPagamentoAdapter } from './infrastructure/adapters/cobranca-pag
 import { COBRANCA_PAGAMENTO_PORT } from '../../shared/domain/interfaces/cobranca-pagamento.port';
 
 @Module({
-  controllers: [PagamentoController, MercadoPagoWebhookController],
+  controllers: [MercadoPagoWebhookController],
   providers: [
     PagamentoRepository,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
     {
       provide: PAGAMENTO_REPOSITORY,
       useExisting: PagamentoRepository,
-    },
-    {
-      provide: RegistrarPagamentoUseCase,
-      useFactory: (repository: PagamentoRepository, emissor: IEmissorEventos) =>
-        new RegistrarPagamentoUseCase(repository, emissor),
-      inject: [PAGAMENTO_REPOSITORY, EMISSOR_EVENTOS],
-    },
-    {
-      provide: AcionarEntregaOrdemServicoHandler,
-      useFactory: (emissor: IEmissorEventos) => new AcionarEntregaOrdemServicoHandler(emissor),
-      inject: [EMISSOR_EVENTOS],
     },
     { provide: GATEWAY_PAGAMENTO, useClass: MercadoPagoGateway },
     {
