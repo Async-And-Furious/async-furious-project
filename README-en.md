@@ -353,8 +353,8 @@ pnpm test -- --testNamePattern="CreateClienteUseCase"
 
 | Metric | Minimum |
 | ------ | ------- |
-| Statements | 85% |
-| Lines | 85% |
+| Statements | 80% |
+| Lines | 80% |
 | Functions | 80% |
 | Branches | 80% |
 

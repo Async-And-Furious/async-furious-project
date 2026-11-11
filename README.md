@@ -1,5 +1,7 @@
 # Sistema de Gestão para Oficina Mecânica
 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Async-And-Furious_async-furious-project&metric=coverage)](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project) [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Async-And-Furious_async-furious-project&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project)
+
 > API RESTful para gerenciamento de ordens de serviço, clientes, veículos e estoque de peças.
 
 English version: [README-en.md](./README-en.md)
@@ -75,7 +77,7 @@ Com o aumento da demanda e a expansão para novas unidades, a oficina precisa ga
 - **Infraestrutura escalável**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 réplicas, escalando por CPU > 70% ou memória > 80%).
 - **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migração documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
 - **Pipeline de CI/CD**: GitHub Actions valida build, testes automatizados e infraestrutura (`terraform validate` + `plan`) a cada Pull Request.
-- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 85%.
+- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 80% (ADR-0014).
 
 ### Diagrama de Arquitetura
 
@@ -352,6 +354,12 @@ O token JWT expira em **1 hora**.
 ---
 
 ## Testes
+
+**Evidência de cobertura (#351).** Mínimo de 80% em statements, branches, functions e lines (`jest.config.js`, ADR-0014), verificado pelo `pnpm test:cov` do `tests.yml` em todo PR. Badge e relatório no [SonarCloud](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project). Última coleta no CI:
+
+| Data | Execução | Commit | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|---|---|
+| 11/11/2026 | [tests.yml #43032760452](https://github.com/Async-And-Furious/async-furious-project/actions/runs/43032760452) | `05504f5` | 97,43% | 84,31% | 93,70% | 97,67% |
 
 ```bash
 # Todos os testes unitarios

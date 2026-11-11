@@ -279,7 +279,7 @@ A documentação em `docs/` não descreve integrações com sistemas externos de
 | Orquestração | **Kubernetes (via kind localmente)** | Alta disponibilidade e escalabilidade horizontal automática (HPA 2–5 réplicas, CPU>70%/mem>80%) diante do crescimento de demanda e expansão para novas unidades da oficina (motivação de negócio explícita no README). |
 | IaC | **Terraform** | Provisionamento reprodutível e versionado do cluster e dos recursos Kubernetes, com caminho de migração claro para EKS sem reescrever os manifests YAML (estrutura modular escolhida deliberadamente por isso). |
 | Manifests Kubernetes | **YAML puro em `/k8s`** (não Helm/Kustomize) | Legibilidade e depuração direta via `kubectl`, decisão explícita registrada no spec de Terraform/K8s. |
-| CI/CD | **GitHub Actions** | Valida build, roda testes automatizados e valida/planeja infraestrutura a cada PR; cobertura mínima de testes de 85% enforçada. |
+| CI/CD | **GitHub Actions** | Valida build, roda testes automatizados e valida/planeja infraestrutura a cada PR; cobertura mínima de testes de 80% enforçada (ADR-0014). |
 | Segurança DAST | **OWASP ZAP** | Scan de segurança dinâmico incluído no pipeline (mencionado no README como parte da stack de tecnologia; há histórico de commits corrigindo falsos positivos/erros de configuração do ZAP). |
 
 ### Conflito documentado: CI/CD aplica ou não aplica infraestrutura automaticamente?
