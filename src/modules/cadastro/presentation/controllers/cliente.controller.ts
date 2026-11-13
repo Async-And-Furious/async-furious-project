@@ -144,7 +144,11 @@ export class ClienteController {
   @Delete(':id')
   @UseGuards(RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: 'Deletar cliente' })
+  @ApiOperation({
+    summary: 'Deletar cliente',
+    description:
+      'Soft delete: o cliente fica inativo, sai do cadastro e não autentica mais; as ordens de serviço dele continuam.',
+  })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Cliente deletado com sucesso' })
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })

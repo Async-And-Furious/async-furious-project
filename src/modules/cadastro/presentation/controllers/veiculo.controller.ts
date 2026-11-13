@@ -131,6 +131,10 @@ export class VeiculoController {
   @ApiResponse({ status: 401, description: 'Não autorizado - token inválido ou expirado' })
   @ApiResponse({ status: 403, description: 'Acesso negado - requer role ADMIN' })
   @ApiResponse({ status: 404, description: 'Veículo não encontrado' })
+  @ApiResponse({
+    status: 409,
+    description: 'Veículo possui ordens de serviço e não pode ser removido',
+  })
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<VeiculoResponseDto> {
     const veiculo = await this.deleteUseCase.execute(id);
     return VeiculoResponseDto.fromDomain(veiculo);
