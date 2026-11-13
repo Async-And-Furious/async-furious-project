@@ -32,7 +32,8 @@ export class ClienteReadModelRebuilder {
 
   private async existentes(ids: string[]): Promise<Set<string>> {
     const rows = await this.prisma.cliente.findMany({
-      where: { id: { in: ids } },
+      // Inativo (soft delete) conta como ausente: o rebuild remove o documento.
+      where: { id: { in: ids }, ativo: true },
       select: { id: true },
     });
     return new Set(rows.map((row) => row.id));
@@ -42,6 +43,7 @@ export class ClienteReadModelRebuilder {
     let lastId: string | undefined;
     for (;;) {
       const rows = await this.prisma.cliente.findMany({
+        where: { ativo: true },
         take: BATCH_SIZE,
         orderBy: { id: 'asc' },
         ...(lastId && { cursor: { id: lastId }, skip: 1 }),

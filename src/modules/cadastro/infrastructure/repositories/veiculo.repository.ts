@@ -1,9 +1,10 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import {
   formatPaginatedResponse,
   buildSearchWhere,
+  isForeignKeyViolation,
   isUniqueConstraintViolation,
 } from '../../../../shared/infrastructure/database/repository.utils';
 import { ConflitoException } from '../../../../shared/domain/exceptions/conflito.exception';
@@ -15,15 +16,12 @@ import {
   UpdateVeiculoInput,
 } from '../../domain/interfaces/veiculo.interface';
 import { VeiculoMapper, VeiculoORMEntity } from '../persistence/veiculo.orm-entity';
-import { CLIENTE_READ_MODEL_PROJECTOR } from '../../domain/interfaces/cliente-read-model.interface';
-import type { IClienteReadModelProjector } from '../../domain/interfaces/cliente-read-model.interface';
+
+const VEICULO_COM_OS = 'Veículo possui ordens de serviço e não pode ser removido';
 
 @Injectable()
 export class VeiculoRepository implements IVeiculoRepository {
-  constructor(
-    private readonly prisma: PrismaService,
-    @Inject(CLIENTE_READ_MODEL_PROJECTOR) private readonly projector: IClienteReadModelProjector
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(data: CreateVeiculoInput): Promise<Veiculo> {
     const veiculo = Veiculo.criar({
@@ -122,13 +120,23 @@ export class VeiculoRepository implements IVeiculoRepository {
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
 
+  // Veículo com OS não é removido (#378, item 2): o delete apagava as OS em cascata. A FK
+  // `onDelete: Restrict` em OrdemServico garante isso também quando uma OS é aberta entre a
+  // checagem e o delete.
   async remove(id: string): Promise<Veiculo> {
     await this.findById(id);
 
-    const ormEntity = await this.prisma.veiculo.delete({
-      where: { id },
-    });
-    await this.projector.removerOrdensServicoEmCascata({ veiculoId: id });
+    const ordens = await this.prisma.ordemServico.count({ where: { id_veiculo: id } });
+    if (ordens > 0) throw new ConflitoException(VEICULO_COM_OS);
+
+    const ormEntity = await this.prisma.veiculo
+      .delete({
+        where: { id },
+      })
+      .catch((error: unknown) => {
+        if (isForeignKeyViolation(error)) throw new ConflitoException(VEICULO_COM_OS);
+        throw error;
+      });
 
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
