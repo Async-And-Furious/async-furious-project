@@ -4,12 +4,16 @@ import request from 'supertest';
 import { Collection, Db } from 'mongodb';
 import type { Application } from 'express';
 import { JwtService } from '@nestjs/jwt';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/shared/infrastructure/database/prisma.service';
 import { READ_MODEL_DB } from '../src/shared/infrastructure/read-model/read-model.config';
 import { ReadModelFailureReporter } from '../src/shared/infrastructure/read-model/read-model-failure.reporter';
 import { OsReadModelRebuilder } from '../src/modules/ordem-servico/infrastructure/read-model/os-read-model.rebuilder';
 import { ClienteReadModelRebuilder } from '../src/modules/cadastro/infrastructure/read-model/cliente-read-model.rebuilder';
+import { DiagnosticoIniciado } from '../src/modules/ordem-servico/domain/events/diagnostico-iniciado.event';
+import { OrcamentoGerado } from '../src/modules/ordem-servico/domain/events/orcamento-gerado.event';
+import { OrcamentoRecusado } from '../src/modules/ordem-servico/domain/events/orcamento-recusado.event';
 import { createTestUser, cleanupTestUser } from './support/fixtures';
 import { randomInt } from 'node:crypto';
 
@@ -175,10 +179,11 @@ describe('Read model de OS e Cliente (e2e)', () => {
   it('reflete cada mudança de estado e grava o histórico com motivo', async () => {
     const id = await abrirOs('Barulho no motor');
 
-    await server
-      .patch(`/ordens-servico/${id}/assumir`)
-      .set('Authorization', `Bearer ${mecanico}`)
-      .expect(200);
+    // `assumir` e `orcamento/recusar` saíram do OS Service (divisão em serviços e #330): os eventos
+    // do Execução e do Billing são injetados in-process, como em ordem-servico.e2e-spec.ts.
+    const eventos = app.get(EventEmitter2);
+
+    await eventos.emitAsync('DiagnosticoIniciado', new DiagnosticoIniciado(id));
     expect((await documentoOs(id))?.status).toBe('UNDER_DIAGNOSIS');
 
     await server
@@ -186,9 +191,10 @@ describe('Read model de OS e Cliente (e2e)', () => {
       .set('Authorization', `Bearer ${mecanico}`)
       .send({ valor_total_servicos: 150, valor_total_pecas: 0 })
       .expect(200);
+    await eventos.emitAsync('OrcamentoGerado', new OrcamentoGerado(id, 'orc-e2e-rm'));
     expect((await documentoOs(id))?.status).toBe('AWAITING_APPROVAL');
 
-    await server.patch(`/ordens-servico/${id}/orcamento/recusar`).expect(200);
+    await eventos.emitAsync('OrcamentoRecusado', new OrcamentoRecusado(id, 'orc-e2e-rm'));
     expect((await documentoOs(id))?.status).toBe('CLOSED_WITHOUT_EXECUTION');
 
     const historico = await prisma.historicoStatusOS.findMany({
