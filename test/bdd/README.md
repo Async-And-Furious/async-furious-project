@@ -69,6 +69,10 @@ O texto de [`saga-flow.md`](../../docs/architecture/saga-flow.md) é o alvo. Ond
 | "a Execucao está em CANCELADA", "o HistoricoStatusOS registra o motivo..." (cenário de falha) | Não revisados nesta entrega | Cenário `@depende-338`, pulado. |
 | Cabeçalho "por eventos reais no Kafka" | "por eventos" | Não há Kafka real na suíte. |
 
+## Substitui o fluxo do mecânico no `full-acceptance.yml` (#334)
+
+O `full-acceptance.yml` era o teste de aceitação do fluxo do mecânico no monólito (`assumir`, `analisar`, `finalizar-execucao`). Essas rotas saíram do OS Service, e o fluxo passou a atravessar o Execução e o Billing por eventos. O workflow ficou como aceitação de borda contra HML/PROD (autenticação, rota pública de status e matriz de papéis). O fluxo do mecânico, do diagnóstico ao `FINISHED`, passou a ser coberto por esta suíte, que roda em todo PR.
+
 ## Por que cobertura e BDD são métricas distintas
 
 A cobertura (ADR-0014, 80%) mede as linhas, ramos e funções de `src/`, com `test:cov` e o `jest.config.js`. A suíte BDD não entra nessa conta: os arquivos daqui são `*.feature` e `*.steps.ts`, que a configuração unitária não executa, e `collectCoverageFrom` só olha `src/`. A cobertura diz quanto código foi exercitado por qualquer teste. O BDD diz se um caminho de negócio da saga funciona de ponta a ponta. Um número alto de cobertura não mostra o fluxo testado, e a suíte BDD não altera o número.

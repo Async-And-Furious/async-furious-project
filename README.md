@@ -1,5 +1,7 @@
 # Sistema de Gestão para Oficina Mecânica
 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Async-And-Furious_async-furious-project&metric=coverage)](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project) [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Async-And-Furious_async-furious-project&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project)
+
 > API RESTful para gerenciamento de ordens de serviço, clientes, veículos e estoque de peças.
 
 English version: [README-en.md](./README-en.md)
@@ -75,7 +77,7 @@ Com o aumento da demanda e a expansão para novas unidades, a oficina precisa ga
 - **Infraestrutura escalável**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 réplicas, escalando por CPU > 70% ou memória > 80%).
 - **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migração documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
 - **Pipeline de CI/CD**: GitHub Actions valida build, testes automatizados e infraestrutura (`terraform validate` + `plan`) a cada Pull Request.
-- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 85%.
+- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 80% (ADR-0014).
 
 ### Diagrama de Arquitetura
 
@@ -203,20 +205,23 @@ Depois de iniciar o projeto, acesse o Swagger em:
 http://localhost:3000/api/docs
 ```
 
-O Swagger descreve só o OS Service (título `Async Furious - OS Service`). O esquema `bearer` (JWT) vale para todas as rotas, exceto as públicas (`/status`, `auth/login`, `health`, o webhook do Mercado Pago e, até a #330, `PATCH /ordens-servico/:id/orcamento/aprovar|recusar`), que saem com `security: []`. O webhook de status exige `bearer` e `webhook-secret` (header `x-webhook-secret`) juntos, em um único requisito. Evidência: o export do OpenAPI fica versionado em [`docs/http/openapi/os-service.openapi.json`](docs/http/openapi/os-service.openapi.json) e é regenerado com `pnpm docs:openapi` (não sobe o servidor nem conecta no banco). O CI (`tests.yml`) regenera o arquivo e falha se ele divergir do código.
+O Swagger descreve só o OS Service (título `Async Furious - OS Service`). O esquema `bearer` (JWT) vale para todas as rotas, exceto as públicas (`/status`, `auth/login` e `health`), que saem com `security: []`. Orçamento, pagamento e o webhook do Mercado Pago saíram com a extração do financeiro (#330) e estão no Swagger do Billing (`/api/docs/billing`). O webhook de status exige `bearer` e `webhook-secret` (header `x-webhook-secret`) juntos, em um único requisito. Evidência: o export do OpenAPI fica versionado em [`docs/http/openapi/os-service.openapi.json`](docs/http/openapi/os-service.openapi.json) e é regenerado com `pnpm docs:openapi` (não sobe o servidor nem conecta no banco). O CI (`tests.yml`) regenera o arquivo e falha se ele divergir do código.
 
 ### Superfície HTTP do OS Service (#332)
 
 - **Sem REST entre serviços.** Nenhuma rota deste serviço é consumida por Billing ou Execução; tudo o que eles precisam chega por evento ([`saga-flow.md`](docs/architecture/saga-flow.md)).
-- **Rota pública de consulta:** `GET /api/v1/ordens-servico/{id}/status`, sem Bearer, com resposta mínima (`ordemServicoId`, `status` e `marcos` de tempo, sem dados do cliente). Na borda é a única rota pública do OS Service: `ordens-servico/*` passa pelo Lambda Authorizer. **No serviço, `PATCH /ordens-servico/:id/orcamento/aprovar` e `/recusar` ainda são `@Public()` até a extração do financeiro (#330)**, além de `auth/login`, `health` e o webhook do Mercado Pago; as demais rotas sem token respondem `401`.
+- **Rota pública de consulta:** `GET /api/v1/ordens-servico/{id}/status`, sem Bearer, com resposta mínima (`ordemServicoId`, `status` e `marcos` de tempo, sem dados do cliente). Na borda é a única rota pública do OS Service: `ordens-servico/*` passa pelo Lambda Authorizer. No serviço, além dela, só `auth/login` e `health` são `@Public()`; as demais rotas sem token respondem `401`.
 - **Removidas, sem proxy:** `GET /ordens-servico/:id/rastreamento` (alias de `/status`) e `POST /ordens-servico/:id/aprovar-servico` (aprovação pública duplicada do orçamento) respondem `404`. `PATCH /ordens-servico/:id/aprovar-servico` continua, autenticada.
 - **RBAC inalterado:** `JwtAuthGuard` e `RolesGuard` seguem validando o token localmente, como segunda camada depois do Lambda Authorizer da borda (ADR-0021).
 - **Webhook de status como exceção:** `POST /webhooks/service-orders/status` é um canal de reprocesso manual (JWT + `x-webhook-secret`). A transição é validada pelo `StatusTransitionService`, e `DELIVERED` é rejeitado com `400` (fora do enum do DTO): a entrega só acontece por `registrar-entrega`.
 - **Versionamento:** o prefixo continua `api/v1`. Durante a Fase 4 quebras de contrato são aceitas dentro de `v1`, sem `v2` em paralelo: todos os consumidores nascem nesta fase e não há cliente externo a preservar. Cada quebra é registrada nesta seção e na ADR correspondente.
 - **Read model (#335, ADR-0019):** `GET /ordens-servico` (fila), `GET /ordens-servico/:id`, `/status` e `GET /clientes/:id` leem do DocumentDB (MongoDB local e no CI), alimentado por write-through síncrono nos repositories; `tempo-medio`, `GET /clientes` e `GET /veiculos/:id` seguem no Postgres. A fila pagina por cursor (`?limit=&cursor=`, resposta `{ data, pagination: { limit, nextCursor } }`) e não inclui `CLOSED_WITHOUT_EXECUTION`; a OS lida do read model não traz `orcamento`. Rebuild: `pnpm read-model:rebuild` (no deploy, um Job depois da migration). Modelo em [`persistence-model.md`](docs/architecture/persistence-model.md).
-- **Pendências de outras features:** `pagamentos` e as rotas de aprovação/recusa de orçamento (ainda públicas no serviço) saem do serviço na extração do financeiro (#330); os consumidores de evento (`atualizar-status-*.handler.ts`) ainda checam o status atual sem `StatusTransitionService` (o histórico é gravado pelo repository), então webhook e consumidores ainda não compartilham a mesma máquina de estados.
+- **Orçamento e pagamento:** `pagamentos` e as rotas de aprovação/recusa de orçamento saíram do serviço com a extração do financeiro (#330). As rotas novas estão no Billing (`/api/v1/orcamentos/{ordemServicoId}/aprovar|recusar`), sem proxy aqui.
+- **Máquina de estados:** webhook e consumidores de evento validam as transições pelo mesmo `StatusTransitionService` (#332); o histórico é gravado pelo repository.
 
-A coleção completa das APIs (formato Insomnia v5) fica versionada no repositório e pode ser importada diretamente pelo link:
+> **Legado da Fase 3.** As coleções Insomnia/Postman (`docs/http/insomnia*`, `docs/http/postman/`) e o gerador `scripts/generate-http-collections.py` descrevem o monólito da Fase 3 e não são o contrato da Fase 4. O contrato de cada serviço é o `openapi.json` versionado ([OS](docs/http/openapi/os-service.openapi.json), Billing e Execução em `docs/openapi.json` de cada repositório).
+
+A coleção da Fase 3 (formato Insomnia v5) segue versionada e pode ser importada pelo link:
 
 [docs/http/insomnia.yaml](https://github.com/Async-And-Furious/async-furious-project/blob/develop/docs/http/insomnia.yaml)
 
@@ -321,41 +326,7 @@ Detalhes em [`docs/architecture/os-service-integracao-execucao.md`](docs/archite
 
 ## Estratégia de Saga
 
-A partir da Fase 4, este monólito é refatorado em três microsserviços
-independentes — **OS Service** (este repositório), **Billing Service** e
-**Execução e Produção** — e o fluxo acima passa a atravessar fronteiras de
-serviço via eventos assíncronos (Kafka).
-
-**Estratégia escolhida: Saga coreografada.** Não existe orquestrador
-central nem um serviço/repositório coordenador — cada serviço publica os
-eventos de sua própria fronteira e reage aos eventos dos outros dois,
-executando a própria compensação quando algo falha. Consideramos e
-recusamos um orquestrador central com repositório próprio (custo de
-infraestrutura e de ponto único de falha não compensado pelo requisito, que
-trata orquestração e coreografia como opções equivalentes) e um
-orquestrador embutido no OS Service sem repositório separado (acoplaria os
-outros dois serviços a decisões tomadas por este).
-
-O fluxo coberto pela saga é `Abrir OS → orçamento → aprovação → pagamento →
-execução iniciada` — o pagamento acontece logo após a aprovação do
-orçamento e **antes** do início da execução, como etapa obrigatória para
-que o Billing Service participe da transação distribuída. A entrega fica
-fora do escopo da saga por ser um ato presencial, sem contrapartida
-assíncrona a coordenar; `registrar-entrega` não checa pagamento, porque
-`FINISHED` só é alcançável depois de `PagamentoConfirmado`
-([`saga-flow.md` §4](./docs/architecture/saga-flow.md)). O OS Service só grava
-o marcador `pago_em` ao receber `PagamentoConfirmado`, sem mudar status. Compensação é lógica por padrão (reverter status
-da OS, encerrar orçamento sem execução); o estorno real no Mercado Pago só
-é acionado se o pagamento já tiver sido capturado antes da falha.
-
-Sem orquestrador, não há um "estado único da saga" — a rastreabilidade do
-fluxo distribuído combina trace no New Relic, o `correlationId` propagado
-no envelope de evento e o `HistoricoStatusOS.motivo` já existente no banco.
-
-Detalhamento completo (diagrama de sequência, mapa de responsabilidade por
-etapa e matriz `etapa → falha → compensação`):
-[ADR-0016](./docs/adr/0016-saga-coreografada.md) e
-[`docs/architecture/saga-flow.md`](./docs/architecture/saga-flow.md).
+O fluxo de Ordem de Serviço é coordenado por uma Saga coreografada (ADR-0016): não há orquestrador nem chamadas REST entre microsserviços. Cada serviço publica e consome eventos Kafka com correlationId = ordemServicoId. Esta escolha reduz acoplamento síncrono, mas abre mão de uma visão central do estado da Saga e de um único ponto de timeout; cada serviço responde por suas transições, retries e compensações. Veja a [ADR-0016 — Saga coreografada](./docs/adr/0016-saga-coreografada.md) e o [fluxo completo da Saga](./docs/architecture/saga-flow.md).
 
 ### Observabilidade do OS Service
 
@@ -383,6 +354,12 @@ O token JWT expira em **1 hora**.
 ---
 
 ## Testes
+
+**Evidência de cobertura (#351).** Mínimo de 80% em statements, branches, functions e lines (`jest.config.js`, ADR-0014), verificado pelo `pnpm test:cov` do `tests.yml` em todo PR. Badge e relatório no [SonarCloud](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project). Última coleta no CI:
+
+| Data | Execução | Commit | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|---|---|
+| 11/11/2026 | [tests.yml #43032760452](https://github.com/Async-And-Furious/async-furious-project/actions/runs/43032760452) | `05504f5` | 97,43% | 84,31% | 93,70% | 97,67% |
 
 ```bash
 # Todos os testes unitarios
