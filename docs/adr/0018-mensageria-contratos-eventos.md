@@ -561,8 +561,11 @@ precisou decidir.
   - **Read model no DocumentDB:** write-through da #335. Uma projeção perdida deixa a
     leitura desatualizada até o rebuild da coleção.
 
-  O teste conjunto dos dois depende de a #335 (PR #381) entrar nesta pilha. Hoje o teste
-  de consumo cobre só o lado do evento.
+  Os dois lados ficam no mesmo teste, `test/ordem-servico/dual-writes.spec.ts`: abre a OS
+  com o caso de uso, o repository, o projetor e a ponte reais, com o broker e o DocumentDB
+  fora. Ele mostra que o request não falha, que as duas escritas só acontecem depois do
+  commit, que a projeção perdida vira `ReadModelProjectionFailure` (corrigida pelo rebuild) e
+  que o evento perdido fica só no log, sem nova tentativa (#331).
 - **SASL.** A plataforma (`repo-k8s-infra`, #314) entregou SASL/PLAIN, o plano B desta
   ADR, e os três serviços usam o mesmo mecanismo, com a senha vinda do Secrets Manager
   (`tc3/kafka/hml`). Fica registrada a troca do SCRAM previsto em "Decisão" pelo PLAIN.
