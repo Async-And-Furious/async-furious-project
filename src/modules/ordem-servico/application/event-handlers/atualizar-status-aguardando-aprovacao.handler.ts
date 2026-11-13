@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { FalhaRetentavelException } from '../../../../shared/domain/exceptions/falha-retentavel.exception';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
+import { StatusTransitionService } from '../../domain/services/status-transition.service';
 import type { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event';
 
 /**
@@ -11,13 +12,17 @@ import type { OrcamentoGerado } from '../../domain/events/orcamento-gerado.event
  *
  * Guarda (ADR-0018): RECEIVED é "ainda-não" (o diagnóstico não foi consumido), falha
  * retentável; de AWAITING_APPROVAL em diante é "já-passou", ack. A gravação é condicionada a
- * UNDER_DIAGNOSIS no próprio UPDATE, então duas entregas não gravam duas vezes.
+ * UNDER_DIAGNOSIS no próprio UPDATE, então duas entregas não gravam duas vezes. A transição é
+ * validada pela máquina de estados (`StatusTransitionService`), como nos demais handlers.
  */
 @Injectable()
 export class AtualizarStatusAguardandoAprovacaoHandler {
   private readonly logger = new Logger(AtualizarStatusAguardandoAprovacaoHandler.name);
 
-  constructor(private readonly ordemServicoRepository: IOrdemServicoRepository) {}
+  constructor(
+    private readonly ordemServicoRepository: IOrdemServicoRepository,
+    private readonly transicao: StatusTransitionService
+  ) {}
 
   @OnEvent('OrcamentoGerado')
   async handleOrcamentoGerado(evento: OrcamentoGerado): Promise<void> {
@@ -34,6 +39,7 @@ export class AtualizarStatusAguardandoAprovacaoHandler {
     }
 
     if (os.status === 'UNDER_DIAGNOSIS') {
+      this.transicao.validarTransicao('UNDER_DIAGNOSIS', 'AWAITING_APPROVAL');
       const gravou = await this.ordemServicoRepository.atualizarSeCondicao(
         ordemServicoId,
         { status: 'UNDER_DIAGNOSIS' },
