@@ -163,7 +163,7 @@ export function montarSagaEmMemoria(inicial: Partial<EstadoOs> | null, { reserva
         ),
       }),
       ...despachantesBilling({
-        aguardandoAprovacao: new AtualizarStatusAguardandoAprovacaoHandler(osRepo),
+        aguardandoAprovacao: new AtualizarStatusAguardandoAprovacaoHandler(osRepo, transicao),
         verificarNecessidadePecas: new VerificarNecessidadePecasHandler(
           osRepo,
           historicoRepo,

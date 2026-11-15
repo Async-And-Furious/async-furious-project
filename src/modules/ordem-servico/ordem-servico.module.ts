@@ -143,8 +143,9 @@ import { CadastroModule } from '../cadastro/cadastro.module';
     // Event handlers (registered as NestJS providers — @OnEvent listeners)
     {
       provide: AtualizarStatusRecebidaHandler,
-      useFactory: (osRepo: OrdemServicoRepository) => new AtualizarStatusRecebidaHandler(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (osRepo: OrdemServicoRepository, transicaoSvc: StatusTransitionService) =>
+        new AtualizarStatusRecebidaHandler(osRepo, transicaoSvc),
+      inject: [OrdemServicoRepository, StatusTransitionService],
     },
     {
       provide: AtualizarStatusEmDiagnosticoHandler,
@@ -163,9 +164,9 @@ import { CadastroModule } from '../cadastro/cadastro.module';
     },
     {
       provide: AtualizarStatusAguardandoAprovacaoHandler,
-      useFactory: (osRepo: OrdemServicoRepository) =>
-        new AtualizarStatusAguardandoAprovacaoHandler(osRepo),
-      inject: [OrdemServicoRepository],
+      useFactory: (osRepo: OrdemServicoRepository, transicaoSvc: StatusTransitionService) =>
+        new AtualizarStatusAguardandoAprovacaoHandler(osRepo, transicaoSvc),
+      inject: [OrdemServicoRepository, StatusTransitionService],
     },
     {
       provide: AtualizarStatusAguardandoPecasHandler,
