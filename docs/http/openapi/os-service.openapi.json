@@ -278,6 +278,7 @@
         ]
       },
       "delete": {
+        "description": "Soft delete: o cliente fica inativo, sai do cadastro e não autentica mais; as ordens de serviço dele continuam.",
         "operationId": "ClienteController_remove",
         "parameters": [
           {
@@ -518,6 +519,9 @@
           },
           "404": {
             "description": "Veículo não encontrado"
+          },
+          "409": {
+            "description": "Veículo possui ordens de serviço e não pode ser removido"
           }
         },
         "security": [

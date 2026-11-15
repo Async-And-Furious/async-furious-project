@@ -81,8 +81,9 @@ model OrdemServico {
   created_at             DateTime  @default(now())
   updated_at             DateTime  @updatedAt
 
-  veiculo         Veiculo             @relation(fields: [id_veiculo], references: [id], onDelete: Cascade)
-  cliente         Cliente             @relation(fields: [id_cliente], references: [id], onDelete: Cascade)
+  // Restrict (#378, item 2): apagar cliente ou veículo não apaga mais as OS.
+  veiculo         Veiculo             @relation(fields: [id_veiculo], references: [id], onDelete: Restrict)
+  cliente         Cliente             @relation(fields: [id_cliente], references: [id], onDelete: Restrict)
   osPecas         OsPeca[]
   osServicos      OsServico[]
   historicoStatus HistoricoStatusOS[]

@@ -50,40 +50,13 @@ describe('ClienteReadModelProjector', () => {
     );
   });
 
-  it('remove do read model de OS as ordens apagadas em cascata com o cliente ou o veículo', async () => {
-    collection = {
-      ...collection,
-      deleteMany: jest.fn().mockResolvedValue({}),
-    } as typeof collection;
-    const db = { collection: jest.fn(() => collection) };
-    projector = new ClienteReadModelProjector(
-      prisma as unknown as PrismaService,
-      db as unknown as Db,
-      reporter as unknown as ReadModelFailureReporter
-    );
+  it('remove o documento quando o cliente foi removido (soft delete, #378)', async () => {
+    prisma.cliente.findUnique.mockResolvedValue({ id: 'cli-1', ativo: false });
 
-    await projector.removerOrdensServicoEmCascata({ clienteId: 'cli-1' });
-    await projector.removerOrdensServicoEmCascata({ veiculoId: 'vei-1' });
+    await projector.project('cli-1');
 
-    expect(db.collection).toHaveBeenCalledWith('os_read_model');
-    const deleteMany = (collection as unknown as { deleteMany: jest.Mock }).deleteMany;
-    expect(deleteMany).toHaveBeenNthCalledWith(1, { 'cliente.id': 'cli-1' });
-    expect(deleteMany).toHaveBeenNthCalledWith(2, { 'veiculo.id': 'vei-1' });
-  });
-
-  it('falha ao limpar as OS em cascata é relatada sem derrubar o request', async () => {
-    const falha = new Error('timeout');
-    const db = { collection: jest.fn(() => ({ deleteMany: jest.fn().mockRejectedValue(falha) })) };
-    projector = new ClienteReadModelProjector(
-      prisma as unknown as PrismaService,
-      db as unknown as Db,
-      reporter as unknown as ReadModelFailureReporter
-    );
-
-    await expect(
-      projector.removerOrdensServicoEmCascata({ clienteId: 'cli-1' })
-    ).resolves.toBeUndefined();
-    expect(reporter.report).toHaveBeenCalledWith('os_read_model', 'cli-1', falha);
+    expect(collection.deleteOne).toHaveBeenCalledWith({ _id: 'cli-1' });
+    expect(collection.replaceOne).not.toHaveBeenCalled();
   });
 
   it('remove o documento quando o cliente não existe mais', async () => {

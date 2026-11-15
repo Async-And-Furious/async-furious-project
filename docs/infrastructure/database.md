@@ -322,8 +322,8 @@ Log de eventos, imutável por natureza: só tem `data_hora`, sem
 | Origem (FK) | Coluna | Destino | `ON DELETE` | Cardinalidade |
 | --- | --- | --- | --- | --- |
 | `Veiculo` | `id_cliente` | `Cliente` | CASCADE | N:1 |
-| `OrdemServico` | `id_veiculo` | `Veiculo` | CASCADE | N:1 |
-| `OrdemServico` | `id_cliente` | `Cliente` | CASCADE | N:1 |
+| `OrdemServico` | `id_veiculo` | `Veiculo` | RESTRICT | N:1 |
+| `OrdemServico` | `id_cliente` | `Cliente` | RESTRICT | N:1 |
 | `OsPeca` | `id_ordem_servico` | `OrdemServico` | CASCADE | N:1 |
 | `OsPeca` | `id_peca` | `Peca` | RESTRICT | N:1 |
 | `OsServico` | `id_ordem_servico` | `OrdemServico` | CASCADE | N:1 |
@@ -335,8 +335,12 @@ Log de eventos, imutável por natureza: só tem `data_hora`, sem
 | *(sem FK)* `Pagamento` | `ordemServicoId` | `OrdemServico` | n/a | N:1 (não garantido pelo banco) |
 | *(sem FK)* `PedidoFornecedor` | `fornecedor_id` | nenhuma tabela (sem model `Fornecedor`) | n/a | n/a |
 
-`ON DELETE CASCADE` domina o schema: apagar um `Cliente` apaga em cascata
-seus veículos, OSs, orçamentos, itens de OS e histórico de status.
+Desde a #378 (item 2), `OrdemServico` referencia `Cliente` e `Veiculo` com
+`ON DELETE RESTRICT`: apagar cliente ou veículo não apaga mais as OS nem o histórico.
+O `DELETE /clientes/:id` faz soft delete (`ativo = false`): o cliente sai do cadastro
+e do read model e não autentica mais, e as OS dele continuam. O `DELETE /veiculos/:id`
+de veículo com OS responde 409. O `CASCADE` continua de `Veiculo` para `Cliente` e
+das tabelas filhas (itens, histórico) para `OrdemServico`.
 `ON DELETE RESTRICT` só aparece nas duas tabelas de junção que referenciam
 `Peca`/`Servico` (`OsPeca`, `OsServico`, `PedidoFornecedorItem`), impedindo
 apagar uma peça ou serviço já usado.

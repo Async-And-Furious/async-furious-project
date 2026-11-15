@@ -83,16 +83,17 @@ describe('VeiculosController (e2e)', () => {
   });
 
   afterAll(async () => {
-    if (testVeiculoId) {
-      await prismaService.veiculo.deleteMany({ where: { id: testVeiculoId } });
+    try {
+      if (testClienteId) {
+        await prismaService.ordemServico.deleteMany({ where: { id_cliente: testClienteId } });
+        await prismaService.veiculo.deleteMany({ where: { id_cliente: testClienteId } });
+        await prismaService.cliente.deleteMany({ where: { id: testClienteId } });
+      }
+      await prismaService.user.deleteMany({ where: { email: testUser.email } });
+      await prismaService.user.deleteMany({ where: { email: 'veiculos-admin@example.com' } });
+    } finally {
+      await app.close();
     }
-    if (testClienteId) {
-      await prismaService.veiculo.deleteMany({ where: { id_cliente: testClienteId } });
-      await prismaService.cliente.deleteMany({ where: { id: testClienteId } });
-    }
-    await prismaService.user.deleteMany({ where: { email: testUser.email } });
-    await prismaService.user.deleteMany({ where: { email: 'veiculos-admin@example.com' } });
-    await app.close();
   });
 
   describe('POST /veiculos', () => {
@@ -383,7 +384,7 @@ describe('VeiculosController (e2e)', () => {
         .expect(404);
     });
 
-    it('should cascade delete ordensServico when veiculo is deleted', async () => {
+    it('should return 409 and preserve ordensServico when deleting a veiculo with OS', async () => {
       const placaCascade = generateValidPlaca('CAS');
       const veiculo = await prismaService.veiculo.create({
         data: {
@@ -406,14 +407,12 @@ describe('VeiculosController (e2e)', () => {
       await server
         .delete(`/veiculos/${veiculo.id}`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
+        .expect(409);
 
       const ordens = await prismaService.ordemServico.findMany({
         where: { id_veiculo: veiculo.id },
       });
-      expect(ordens).toHaveLength(0);
-
-      await prismaService.veiculo.deleteMany({ where: { placa: placaCascade } });
+      expect(ordens).toHaveLength(1);
     });
 
     it('should return 404 for nonexistent veiculo', async () => {

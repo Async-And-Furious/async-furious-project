@@ -65,7 +65,8 @@ export class ClienteRepository implements IClienteRepository {
     data: Cliente[];
     pagination: { page: number; limit: number; total: number; totalPages: number };
   }> {
-    const where = buildSearchWhere(['nome', 'email', 'documento'], search) || {};
+    // Cliente removido (soft delete) sai das leituras do cadastro.
+    const where = { ativo: true, ...buildSearchWhere(['nome', 'email', 'documento'], search) };
 
     const [ormData, total] = await Promise.all([
       this.prisma.cliente.findMany({
@@ -86,8 +87,8 @@ export class ClienteRepository implements IClienteRepository {
   }
 
   async findById(id: string): Promise<Cliente> {
-    const ormEntity = await this.prisma.cliente.findUnique({
-      where: { id },
+    const ormEntity = await this.prisma.cliente.findFirst({
+      where: { id, ativo: true },
       include: { veiculos: true },
     });
 
@@ -99,8 +100,8 @@ export class ClienteRepository implements IClienteRepository {
   }
 
   async findByDocumento(documento: string): Promise<Cliente | null> {
-    const ormEntity = await this.prisma.cliente.findUnique({
-      where: { documento: CpfCnpjVo.normalizar(documento) },
+    const ormEntity = await this.prisma.cliente.findFirst({
+      where: { documento: CpfCnpjVo.normalizar(documento), ativo: true },
       include: { veiculos: true },
     });
 
@@ -125,14 +126,17 @@ export class ClienteRepository implements IClienteRepository {
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
 
+  // Soft delete (#378, item 2): o hard delete apagava em cascata as OS do cliente, com o
+  // histórico. O cliente inativo sai do cadastro e do read model de cliente e não autentica mais
+  // (AuthService e a Lambda checam `ativo`); as OS dele continuam consultáveis.
   async remove(id: string): Promise<Cliente> {
     await this.findById(id);
 
-    const ormEntity = await this.prisma.cliente.delete({
+    const ormEntity = await this.prisma.cliente.update({
       where: { id },
+      data: { ativo: false },
     });
     await this.projector.project(id);
-    await this.projector.removerOrdensServicoEmCascata({ clienteId: id });
 
     return ClienteMapper.toDomain(this.mapToORMEntity(ormEntity));
   }

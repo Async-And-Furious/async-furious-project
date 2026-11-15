@@ -7,7 +7,7 @@ import { CLIENTE_READ_MODEL_PROJECTOR } from '../../domain/interfaces/cliente-re
 interface MockPrismaCliente {
   create: jest.Mock;
   findMany: jest.Mock;
-  findUnique: jest.Mock;
+  findFirst: jest.Mock;
   update: jest.Mock;
   delete: jest.Mock;
   count: jest.Mock;
@@ -22,7 +22,6 @@ describe('ClienteRepository', () => {
   let mockPrismaService: MockPrismaService;
   const projector = {
     project: jest.fn().mockResolvedValue(undefined),
-    removerOrdensServicoEmCascata: jest.fn().mockResolvedValue(undefined),
   };
 
   const validCpf = '11144477735';
@@ -44,7 +43,7 @@ describe('ClienteRepository', () => {
       cliente: {
         create: jest.fn(),
         findMany: jest.fn(),
-        findUnique: jest.fn(),
+        findFirst: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
         count: jest.fn(),
@@ -221,6 +220,7 @@ describe('ClienteRepository', () => {
 
       expect(mockPrismaService.cliente.findMany).toHaveBeenCalledWith({
         where: {
+          ativo: true,
           OR: [
             { nome: { contains: 'test', mode: 'insensitive' } },
             { email: { contains: 'test', mode: 'insensitive' } },
@@ -252,7 +252,7 @@ describe('ClienteRepository', () => {
       await repository.findAll(1, 10);
 
       expect(mockPrismaService.cliente.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: {} })
+        expect.objectContaining({ where: { ativo: true } })
       );
     });
 
@@ -281,7 +281,7 @@ describe('ClienteRepository', () => {
       // `buildSearchWhere` retorna null/undefined para string vazia,
       // forçando o branch `|| {}` do repositório
       expect(mockPrismaService.cliente.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: {} })
+        expect.objectContaining({ where: { ativo: true } })
       );
     });
 
@@ -301,26 +301,26 @@ describe('ClienteRepository', () => {
 
   describe('findById', () => {
     it('should return a cliente by id', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
 
       const result = await repository.findById('123');
 
       expect(result.id).toBe('123');
-      expect(mockPrismaService.cliente.findUnique).toHaveBeenCalledWith({
-        where: { id: '123' },
+      expect(mockPrismaService.cliente.findFirst).toHaveBeenCalledWith({
+        where: { id: '123', ativo: true },
         include: { veiculos: true },
       });
     });
 
     it('should throw NotFoundException when cliente not found', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(null);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(null);
 
       await expect(repository.findById('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     // ─── BRANCH: NotFoundException com mensagem correta ─────────────────────
     it('should throw NotFoundException with correct message', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(null);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(null);
 
       await expect(repository.findById('abc-123')).rejects.toThrow(
         'Cliente com ID abc-123 nao encontrado'
@@ -333,7 +333,7 @@ describe('ClienteRepository', () => {
       const updateData = { nome: 'Updated Name' };
       const updatedCliente = { ...mockOrmCliente, nome: 'Updated Name' };
 
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
       mockPrismaService.cliente.update.mockResolvedValue(updatedCliente);
 
       const result = await repository.update('123', updateData);
@@ -349,7 +349,7 @@ describe('ClienteRepository', () => {
       const updateData = { nome: 'New Name', email: 'new@test.com' };
       const updatedCliente = { ...mockOrmCliente, ...updateData };
 
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
       mockPrismaService.cliente.update.mockResolvedValue(updatedCliente);
 
       const result = await repository.update('123', updateData);
@@ -359,7 +359,7 @@ describe('ClienteRepository', () => {
     });
 
     it('should throw NotFoundException when updating nonexistent cliente', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(null);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(null);
 
       await expect(repository.update('nonexistent', { nome: 'Test' })).rejects.toThrow(
         NotFoundException
@@ -371,7 +371,7 @@ describe('ClienteRepository', () => {
       const updateData = { telefone: '11988880000' };
       const updatedCliente = { ...mockOrmCliente, telefone: '11988880000' };
 
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
       mockPrismaService.cliente.update.mockResolvedValue(updatedCliente);
 
       const result = await repository.update('123', updateData);
@@ -388,7 +388,7 @@ describe('ClienteRepository', () => {
       const updateData = {};
       const updatedCliente = { ...mockOrmCliente };
 
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
       mockPrismaService.cliente.update.mockResolvedValue(updatedCliente);
 
       const result = await repository.update('123', updateData);
@@ -402,20 +402,22 @@ describe('ClienteRepository', () => {
   });
 
   describe('remove', () => {
-    it('should delete a cliente', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
-      mockPrismaService.cliente.delete.mockResolvedValue(mockOrmCliente);
+    it('faz soft delete do cliente (ativo=false), sem apagar a linha (#378, item 2)', async () => {
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.update.mockResolvedValue(mockOrmCliente);
 
       const result = await repository.remove('123');
 
       expect(result.id).toBe('123');
-      expect(mockPrismaService.cliente.delete).toHaveBeenCalledWith({
+      expect(mockPrismaService.cliente.update).toHaveBeenCalledWith({
         where: { id: '123' },
+        data: { ativo: false },
       });
+      expect(mockPrismaService.cliente.delete).not.toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when trying to delete nonexistent cliente', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(null);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(null);
 
       await expect(repository.remove('nonexistent')).rejects.toThrow(NotFoundException);
     });
@@ -437,7 +439,7 @@ describe('ClienteRepository', () => {
     });
 
     it('projeta o cliente atualizado', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
       mockPrismaService.cliente.update.mockResolvedValue({ ...mockOrmCliente, nome: 'Novo' });
 
       await repository.update('123', { nome: 'Novo' });
@@ -445,18 +447,17 @@ describe('ClienteRepository', () => {
       expect(projector.project).toHaveBeenCalledWith('123');
     });
 
-    it('projeta a remoção (o projetor apaga o documento)', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(mockOrmCliente);
-      mockPrismaService.cliente.delete.mockResolvedValue(mockOrmCliente);
+    it('projeta a remoção (o projetor apaga o documento do cliente inativo)', async () => {
+      mockPrismaService.cliente.findFirst.mockResolvedValue(mockOrmCliente);
+      mockPrismaService.cliente.update.mockResolvedValue(mockOrmCliente);
 
       await repository.remove('123');
 
       expect(projector.project).toHaveBeenCalledWith('123');
-      expect(projector.removerOrdensServicoEmCascata).toHaveBeenCalledWith({ clienteId: '123' });
     });
 
     it('não projeta quando a escrita falha no Postgres', async () => {
-      mockPrismaService.cliente.findUnique.mockResolvedValue(null);
+      mockPrismaService.cliente.findFirst.mockResolvedValue(null);
 
       await expect(repository.update('x', { nome: 'Novo' })).rejects.toThrow(NotFoundException);
       expect(projector.project).not.toHaveBeenCalled();

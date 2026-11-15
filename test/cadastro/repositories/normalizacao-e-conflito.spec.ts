@@ -13,10 +13,9 @@ const p2002 = (): Prisma.PrismaClientKnownRequestError =>
   });
 
 describe('ClienteRepository: normalização e conflito', () => {
-  const prisma = { cliente: { findUnique: jest.fn(), create: jest.fn() } };
+  const prisma = { cliente: { findFirst: jest.fn(), create: jest.fn() } };
   const repository = new ClienteRepository(prisma as unknown as PrismaService, {
     project: jest.fn(),
-    removerOrdensServicoEmCascata: jest.fn(),
   });
   const input = {
     nome: 'Maria',
@@ -28,12 +27,12 @@ describe('ClienteRepository: normalização e conflito', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('busca pelo documento só com dígitos, como ele é gravado', async () => {
-    prisma.cliente.findUnique.mockResolvedValue(null);
+    prisma.cliente.findFirst.mockResolvedValue(null);
 
     await repository.findByDocumento('529.982.247-25');
 
-    expect(prisma.cliente.findUnique).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { documento: '52998224725' } })
+    expect(prisma.cliente.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { documento: '52998224725', ativo: true } })
     );
   });
 
@@ -53,10 +52,7 @@ describe('ClienteRepository: normalização e conflito', () => {
 
 describe('VeiculoRepository: normalização e conflito', () => {
   const prisma = { veiculo: { findUnique: jest.fn(), create: jest.fn() } };
-  const repository = new VeiculoRepository(prisma as unknown as PrismaService, {
-    project: jest.fn(),
-    removerOrdensServicoEmCascata: jest.fn(),
-  });
+  const repository = new VeiculoRepository(prisma as unknown as PrismaService);
   const input = { placa: 'abc-1d23', marca: 'Fiat', modelo: 'Uno', ano: 2015, clienteId: 'cli-1' };
 
   beforeEach(() => jest.clearAllMocks());

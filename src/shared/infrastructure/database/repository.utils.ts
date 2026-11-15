@@ -89,3 +89,8 @@ export async function findOneOrThrow<T>(
 export function isUniqueConstraintViolation(error: unknown): boolean {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
 }
+
+/** P2003: a linha ainda é referenciada por outra tabela (FK com `onDelete: Restrict`). */
+export function isForeignKeyViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
+}
