@@ -194,4 +194,35 @@ describe('rebuilders', () => {
       expect.objectContaining({ _id: 'cli-1', documento: '529.982.247-25' })
     );
   });
+
+  it('ClienteReadModelRebuilder pula cliente com documento inválido e segue o rebuild', async () => {
+    const collection = fakeCollection('cliente_read_model', ['cli-1']);
+    const linha = (id: string, documento: string) => ({
+      id,
+      nome: 'Cliente',
+      email: `${id}@example.com`,
+      telefone: null,
+      documento,
+      tipo_documento: 'CPF',
+      created_at: new Date(),
+      updated_at: new Date(),
+    });
+    const findMany = jest
+      .fn()
+      .mockResolvedValueOnce([linha('cli-1', '52998224725'), linha('cli-sujo', '12345678900')])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'cli-1' }]);
+    const rebuilder = new ClienteReadModelRebuilder(
+      { cliente: { findMany } } as unknown as PrismaService,
+      { collection: jest.fn(() => collection) } as unknown as Db
+    );
+
+    const result = await rebuilder.rebuild();
+
+    expect(result).toEqual({ collection: 'cliente_read_model', upserted: 1, removed: 0 });
+    const [ops] = collection.bulkWrite.mock.calls[0] as [
+      Array<{ replaceOne: { replacement: { _id: string } } }>,
+    ];
+    expect(ops.map((op) => op.replaceOne.replacement._id)).toEqual(['cli-1']);
+  });
 });
