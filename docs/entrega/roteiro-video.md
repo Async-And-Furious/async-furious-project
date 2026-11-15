@@ -15,7 +15,7 @@ conferidos no código em 15/11:
 - `repo-auth-serverless@develop`;
 - `repo-k8s-infra@develop`.
 
-Nada foi executado em HML.
+O fluxo ainda não foi executado em HML. O estado do ambiente está na seção 2.
 
 > Não aparecem na tela nem neste arquivo: CPF, número de cartão, token, senha, URL privada
 > ou credencial. Segredos entram como variável de ambiente exportada fora da gravação.
@@ -31,7 +31,7 @@ tudo. Quando uma parte continua a OS de outra, o id da OS passa de um dono para 
 
 | Parte | Bloco | Tempo no vídeo | Duração | Conteúdo | Responsável |
 |---|---|---|---|---|---|
-| A | 1 | 0:00-0:30 | 0:30 | Abertura e arquitetura | Trigo |
+| A | 1 | 0:00-0:30 | 0:30 | Abertura e arquitetura | Vic |
 | B1 | 1 | 0:30-1:50 | 1:20 | Recepção e mecânico: abrir a OS, diagnóstico, orçamento | Jonathan |
 | **C1** | 1 | 1:50-2:40 | 0:50 | **Mercado Pago: aprovação, Checkout Pro, webhook, `CONFIRMADO`** | **Felipe** |
 | B2 | 1 | 2:40-3:00 | 0:20 | Mecânico: reparo e conclusão, OS em `FINISHED` | Jonathan |
@@ -45,7 +45,7 @@ tudo. Quando uma parte continua a OS de outra, o id da OS passa de um dono para 
 Cada parte ficou com quem mais trabalhou no assunto. O critério foi o responsável pela issue
 e a autoria do código nos branches remotos em 15/11:
 
-- **A (Trigo):** decisão do grupo em 15/11. Pelo critério de autoria, a parte seria do
+- **A (Vic):** decisão do grupo em 15/11. Pelo critério de autoria, a parte seria do
   Felipe (#306, #348), que já fica com C e F.
 - **B (Jonathan):** responsável pela #320, que trata da fila de execução e do domínio. Ele
   escreveu a maior parte dos controllers e use-cases do Execução.
@@ -63,8 +63,8 @@ Tempo de vídeo por pessoa:
 | Pessoa | Partes | Tempo |
 |---|---|---|
 | Felipe | C1, C2 e F | 5:00 |
-| Vic | D1, D2 e G | 4:20 |
-| Trigo | A e E | 3:00 |
+| Vic | A, D1, D2 e G | 4:50 |
+| Trigo | E | 2:30 |
 | Jonathan | B1 e B2 | 1:40 |
 
 A coordenação é do Trigo, conforme o comentário de 03/11 na #353. A edição e a publicação
@@ -72,24 +72,36 @@ ficam com a Vic, responsável pela #353.
 
 ## 2. Go/no-go antes de gravar
 
-Estado em 15/11. Os blocos 1 e 2 dependem dos itens 1 a 4. Sem eles, vale o plano B
-(seção 6).
+Estado em 15/11, à noite. Os blocos 1 e 2 dependem dos itens 1 a 4 e do 6. Sem eles, vale o
+plano B (seção 6).
 
-| # | Precisa estar de pé em HML | Estado em 15/11 | Dono sugerido |
+| # | Precisa estar de pé em HML | Estado em 15/11 | Dono |
 |---|---|---|---|
-| 1 | **Execução deployado** (`execucao-api`, namespace `execucao`) | **Não.** A `main` do `repo-execucao-service` só tem o `README.md`, 42 commits atrás da `develop`. O `Deploy Execucao to HML EKS` só dispara em push na `main`. Falta o `NEW_RELIC_LICENSE_KEY` no environment `hml`. O Sonar falha fora da `main` | Trigo |
-| 2 | OS na versão atual (`async-furious-api`, namespace `async-furious`) | Deploy parado desde a falha de 11/11; a migration da #330 não foi aplicada | Trigo |
-| 3 | Billing com webhook real: `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` no `billing-secret`; `MP_NOTIFICATION_URL` no configmap, apontando para `$API/api/v1/webhooks/mercado-pago` | Billing subiu em 12/11; a notificação real não foi confirmada | **Felipe** |
-| 4 | Borda com as rotas públicas `/status`, `aprovar`, `recusar` e o webhook | Estão na `develop` do `repo-auth-serverless`; a `main` não tem nenhuma rota pública | Trigo (#317) |
-| 5 | Os três apps reportando ao New Relic, e o dashboard `tc3-observability-hml` com a página "Fluxo distribuído" (repo-k8s-infra#93) | `af-execucao-hml` depende do item 1 | **Felipe** |
-| 6 | Credenciais AWS Academy renovadas e `kubectl` apontando para o cluster | — | cada um, antes da sua parte |
+| 1 | Execução publicado (`execucao-api`, namespace `execucao`) | ✅ Primeiro deploy às 20:25, depois do merge `develop` → `main` (repo-execucao-service#14), já com o `NEW_RELIC_LICENSE_KEY` no environment `hml` | — |
+| 2 | OS na versão atual (`async-furious-api`, namespace `async-furious`) | ❌ O `/status` devolve 503. As migrations foram aplicadas, inclusive a da #330, mas o rebuild do read model falha: a imagem não deixa ler a CA do DocumentDB, e um cliente com CPF inválido aborta o rebuild. A correção está no PR #419; depois do merge, o deploy roda sozinho | Felipe |
+| 3 | Billing com webhook real | ✅ Billing no ar. O webhook chega ao guard de assinatura, e os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` e a variável `MP_NOTIFICATION_URL` existem. **[ensaio]**: um pagamento `APRO` real chegando a `CONFIRMADO` | Felipe |
+| 4 | Borda com as rotas públicas `/status`, `aprovar`, `recusar` e o webhook | ✅ Aplicadas: as três rotas públicas testadas chegam aos serviços sem token | — |
+| 5 | Os três apps no New Relic e o dashboard `tc3-observability-hml`, página "Fluxo distribuído" | **[ensaio]**: o `af-execucao-hml` deve aparecer a partir do deploy de 15/11 | Felipe |
+| 6 | Senhas de staff (`SEED_RECEPCIONISTA_PASSWORD`, `SEED_MECANICO_PASSWORD`, `SEED_ADMIN_*`) com quem grava | ❌ Só existem nos secrets do GitHub, que não dão para ler. Pedidas ao Trigo | Trigo |
 | 7 | Congelamento: nenhum merge na `develop` nem na `main` dos três serviços na janela de gravação | — | Trigo avisa o grupo |
+
+**Acesso:** o fluxo inteiro passa pela API Gateway. Não precisa de `kubectl`, e ele nem
+funcionaria: o endpoint do EKS só abre, temporariamente, para o runner do GitHub durante o
+deploy. A AWS só entra para descobrir o `$API` (seção 0 do roteiro de validação).
 
 ## 3. Preparação (cada dono, fora da gravação)
 
 Rode a seção 0 do [roteiro de validação](roteiro-validacao-hml-fase4.md#0-preparação): ela
 traz os segredos lidos sem eco, os tokens e a peça. Depois carregue os helpers abaixo e dê
 `clear` antes de gravar.
+
+O `SEEDED_CPF` pode ser qualquer CPF de cliente ativo do seed. Para não depender do secret,
+dá para tirá-lo do próprio repositório, sem exibir:
+`SEEDED_CPF=$(git show origin/develop:scripts/seed.ts | grep -m1 -oP "documento: '\K[0-9]{11}")`.
+
+Tudo entre os serviços passa pelo Kafka e é assíncrono. Se um `status`, `exe` ou `pagamento`
+ainda mostrar o estado anterior, espere 2 a 3 segundos e rode de novo; a espera sai na
+edição.
 
 ```bash
 status()  { req "$API/api/v1/ordens-servico/$OS/status" | jq -c '{status, marcos}'; }
@@ -119,7 +131,7 @@ preferência do Mercado Pago vale 48 h.
 
 ## 4. Partes
 
-### Parte A — Abertura (0:30) · Trigo
+### Parte A — Abertura (0:30) · Vic
 
 | Tela | Fala-guia |
 |---|---|
@@ -134,8 +146,7 @@ preferência do Mercado Pago vale 48 h.
 | 0:40-0:55 | Mecânico | `req -X PATCH -H "authorization: Bearer $MEC" "$API/api/v1/execucoes/$EXE/iniciar-diagnostico" \| jq -c .status; status` | `EM_DIAGNOSTICO`; OS em `UNDER_DIAGNOSIS` | "`DiagnosticoIniciado` volta para o OS, que atualiza o status." |
 | 0:55-1:20 | Mecânico | `req -X PATCH -H "authorization: Bearer $MEC" -d '{"valor_total_servicos":300,"valor_total_pecas":60}' "$API/api/v1/ordens-servico/$OS/servicos-insumos" \| jq -c .; status` | `valorTotalGeral: 360`; OS em `AWAITING_APPROVAL` | "O OS publica `OrcamentoCalculado`; o Billing gera o orçamento e devolve `OrcamentoGerado`." |
 
-Se `exe` voltar vazio, espere 2 a 3 segundos e rode de novo, porque o Kafka é assíncrono
-(corte na edição). Termine passando o `$OS` e o `$EXE` para o Felipe.
+Termine passando o `$OS` e o `$EXE` para o Felipe.
 
 ### Parte C1 — Mercado Pago: pagamento aprovado (0:50) · Felipe
 
@@ -144,7 +155,7 @@ Se `exe` voltar vazio, espere 2 a 3 segundos e rode de novo, porque o Kafka é a
 | 0:00-0:10 | Terminal | `req -H "authorization: Bearer $RECEP" "$API/api/v1/orcamentos/$OS" \| jq -c '{status,valorTotalGeral}'` | `PENDING`, 360 | "O orçamento mora no Billing." |
 | 0:10-0:20 | Terminal | `LINK=$(req -X PATCH "$API/api/v1/orcamentos/$OS/aprovar" \| jq -r .linkPagamento); echo "$LINK" \| cut -c1-60` | início do link do Checkout Pro | "O cliente aprova por uma rota pública, sem login. O Billing cria a cobrança no Mercado Pago e devolve o link. O `external_reference` da cobrança é o id da OS." |
 | 0:20-0:35 | Janela anônima, logada com o comprador de teste | Abrir o link e pagar com o cartão de teste de titular **`APRO`** (acelerar na edição) | pagamento aprovado | "Ambiente de teste do Mercado Pago, com comprador de teste." |
-| 0:35-0:50 | Terminal | `pagamento` | `CONFIRMADO` | "O Mercado Pago notificou o webhook. O Billing valida a assinatura (`x-signature`, HMAC com o segredo do webhook), **reconsulta** o pagamento na API do Mercado Pago em vez de confiar no corpo da notificação e publica `PagamentoConfirmado`." |
+| 0:35-0:50 | Terminal | `pagamento` (se ainda vier `AGUARDANDO_PAGAMENTO`, o webhook não chegou: espere e repita) | `CONFIRMADO` | "O Mercado Pago notificou o webhook. O Billing valida a assinatura (`x-signature`, HMAC com o segredo do webhook), **reconsulta** o pagamento na API do Mercado Pago em vez de confiar no corpo da notificação e publica `PagamentoConfirmado`." |
 
 Opcional, se sobrar tempo (+0:15): painel do Mercado Pago > a aplicação > Webhooks >
 histórico de notificações, com a notificação respondida com 200. **[ensaio]**
@@ -172,7 +183,7 @@ parte F.
 | Tempo | Comando | Esperado | Fala-guia |
 |---|---|---|---|
 | 0:00-0:20 | `ANTES=$(estoque); echo "estoque antes: $ANTES"` | número | "Agora, a falha. Primeiro o estoque da peça, para comparar no fim." |
-| 0:20-1:20 (acelerado) | `OS=$(nova_os DEM0B34)`; `EXE=$(exe AGUARDANDO_DIAGNOSTICO)`; `iniciar-diagnostico`; `servicos-insumos`; `status` | `AWAITING_APPROVAL` | "Mesmo fluxo até o orçamento, com outra OS." |
+| 0:20-1:20 (acelerado) | `OS=$(nova_os DEM0B34)`; `EXE=$(exe AGUARDANDO_DIAGNOSTICO)`; depois o `iniciar-diagnostico` e o `servicos-insumos` com os mesmos comandos da B1; `status` | `AWAITING_APPROVAL` | "Mesmo fluxo até o orçamento, com outra OS." |
 
 Termine passando o `$OS` e o `$EXE` para o Felipe. Guarde o `ANTES`: ele é usado na D2.
 
@@ -194,7 +205,7 @@ Termine passando o `$OS` e o `$EXE` de volta.
 | 0:00-0:25 | OS | `status` | `CLOSED_WITHOUT_EXECUTION` | "O OS consumiu o `PagamentoRecusado` e encerrou a OS sem execução." |
 | 0:25-0:50 | Execução | `exe CANCELADA` | o mesmo `$EXE` | "O Execução consumiu o mesmo evento e cancelou a execução. Nenhum coordenador mandou isso." |
 | 0:50-1:10 | OS (estoque) | `echo "antes: $ANTES  depois: $(estoque)"` | os dois números iguais | "A reserva de peças foi liberada." |
-| 1:10-1:40 | OS (histórico) | `historico` (do [roteiro de validação](roteiro-validacao-hml-fase4.md), passo 2) **[ensaio]** | linha `→ CLOSED_WITHOUT_EXECUTION` com o motivo `Pagamento recusado pelo Mercado Pago` | "O motivo fica no histórico da OS." |
+| 1:10-1:40 | New Relic > Logs | `SELECT timestamp, message FROM Log WHERE ordemServicoId = '<OS>' OR message LIKE '%<OS>%' SINCE 1 hour ago` **[ensaio]** | a linha `[P-14] ... reserva(s) de peças da OS <OS> devolvida(s) ao estoque` e a transição para `CLOSED_WITHOUT_EXECUTION` | "O OS registra a compensação no log. O motivo, 'Pagamento recusado pelo Mercado Pago', fica gravado no histórico da OS no Postgres." |
 | 1:40-2:30 | — | Diagrama da compensação (`docs/architecture/saga-flow.md`) | um evento, três reações | "Na saga coreografada, cada serviço desfaz a própria parte quando ouve o evento: Billing, OS e Execução." |
 
 Fora do corte: OS parada pelo detector, endpoint de caos e derrubar serviço (vedados pela
@@ -203,7 +214,12 @@ Fora do corte: OS parada pelo detector, endpoint de caos e derrubar serviço (ve
 ### Parte E — CI/CD (2:30) · Trigo
 
 O serviço demonstrado é o que tiver a run de deploy verde mais recente em HML. O candidato
-hoje é o Billing (`CI` + `Deploy Billing to HML EKS`); o OS é a segunda opção.
+hoje é o Billing (`CI` + `Deploy Billing to HML EKS`); o OS e o Execução são as alternativas.
+
+**Antes de gravar:** o `CI` da `main` do Billing e do Execução está vermelho no Sonar ("Organization
+is not allowed to access data from non main branches"). Para corrigir, no SonarCloud, em cada
+projeto: Administration > Branches and Pull Requests, renomear o branch principal para `main`.
+Sem isso, o check vermelho aparece na tela.
 
 **Fala obrigatória:** nos três serviços o deploy **não** é encadeado aos testes, porque o
 `deploy-eks.yml` é um workflow separado. O que barra código sem teste é a proteção de
@@ -216,7 +232,7 @@ pipeline de deploy roda os testes.
 | 0:20-0:45 | Settings > Branches, regra da `main` | PR obrigatório e check de testes exigido | "Nada entra na `main` sem PR e testes verdes." |
 | 0:45-1:30 | PR com os checks `tests` e `sonar` verdes | log do Jest com as quatro métricas ≥ 80% | "Se a cobertura cair abaixo de 80%, o check falha e o merge fica bloqueado." |
 | 1:30-2:10 | Run do deploy disparada pelo merge (acelerada) | jobs `image` → `deploy-hml` verdes; imagem com tag do SHA | "O merge disparou o deploy só deste serviço." |
-| 2:10-2:30 | `kubectl -n billing get pods` e `kubectl -n billing get deploy billing-api -o jsonpath='{.spec.template.spec.containers[0].image}'` | pod novo com o mesmo SHA | "O pod novo está no ar com a versão que passou pelos testes." |
+| 2:10-2:30 | Na mesma run, o log do job `deploy-hml`: `deployment "billing-api" successfully rolled out` e a saída do `kubectl get pods` que o workflow imprime | pod novo, com minutos de idade, e a imagem com o mesmo SHA | "O pod novo está no ar com a versão que passou pelos testes." |
 
 ### Parte F — New Relic (3:00) · Felipe
 
@@ -278,7 +294,7 @@ Mostrar só o que aconteceu, dizer o que não foi validado e não montar estado.
 
 Valem a partir de 15/11.
 
-- **Ambiente:** os itens 1 a 5 da seção 2.
+- **Ambiente:** os itens 2, 3, 5 e 6 da seção 2 e o Sonar da `main` (parte E).
 - **Divisão das partes:** cada pessoa confirma a sua parte (seção 1).
 - **Ensaio e itens [ensaio]:** o ensaio completo e a confirmação de cada item marcado
   **[ensaio]**.

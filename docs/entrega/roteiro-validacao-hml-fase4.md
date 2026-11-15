@@ -8,7 +8,12 @@ vídeo (#353) com a mesma sequência. Cada passo diz qual card ele fecha e qual 
 - Os três serviços precisam estar em HML: o OS (`deploy-eks.yml` deste repositório), o
   Billing (`repo-billing`) e o Execução (`repo-execucao-service`, depois do merge
   `develop` → `main`).
-- No terminal: credenciais AWS do grupo, `aws`, `curl`, `jq` e `kubectl`.
+- No terminal: credenciais AWS do grupo, `aws`, `curl` e `jq`. Os passos 2 a 4 passam todos
+  pela API Gateway e pelo New Relic.
+- O `kubectl` (o `historico` do passo 2 e os passos 5 e 6) só funciona com o endpoint do EKS
+  liberado para o seu IP. Por padrão ele só abre, temporariamente, para o runner do GitHub
+  durante o deploy. Sem esse acesso, use o New Relic: o log `[P-14]` da compensação e o
+  `os.status.transition`.
 - Anote a data e o commit de cada serviço no topo das evidências.
 
 ## 0. Preparação
