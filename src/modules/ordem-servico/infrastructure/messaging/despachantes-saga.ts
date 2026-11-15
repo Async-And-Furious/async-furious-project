@@ -14,6 +14,11 @@ import { OrcamentoAprovado } from '../../domain/events/orcamento-aprovado.event'
 import { OrcamentoRecusado } from '../../domain/events/orcamento-recusado.event';
 import { PagamentoConfirmado } from '../../domain/events/pagamento-confirmado.event';
 import { PagamentoRecusado } from '../../domain/events/pagamento-recusado.event';
+import {
+  ETAPAS_DA_SAGA,
+  EtapaDaSagaFalhou,
+  type EtapaDaSaga,
+} from '../../domain/events/etapa-da-saga-falhou.event';
 import type { Despachante } from './processador-mensagens-saga';
 
 type Dados = Parameters<Despachante>[0];
@@ -35,6 +40,14 @@ function numero(data: Dados, campo: string): number {
   return valor;
 }
 
+function etapa(data: Dados): EtapaDaSaga {
+  const valor = texto(data, 'etapa');
+  if (!(ETAPAS_DA_SAGA as readonly string[]).includes(valor)) {
+    throw new DomainException(`Etapa da saga desconhecida: ${valor}`);
+  }
+  return valor as EtapaDaSaga;
+}
+
 /** Eventos de `execucao.eventos.v1` consumidos pelo OS Service e o handler de cada um. */
 export function despachantesExecucao(handlers: {
   emDiagnostico: AtualizarStatusEmDiagnosticoHandler;
@@ -51,10 +64,7 @@ export function despachantesExecucao(handlers: {
   };
 }
 
-/**
- * Eventos de `billing.eventos.v1` consumidos pelo OS Service (`event-catalog.md`). A
- * `EtapaDaSagaFalhou` do Billing fica de fora: a reação a ela é a compensação (#338).
- */
+/** Eventos de `billing.eventos.v1` consumidos pelo OS Service (`event-catalog.md`). */
 export function despachantesBilling(handlers: {
   aguardandoAprovacao: AtualizarStatusAguardandoAprovacaoHandler;
   verificarNecessidadePecas: VerificarNecessidadePecasHandler;
@@ -85,6 +95,28 @@ export function despachantesBilling(handlers: {
     PagamentoRecusado: (data) =>
       handlers.encerradaSemExecucao.handlePagamentoRecusado(
         new PagamentoRecusado(data.ordemServicoId, texto(data, 'pagamentoId'))
+      ),
+  };
+}
+
+/**
+ * `EtapaDaSagaFalhou`, recebida tanto de `billing.eventos.v1` quanto de `execucao.eventos.v1`, e
+ * reaplicada pelo processador quando o próprio OS a publica a partir da DLT: dispara a
+ * compensação do OS (`saga-flow.md` §3, #338).
+ */
+export function despachantesCompensacao(handlers: {
+  encerradaSemExecucao: AtualizarStatusEncerradaSemExecucaoHandler;
+}): Record<string, Despachante> {
+  return {
+    EtapaDaSagaFalhou: (data) =>
+      handlers.encerradaSemExecucao.handleEtapaDaSagaFalhou(
+        new EtapaDaSagaFalhou(
+          texto(data, 'servicoOrigem'),
+          typeof data.eventTypeOriginal === 'string' ? data.eventTypeOriginal : null,
+          data.ordemServicoId,
+          etapa(data),
+          texto(data, 'motivo')
+        )
       ),
   };
 }

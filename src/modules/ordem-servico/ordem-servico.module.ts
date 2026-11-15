@@ -8,12 +8,17 @@ import { ClienteRepository } from '../cadastro/infrastructure/repositories/clien
 import { VeiculoRepository } from '../cadastro/infrastructure/repositories/veiculo.repository';
 import { ServicoRepository } from '../cadastro/infrastructure/repositories/servico.repository';
 import { PecaInsumoRepository } from '../pecas-insumos/infrastructure/repositories/peca-insumo.repository';
+import { ReservaEstoqueRepository } from '../pecas-insumos/infrastructure/repositories/reserva-estoque.repository';
 import {
   EMISSOR_EVENTOS,
   IEmissorEventos,
 } from '../../shared/domain/interfaces/emissor-eventos.interface';
 import { OrdemServicoBacklogAdapter } from './infrastructure/adapters/ordem-servico-backlog.adapter';
 import { ORDEM_SERVICO_BACKLOG_PORT } from '../../shared/domain/interfaces/ordem-servico-backlog.port';
+import {
+  RESERVA_ESTOQUE_PORT,
+  type IReservaEstoquePort,
+} from '../../shared/domain/interfaces/reserva-estoque.port';
 import {
   CriarOrdemServicoUseCase,
   ListarServicosInsumosNaOsUseCase,
@@ -58,6 +63,7 @@ import { PonteEventosIntegracaoListener } from './infrastructure/messaging/ponte
 import { KafkaConsumidorSaga } from './infrastructure/messaging/kafka-consumidor-saga';
 import {
   despachantesBilling,
+  despachantesCompensacao,
   despachantesExecucao,
 } from './infrastructure/messaging/despachantes-saga';
 import {
@@ -86,6 +92,8 @@ import { CadastroModule } from '../cadastro/cadastro.module';
     OsServicoRepository,
     StatusHistoryRepository,
     PecaInsumoRepository,
+    // Devolução de peças na compensação da saga (#338)
+    { provide: RESERVA_ESTOQUE_PORT, useClass: ReservaEstoqueRepository },
     EmissorEventos,
     { provide: EMISSOR_EVENTOS, useClass: EmissorEventos },
     {
@@ -115,6 +123,7 @@ import { CadastroModule } from '../cadastro/cadastro.module';
               encerradaSemExecucao,
               pagamentoConfirmado,
             }),
+            ...despachantesCompensacao({ encerradaSemExecucao }),
           },
           publicador
         ),
@@ -242,14 +251,16 @@ import { CadastroModule } from '../cadastro/cadastro.module';
         barramento: IEmissorEventos,
         historicoRepo: StatusHistoryRepository,
         transicaoSvc: StatusTransitionService,
-        transitionLogger: OsStatusTransitionPinoLogger
+        transitionLogger: OsStatusTransitionPinoLogger,
+        reservaEstoque: IReservaEstoquePort
       ) =>
         new AtualizarStatusEncerradaSemExecucaoHandler(
           osRepo,
           barramento,
           historicoRepo,
           transicaoSvc,
-          transitionLogger
+          transitionLogger,
+          reservaEstoque
         ),
       inject: [
         OrdemServicoRepository,
@@ -257,6 +268,7 @@ import { CadastroModule } from '../cadastro/cadastro.module';
         StatusHistoryRepository,
         StatusTransitionService,
         OS_STATUS_TRANSITION_LOGGER,
+        RESERVA_ESTOQUE_PORT,
       ],
     },
     {

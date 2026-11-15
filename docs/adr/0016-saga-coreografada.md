@@ -252,6 +252,39 @@ detalhado em [`saga-flow.md`](../architecture/saga-flow.md) como fonte
 - Checagem de pagamento em `registrar-entrega` **cortada** (ver "Decisão").
 - Zero chamada REST entre serviços: toda a coordenação é por evento.
 
+## Revisão de 11/11/2026 (#338)
+
+A estratégia de compensação ficou implementada nos três serviços. A decisão
+central não muda. As regras da compensação em saga coreografada passam a
+ser estas:
+
+- **Uma única falha técnica.** `EtapaDaSagaFalhou` é publicada pela DLT de
+  cada serviço ou pelo detector de OS parada. As recusas de negócio
+  (`OrcamentoRecusado`, `PagamentoRecusado`) têm evento próprio. Nenhum
+  serviço publica um evento de falha próprio.
+- **Cada serviço compensa a si mesmo**, sem coordenador. O serviço que
+  publica a falha não assina o próprio tópico, então aplica a compensação
+  local no mesmo ato (no OS: DLT e detector).
+- **Compensação idempotente, com guarda de estado.** O OS fecha a OS com
+  gravação condicionada ao status lido. A devolução de peças só devolve a
+  reserva cuja linha conseguiu apagar. A reentrega do mesmo evento não
+  gera efeito duplicado.
+- **Compensação sempre para trás.** O OS só fecha a OS a partir de
+  `RECEIVED`, `UNDER_DIAGNOSIS` ou `AWAITING_APPROVAL`, e só devolve as
+  peças depois de fechar. Em `IN_PROGRESS` ou `AWAITING_PARTS`, e em
+  `etapa=reparo`, só registra o motivo. Em estado terminal, ack.
+- **Compensação lógica por padrão**, com estorno real só para pagamento
+  capturado (Billing, repo-billing#3).
+
+**Custo assumido:** a compensação vive em três repositórios. Só a matriz de
+[`saga-flow.md`](../architecture/saga-flow.md) §3 a descreve num lugar só,
+agora com a implementação de cada linha apontada.
+
+**Fora do escopo mínimo da entrega** (dívida registrada): o evento custom
+`SagaCompleted` no New Relic. Também não há teste dedicado para a falha do
+OS ao gravar `pago_em` (`PagamentoConfirmado` na DLT): o código já a deixa
+para replay manual, sem `EtapaDaSagaFalhou` e sem compensação.
+
 ## Referências
 
 - Tech Challenge — Fase 4 (`12SOAT - Fase 4 - Tech challenge.pdf`), p.2, p.4, p.5 e p.6

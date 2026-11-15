@@ -43,22 +43,31 @@ Funcionalidade: Fluxo da Ordem de Serviço pela Saga entre os três serviços
     Quando a Execução publica ExecucaoConcluida
     Então a OS está em FINISHED
 
-  # Depende da #338 (compensações): este cenário só passa depois que as compensações estiverem implementadas.
-  # Não revisado nesta entrega: o texto é o alvo da #338 e ainda descreve o webhook do Billing.
-  @compensacao @depende-338
+  # Compensação do lado do OS (#338). Billing e Execução compensam a si mesmos nos próprios
+  # repositórios (repo-billing, repo-execucao-service); aqui chegam só os eventos deles.
+  @compensacao
   Cenário: Pagamento recusado compensa a saga até CLOSED_WITHOUT_EXECUTION
-    Dado que a OS está em AWAITING_APPROVAL com o Orcamento em PENDING
-    E que as peças do orçamento estão em estoque
+    Dado que as peças do orçamento estão em estoque
+    E que a OS chegou a AWAITING_APPROVAL
+    Quando o Billing publica OrcamentoAprovado
+    Então as peças da OS são reservadas
 
-    Quando o cliente aprova o orçamento (PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar)
-    Então a resposta contém linkPagamento
-    E as peças da OS são reservadas
+    Quando o Billing publica PagamentoRecusado
+    Então a OS está em CLOSED_WITHOUT_EXECUTION
+    E as peças reservadas voltam ao estoque
+    E o HistoricoStatusOS registra o motivo "Pagamento recusado pelo Mercado Pago"
 
-    Quando o Mercado Pago notifica o pagamento recusado (POST /api/v1/webhooks/mercado-pago, com assinatura válida) e a reconsulta devolve rejected
-    Então o Pagamento está em RECUSADO
-    E o evento PagamentoRecusado é publicado em billing.eventos.v1
-    E a reserva de peças da OS é liberada
-    E a OS está em CLOSED_WITHOUT_EXECUTION
-    E o HistoricoStatusOS registra o motivo "pagamento recusado"
-    E a Execucao está em CANCELADA
-    E o Mercado Pago não recebe nenhum estorno, porque nada foi capturado
+    Quando o Billing publica PagamentoRecusado de novo
+    Então as peças não voltam ao estoque em dobro
+
+  @compensacao
+  Cenário: Falha técnica no início da execução compensa a saga até CLOSED_WITHOUT_EXECUTION
+    Dado que as peças do orçamento estão em estoque
+    E que a OS chegou a AWAITING_APPROVAL
+    Quando o Billing publica OrcamentoAprovado
+    Então as peças da OS são reservadas
+
+    Quando a Execução publica EtapaDaSagaFalhou com etapa inicio-execucao
+    Então a OS está em CLOSED_WITHOUT_EXECUTION
+    E as peças reservadas voltam ao estoque
+    E o HistoricoStatusOS registra o motivo "Falha técnica na etapa inicio-execucao (execucao-service): retry esgotado"

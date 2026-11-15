@@ -15,6 +15,7 @@ import {
 import { ProcessadorMensagensSaga } from '../../../src/modules/ordem-servico/infrastructure/messaging/processador-mensagens-saga';
 import {
   despachantesBilling,
+  despachantesCompensacao,
   despachantesExecucao,
 } from '../../../src/modules/ordem-servico/infrastructure/messaging/despachantes-saga';
 import { AtualizarStatusEmDiagnosticoHandler } from '../../../src/modules/ordem-servico/application/event-handlers/atualizar-status-em-diagnostico.handler';
@@ -113,6 +114,9 @@ export class AmbienteSaga {
           verificarNecessidadePecas: this.app.get(VerificarNecessidadePecasHandler),
           encerradaSemExecucao: this.app.get(AtualizarStatusEncerradaSemExecucaoHandler),
           pagamentoConfirmado: this.app.get(RegistrarPagamentoConfirmadoHandler),
+        }),
+        ...despachantesCompensacao({
+          encerradaSemExecucao: this.app.get(AtualizarStatusEncerradaSemExecucaoHandler),
         }),
       },
       publicador: { publicar: (evento) => this.registrarPublicacao(evento) },
@@ -222,6 +226,14 @@ export class AmbienteSaga {
 
   async ordemDaOs(ordemServicoId: string): Promise<OrdemDeServico> {
     return this.app.get(OrdemServicoRepository).findOne(ordemServicoId);
+  }
+
+  async motivosDoHistorico(ordemServicoId: string): Promise<string[]> {
+    const linhas = await this.prisma().historicoStatusOS.findMany({
+      where: { ordem_servico_id: ordemServicoId },
+      orderBy: { data_hora: 'asc' },
+    });
+    return linhas.map((linha) => linha.motivo ?? '');
   }
 
   /** Nomes dos eventos de integração que a OS publicou (o publicador só grava `os.eventos.v1`). */

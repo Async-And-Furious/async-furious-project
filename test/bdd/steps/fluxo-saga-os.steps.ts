@@ -2,10 +2,7 @@ import path from 'node:path';
 import { defineFeature, loadFeature } from 'jest-cucumber';
 import { AmbienteSaga } from '../support/ambiente-saga';
 
-// Cenário com @depende-338 fica pulado pela tag (e segue no arquivo): ver test/bdd/README.md.
-const feature = loadFeature(path.join(__dirname, '..', 'features', 'fluxo-saga-os.feature'), {
-  tagFilter: 'not @depende-338',
-});
+const feature = loadFeature(path.join(__dirname, '..', 'features', 'fluxo-saga-os.feature'));
 
 const ESTOQUE_INICIAL = 5;
 const PAGAMENTO_ID = 'pagamento-bdd-1';
@@ -125,37 +122,116 @@ defineFeature(feature, (test) => {
     });
   });
 
-  // Passos definidos e pulados: o cenário segue o .feature (a validação do jest-cucumber exige
-  // os passos), mas nenhum roda até a #338. Remover o `pending` junto com a tag @depende-338.
+  // Contexto e preparação comuns aos cenários de compensação (#338).
+  const prepararAteAguardarAprovacao = (
+    given: (texto: string, passo: () => unknown) => void,
+    and: (texto: string, passo: () => unknown) => void,
+    estado: { idPeca: string; osId: string }
+  ): void => {
+    given('que o OS Service está no ar com o banco de teste', async () => {
+      ambiente = await AmbienteSaga.subir();
+    });
+    and(
+      'que o Billing Service e a Execução e Produção são simulados por eventos entregues ao consumidor da saga',
+      () => {
+        saga().conectarConsumidorSimulado();
+      }
+    );
+    given('que as peças do orçamento estão em estoque', async () => {
+      estado.idPeca = await saga().criarPecaEmEstoque(ESTOQUE_INICIAL);
+    });
+    and('que a OS chegou a AWAITING_APPROVAL', async () => {
+      estado.osId = await saga().abrirOs(estado.idPeca);
+      await saga().entregar('execucao', estado.osId, 'DiagnosticoIniciado');
+      await saga().lancarServicosInsumos(estado.osId, {
+        valor_total_servicos: 300,
+        valor_total_pecas: 60,
+      });
+      await saga().entregar('billing', estado.osId, 'OrcamentoGerado', {
+        orcamentoId: ORCAMENTO_ID,
+      });
+      expect(await saga().statusDaOs(estado.osId)).toBe('AWAITING_APPROVAL');
+    });
+  };
+
+  const aprovarEReservar = (
+    when: (texto: string, passo: () => unknown) => void,
+    then: (texto: string, passo: () => unknown) => void,
+    estado: { idPeca: string; osId: string }
+  ): void => {
+    when('o Billing publica OrcamentoAprovado', async () => {
+      await saga().entregar('billing', estado.osId, 'OrcamentoAprovado', {
+        orcamentoId: ORCAMENTO_ID,
+        valorTotalPecas: 60,
+      });
+    });
+    then('as peças da OS são reservadas', async () => {
+      expect(await saga().estoqueDaPeca(estado.idPeca)).toBe(ESTOQUE_INICIAL - 1);
+    });
+  };
+
   test('Pagamento recusado compensa a saga até CLOSED_WITHOUT_EXECUTION', ({
     given,
     when,
     then,
     and,
-    pending,
   }) => {
-    given('que o OS Service está no ar com o banco de teste', () => pending());
-    and(
-      'que o Billing Service e a Execução e Produção são simulados por eventos entregues ao consumidor da saga',
-      () => pending()
-    );
-    given('que a OS está em AWAITING_APPROVAL com o Orcamento em PENDING', () => pending());
-    and('que as peças do orçamento estão em estoque', () => pending());
-    when('o cliente aprova o orçamento (PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar)', () =>
-      pending()
-    );
-    then('a resposta contém linkPagamento', () => pending());
-    and('as peças da OS são reservadas', () => pending());
-    when(
-      'o Mercado Pago notifica o pagamento recusado (POST /api/v1/webhooks/mercado-pago, com assinatura válida) e a reconsulta devolve rejected',
-      () => pending()
-    );
-    then('o Pagamento está em RECUSADO', () => pending());
-    and('o evento PagamentoRecusado é publicado em billing.eventos.v1', () => pending());
-    and('a reserva de peças da OS é liberada', () => pending());
-    and('a OS está em CLOSED_WITHOUT_EXECUTION', () => pending());
-    and('o HistoricoStatusOS registra o motivo "pagamento recusado"', () => pending());
-    and('a Execucao está em CANCELADA', () => pending());
-    and('o Mercado Pago não recebe nenhum estorno, porque nada foi capturado', () => pending());
+    const estado = { idPeca: '', osId: '' };
+    prepararAteAguardarAprovacao(given, and, estado);
+    aprovarEReservar(when, then, estado);
+
+    when('o Billing publica PagamentoRecusado', async () => {
+      await saga().entregar('billing', estado.osId, 'PagamentoRecusado', {
+        pagamentoId: PAGAMENTO_ID,
+      });
+    });
+    then('a OS está em CLOSED_WITHOUT_EXECUTION', async () => {
+      expect(await saga().statusDaOs(estado.osId)).toBe('CLOSED_WITHOUT_EXECUTION');
+    });
+    and('as peças reservadas voltam ao estoque', async () => {
+      expect(await saga().estoqueDaPeca(estado.idPeca)).toBe(ESTOQUE_INICIAL);
+    });
+    and(/^o HistoricoStatusOS registra o motivo "(.*)"$/, async (motivo: string) => {
+      expect(await saga().motivosDoHistorico(estado.osId)).toContain(motivo);
+    });
+
+    when('o Billing publica PagamentoRecusado de novo', async () => {
+      await saga().entregar('billing', estado.osId, 'PagamentoRecusado', {
+        pagamentoId: PAGAMENTO_ID,
+      });
+    });
+    then('as peças não voltam ao estoque em dobro', async () => {
+      expect(await saga().estoqueDaPeca(estado.idPeca)).toBe(ESTOQUE_INICIAL);
+      expect(await saga().statusDaOs(estado.osId)).toBe('CLOSED_WITHOUT_EXECUTION');
+    });
+  });
+
+  test('Falha técnica no início da execução compensa a saga até CLOSED_WITHOUT_EXECUTION', ({
+    given,
+    when,
+    then,
+    and,
+  }) => {
+    const estado = { idPeca: '', osId: '' };
+    prepararAteAguardarAprovacao(given, and, estado);
+    aprovarEReservar(when, then, estado);
+
+    when('a Execução publica EtapaDaSagaFalhou com etapa inicio-execucao', async () => {
+      await saga().entregar('execucao', estado.osId, 'EtapaDaSagaFalhou', {
+        servicoOrigem: 'execucao-service',
+        eventTypeOriginal: 'PagamentoConfirmado',
+        etapa: 'inicio-execucao',
+        motivo: 'retry esgotado',
+      });
+    });
+    then('a OS está em CLOSED_WITHOUT_EXECUTION', async () => {
+      expect(await saga().statusDaOs(estado.osId)).toBe('CLOSED_WITHOUT_EXECUTION');
+    });
+    and('as peças reservadas voltam ao estoque', async () => {
+      expect(await saga().estoqueDaPeca(estado.idPeca)).toBe(ESTOQUE_INICIAL);
+    });
+    and(/^o HistoricoStatusOS registra o motivo "(.*)"$/, async (motivo: string) => {
+      expect(await saga().motivosDoHistorico(estado.osId)).toContain(motivo);
+    });
   });
 });

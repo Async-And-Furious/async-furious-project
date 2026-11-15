@@ -149,7 +149,7 @@ describe('PecasInsumos Event handlers', () => {
         ])
       );
 
-      expect(repo.debitarEstoqueAtomico).toHaveBeenCalledWith([
+      expect(repo.debitarEstoqueAtomico).toHaveBeenCalledWith('os-1', [
         { id_peca: 'peca-1', quantidade: 3 },
         { id_peca: 'peca-2', quantidade: 1 },
       ]);

@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { IPublicadorIntegracao } from '../../../../shared/domain/interfaces/publicador-integracao.interface';
+import type { IReservaEstoquePort } from '../../../../shared/domain/interfaces/reserva-estoque.port';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
 import { EtapaDaSagaFalhou } from '../../domain/events/etapa-da-saga-falhou.event';
 import { logOsStatusTransition } from '../logging/log-os-status-transition';
@@ -21,12 +22,13 @@ export interface ResultadoDetector {
  * 1. publica `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`, `eventTypeOriginal = null`), para
  *    o Billing cancelar a cobrança e o Execução cancelar a `Execucao`;
  * 2. aplica a compensação local no mesmo ato: fecha a OS como CLOSED_WITHOUT_EXECUTION,
- *    condicionado a AWAITING_APPROVAL e `pago_em` nulo, e registra o motivo.
+ *    condicionado a AWAITING_APPROVAL e `pago_em` nulo, e registra o motivo;
+ * 3. devolve ao estoque as peças reservadas na aprovação (#338), só depois de fechar.
  *
  * Publica antes de fechar: se o fechamento falhar, a próxima execução publica de novo, e as
  * compensações são idempotentes. Fechada, a OS sai da varredura. Se o pagamento chegar entre a
  * busca e o fechamento, a condição não casa e a OS segue (o Billing estorna o pagamento atrasado).
- * A devolução ao estoque das peças reservadas é compensação da #338.
+ * Se a devolução falhar, a OS já fechada sai da varredura: conta como falha e fica no log.
  */
 export class DetectarOsParadaUseCase {
   private readonly logger = new Logger(DetectarOsParadaUseCase.name);
@@ -35,6 +37,7 @@ export class DetectarOsParadaUseCase {
     private readonly ordemServicoRepository: IOrdemServicoRepository,
     private readonly publicador: IPublicadorIntegracao,
     private readonly transitionLogger: IOSStatusTransitionLogger,
+    private readonly reservaEstoque: IReservaEstoquePort,
     private readonly prazoMinutos: number = PRAZO_PADRAO_MINUTOS,
     private readonly agora: () => Date = () => new Date()
   ) {}
@@ -65,6 +68,7 @@ export class DetectarOsParadaUseCase {
           'CLOSED_WITHOUT_EXECUTION'
         );
         resultado.encerradas += 1;
+        await this.reservaEstoque.releaseByOrdemId(os.id);
       } catch (erro) {
         resultado.falhas += 1;
         this.logger.error(

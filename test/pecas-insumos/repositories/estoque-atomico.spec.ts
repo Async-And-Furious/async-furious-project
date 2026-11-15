@@ -4,14 +4,17 @@ import type { PrismaService } from '../../../src/shared/infrastructure/database/
 
 // #378, item 9: débito e recebimento de estoque atômicos, condicionados no UPDATE.
 describe('PecaInsumoRepository.debitarEstoqueAtomico', () => {
-  let tx: { peca: { updateMany: jest.Mock } };
+  let tx: { peca: { updateMany: jest.Mock }; reservaEstoque: { upsert: jest.Mock } };
   let prisma: { $transaction: jest.Mock };
   let repository: PecaInsumoRepository;
   let commits: number;
 
   beforeEach(() => {
     commits = 0;
-    tx = { peca: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) } };
+    tx = {
+      peca: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      reservaEstoque: { upsert: jest.fn().mockResolvedValue({}) },
+    };
     prisma = {
       $transaction: jest.fn(async (fn: (client: typeof tx) => Promise<unknown>) => {
         const result = await fn(tx);
@@ -23,7 +26,7 @@ describe('PecaInsumoRepository.debitarEstoqueAtomico', () => {
   });
 
   it('decrementa cada item só se houver saldo, numa transação', async () => {
-    const result = await repository.debitarEstoqueAtomico([
+    const result = await repository.debitarEstoqueAtomico('os-1', [
       { id_peca: 'peca-1', quantidade: 3 },
       { id_peca: 'peca-2', quantidade: 1 },
     ]);
@@ -43,13 +46,38 @@ describe('PecaInsumoRepository.debitarEstoqueAtomico', () => {
   it('com o segundo item sem saldo, desfaz a transação e devolve os ids indisponíveis', async () => {
     tx.peca.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
 
-    const result = await repository.debitarEstoqueAtomico([
+    const result = await repository.debitarEstoqueAtomico('os-1', [
       { id_peca: 'peca-1', quantidade: 3 },
       { id_peca: 'peca-2', quantidade: 9 },
     ]);
 
     expect(result).toEqual({ indisponiveis: ['peca-2'] });
     expect(commits).toBe(0); // a transação lançou: o débito da peca-1 não é confirmado
+    expect(tx.reservaEstoque.upsert).not.toHaveBeenCalled();
+  });
+
+  it('grava a reserva da OS para cada item debitado, na mesma transação (#338)', async () => {
+    await repository.debitarEstoqueAtomico('os-1', [
+      { id_peca: 'peca-1', quantidade: 3 },
+      { id_peca: 'peca-2', quantidade: 1 },
+    ]);
+
+    expect(tx.reservaEstoque.upsert).toHaveBeenCalledTimes(2);
+    expect(tx.reservaEstoque.upsert).toHaveBeenNthCalledWith(1, {
+      where: { ordem_id_peca_id: { ordem_id: 'os-1', peca_id: 'peca-1' } },
+      create: { ordem_id: 'os-1', peca_id: 'peca-1', quantidade: 3 },
+      update: { quantidade: { increment: 3 } },
+    });
+    expect(commits).toBe(1);
+  });
+
+  it('falha ao gravar a reserva desfaz o débito', async () => {
+    tx.reservaEstoque.upsert.mockRejectedValue(new Error('unique violation'));
+
+    await expect(
+      repository.debitarEstoqueAtomico('os-1', [{ id_peca: 'peca-1', quantidade: 1 }])
+    ).rejects.toThrow('unique violation');
+    expect(commits).toBe(0);
   });
 
   it('propaga erros que não são de saldo', async () => {
@@ -57,7 +85,7 @@ describe('PecaInsumoRepository.debitarEstoqueAtomico', () => {
     tx.peca.updateMany.mockRejectedValue(falha);
 
     await expect(
-      repository.debitarEstoqueAtomico([{ id_peca: 'peca-1', quantidade: 1 }])
+      repository.debitarEstoqueAtomico('os-1', [{ id_peca: 'peca-1', quantidade: 1 }])
     ).rejects.toBe(falha);
   });
 });

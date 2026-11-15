@@ -5,6 +5,7 @@ import { EtapaDaSagaFalhou } from '../../src/modules/ordem-servico/domain/events
 import { OrdemDeServico } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { IOrdemServicoRepository } from '../../src/modules/ordem-servico/domain/interfaces/ordem-servico.interface';
 import type { IPublicadorIntegracao } from '../../src/shared/domain/interfaces/publicador-integracao.interface';
+import type { IReservaEstoquePort } from '../../src/shared/domain/interfaces/reserva-estoque.port';
 import type { IOSStatusTransitionLogger } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
 
 const AGORA = new Date('2026-11-03T12:00:00.000Z');
@@ -16,11 +17,13 @@ describe('DetectarOsParadaUseCase', () => {
   >;
   let publicador: jest.Mocked<IPublicadorIntegracao>;
   let transitionLogger: jest.Mocked<IOSStatusTransitionLogger>;
+  let reservaEstoque: jest.Mocked<IReservaEstoquePort>;
   const detector = (prazoMinutos = 30) =>
     new DetectarOsParadaUseCase(
       osRepo as unknown as IOrdemServicoRepository,
       publicador,
       transitionLogger,
+      reservaEstoque,
       prazoMinutos,
       () => AGORA
     );
@@ -34,6 +37,7 @@ describe('DetectarOsParadaUseCase', () => {
     };
     publicador = { publicar: jest.fn().mockResolvedValue(undefined) };
     transitionLogger = { log: jest.fn() };
+    reservaEstoque = { releaseByOrdemId: jest.fn().mockResolvedValue(0) };
   });
   afterEach(() => jest.restoreAllMocks());
 
@@ -74,6 +78,42 @@ describe('DetectarOsParadaUseCase', () => {
       previousStatus: 'AWAITING_APPROVAL',
       newStatus: 'CLOSED_WITHOUT_EXECUTION',
     });
+  });
+
+  it('devolve as peças reservadas da OS depois de fechá-la (#338)', async () => {
+    const order: string[] = [];
+    osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
+    osRepo.atualizarSeCondicao.mockImplementation(() => {
+      order.push('cas');
+      return Promise.resolve(true);
+    });
+    reservaEstoque.releaseByOrdemId.mockImplementation(() => {
+      order.push('release');
+      return Promise.resolve(2);
+    });
+
+    await detector().executar();
+
+    expect(reservaEstoque.releaseByOrdemId).toHaveBeenCalledWith('os-1');
+    expect(order).toEqual(['cas', 'release']);
+  });
+
+  it('não devolve peças de OS que não fechou (paga entre a busca e o fechamento)', async () => {
+    osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
+    osRepo.atualizarSeCondicao.mockResolvedValue(false);
+
+    await detector().executar();
+
+    expect(reservaEstoque.releaseByOrdemId).not.toHaveBeenCalled();
+  });
+
+  it('falha na devolução conta como falha, com a OS já encerrada', async () => {
+    osRepo.findParadasAguardandoAprovacao.mockResolvedValue([os('os-1')]);
+    reservaEstoque.releaseByOrdemId.mockRejectedValue(new Error('deadlock'));
+
+    const resultado = await detector().executar();
+
+    expect(resultado).toEqual({ encontradas: 1, encerradas: 1, falhas: 1 });
   });
 
   it('publica antes de fechar: o evento sai mesmo se o fechamento falhar depois', async () => {

@@ -21,6 +21,7 @@ import { MOTIVO_ORCAMENTO_APROVADO } from '../../src/modules/ordem-servico/appli
 import {
   MOTIVO_ORCAMENTO_RECUSADO,
   MOTIVO_PAGAMENTO_RECUSADO,
+  motivoEtapaDaSagaFalhou,
 } from '../../src/modules/ordem-servico/application/event-handlers/atualizar-status-encerrada-sem-execucao.handler';
 import { OrdemServicoCriada } from '../../src/modules/ordem-servico/domain/events/ordem-servico-criada.event';
 import { DiagnosticoIniciado } from '../../src/modules/ordem-servico/domain/events/diagnostico-iniciado.event';
@@ -46,6 +47,7 @@ import {
 } from '../../src/modules/ordem-servico/domain/entities/ordem-servico.entity';
 import type { INotificacaoClienteGateway } from '../../src/modules/ordem-servico/application/ports/notificacao-cliente.gateway';
 import type { IOSStatusTransitionLogger } from '../../src/modules/ordem-servico/application/logging/log-os-status-transition';
+import type { IReservaEstoquePort } from '../../src/shared/domain/interfaces/reserva-estoque.port';
 
 const mockOs = (overrides: Partial<OrdemDeServico> = {}): OrdemDeServico => {
   const os = new OrdemDeServico();
@@ -1224,7 +1226,15 @@ describe('OS Event handlers', () => {
 
   describe('P-14 AtualizarStatusEncerradaSemExecucaoHandler', () => {
     let historyRepo: jest.Mocked<IStatusHistoryRepository>;
+    let reservaEstoque: jest.Mocked<IReservaEstoquePort>;
     let handler: AtualizarStatusEncerradaSemExecucaoHandler;
+    const falhaTecnica = new EtapaDaSagaFalhou(
+      'billing-service',
+      'OrcamentoCalculado',
+      'os-1',
+      'orcamento',
+      'timeout'
+    );
     const recusas = [
       [
         'OrcamentoRecusado',
@@ -1238,6 +1248,11 @@ describe('OS Event handlers', () => {
           h.handlePagamentoRecusado(new PagamentoRecusado('os-1', 'pag-1')),
         MOTIVO_PAGAMENTO_RECUSADO,
       ],
+      [
+        'EtapaDaSagaFalhou',
+        (h: AtualizarStatusEncerradaSemExecucaoHandler) => h.handleEtapaDaSagaFalhou(falhaTecnica),
+        motivoEtapaDaSagaFalhou(falhaTecnica),
+      ],
     ] as const;
 
     beforeEach(() => {
@@ -1245,12 +1260,14 @@ describe('OS Event handlers', () => {
         create: jest.fn(),
         findByOrdemServicoId: jest.fn().mockResolvedValue([]),
       } as jest.Mocked<IStatusHistoryRepository>;
+      reservaEstoque = { releaseByOrdemId: jest.fn().mockResolvedValue(0) };
       handler = new AtualizarStatusEncerradaSemExecucaoHandler(
         osRepo,
         emissor,
         historyRepo,
         transicao,
-        transitionLogger
+        transitionLogger,
+        reservaEstoque
       );
     });
 
@@ -1282,6 +1299,59 @@ describe('OS Event handlers', () => {
         }
       );
 
+      it('depois de fechar e emitir, devolve as peças reservadas da OS (#338)', async () => {
+        const order: string[] = [];
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+        osRepo.atualizarSeCondicao.mockImplementation(() => {
+          order.push('cas');
+          return Promise.resolve(true);
+        });
+        emissor.emitir.mockImplementation(() => {
+          order.push('publish');
+          return Promise.resolve();
+        });
+        reservaEstoque.releaseByOrdemId.mockImplementation(() => {
+          order.push('release');
+          return Promise.resolve(2);
+        });
+
+        await consumir(handler);
+
+        expect(reservaEstoque.releaseByOrdemId).toHaveBeenCalledWith('os-1');
+        expect(order).toEqual(['cas', 'publish', 'release']);
+      });
+
+      it('falha na devolução sobe para a reentrega, com a OS já fechada', async () => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
+        osRepo.atualizarSeCondicao.mockResolvedValue(true);
+        reservaEstoque.releaseByOrdemId.mockRejectedValue(new Error('deadlock'));
+
+        await expect(consumir(handler)).rejects.toThrow('deadlock');
+        expect(osRepo.atualizarSeCondicao).toHaveBeenCalledTimes(1);
+      });
+
+      it('reentrega com a OS já em CLOSED_WITHOUT_EXECUTION tenta devolver de novo, sem fechar', async () => {
+        osRepo.findOne.mockResolvedValue(mockOs({ status: 'CLOSED_WITHOUT_EXECUTION' }));
+
+        await consumir(handler);
+
+        expect(reservaEstoque.releaseByOrdemId).toHaveBeenCalledWith('os-1');
+        expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+        expect(emissor.emitir).not.toHaveBeenCalled();
+      });
+
+      it.each<OSStatus>(['IN_PROGRESS', 'AWAITING_PARTS', 'FINISHED', 'DELIVERED'])(
+        'em %s não devolve peças',
+        async (status) => {
+          jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+          osRepo.findOne.mockResolvedValue(mockOs({ status }));
+
+          await consumir(handler);
+
+          expect(reservaEstoque.releaseByOrdemId).not.toHaveBeenCalled();
+        }
+      );
+
       it('se a OS mudou entre a leitura e a gravação, lança FalhaRetentavelException', async () => {
         const log = transitionLogger.log;
         osRepo.findOne.mockResolvedValue(mockOs({ status: 'AWAITING_APPROVAL' }));
@@ -1289,6 +1359,7 @@ describe('OS Event handlers', () => {
 
         await expect(consumir(handler)).rejects.toBeInstanceOf(FalhaRetentavelException);
         expect(emissor.emitir).not.toHaveBeenCalled();
+        expect(reservaEstoque.releaseByOrdemId).not.toHaveBeenCalled();
         expect(log).not.toHaveBeenCalledWith(
           expect.objectContaining({ logType: 'os.status.transition' })
         );
@@ -1359,6 +1430,45 @@ describe('OS Event handlers', () => {
 
           expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
           expect(historyRepo.create).not.toHaveBeenCalled();
+        }
+      );
+    });
+
+    describe('EtapaDaSagaFalhou em reparo', () => {
+      const falhaReparo = new EtapaDaSagaFalhou(
+        'execucao-service',
+        'ExecucaoIniciada',
+        'os-1',
+        'reparo',
+        'timeout'
+      );
+
+      it.each<OSStatus>(['AWAITING_APPROVAL', 'IN_PROGRESS'])(
+        'em %s não compensa: só registra o motivo, uma vez',
+        async (status) => {
+          jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+          osRepo.findOne.mockResolvedValue(mockOs({ status }));
+
+          await handler.handleEtapaDaSagaFalhou(falhaReparo);
+          historyRepo.findByOrdemServicoId.mockResolvedValue([
+            HistoricoStatus.create({
+              ordemServicoId: 'os-1',
+              statusAnterior: status,
+              statusNovo: status,
+              motivo: motivoEtapaDaSagaFalhou(falhaReparo),
+            }),
+          ]);
+          await handler.handleEtapaDaSagaFalhou(falhaReparo);
+
+          expect(historyRepo.create).toHaveBeenCalledTimes(1);
+          expect(historyRepo.create.mock.calls[0][0]).toMatchObject({
+            statusAnterior: status,
+            statusNovo: status,
+            motivo: 'Falha técnica na etapa reparo (execucao-service): timeout',
+          });
+          expect(osRepo.atualizarSeCondicao).not.toHaveBeenCalled();
+          expect(reservaEstoque.releaseByOrdemId).not.toHaveBeenCalled();
+          expect(emissor.emitir).not.toHaveBeenCalled();
         }
       );
     });

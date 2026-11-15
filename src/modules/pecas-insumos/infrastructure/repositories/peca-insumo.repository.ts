@@ -140,6 +140,7 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
   }
 
   async debitarEstoqueAtomico(
+    ordemId: string,
     itens: Array<{ id_peca: string; quantidade: number }>
   ): Promise<{ indisponiveis: string[] }> {
     try {
@@ -155,6 +156,15 @@ export class PecaInsumoRepository implements IPecaInsumoRepository {
           if (count === 0) indisponiveis.push(item.id_peca);
         }
         if (indisponiveis.length > 0) throw new EstoqueInsuficienteRollback(indisponiveis);
+        // Rastro do débito para a compensação (#338). A mesma peça repetida na OS soma
+        // na linha única de (ordem_id, peca_id).
+        for (const item of itens) {
+          await tx.reservaEstoque.upsert({
+            where: { ordem_id_peca_id: { ordem_id: ordemId, peca_id: item.id_peca } },
+            create: { ordem_id: ordemId, peca_id: item.id_peca, quantidade: item.quantidade },
+            update: { quantidade: { increment: item.quantidade } },
+          });
+        }
       });
       return { indisponiveis: [] };
     } catch (error) {

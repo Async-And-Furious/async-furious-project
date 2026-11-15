@@ -19,28 +19,28 @@ pnpm run test:bdd
 
 ## Estado atual
 
-| Parte | Situação |
-|---|---|
-| `features/fluxo-saga-os.feature` | Caminho feliz executável. O cenário de pagamento recusado segue no arquivo com a tag `@depende-338` (pulado). |
-| `steps/fluxo-saga-os.steps.ts` | Feito. O caminho feliz roda; o cenário pulado tem passos marcados `pending()`. |
-| `support/ambiente-saga.ts` | Feito. Sobe o `AppModule` real contra o PostgreSQL de teste e monta o consumidor da saga simulado. |
-| `jest-cucumber@4.5.0` | Instalado como devDependency, com versão exata (o parse de `# language: pt` foi verificado só nesta versão). |
-| `test/jest-bdd.json` e script `test:bdd` | Feitos. |
-| Passo de BDD no CI | Feito, no job `test` (ver acima). |
-| `docker-compose.bdd.yml` (Kafka, tópicos, Billing e Execução reais) | Não existe. Dívida documentada abaixo. |
-| Cenário de compensação (`@depende-338`) | Pulado até a #338 ser mesclada. |
+| Parte                                                               | Situação                                                                                                                  |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `features/fluxo-saga-os.feature`                                    | Caminho feliz e dois cenários de compensação (#338) executáveis: pagamento recusado e falha técnica em `inicio-execucao`. |
+| `steps/fluxo-saga-os.steps.ts`                                      | Feito. O caminho feliz roda; o cenário pulado tem passos marcados `pending()`.                                            |
+| `support/ambiente-saga.ts`                                          | Feito. Sobe o `AppModule` real contra o PostgreSQL de teste e monta o consumidor da saga simulado.                        |
+| `jest-cucumber@4.5.0`                                               | Instalado como devDependency, com versão exata (o parse de `# language: pt` foi verificado só nesta versão).              |
+| `test/jest-bdd.json` e script `test:bdd`                            | Feitos.                                                                                                                   |
+| Passo de BDD no CI                                                  | Feito, no job `test` (ver acima).                                                                                         |
+| `docker-compose.bdd.yml` (Kafka, tópicos, Billing e Execução reais) | Não existe. Dívida documentada abaixo.                                                                                    |
+| Cenários de compensação (`@compensacao`)                            | Executáveis (#338).                                                                                                       |
 
 ## O que é simulado
 
 O OS Service roda de verdade. O resto da saga não sobe, e os eventos dele entram pelo mesmo caminho do consumidor Kafka:
 
-| Componente | Como entra na suíte |
-|---|---|
-| OS Service | App Nest real (`AppModule`), com o prefixo `api/v1` e a `ValidationPipe` de `src/main.ts`. Banco: PostgreSQL de teste. |
-| Execução e Produção | Eventos `DiagnosticoIniciado`, `ExecucaoIniciada` e `ExecucaoConcluida` entregues ao `ProcessadorMensagensSaga`, com os despachantes de `despachantes-saga.ts` e os handlers reais do módulo. O envelope segue a ADR-0018. |
-| Billing Service | Eventos `OrcamentoGerado`, `OrcamentoAprovado` e `PagamentoConfirmado` entregues da mesma forma, no tópico `billing.eventos.v1`. Orçamento, cobrança e webhook do Mercado Pago são do Billing desde a #330: a suíte não chama o Mercado Pago. |
-| Kafka | Não sobe. O publicador do OS é substituído por um que registra os eventos publicados (o real grava só `os.eventos.v1`). |
-| mongo | Não é usado: o OS Service não tem read model no código atual (ADR-0019 ainda não implementada no monólito). |
+| Componente          | Como entra na suíte                                                                                                                                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OS Service          | App Nest real (`AppModule`), com o prefixo `api/v1` e a `ValidationPipe` de `src/main.ts`. Banco: PostgreSQL de teste.                                                                                                                        |
+| Execução e Produção | Eventos `DiagnosticoIniciado`, `ExecucaoIniciada` e `ExecucaoConcluida` entregues ao `ProcessadorMensagensSaga`, com os despachantes de `despachantes-saga.ts` e os handlers reais do módulo. O envelope segue a ADR-0018.                    |
+| Billing Service     | Eventos `OrcamentoGerado`, `OrcamentoAprovado` e `PagamentoConfirmado` entregues da mesma forma, no tópico `billing.eventos.v1`. Orçamento, cobrança e webhook do Mercado Pago são do Billing desde a #330: a suíte não chama o Mercado Pago. |
+| Kafka               | Não sobe. O publicador do OS é substituído por um que registra os eventos publicados (o real grava só `os.eventos.v1`).                                                                                                                       |
+| mongo               | Não é usado: o OS Service não tem read model no código atual (ADR-0019 ainda não implementada no monólito).                                                                                                                                   |
 
 Se o consumidor simulado mandar uma mensagem para retry ou DLT, a entrega falha com o nome do passo. Sem Kafka real, nada reentregaria a mensagem, e o erro passaria despercebido.
 
@@ -52,22 +52,22 @@ Esperas: o consumidor simulado é chamado de forma síncrona, então a suíte n�
 
 O texto de [`saga-flow.md`](../../docs/architecture/saga-flow.md) é o alvo. Onde o código de hoje não faz o que o texto dizia, o passo foi ajustado para o comportamento real, e o motivo está abaixo.
 
-| Passo original | Ajuste | Motivo |
-|---|---|---|
-| "o OS Service, o Billing Service e a Execução e Produção estão no ar" | Só o OS Service sobe; Billing e Execução são simulados | Compose fora do escopo reduzido (03/11). |
-| "o Kafka, o PostgreSQL, o mongo e o stub do Mercado Pago estão disponíveis" | "o PostgreSQL de teste" | Sem broker. O Mercado Pago saiu do OS Service na #330. |
-| "a Execucao da OS está em AGUARDANDO_DIAGNOSTICO", "a Execucao está em EM_DIAGNOSTICO", "...EM_REPARO", "...CONCLUIDA", "a Execucao está em AGUARDANDO_REPARO" | Removidos | Estado da Execução, que é simulada. A suíte não observa o que ela guarda. |
-| "o evento DiagnosticoIniciado / ExecucaoIniciada / ExecucaoConcluida é publicado em execucao.eventos.v1" | Removidos; o passo vira "a Execução publica ..." | Ver acima: a publicação é a própria entrega simulada. |
-| "o mecânico inicia o diagnóstico / o reparo / conclui (PATCH /api/v1/execucoes/...)" | "a Execução publica ..." | As rotas `/execucoes` são do serviço de Execução, que não sobe. |
-| "o evento OrcamentoGerado é publicado em billing.eventos.v1" | "o Billing publica OrcamentoGerado" | O orçamento é do Billing (simulado) desde a #330. O efeito no OS é ir a `AWAITING_APPROVAL`. |
-| "o cliente aprova o orçamento (PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar)" e "a resposta contém linkPagamento" | "o Billing publica OrcamentoAprovado" | A rota e o link de pagamento são do Billing, que não sobe. O efeito no OS é a reserva das peças. |
-| "o Pagamento está em AGUARDANDO_PAGAMENTO" | Removido | O `Pagamento` é do Billing (simulado). |
-| "as peças da OS são reservadas" | Mantido, observado pelo estoque da peça (5 → 4) | Efeito real: a reserva debita o estoque em processo. |
-| "o Mercado Pago notifica o pagamento aprovado (POST /api/v1/webhooks/mercado-pago ...)" | "o Billing publica PagamentoConfirmado" | Webhook e reconsulta são do Billing (simulado). |
-| "o Pagamento está em CONFIRMADO" e "o evento PagamentoConfirmado é publicado..." | Removidos | Estado do Billing. |
-| "a OS registra pago_em e continua em AWAITING_APPROVAL" | Mantido | Efeito no OS: `RegistrarPagamentoConfirmadoHandler` grava `pago_em` sem mudar o status. |
-| "a Execucao está em CANCELADA", "o HistoricoStatusOS registra o motivo..." (cenário de falha) | Não revisados nesta entrega | Cenário `@depende-338`, pulado. |
-| Cabeçalho "por eventos reais no Kafka" | "por eventos" | Não há Kafka real na suíte. |
+| Passo original                                                                                                                                                                                    | Ajuste                                                                                              | Motivo                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "o OS Service, o Billing Service e a Execução e Produção estão no ar"                                                                                                                             | Só o OS Service sobe; Billing e Execução são simulados                                              | Compose fora do escopo reduzido (03/11).                                                                                                                                                                             |
+| "o Kafka, o PostgreSQL, o mongo e o stub do Mercado Pago estão disponíveis"                                                                                                                       | "o PostgreSQL de teste"                                                                             | Sem broker. O Mercado Pago saiu do OS Service na #330.                                                                                                                                                               |
+| "a Execucao da OS está em AGUARDANDO_DIAGNOSTICO", "a Execucao está em EM_DIAGNOSTICO", "...EM_REPARO", "...CONCLUIDA", "a Execucao está em AGUARDANDO_REPARO"                                    | Removidos                                                                                           | Estado da Execução, que é simulada. A suíte não observa o que ela guarda.                                                                                                                                            |
+| "o evento DiagnosticoIniciado / ExecucaoIniciada / ExecucaoConcluida é publicado em execucao.eventos.v1"                                                                                          | Removidos; o passo vira "a Execução publica ..."                                                    | Ver acima: a publicação é a própria entrega simulada.                                                                                                                                                                |
+| "o mecânico inicia o diagnóstico / o reparo / conclui (PATCH /api/v1/execucoes/...)"                                                                                                              | "a Execução publica ..."                                                                            | As rotas `/execucoes` são do serviço de Execução, que não sobe.                                                                                                                                                      |
+| "o evento OrcamentoGerado é publicado em billing.eventos.v1"                                                                                                                                      | "o Billing publica OrcamentoGerado"                                                                 | O orçamento é do Billing (simulado) desde a #330. O efeito no OS é ir a `AWAITING_APPROVAL`.                                                                                                                         |
+| "o cliente aprova o orçamento (PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar)" e "a resposta contém linkPagamento"                                                                            | "o Billing publica OrcamentoAprovado"                                                               | A rota e o link de pagamento são do Billing, que não sobe. O efeito no OS é a reserva das peças.                                                                                                                     |
+| "o Pagamento está em AGUARDANDO_PAGAMENTO"                                                                                                                                                        | Removido                                                                                            | O `Pagamento` é do Billing (simulado).                                                                                                                                                                               |
+| "as peças da OS são reservadas"                                                                                                                                                                   | Mantido, observado pelo estoque da peça (5 → 4)                                                     | Efeito real: a reserva debita o estoque em processo.                                                                                                                                                                 |
+| "o Mercado Pago notifica o pagamento aprovado (POST /api/v1/webhooks/mercado-pago ...)"                                                                                                           | "o Billing publica PagamentoConfirmado"                                                             | Webhook e reconsulta são do Billing (simulado).                                                                                                                                                                      |
+| "o Pagamento está em CONFIRMADO" e "o evento PagamentoConfirmado é publicado..."                                                                                                                  | Removidos                                                                                           | Estado do Billing.                                                                                                                                                                                                   |
+| "a OS registra pago_em e continua em AWAITING_APPROVAL"                                                                                                                                           | Mantido                                                                                             | Efeito no OS: `RegistrarPagamentoConfirmadoHandler` grava `pago_em` sem mudar o status.                                                                                                                              |
+| "o cliente aprova", "o Mercado Pago notifica o pagamento recusado", "o Pagamento está em RECUSADO", "a Execucao está em CANCELADA", "o Mercado Pago não recebe nenhum estorno" (cenário de falha) | "o Billing publica OrcamentoAprovado / PagamentoRecusado"; os estados do Billing e do Execução saem | São do Billing e do Execução, simulados; cada um testa a própria compensação no seu repositório. Aqui fica o efeito no OS: fechamento, motivo no histórico e devolução das peças, com reentrega sem efeito em dobro. |
+| Cabeçalho "por eventos reais no Kafka"                                                                                                                                                            | "por eventos"                                                                                       | Não há Kafka real na suíte.                                                                                                                                                                                          |
 
 ## Por que cobertura e BDD são métricas distintas
 
@@ -76,7 +76,7 @@ A cobertura (ADR-0014, 80%) mede as linhas, ramos e funções de `src/`, com `te
 ## Dívidas (não entram nesta entrega)
 
 1. **Compose com Kafka, Billing e Execução reais** (ADR-0023, seção 3 e item 1 de "Em aberto"). Hoje os eventos são simulados. Quando o compose existir, o passo do CI passa a subir a stack.
-2. **Cenário de falha** (`@depende-338`): pulado pela tag até a #338. Quando a #338 entrar, remover a tag e o `pending()` do cenário na mesma PR.
+2. **Cenários de falha com Billing e Execução reais**: hoje os dois cenários de compensação (#338) observam só o OS; o cancelamento do `Pagamento` e da `Execucao` é verificado nos testes de cada repositório.
 3. **Rota ou acesso de leitura** para `pago_em` e reserva (ADR-0023, item 3).
 4. **Publicação de `OrcamentoGerado` e `OrcamentoAprovado` pelo Billing real**: hoje a suíte entrega esses eventos simulados. Quando o compose existir (item 1), eles devem vir do Billing.
 5. **Duplicação da composição do consumidor**: `ambiente-saga.ts` monta o `ProcessadorMensagensSaga` com os mesmos despachantes de `ordem-servico.module.ts`. Se a fábrica do módulo mudar, o teste precisa acompanhar.

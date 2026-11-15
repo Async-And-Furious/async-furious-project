@@ -6,6 +6,11 @@ import {
   PUBLICADOR_INTEGRACAO,
   type IPublicadorIntegracao,
 } from '../../shared/domain/interfaces/publicador-integracao.interface';
+import {
+  RESERVA_ESTOQUE_PORT,
+  type IReservaEstoquePort,
+} from '../../shared/domain/interfaces/reserva-estoque.port';
+import { ReservaEstoqueRepository } from '../pecas-insumos/infrastructure/repositories/reserva-estoque.repository';
 import { OrdemServicoRepository } from './infrastructure/repositories/ordem-servico.repository';
 import { ReadModelModule } from '../../shared/infrastructure/read-model/read-model.module';
 import { OsReadModelProjector } from './infrastructure/read-model/os-read-model.projector';
@@ -28,7 +33,8 @@ export function prazoDetectorMinutos(env: NodeJS.ProcessEnv = process.env): numb
 }
 
 /**
- * Contexto mínimo do CronJob do detector: banco, read model, publicador Kafka e o caso de uso. Sem HTTP,
+ * Contexto mínimo do CronJob do detector: banco, read model, publicador Kafka, devolução de
+ * peças e o caso de uso. Sem HTTP,
  * sem consumidor e sem os handlers in-process da API.
  */
 @Module({
@@ -46,21 +52,29 @@ export function prazoDetectorMinutos(env: NodeJS.ProcessEnv = process.env): numb
     // O repository projeta no read model a OS encerrada pelo detector (ADR-0019).
     { provide: OS_READ_MODEL_PROJECTOR, useClass: OsReadModelProjector },
     OrdemServicoRepository,
+    { provide: RESERVA_ESTOQUE_PORT, useClass: ReservaEstoqueRepository },
     {
       provide: DetectarOsParadaUseCase,
       useFactory: (
         osRepo: OrdemServicoRepository,
         publicador: IPublicadorIntegracao,
-        transitionLogger: OsStatusTransitionPinoLogger
+        transitionLogger: OsStatusTransitionPinoLogger,
+        reservaEstoque: IReservaEstoquePort
       ) =>
         new DetectarOsParadaUseCase(
           osRepo,
           publicador,
           transitionLogger,
+          reservaEstoque,
           prazoDetectorMinutos(),
           () => new Date()
         ),
-      inject: [OrdemServicoRepository, PUBLICADOR_INTEGRACAO, OS_STATUS_TRANSITION_LOGGER],
+      inject: [
+        OrdemServicoRepository,
+        PUBLICADOR_INTEGRACAO,
+        OS_STATUS_TRANSITION_LOGGER,
+        RESERVA_ESTOQUE_PORT,
+      ],
     },
   ],
 })

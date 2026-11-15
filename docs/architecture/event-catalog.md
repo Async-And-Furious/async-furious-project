@@ -108,8 +108,9 @@ ocorre após o commit, sem outbox; webhook redelivered após o commit do
 processamento é considerado já processado e não república o evento. A única
 recuperação por detector é no OS Service para `AWAITING_APPROVAL` com
 `pago_em` nulo. O Billing não altera status da OS. Na compensação,
-`EtapaDaSagaFalhou` só é tratado em `aprovacao-pagamento` e
-`inicio-execucao`: ausência de pagamento e outras etapas são ignoradas;
+`EtapaDaSagaFalhou` é tratado em `aprovacao-pagamento` e
+`inicio-execucao`, e em `orcamento` só encerra o orçamento `PENDING`, sem
+Mercado Pago (repo-billing#9); ausência de pagamento e outras etapas são ignoradas;
 pagamento pendente fica `CANCELADO` sem Mercado Pago, e pagamento confirmado
 é estornado idempotentemente e fica `ESTORNADO`, sem evento de estorno.
 
@@ -153,7 +154,9 @@ O `eventId` e o `occurredAt` do envelope são os do próprio evento de domínio.
 **Consumo pelo `os-consumer`.** Os handlers de aplicação são chamados diretamente, com a
 classificação de falha da ADR-0018. Os oito eventos de `execucao.eventos.v1` e
 `billing.eventos.v1` estão ligados. A `EtapaDaSagaFalhou` recebida dos outros serviços
-recebe ack sem efeito até a compensação (#338).
+dispara a compensação do OS (#338): fecha a OS antes do reparo, registra o motivo e devolve
+as peças reservadas. Com `etapa=reparo`, só registra o motivo. Detalhes na matriz de
+`saga-flow.md` §3.
 
 **Defasagem do catálogo interno.** O `docs/ddd.md` §5 cataloga 28 eventos de domínio nos
 BCs do OS Service. O código tem 42 classes em `src/modules/*/domain/events/`: 30 em
