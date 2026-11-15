@@ -13,24 +13,44 @@ vídeo (#353) com a mesma sequência. Cada passo diz qual card ele fecha e qual 
 
 ## 0. Preparação
 
+Os segredos são os do environment `hml` (os mesmos que o `scripts/seed.ts` e o
+`full-acceptance.yml` usam). Exporte-os sem eco e fora da gravação:
+
 ```bash
-export AWS_REGION=us-east-2   # região da conta nova (confirmar)
+read -rs SEED_ADMIN_EMAIL; read -rs SEED_ADMIN_PASSWORD
+read -rs SEED_RECEPCIONISTA_PASSWORD; read -rs SEED_MECANICO_PASSWORD; read -rs SEEDED_CPF
+export SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD SEEDED_CPF
+```
+
+```bash
+export AWS_REGION=us-east-2   # região do environment hml
 API=$(aws apigatewayv2 get-apis --query "Items[?Name=='tc3-auth-hml'].ApiEndpoint | [0]" --output text)
 echo "$API"
 
 req() { curl -sS -H 'content-type: application/json' -H "x-correlation-id: roteiro-$(date +%s)" "$@"; }
 
-# Tokens de staff (senhas do seed, nos secrets do environment hml)
-login() { req -d "{\"email\":\"$1\",\"password\":\"$2\"}" "$API/api/v1/auth/login" | jq -r .access_token; }
-RECEP=$(login "$RECEP_EMAIL" "$RECEP_SENHA")
-MEC=$(login "$MEC_EMAIL" "$MEC_SENHA")
-ADMIN=$(login "$ADMIN_EMAIL" "$ADMIN_SENHA")
+# 1) Token de cliente (Lambda authenticate-customer, por CPF de cliente ativo).
+#    POST /auth não tem authorizer; o Bearer é um valor fixo, como no full-acceptance.yml.
+CLIENTE=$(req -H 'authorization: Bearer acceptance-gateway-token' \
+  -d "{\"cpf\":\"$SEEDED_CPF\"}" "$API/auth" | jq -r .token)
 
-# Token de cliente (Lambda authenticate-customer, por CPF de cliente ativo)
-CLIENTE=$(req -H 'authorization: Bearer acceptance-gateway-token' -d "{\"cpf\":\"$CPF\"}" "$API/auth" | jq -r .token)
+# 2) Tokens de staff. O /api/v1/auth/login não está nas rotas públicas da borda: passa pelo
+#    authorizer, que exige um JWT de cliente válido (full-acceptance.yml faz o mesmo).
+login() { req -H "authorization: Bearer $CLIENTE" \
+  -d "{\"email\":\"$1\",\"password\":\"$2\"}" "$API/api/v1/auth/login" | jq -r .access_token; }
+RECEP=$(login recepcionista@oficina.com "$SEED_RECEPCIONISTA_PASSWORD")   # e-mail fixo no seed
+MEC=$(login mecanico@oficina.com "$SEED_MECANICO_PASSWORD")               # e-mail fixo no seed
+ADMIN=$(login "$SEED_ADMIN_EMAIL" "$SEED_ADMIN_PASSWORD")
+
+# 3) Peça usada nos passos 2 e 3 (qualquer peça do seed com estoque; aqui, o filtro de óleo)
+PECA=$(req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas" \
+  | jq -r '[.. | objects | select(.nome? == "Filtro de Óleo Universal")][0].id')
+
+for v in CLIENTE RECEP MEC ADMIN PECA; do [ -n "${!v}" ] && [ "${!v}" != null ] && echo "$v ok" || echo "$v FALHOU"; done
 ```
 
-O login de staff devolve `access_token`; a Lambda de cliente devolve `token`.
+A Lambda de cliente devolve `token`; o login de staff devolve `access_token`. Se algum item
+aparecer como `FALHOU`, pare aqui: os passos seguintes dependem dele.
 
 ## 1. Borda: uma requisição por serviço (#317, #360)
 
@@ -39,8 +59,8 @@ O login de staff devolve `access_token`; a Lambda de cliente devolve `token`.
 req -o /dev/null -w '%{http_code}\n' "$API/api/v1/ordens-servico"                          # 401
 req -o /dev/null -w '%{http_code}\n' "$API/api/v1/health/live"                             # 401 em HML
 
-# Cada recurso chega ao serviço certo (pelo Swagger de cada um)
-req -o /dev/null -w 'OS %{http_code}\n'        "$API/api/docs"                              # 200
+# Cada recurso chega ao serviço certo (pelo Swagger de cada um; nenhum é rota pública)
+req -o /dev/null -w 'OS %{http_code}\n'        -H "authorization: Bearer $RECEP" "$API/api/docs"           # 200
 req -o /dev/null -w 'Billing %{http_code}\n'   -H "authorization: Bearer $RECEP" "$API/api/docs/billing"   # 200
 req -o /dev/null -w 'Execucao %{http_code}\n'  -H "authorization: Bearer $MEC"   "$API/api/docs/execucao"  # 200
 
@@ -56,7 +76,7 @@ Também vale mostrar no console da AWS os três target groups (`tc3-hml-app`, `t
 ```bash
 # 2.1 Abrir a OS (recepcionista)
 OS=$(req -H "authorization: Bearer $RECEP" -d '{
-  "cliente": {"nome":"Cliente Demo","email":"demo@example.com","documento":"'"$CPF"'","tipoDocumento":"CPF"},
+  "cliente": {"nome":"Cliente Demo","email":"demo@example.com","documento":"'"$SEEDED_CPF"'","tipoDocumento":"CPF"},
   "veiculo": {"placa":"DEM0A12","marca":"Honda","modelo":"Fit","ano":2021},
   "servicos": [], "pecas": [{"id_peca":"'"$PECA"'","quantidade":1}],
   "descricao":"Revisão (roteiro HML)"}' "$API/api/v1/ordens-servico" | jq -r .id)
@@ -73,7 +93,7 @@ status                                                        # UNDER_DIAGNOSIS
 req -X PATCH -H "authorization: Bearer $MEC" -d '{"valor_total_servicos":300,"valor_total_pecas":60}' \
   "$API/api/v1/ordens-servico/$OS/servicos-insumos" | jq -c .
 status                                                        # AWAITING_APPROVAL (OrcamentoGerado)
-req -H "authorization: Bearer $RECEP" "$API/api/v1/orcamentos/$OS" | jq -c '{status,valorTotal}'
+req -H "authorization: Bearer $RECEP" "$API/api/v1/orcamentos/$OS" | jq -c '{status,valorTotalGeral}'
 
 # 2.4 Cliente aprova (rota pública): devolve o link do Mercado Pago
 req -X PATCH "$API/api/v1/orcamentos/$OS/aprovar" | jq -r .linkPagamento
@@ -84,7 +104,9 @@ estão na documentação de testes do Mercado Pago). Depois:
 
 ```bash
 req -H "authorization: Bearer $RECEP" "$API/api/v1/pagamentos/$OS" | jq -c .status   # CONFIRMADO
-status                                                        # AWAITING_APPROVAL, com pago_em gravado
+status                                                        # continua AWAITING_APPROVAL
+# O OS só grava o pago_em (não aparece no /status). Quem leva a OS a IN_PROGRESS é o
+# ExecucaoIniciada, publicado no passo seguinte.
 
 # 2.5 Reparo: o pagamento libera a fila de reparo
 req -X PATCH -H "authorization: Bearer $MEC" "$API/api/v1/execucoes/$EXE/iniciar-reparo" | jq -c .status
@@ -93,24 +115,39 @@ req -X PATCH -H "authorization: Bearer $MEC" "$API/api/v1/execucoes/$EXE/conclui
 status                                                        # FINISHED: fim da saga
 ```
 
-Evidência: a saída de cada `status` com os marcos de tempo, e o histórico
-(`GET /api/v1/ordens-servico/$OS` com token de staff).
+Evidência: a saída de cada `status` com os marcos de tempo, e o histórico da OS. Nenhum
+endpoint expõe o histórico (o `GET /api/v1/ordens-servico/$OS` serve o read model sem ele);
+consulte a tabela `historico_status_os` pelo pod da API, sem mostrar a connection string:
+
+```bash
+historico() { kubectl -n async-furious exec deploy/async-furious-api -- node -e "
+const { PrismaClient } = require('@prisma/client');
+new PrismaClient().historicoStatusOS.findMany({ where: { ordem_servico_id: '$OS' }, orderBy: { data_hora: 'asc' } })
+  .then(r => console.table(r.map(({ status_anterior, status_novo, motivo }) => ({ status_anterior, status_novo, motivo }))))"; }
+historico
+```
+
+Se o `@prisma/client` não estiver na imagem, use o log `os.status.transition` no New Relic
+(passo 4): ele prova a transição terminal, mas não traz o motivo.
 
 ## 3. Compensação: pagamento recusado (#338, #341, #326)
 
-Repita 2.1 a 2.4 com uma OS nova (outra placa e uma peça com estoque conhecido) e pague com o
+Anote o estoque da peça, repita 2.1 a 2.4 com uma OS nova (outra placa) e pague com o
 **cartão de teste recusado** (titular `OTHE`).
 
 ```bash
+ANTES=$(req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas/$PECA" | jq .quantidade_estoque)   # antes do 2.1
 req -H "authorization: Bearer $RECEP" "$API/api/v1/pagamentos/$OS" | jq -c .status   # RECUSADO
 status                                                        # CLOSED_WITHOUT_EXECUTION
 req -H "authorization: Bearer $MEC" "$API/api/v1/execucoes?status=CANCELADA" \
   | jq -r --arg os "$OS" '.[] | select(.ordemServicoId==$os) | .status'           # CANCELADA
-req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas/$PECA" | jq .quantidade_estoque  # voltou ao valor de antes
+echo "antes: $ANTES  depois: $(req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas/$PECA" | jq .quantidade_estoque)"  # iguais
+historico                                                     # ... → CLOSED_WITHOUT_EXECUTION
 ```
 
-Mostre também o motivo no histórico ("Pagamento recusado pelo Mercado Pago") e que nenhum
-estorno foi chamado (nada foi capturado).
+O `historico` (definido no passo 2) mostra o motivo `Pagamento recusado pelo Mercado Pago`.
+Nenhum estorno é chamado, porque nada foi capturado: o `Pagamento` fica `RECUSADO`, não
+`ESTORNADO`.
 
 ## 4. Observabilidade (#343, #344, #345)
 
@@ -124,6 +161,9 @@ SELECT appName, name, duration FROM Span WHERE trace.id = '<trace.id>' SINCE 1 h
 SELECT count(*) FROM Transaction WHERE name LIKE 'OtherTransaction/Kafka/%' FACET appName, name SINCE 1 hour ago
 -- etapas da saga no Billing
 SELECT average(durationMs) FROM SagaStep FACET service, step, outcome SINCE 1 hour ago
+-- logs dos três serviços para a mesma OS (o correlationId dos logs HTTP é o id da requisição,
+-- então o filtro é pelo ordemServicoId)
+SELECT timestamp, entity.name, message FROM Log WHERE ordemServicoId = '<OS>' SINCE 1 hour ago
 -- transições terminais da OS (sagas por resultado)
 SELECT count(*) FROM Log WHERE logType = 'os.status.transition' FACET newStatus SINCE 1 day ago
 ```
