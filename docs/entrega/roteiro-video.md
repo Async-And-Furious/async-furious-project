@@ -95,9 +95,11 @@ Rode a seção 0 do [roteiro de validação](roteiro-validacao-hml-fase4.md#0-pr
 traz os segredos lidos sem eco, os tokens e a peça. Depois carregue os helpers abaixo e dê
 `clear` antes de gravar.
 
-O `SEEDED_CPF` pode ser qualquer CPF de cliente ativo do seed. Para não depender do secret,
-dá para tirá-lo do próprio repositório, sem exibir:
-`SEEDED_CPF=$(git show origin/develop:scripts/seed.ts | grep -m1 -oP "documento: '\K[0-9]{11}")`.
+O `SEEDED_CPF` pode ser o CPF de qualquer cliente ativo do seed, **menos o primeiro (Carlos
+Eduardo Mendes)**. O CPF dele está na lista de bloqueio da `cpf-cnpj-validator`, então o
+domínio o rejeita, e o rebuild do read model já o pula. Para não depender do secret, dá para
+tirar o da Ana Paula Ferreira do próprio repositório, sem exibir:
+`SEEDED_CPF=$(git show origin/develop:scripts/seed.ts | grep -A4 "nome: 'Ana Paula Ferreira'" | grep -oP "documento: '\K[0-9]{11}")`.
 
 Tudo entre os serviços passa pelo Kafka e é assíncrono. Se um `status`, `exe` ou `pagamento`
 ainda mostrar o estado anterior, espere 2 a 3 segundos e rode de novo; a espera sai na
