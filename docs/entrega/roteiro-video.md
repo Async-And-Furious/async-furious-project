@@ -31,7 +31,7 @@ tudo. Quando uma parte continua a OS de outra, o id da OS passa de um dono para 
 
 | Parte | Bloco | Tempo no vídeo | Duração | Conteúdo | Responsável |
 |---|---|---|---|---|---|
-| **A** | 1 | 0:00-0:30 | 0:30 | **Abertura e arquitetura** | **Felipe** |
+| A | 1 | 0:00-0:30 | 0:30 | Abertura e arquitetura | Trigo |
 | B1 | 1 | 0:30-1:50 | 1:20 | Recepção e mecânico: abrir a OS, diagnóstico, orçamento | Jonathan |
 | **C1** | 1 | 1:50-2:40 | 0:50 | **Mercado Pago: aprovação, Checkout Pro, webhook, `CONFIRMADO`** | **Felipe** |
 | B2 | 1 | 2:40-3:00 | 0:20 | Mecânico: reparo e conclusão, OS em `FINISHED` | Jonathan |
@@ -45,8 +45,8 @@ tudo. Quando uma parte continua a OS de outra, o id da OS passa de um dono para 
 Cada parte ficou com quem mais trabalhou no assunto. O critério foi o responsável pela issue
 e a autoria do código nos branches remotos em 15/11:
 
-- **A (Felipe):** responsável pelas issues #306 e #348 e com a maior parte dos commits em
-  `docs/architecture`.
+- **A (Trigo):** decisão do grupo em 15/11. Pelo critério de autoria, a parte seria do
+  Felipe (#306, #348), que já fica com C e F.
 - **B (Jonathan):** responsável pela #320, que trata da fila de execução e do domínio. Ele
   escreveu a maior parte dos controllers e use-cases do Execução.
 - **C e F (Felipe):** responsável pelas issues #325 (Mercado Pago), #343 (APM) e #344
@@ -62,9 +62,9 @@ Tempo de vídeo por pessoa:
 
 | Pessoa | Partes | Tempo |
 |---|---|---|
-| Felipe | A, C1, C2 e F | 5:30 |
+| Felipe | C1, C2 e F | 5:00 |
 | Vic | D1, D2 e G | 4:20 |
-| Trigo | E | 2:30 |
+| Trigo | A e E | 3:00 |
 | Jonathan | B1 e B2 | 1:40 |
 
 A coordenação é do Trigo, conforme o comentário de 03/11 na #353. A edição e a publicação
@@ -119,7 +119,7 @@ preferência do Mercado Pago vale 48 h.
 
 ## 4. Partes
 
-### Parte A — Abertura (0:30) · Felipe
+### Parte A — Abertura (0:30) · Trigo
 
 | Tela | Fala-guia |
 |---|---|
