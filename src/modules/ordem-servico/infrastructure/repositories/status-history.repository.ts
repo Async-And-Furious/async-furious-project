@@ -1,10 +1,14 @@
-import { PrismaClient } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../../shared/infrastructure/database/prisma.service';
 import { IStatusHistoryRepository } from '../../domain/interfaces/status-history.interface';
 import { HistoricoStatus } from '../../domain/entities/historico-status.entity';
 import { OSStatus } from '../../domain/entities/ordem-servico.entity';
 
+// Usa o PrismaService global: o mesmo pool de conexões e o mesmo ciclo de vida dos demais
+// repositories (#335), em vez de um PrismaClient próprio que nunca desconecta.
+@Injectable()
 export class StatusHistoryRepository implements IStatusHistoryRepository {
-  private readonly prisma = new PrismaClient();
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(historico: HistoricoStatus): Promise<HistoricoStatus> {
     const created = await this.prisma.historicoStatusOS.create({
