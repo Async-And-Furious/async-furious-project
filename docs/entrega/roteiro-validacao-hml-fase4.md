@@ -48,8 +48,9 @@ MEC=$(login mecanico@oficina.com "$SEED_MECANICO_PASSWORD")               # e-ma
 ADMIN=$(login "$SEED_ADMIN_EMAIL" "$SEED_ADMIN_PASSWORD")
 
 # 3) Peça usada nos passos 2 e 3 (qualquer peça do seed com estoque; aqui, o filtro de óleo)
-PECA=$(req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas" \
-  | jq -r '[.. | objects | select(.nome? == "Filtro de Óleo Universal")][0].id')
+# A listagem é paginada (10 por página por padrão): sem o limit, a peça pode não vir
+PECA=$(req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas?limit=100" \
+  | jq -r '[.data[] | select(.nome == "Filtro de Óleo Universal")][0].id')
 
 for v in CLIENTE RECEP MEC ADMIN PECA; do [ -n "${!v}" ] && [ "${!v}" != null ] && echo "$v ok" || echo "$v FALHOU"; done
 ```
