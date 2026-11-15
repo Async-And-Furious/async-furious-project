@@ -1,5 +1,11 @@
 name: Full HML/PROD acceptance
 
+# Aceitação de borda: autenticação de cliente e de staff, rota pública de status e matriz de
+# papéis contra o ambiente. Não percorre o fluxo do mecânico: depois da divisão (#334) ele
+# atravessa o Execução e o Billing por eventos, e quem o cobre é a suíte BDD da Saga
+# (test/bdd, passo "Run BDD tests" do tests.yml, ADR-0023), do recebimento até FINISHED e nas
+# compensações. Aqui o mecânico só é checado no acesso a servicos-insumos.
+
 on:
   workflow_dispatch:
     inputs:

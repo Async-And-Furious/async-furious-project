@@ -1,4 +1,8 @@
-"""Generate secret-free Postman and Insomnia exports from the route contract."""
+"""Generate secret-free Postman and Insomnia exports from the route contract.
+
+Phase 3 legacy (#350): describes the monolith routes. The Phase 4 contract is each
+service's versioned openapi.json.
+"""
 import json
 import yaml
 from pathlib import Path
