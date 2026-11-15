@@ -185,6 +185,75 @@ mesmo use case de `/status`).
   da escrita não fica acoplada à da leitura, ao custo de uma janela de
   inconsistência **rara e sinalizada**.
 
+### 5.1. Diagrama: os dois bancos do OS Service (#335)
+
+O OS Service tem **dois** bancos. O PostgreSQL `os_service` é a escrita e a fonte da
+verdade. O DocumentDB `os_read_model` é a leitura. A seta entre eles é o
+**write-through síncrono**: quem grava no DocumentDB é o próprio OS Service (o
+`OrdemServicoRepository`, pelo port `IOsReadModelProjector`), logo depois do commit no
+PostgreSQL e dentro do mesmo request. Não é replicação nem CDC.
+
+```mermaid
+flowchart LR
+    http["HTTP<br/>POST /ordens-servico, servicos-insumos,<br/>registrar-entrega, PATCH, DELETE"]
+    kafka["Consumidor Kafka<br/>(os-consumer)<br/>eventos do Billing e do Execução"]
+    detector["CronJob<br/>detector de OS parada"]
+
+    subgraph OS["OS Service (async-furious-project)"]
+        repo["OrdemServicoRepository<br/>ClienteRepository<br/>(ponto único de escrita)"]
+        proj["IOsReadModelProjector e<br/>IClienteReadModelProjector<br/>(projetores)"]
+        query["IOsReadModelQuery<br/>leituras da fila, detalhe,<br/>status e cliente"]
+        rep["ReadModelFailureReporter<br/>log de erro +<br/>ReadModelProjectionFailure (New Relic)"]
+    end
+
+    subgraph PG["PostgreSQL os_service (RDS)<br/>escrita, fonte da verdade"]
+        tOs[("ordens_servico")]
+        tHist[("historico_status_os")]
+        tCli[("clientes, veiculos, pecas...")]
+    end
+
+    subgraph DDB["DocumentDB os_read_model<br/>leitura (CQRS)"]
+        cOs[("os_read_model<br/>idx_fila_prioridade")]
+        cCli[("cliente_read_model")]
+    end
+
+    rebuild["Job read-model:rebuild<br/>(deploy e manual)"]
+
+    http --> repo
+    kafka --> repo
+    detector --> repo
+    repo -->|"1. $transaction: OS + histórico<br/>(SELECT ... FOR UPDATE)"| PG
+    repo -->|"2. depois do commit"| proj
+    proj -->|"relê o agregado"| PG
+    proj ==>|"3. write-through síncrono<br/>replaceOne upsert, guarda de versão"| DDB
+    proj -.->|"falha: não derruba o request"| rep
+    query -->|"GET /ordens-servico, /:id,<br/>/:id/status, GET /clientes/:id"| DDB
+    rebuild -->|"lê tudo"| PG
+    rebuild -->|"reescreve e remove órfãos"| DDB
+
+    classDef data fill:#dcfce7,stroke:#15803d,color:#0f172a
+    classDef svc fill:#dbeafe,stroke:#1d4ed8,color:#0f172a
+    classDef ext fill:#f1f5f9,stroke:#475569,color:#0f172a
+    class tOs,tHist,tCli,cOs,cCli data
+    class repo,proj,query,rep svc
+    class http,kafka,detector,rebuild ext
+```
+
+Leitura do diagrama:
+
+1. **Escrita** (HTTP, consumidor Kafka ou detector): o repository grava a OS e, se o
+   status mudou, a linha de `HistoricoStatusOS`, numa única transação.
+2. **Depois do commit**, e só se a gravação casou (`atualizarSeCondicao`), o projetor relê
+   o agregado e substitui o documento. A guarda por `updatedAt` impede que uma projeção
+   antiga sobrescreva uma mais nova.
+3. **Falha no DocumentDB**: o commit no PostgreSQL vale, o request responde normalmente e
+   a falha vira log de erro e evento `ReadModelProjectionFailure`. O documento se corrige
+   na próxima escrita daquele id ou no rebuild (§6).
+
+Este é um dos dois dual-writes do OS Service. O outro é a publicação no Kafka. Os dois
+são cobertos no mesmo teste, `test/ordem-servico/dual-writes.spec.ts` (#414, ADR-0018). O
+diagrama-mestre de topologia está em [`overview.md`](./overview.md) §1.
+
 ## 6. Procedimento de reconstrução do read model
 
 O read model é **descartável e reconstruível** a partir do PostgreSQL —
