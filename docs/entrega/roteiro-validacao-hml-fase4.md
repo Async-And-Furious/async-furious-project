@@ -47,10 +47,16 @@ RECEP=$(login recepcionista@oficina.com "$SEED_RECEPCIONISTA_PASSWORD")   # e-ma
 MEC=$(login mecanico@oficina.com "$SEED_MECANICO_PASSWORD")               # e-mail fixo no seed
 ADMIN=$(login "$SEED_ADMIN_EMAIL" "$SEED_ADMIN_PASSWORD")
 
-# 3) Peça usada nos passos 2 e 3 (qualquer peça do seed com estoque; aqui, o filtro de óleo)
-# A listagem é paginada (10 por página por padrão): sem o limit, a peça pode não vir
-PECA=$(req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas?limit=100" \
-  | jq -r '[.data[] | select(.nome == "Filtro de Óleo Universal")][0].id')
+# 3) Peça usada nos passos 2 e 3. As peças do seed não servem: o id delas vem de um hash e
+#    não é um UUID válido, e a criação da OS exige UUID (IsUUID). Por isso o roteiro usa uma
+#    peça de demonstração criada pela API (DEMO-FO-001), criada só se ainda não existir.
+#    A listagem é paginada (10 por página por padrão), daí o limit.
+achar_peca() { req -H "authorization: Bearer $ADMIN" "$API/api/v1/pecas?limit=100" \
+  | jq -r '[.data[] | select(.codigo == "DEMO-FO-001")][0].id // empty'; }
+PECA=$(achar_peca)
+[ -z "$PECA" ] && PECA=$(req -H "authorization: Bearer $ADMIN" -d '{"nome":"Filtro de Óleo (demo)",
+  "codigo":"DEMO-FO-001","descricao":"Peça do roteiro de demonstração da Fase 4","preco":45.9,
+  "quantidade_estoque":100,"quantidade_minima":5}' "$API/api/v1/pecas" | jq -r .id)
 
 for v in CLIENTE RECEP MEC ADMIN PECA; do [ -n "${!v}" ] && [ "${!v}" != null ] && echo "$v ok" || echo "$v FALHOU"; done
 ```
