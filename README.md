@@ -1,5 +1,7 @@
 # Sistema de Gestão para Oficina Mecânica
 
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=Async-And-Furious_async-furious-project&metric=coverage)](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project) [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=Async-And-Furious_async-furious-project&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project)
+
 > API RESTful para gerenciamento de ordens de serviço, clientes, veículos e estoque de peças.
 
 English version: [README-en.md](./README-en.md)
@@ -24,7 +26,6 @@ Backend para **gestão integrada de oficina mecânica**, desenvolvido como Tech 
 | **Veículos** | CRUD com validação de placa brasileira. |
 | **Serviços** | Catálogo de serviços oferecidos pela oficina. |
 | **Peças e Insumos** | CRUD com controle de estoque e pedidos a fornecedores. |
-| **Pagamentos** | Registro de pagamentos com disparo automático da entrega. |
 | **Autenticação** | JWT com papéis `ADMIN`, `RECEPCIONISTA` e `MECANICO`. |
 
 ---
@@ -76,7 +77,7 @@ Com o aumento da demanda e a expansão para novas unidades, a oficina precisa ga
 - **Infraestrutura escalável**: cluster Kubernetes com Horizontal Pod Autoscaler (2 a 5 réplicas, escalando por CPU > 70% ou memória > 80%).
 - **Provisionamento automatizado**: Terraform cria o cluster (kind local, com caminho de migração documentado para EKS) e aplica todos os manifests Kubernetes via provider `kubectl`.
 - **Pipeline de CI/CD**: GitHub Actions valida build, testes automatizados e infraestrutura (`terraform validate` + `plan`) a cada Pull Request.
-- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 85%.
+- **Qualidade e organização do código**: Clean Architecture + DDD, com cobertura mínima de testes de 80% (ADR-0014).
 
 ### Diagrama de Arquitetura
 
@@ -132,7 +133,7 @@ Detalhes de execução (scripts, comandos manuais, troubleshooting) estão na se
 
 - Python 3 (para o orquestrador de stack)
 - GitHub CLI (`gh`), autenticado com `gh auth login` (para o orquestrador de stack)
-- Node.js 20+
+- Node.js 22
 - pnpm (`npm install -g pnpm`)
 - Docker e Docker Compose
 - Terraform 1.6+
@@ -167,6 +168,12 @@ SEED_ADMIN_EMAIL="admin@oficina.com"
 SEED_ADMIN_PASSWORD="changeme123"
 ```
 
+Orçamento, aprovação e cobrança (Mercado Pago) são do Billing Service; as credenciais do Mercado Pago ficam lá.
+
+Sem `KAFKA_BROKERS`, o OS Service sobe sem publicar os eventos de integração (`OrdemServicoRecebida`, `OrcamentoCalculado` e `EtapaDaSagaFalhou` em `os.eventos.v1`) e só registra um aviso no log. Em HML, o `deploy-eks.yml` preenche o broker e as credenciais SASL.
+
+O detector de OS parada roda como CronJob (`k8s/app/detector-os-parada-cronjob.yaml`, a cada 5 minutos) com a mesma imagem da API: `node dist/detector-os-parada.js`. Ele fecha as OS em `AWAITING_APPROVAL` sem pagamento além de `DETECTOR_OS_PARADA_PRAZO_MINUTOS` (padrão 2880, ou seja, 48 h) e publica `EtapaDaSagaFalhou` (`etapa=aprovacao-pagamento`). Para a demonstração, baixe o prazo no ConfigMap para alguns minutos.
+
 ### 3. Iniciar com Docker para desenvolvimento
 
 ```bash
@@ -198,7 +205,23 @@ Depois de iniciar o projeto, acesse o Swagger em:
 http://localhost:3000/api/docs
 ```
 
-A coleção completa das APIs (formato Insomnia v5) fica versionada no repositório e pode ser importada diretamente pelo link:
+O Swagger descreve só o OS Service (título `Async Furious - OS Service`). O esquema `bearer` (JWT) vale para todas as rotas, exceto as públicas (`/status`, `auth/login` e `health`), que saem com `security: []`. Orçamento, pagamento e o webhook do Mercado Pago saíram com a extração do financeiro (#330) e estão no Swagger do Billing (`/api/docs/billing`). O webhook de status exige `bearer` e `webhook-secret` (header `x-webhook-secret`) juntos, em um único requisito. Evidência: o export do OpenAPI fica versionado em [`docs/http/openapi/os-service.openapi.json`](docs/http/openapi/os-service.openapi.json) e é regenerado com `pnpm docs:openapi` (não sobe o servidor nem conecta no banco). O CI (`tests.yml`) regenera o arquivo e falha se ele divergir do código.
+
+### Superfície HTTP do OS Service (#332)
+
+- **Sem REST entre serviços.** Nenhuma rota deste serviço é consumida por Billing ou Execução; tudo o que eles precisam chega por evento ([`saga-flow.md`](docs/architecture/saga-flow.md)).
+- **Rota pública de consulta:** `GET /api/v1/ordens-servico/{id}/status`, sem Bearer, com resposta mínima (`ordemServicoId`, `status` e `marcos` de tempo, sem dados do cliente). Na borda é a única rota pública do OS Service: `ordens-servico/*` passa pelo Lambda Authorizer. No serviço, além dela, só `auth/login` e `health` são `@Public()`; as demais rotas sem token respondem `401`.
+- **Removidas, sem proxy:** `GET /ordens-servico/:id/rastreamento` (alias de `/status`) e `POST /ordens-servico/:id/aprovar-servico` (aprovação pública duplicada do orçamento) respondem `404`. `PATCH /ordens-servico/:id/aprovar-servico` continua, autenticada.
+- **RBAC inalterado:** `JwtAuthGuard` e `RolesGuard` seguem validando o token localmente, como segunda camada depois do Lambda Authorizer da borda (ADR-0021).
+- **Webhook de status como exceção:** `POST /webhooks/service-orders/status` é um canal de reprocesso manual (JWT + `x-webhook-secret`). A transição é validada pelo `StatusTransitionService`, e `DELIVERED` é rejeitado com `400` (fora do enum do DTO): a entrega só acontece por `registrar-entrega`.
+- **Versionamento:** o prefixo continua `api/v1`. Durante a Fase 4 quebras de contrato são aceitas dentro de `v1`, sem `v2` em paralelo: todos os consumidores nascem nesta fase e não há cliente externo a preservar. Cada quebra é registrada nesta seção e na ADR correspondente.
+- **Read model (#335, ADR-0019):** `GET /ordens-servico` (fila), `GET /ordens-servico/:id`, `/status` e `GET /clientes/:id` leem do DocumentDB (MongoDB local e no CI), alimentado por write-through síncrono nos repositories; `tempo-medio`, `GET /clientes` e `GET /veiculos/:id` seguem no Postgres. A fila pagina por cursor (`?limit=&cursor=`, resposta `{ data, pagination: { limit, nextCursor } }`) e não inclui `CLOSED_WITHOUT_EXECUTION`; a OS lida do read model não traz `orcamento`. Rebuild: `pnpm read-model:rebuild` (no deploy, um Job depois da migration). Modelo em [`persistence-model.md`](docs/architecture/persistence-model.md).
+- **Orçamento e pagamento:** `pagamentos` e as rotas de aprovação/recusa de orçamento saíram do serviço com a extração do financeiro (#330). As rotas novas estão no Billing (`/api/v1/orcamentos/{ordemServicoId}/aprovar|recusar`), sem proxy aqui.
+- **Máquina de estados:** webhook e consumidores de evento validam as transições pelo mesmo `StatusTransitionService` (#332); o histórico é gravado pelo repository.
+
+> **Legado da Fase 3.** As coleções Insomnia/Postman (`docs/http/insomnia*`, `docs/http/postman/`) e o gerador `scripts/generate-http-collections.py` descrevem o monólito da Fase 3 e não são o contrato da Fase 4. O contrato de cada serviço é o `openapi.json` versionado ([OS](docs/http/openapi/os-service.openapi.json), Billing e Execução em `docs/openapi.json` de cada repositório).
+
+A coleção da Fase 3 (formato Insomnia v5) segue versionada e pode ser importada pelo link:
 
 [docs/http/insomnia.yaml](https://github.com/Async-And-Furious/async-furious-project/blob/develop/docs/http/insomnia.yaml)
 
@@ -219,7 +242,7 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | ------ | -------- | ------ | --------- |
 | POST | `/clientes` | RECEPCIONISTA | Criar cliente. |
 | GET | `/clientes` | Autenticado | Listar clientes. |
-| GET | `/clientes/:id` | Autenticado | Detalhar cliente. |
+| GET | `/clientes/:id` | Autenticado | Detalhar cliente (read model). |
 | PATCH | `/clientes/:id` | RECEPCIONISTA | Atualizar cliente. |
 | DELETE | `/clientes/:id` | ADMIN | Deletar cliente. |
 
@@ -248,19 +271,14 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
 | POST | `/ordens-servico` | RECEPCIONISTA | Criar OS. |
-| GET | `/ordens-servico` | Autenticado | Listar OSs. |
-| GET | `/ordens-servico/:id` | Autenticado | Detalhar OS. |
-| GET | `/ordens-servico/:id/status` | Autenticado | Consultar status da OS. |
+| GET | `/ordens-servico` | Autenticado | Fila de OS ativas por prioridade (read model, cursor). |
+| GET | `/ordens-servico/:id` | Autenticado | Detalhar OS (read model, sem orçamento). |
+| GET | `/ordens-servico/:id/status` | Público | Consultar status da OS (resposta mínima, sem dados do cliente). |
 | PATCH | `/ordens-servico/:id` | ADMIN | Atualizar OS. |
 | DELETE | `/ordens-servico/:id` | ADMIN | Deletar OS. |
-| PATCH | `/ordens-servico/:id/assumir` | MECANICO | Mecânico assume a OS. |
-| PATCH | `/ordens-servico/:id/analisar` | MECANICO | Registrar análise diagnóstica. |
-| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Gerar orçamento. |
-| PATCH | `/ordens-servico/:id/orcamento/aprovar` | Público | Cliente aprova orçamento. |
-| PATCH | `/ordens-servico/:id/orcamento/recusar` | Público | Cliente recusa orçamento. |
-| PATCH | `/ordens-servico/:id/aprovar-servico` | Público | Cliente aprova serviço prestado. |
-| PATCH | `/ordens-servico/:id/finalizar-execucao` | MECANICO | Mecânico finaliza execução. |
-| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega. |
+| PATCH | `/ordens-servico/:id/servicos-insumos` | MECANICO | Lançar serviços e insumos (OS em `UNDER_DIAGNOSIS`): responde `200` com os totais calculados e publica `OrcamentoCalculado`. O início do diagnóstico e a conclusão da execução agora são do serviço de Execução (`PATCH /execucoes/:id/iniciar-diagnostico` e `/concluir`) e chegam aqui por evento. |
+| PATCH | `/ordens-servico/:id/aprovar-servico` | Autenticado | Aprovar o serviço prestado (OS segue Finalizada). |
+| PATCH | `/ordens-servico/:id/registrar-entrega` | RECEPCIONISTA | Registrar entrega (OS `FINISHED` → `DELIVERED`). Único caminho para `DELIVERED`: o webhook de status rejeita esse valor. |
 | GET | `/ordens-servico/tempo-medio` | ADMIN | Consultar tempo médio de execução. |
 
 #### Peças e Insumos (`/api/v1/pecas`)
@@ -276,11 +294,13 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 | POST | `/pecas/fornecedor/solicitar` | ADMIN | Solicitar peças a fornecedor. |
 | PATCH | `/pecas/fornecedor/pedidos/:pedidoId/receber` | ADMIN | Confirmar recebimento de peças. |
 
-#### Pagamentos (`/api/v1/pagamentos`)
+Aprovar ou recusar o orçamento e o webhook do Mercado Pago ficam no Billing Service (`/api/v1/orcamentos/*` e `/api/v1/webhooks/mercado-pago`).
+
+#### Webhook de status da OS (`/api/v1/webhooks/service-orders`)
 
 | Método | Endpoint | Acesso | Descrição |
 | ------ | -------- | ------ | --------- |
-| POST | `/pagamentos/registrar` | Autenticado | Registrar pagamento e disparar entrega da OS. |
+| POST | `/webhooks/service-orders/status` | Autenticado + `x-webhook-secret` | Reprocesso manual do status da OS pela máquina de estados. `DELIVERED` é rejeitado (`400`). |
 
 ---
 
@@ -288,15 +308,34 @@ Para importar no Insomnia: `Application Menu > Preferences > Data > Import Data`
 
 ```text
 RECEIVED
-  -> UNDER_DIAGNOSIS
+  -> UNDER_DIAGNOSIS  (evento DiagnosticoIniciado, do servico de Execucao)
       -> AWAITING_APPROVAL
           -> CLOSED_WITHOUT_EXECUTION  (orcamento recusado)
-          -> IN_PROGRESS
-              -> AWAITING_PARTS  (pecas indisponiveis)
+          -> IN_PROGRESS  (evento ExecucaoIniciada, do servico de Execucao)
+              -> AWAITING_PARTS  (reserva de pecas pendente, logo apos IN_PROGRESS)
                   -> IN_PROGRESS  (pecas reservadas)
-              -> FINISHED
+              -> FINISHED  (evento ExecucaoConcluida, do servico de Execucao)
                   -> DELIVERED
 ```
+
+As acoes do mecanico (`assumir`/`analisar` e `finalizar-execucao`) deixaram de ser
+rotas deste servico: viram rotas do servico de Execucao e chegam aqui por evento.
+Detalhes em [`docs/architecture/os-service-integracao-execucao.md`](docs/architecture/os-service-integracao-execucao.md).
+
+---
+
+## Estratégia de Saga
+
+O fluxo de Ordem de Serviço é coordenado por uma Saga coreografada (ADR-0016): não há orquestrador nem chamadas REST entre microsserviços. Cada serviço publica e consome eventos Kafka com correlationId = ordemServicoId. Esta escolha reduz acoplamento síncrono, mas abre mão de uma visão central do estado da Saga e de um único ponto de timeout; cada serviço responde por suas transições, retries e compensações. Veja a [ADR-0016 — Saga coreografada](./docs/adr/0016-saga-coreografada.md) e o [fluxo completo da Saga](./docs/architecture/saga-flow.md).
+
+### Observabilidade do OS Service
+
+- **APM:** agente `newrelic` carregado na primeira linha do `src/main.ts`, configurado só por ambiente. Em HML o app se chama `async-furious-project-hml`, a mesma entidade da Fase 3 (histórico preservado). Os outros serviços aparecem como `af-billing-hml` e `af-execucao-hml`. O CronJob `detector-os-parada` roda com `NEW_RELIC_ENABLED=false`: não abre transação e sairia antes do envio dos dados.
+- **Variáveis:** `NEW_RELIC_APP_NAME` e `NEW_RELIC_NO_CONFIG_FILE` (aplicadas pelo `deploy-eks.yml`), `NEW_RELIC_LICENSE_KEY` (secret do repositório) e, no `k8s/config/configmap.yaml`, as de log. A feature flag `kafkajs_instrumentation` do agente fica **desligada de propósito**: na versão 14.x, o wrapper do `eachMessage` não devolve a promise do handler, e o kafkajs confirmaria o offset antes do processamento.
+- **Trace distribuído:** começa no OS (a borda API Gateway → Lambda não entra). O trace atravessa o Kafka por propagação manual (#344): o publicador grava `traceparent`, `tracestate` e `newrelic` nos headers da mensagem, dentro da transação ativa, e o consumidor abre uma background transaction `Kafka/<tópico>` que aceita esses headers e registra o erro quando o processamento falha. Retry e DLT também levam os headers.
+- **Sem agente ativo** (testes, `NEW_RELIC_ENABLED=false`): as chamadas do agente viram no-op e a publicação e o consumo seguem normalmente.
+- **Correlação:** cada evento leva no envelope `eventId` e `correlationId`, que é igual ao `ordemServicoId` e à chave da mensagem (ADR-0018). Isso permite buscar nos logs a sequência de uma OS. O `correlationId` não é o `trace.id`.
+- **Dashboard e alertas:** `tc3-observability-hml` no New Relic, mantido como código no `repo-k8s-infra`. Detalhes em [`docs/infrastructure/observability.md`](./docs/infrastructure/observability.md).
 
 ---
 
@@ -315,6 +354,12 @@ O token JWT expira em **1 hora**.
 ---
 
 ## Testes
+
+**Evidência de cobertura (#351).** Mínimo de 80% em statements, branches, functions e lines (`jest.config.js`, ADR-0014), verificado pelo `pnpm test:cov` do `tests.yml` em todo PR. Badge e relatório no [SonarCloud](https://sonarcloud.io/summary/new_code?id=Async-And-Furious_async-furious-project). Última coleta no CI:
+
+| Data | Execução | Commit | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|---|---|
+| 11/11/2026 | [tests.yml #43032760452](https://github.com/Async-And-Furious/async-furious-project/actions/runs/43032760452) | `05504f5` | 97,43% | 84,31% | 93,70% | 97,67% |
 
 ```bash
 # Todos os testes unitarios
@@ -358,9 +403,8 @@ src/
 │   │   ├── application/     # Use cases
 │   │   ├── infrastructure/  # Repositorios Prisma
 │   │   └── presentation/    # Controllers, DTOs
-│   ├── ordem-servico/       # Ordens de Servico + Orcamentos
-│   ├── pecas-insumos/       # Pecas, estoque, pedidos a fornecedores
-│   └── financeiro/          # Pagamentos
+│   ├── ordem-servico/       # Ordens de Servico
+│   └── pecas-insumos/       # Pecas, estoque, pedidos a fornecedores
 └── shared/
     ├── domain/              # DomainEvent base, excecoes, interfaces
     └── infrastructure/      # PrismaService, EmissorEventos, filtros

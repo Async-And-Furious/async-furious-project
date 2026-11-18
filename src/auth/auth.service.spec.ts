@@ -239,6 +239,42 @@ describe('AuthService', () => {
 
       await expect(service.validateTokenSubject({ sub: 'missing-id' })).resolves.toBeNull();
     });
+
+    it.each([true, false])(
+      'rejects a User/Cliente collision when customer active=%s',
+      async (ativo) => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'collision-id',
+          email: 'staff@example.com',
+          role: 'ADMIN',
+        });
+        mockPrisma.cliente.findUnique.mockResolvedValue({
+          id: 'collision-id',
+          email: 'customer@example.com',
+          ativo,
+        });
+
+        await expect(service.validateTokenSubject({ sub: 'collision-id' })).resolves.toBeNull();
+      }
+    );
+
+    it('raises a sanitized operational error when User identity lookup fails', async () => {
+      mockPrisma.user.findUnique.mockRejectedValue(new Error('database unavailable'));
+      mockPrisma.cliente.findUnique.mockResolvedValue(null);
+
+      await expect(service.validateTokenSubject({ sub: 'subject-id' })).rejects.toThrow(
+        'Identity lookup failed'
+      );
+    });
+
+    it('raises a sanitized operational error when customer identity lookup fails', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.cliente.findUnique.mockRejectedValue(new Error('database unavailable'));
+
+      await expect(service.validateTokenSubject({ sub: 'subject-id' })).rejects.toThrow(
+        'Identity lookup failed'
+      );
+    });
   });
 
   describe('findById', () => {
@@ -278,7 +314,7 @@ describe('AuthService', () => {
       await expect(service.validateCustomer('customer-id')).resolves.toEqual({
         id: 'customer-id',
         email: 'customer@test.com',
-        role: 'RECEPCIONISTA',
+        role: 'CLIENTE',
       });
       expect(mockPrisma.cliente.findFirst).toHaveBeenCalledWith({
         where: { id: 'customer-id', ativo: true },

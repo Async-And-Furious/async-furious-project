@@ -4,7 +4,11 @@ import { PrismaService } from '../../../../shared/infrastructure/database/prisma
 import {
   formatPaginatedResponse,
   buildSearchWhere,
+  isForeignKeyViolation,
+  isUniqueConstraintViolation,
 } from '../../../../shared/infrastructure/database/repository.utils';
+import { ConflitoException } from '../../../../shared/domain/exceptions/conflito.exception';
+import { PlacaVeiculoVo } from '../../domain/value-objects/placa-veiculo.vo';
 import { Veiculo } from '../../domain/entities/veiculo.entity';
 import {
   IVeiculoRepository,
@@ -12,6 +16,8 @@ import {
   UpdateVeiculoInput,
 } from '../../domain/interfaces/veiculo.interface';
 import { VeiculoMapper, VeiculoORMEntity } from '../persistence/veiculo.orm-entity';
+
+const VEICULO_COM_OS = 'Veículo possui ordens de serviço e não pode ser removido';
 
 @Injectable()
 export class VeiculoRepository implements IVeiculoRepository {
@@ -29,16 +35,23 @@ export class VeiculoRepository implements IVeiculoRepository {
     });
 
     const ormData = VeiculoMapper.toOrm(veiculo);
-    const ormEntity = await this.prisma.veiculo.create({
-      data: {
-        placa: ormData.placa,
-        marca: ormData.marca,
-        modelo: ormData.modelo,
-        ano: ormData.ano,
-        cor: ormData.cor,
-        id_cliente: ormData.id_cliente,
-      },
-    });
+    const ormEntity = await this.prisma.veiculo
+      .create({
+        data: {
+          placa: ormData.placa,
+          marca: ormData.marca,
+          modelo: ormData.modelo,
+          ano: ormData.ano,
+          cor: ormData.cor,
+          id_cliente: ormData.id_cliente,
+        },
+      })
+      .catch((error: unknown) => {
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflitoException('Já existe um veículo com esta placa');
+        }
+        throw error;
+      });
 
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -84,7 +97,9 @@ export class VeiculoRepository implements IVeiculoRepository {
   }
 
   async findByPlaca(placa: string): Promise<Veiculo | null> {
-    const ormEntity = await this.prisma.veiculo.findUnique({ where: { placa } });
+    const ormEntity = await this.prisma.veiculo.findUnique({
+      where: { placa: PlacaVeiculoVo.normalizar(placa) },
+    });
     if (!ormEntity) return null;
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
@@ -105,12 +120,23 @@ export class VeiculoRepository implements IVeiculoRepository {
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }
 
+  // Veículo com OS não é removido (#378, item 2): o delete apagava as OS em cascata. A FK
+  // `onDelete: Restrict` em OrdemServico garante isso também quando uma OS é aberta entre a
+  // checagem e o delete.
   async remove(id: string): Promise<Veiculo> {
     await this.findById(id);
 
-    const ormEntity = await this.prisma.veiculo.delete({
-      where: { id },
-    });
+    const ordens = await this.prisma.ordemServico.count({ where: { id_veiculo: id } });
+    if (ordens > 0) throw new ConflitoException(VEICULO_COM_OS);
+
+    const ormEntity = await this.prisma.veiculo
+      .delete({
+        where: { id },
+      })
+      .catch((error: unknown) => {
+        if (isForeignKeyViolation(error)) throw new ConflitoException(VEICULO_COM_OS);
+        throw error;
+      });
 
     return VeiculoMapper.toDomain(this.mapToORMEntity(ormEntity));
   }

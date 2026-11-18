@@ -17,9 +17,14 @@ export class PlacaVeiculoVo {
     return this._valor.toUpperCase();
   }
 
+  // Forma persistida da placa (sem hífen/espaço, maiúscula): busca e gravação usam a mesma.
+  static normalizar(placa: string): string {
+    return placa.replace(/[-\s]/g, '').toUpperCase();
+  }
+
   static isValid(placa: string): boolean {
     if (!placa || typeof placa !== 'string') return false;
-    const sanitized = placa.replace(/[-\s]/g, '').toUpperCase();
+    const sanitized = PlacaVeiculoVo.normalizar(placa);
     if (sanitized.length !== 7) return false;
     return BRAZILIAN_PLATE_PATTERN.test(sanitized);
   }
@@ -29,7 +34,7 @@ export class PlacaVeiculoVo {
       throw new DomainException('Placa invalida');
     }
 
-    const sanitized = placa.replace(/[-\s]/g, '').toUpperCase();
+    const sanitized = PlacaVeiculoVo.normalizar(placa);
 
     if (sanitized.length !== 7) {
       throw new DomainException('Placa deve conter 7 caracteres');

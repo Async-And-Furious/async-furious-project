@@ -10,4 +10,12 @@ export interface IPedidoFornecedorRepository {
   findById(id: string): Promise<PedidoFornecedor | null>;
   save(pedido: PedidoFornecedor): Promise<PedidoFornecedor>;
   findAll(): Promise<PedidoFornecedor[]>;
+  /**
+   * Marca o pedido como RECEBIDO e soma as quantidades ao estoque na mesma
+   * transação, só se ele ainda estiver PENDENTE. Devolve null quando o pedido
+   * já foi recebido (inclusive por uma chamada concorrente).
+   */
+  receberECreditarEstoque(
+    pedidoId: string
+  ): Promise<Array<{ pecaId: string; novaQuantidade: number }> | null>;
 }

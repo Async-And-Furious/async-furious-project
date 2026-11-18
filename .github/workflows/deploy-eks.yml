@@ -1,4 +1,4 @@
-name: Deploy monolith to Academy EKS
+name: Deploy OS Service to Academy EKS
 
 on:
   push:
@@ -18,7 +18,7 @@ on:
         description: Logical Academy environment
         required: true
         type: choice
-        options: [hml, prod]
+        options: [hml]
         default: hml
       seed_prod:
         description: Explicitly allow the production seed job
@@ -68,10 +68,15 @@ concurrency:
 jobs:
   image:
     name: Build and publish immutable image
+    # Deploy PROD remains inert below; this job only builds and publishes the image.
     if: >-
-      (github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main')) ||
-      (github.event_name == 'workflow_dispatch' && (inputs.environment == 'hml' || (inputs.environment == 'prod' && github.ref == 'refs/heads/main'))) ||
-      github.event_name == 'workflow_call'
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+      (github.event_name == 'workflow_dispatch' && inputs.environment == 'hml') ||
+      (github.event_name == 'workflow_call' && inputs.environment == 'hml') ||
+      (vars.PROD_DEPLOY_ENABLED == 'true' && (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'workflow_call' && inputs.environment == 'prod')))
     runs-on: ubuntu-latest
     environment: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.environment == 'prod')) && 'production' || 'hml' }}
     env:
@@ -173,6 +178,9 @@ jobs:
       JWT_ISSUER: ${{ vars.JWT_ISSUER }}
       JWT_AUDIENCE: ${{ vars.JWT_AUDIENCE }}
       JWT_PUBLIC_KEY_PARAMETER_NAME: ${{ vars.JWT_PUBLIC_KEY_PARAMETER_NAME }}
+      # Kafka: broker interno do repo-k8s-infra (kafka.kafka.svc.cluster.local:9092, SASL PLAIN). A senha vem do Secrets Manager.
+      KAFKA_BROKERS: ${{ vars.KAFKA_BROKERS || 'kafka.kafka.svc.cluster.local:9092' }}
+      KAFKA_SASL_USERNAME: ${{ vars.KAFKA_SASL_USERNAME || 'app' }}
       JWT_PRIVATE_KEY_SECRET_ARN: ${{ secrets.JWT_PRIVATE_KEY_SECRET_ARN }}
       IMAGE: ${{ needs.image.outputs.image }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -252,17 +260,41 @@ jobs:
           db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
           db_name=$(jq -er '.outputs.db_name.value' "$state_file")
           db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
-          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+          master_secret_arn=$(jq -er '.outputs.db_master_secret_arn.value' "$state_file")
+          billing_secret_arn=$(jq -er '.outputs.db_billing_secret_arn.value' "$state_file")
+          billing_name=$(jq -er '.outputs.db_billing_name.value' "$state_file")
+          execucao_secret_arn=$(jq -er '.outputs.db_execucao_secret_arn.value' "$state_file")
+          execucao_name=$(jq -er '.outputs.db_execucao_name.value' "$state_file")
+          docdb_secret_arn=$(jq -er '.outputs.docdb_secret_arn.value' "$state_file")
+          docdb_endpoint=$(jq -er '.outputs.docdb_endpoint.value' "$state_file")
+          docdb_port=$(jq -er '.outputs.docdb_port.value | tostring' "$state_file")
+          docdb_name=$(jq -er '.outputs.docdb_name.value' "$state_file")
+          for value in docdb_secret_arn docdb_endpoint docdb_port docdb_name; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$docdb_secret_arn"
+          printf '::add-mask::%s\n' "$docdb_endpoint"
+          for value in secret_arn db_host db_port db_name db_ssl_mode master_secret_arn billing_secret_arn billing_name execucao_secret_arn execucao_name; do
             test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
           done
           printf '::add-mask::%s\n' "$secret_arn"
           printf '::add-mask::%s\n' "$db_host"
+          printf '::add-mask::%s\n' "$master_secret_arn"
           {
             printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
             printf 'DB_HOST=%s\n' "$db_host"
             printf 'DB_PORT=%s\n' "$db_port"
             printf 'DB_NAME=%s\n' "$db_name"
             printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+            printf 'MASTER_SECRET_ARN=%s\n' "$master_secret_arn"
+            printf 'BILLING_SECRET_ARN=%s\n' "$billing_secret_arn"
+            printf 'BILLING_DB_NAME=%s\n' "$billing_name"
+            printf 'EXECUCAO_SECRET_ARN=%s\n' "$execucao_secret_arn"
+            printf 'EXECUCAO_DB_NAME=%s\n' "$execucao_name"
+            printf 'DOCDB_SECRET_ARN=%s\n' "$docdb_secret_arn"
+            printf 'DOCDB_HOST=%s\n' "$docdb_endpoint"
+            printf 'DOCDB_PORT=%s\n' "$docdb_port"
+            printf 'DOCDB_NAME=%s\n' "$docdb_name"
           } >> "$GITHUB_ENV"
       - name: Save original HML EKS endpoint access
         run: |
@@ -283,7 +315,6 @@ jobs:
       - name: Allow HML runner to reach Academy EKS
         run: |
           set -euo pipefail
-          state_file="$RUNNER_TEMP/eks-hml-endpoint-access.json"
           runner_ip=$(curl --fail --silent --show-error --ipv4 --proto '=https' https://checkip.amazonaws.com)
           runner_ip=$(python3 - "$runner_ip" <<'PY'
           import ipaddress
@@ -295,39 +326,15 @@ jobs:
           print(address)
           PY
           )
-          access=$(python3 - "$state_file" "$runner_ip" <<'PY'
-          import json
-          import sys
-
-          state = json.load(open(sys.argv[1]))
-          cidrs = list(dict.fromkeys([*state["publicAccessCidrs"], f"{sys.argv[2]}/32"]))
-          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess=true,publicAccessCidrs={','.join(cidrs)}")
-          PY
-          )
-          error_file=$(mktemp)
-          trap 'rm -f "$error_file"' EXIT
-          deadline=$((SECONDS + 600))
-          while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
-            error=$(<"$error_file")
-            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { echo 'Timed out requesting HML EKS endpoint update.' >&2; exit 1; }
-            sleep 10
-          done
-          deadline=$((SECONDS + 600))
-          while (( SECONDS < deadline )); do
-            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
-            [[ "$status" == 'Successful' ]] && { echo "Temporarily added ${runner_ip}/32 to HML EKS." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "HML EKS endpoint update ended with status $status." >&2; exit 1; }
-            sleep 10
-          done
-          echo 'Timed out waiting for HML EKS endpoint update.' >&2
-          exit 1
+          printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-hml-runner-cidr"
+          # Parte sempre da configuração atual, espera o cluster ACTIVE e confere o /32 depois do
+          # update, repetindo se outro deploy mexeu no endpoint no meio (scripts/eks_endpoint_update.sh).
+          bash scripts/eks_endpoint_update.sh open "${runner_ip}/32"
+          echo "Temporarily added ${runner_ip}/32 to HML EKS." >> "$GITHUB_STEP_SUMMARY"
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DOCDB_SECRET_ARN DOCDB_HOST KAFKA_BROKERS KAFKA_SASL_USERNAME DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -341,7 +348,7 @@ jobs:
           WEBHOOK_SECRET="$(printf '%s' "$WEBHOOK_SECRET" | tr -d '\r\n')"
           kubectl apply -f k8s/namespace.yaml
           kubectl apply -f k8s/config/configmap.yaml
-          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\"}}"
+          kubectl patch configmap async-furious-config --namespace "$K8S_NAMESPACE" --type merge -p "{\"data\":{\"AUTH_MODE\":\"gateway\",\"DEPLOY_ENV\":\"hml\",\"JWT_ALGORITHM\":\"RS256\",\"JWT_ISSUER\":\"$JWT_ISSUER\",\"JWT_AUDIENCE\":\"$JWT_AUDIENCE\",\"NEW_RELIC_APP_NAME\":\"$NEW_RELIC_APP_NAME\",\"NEW_RELIC_NO_CONFIG_FILE\":\"true\",\"KAFKA_BROKERS\":\"$KAFKA_BROKERS\"}}"
           secret_json=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --query SecretString --output text)
           for field in username password; do
             jq -e --arg field "$field" '.[$field] != null and .[$field] != ""' <<<"$secret_json" >/dev/null || { echo "RDS secret is missing $field" >&2; exit 1; }
@@ -350,14 +357,26 @@ jobs:
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           printf '::add-mask::%s\n' "$DB_USER"
           printf '::add-mask::%s\n' "$DB_PASSWORD"
+          docdb_json=$(aws secretsmanager get-secret-value --secret-id "$DOCDB_SECRET_ARN" --query SecretString --output text)
+          export DOCDB_USER=$(jq -er '.username' <<<"$docdb_json")
+          export DOCDB_PASSWORD=$(jq -er '.password' <<<"$docdb_json")
+          printf '::add-mask::%s\n' "$DOCDB_PASSWORD"
+          kafka_json=$(aws secretsmanager get-secret-value --secret-id "tc3/kafka/hml" --query SecretString --output text)
+          kafka_password=$(jq -er '.password' <<<"$kafka_json")
+          printf '::add-mask::%s\n' "$kafka_password"
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
             --namespace "$K8S_NAMESPACE" \
-            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" \
+            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}&connection_limit=3" \
             --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
+            --from-literal=DOCDB_HOST="$DOCDB_HOST" --from-literal=DOCDB_PORT="$DOCDB_PORT" \
+            --from-literal=DOCDB_NAME="$DOCDB_NAME" --from-literal=DOCDB_USER="$DOCDB_USER" \
+            --from-literal=DOCDB_PASSWORD="$DOCDB_PASSWORD" \
+            --from-literal=KAFKA_SASL_USERNAME="$KAFKA_SASL_USERNAME" \
+            --from-literal=KAFKA_SASL_PASSWORD="$kafka_password" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
              --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
@@ -405,6 +424,8 @@ jobs:
           fi
           kubectl delete jobs --namespace "$K8S_NAMESPACE" \
             --selector app.kubernetes.io/component=migration --ignore-not-found=true --wait=true
+      - name: Bootstrap per-service databases and roles
+        run: bash scripts/db-bootstrap/run-bootstrap-job.sh
       - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
@@ -442,6 +463,44 @@ jobs:
             kubectl describe job "$job" --namespace "$K8S_NAMESPACE" || true
             kubectl describe pods --namespace "$K8S_NAMESPACE" --selector "job-name=$job" || true
             kubectl get events --namespace "$K8S_NAMESPACE" --sort-by='.metadata.creationTimestamp' || true
+            exit 1
+          }
+          kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
+      - name: Rebuild read model (DocumentDB)
+        # Reconstrói os_read_model e cliente_read_model a partir do Postgres (ADR-0019).
+        # Sob demanda: o mesmo job pode ser recriado com kubectl a partir deste manifesto.
+        run: |
+          set -euo pipefail
+          job="async-furious-read-model-rebuild-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          kubectl apply -f - <<EOF
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: $job
+            namespace: $K8S_NAMESPACE
+            labels:
+              app.kubernetes.io/part-of: async-furious
+              app.kubernetes.io/component: read-model-rebuild
+          spec:
+            backoffLimit: 0
+            ttlSecondsAfterFinished: 86400
+            template:
+              spec:
+                restartPolicy: Never
+                containers:
+                  - name: rebuild
+                    image: $IMAGE
+                    imagePullPolicy: IfNotPresent
+                    command: ["node", "dist/jobs/rebuild-read-model.job.js"]
+                    envFrom:
+                      - configMapRef:
+                          name: async-furious-config
+                      - secretRef:
+                          name: async-furious-secret
+          EOF
+          kubectl wait --for=condition=complete "job/$job" --namespace "$K8S_NAMESPACE" --timeout=10m || {
+            kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true --ignore-errors=true || true
+            kubectl describe job "$job" --namespace "$K8S_NAMESPACE" || true
             exit 1
           }
           kubectl logs "job/$job" --namespace "$K8S_NAMESPACE" --all-containers=true
@@ -515,6 +574,8 @@ jobs:
           kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
+          sed "s|\${app_image}|$IMAGE|g" k8s/app/detector-os-parada-cronjob.yaml > "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
+          kubectl apply -f "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
 
       - name: Capture HML rollout diagnostics
@@ -529,52 +590,25 @@ jobs:
         run: |
           set -euo pipefail
           state_file="$RUNNER_TEMP/eks-hml-endpoint-access.json"
-          if [[ ! -s "$state_file" ]]; then
+          cidr_file="$RUNNER_TEMP/eks-hml-runner-cidr"
+          if [[ ! -s "$state_file" || ! -s "$cidr_file" ]]; then
             echo 'No saved HML EKS endpoint state; nothing to restore.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          access=$(python3 - "$state_file" <<'PY'
-          import json
-          import sys
-
-          state = json.load(open(sys.argv[1]))
-          access = f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess={str(state['endpointPublicAccess']).lower()}"
-          if state['publicAccessCidrs']:
-              access += f",publicAccessCidrs={','.join(state['publicAccessCidrs'])}"
-          print(access)
-          PY
-          )
-          error_file=$(mktemp)
-          trap 'status=$?; rm -f "$error_file"; if (( status != 0 )); then echo "### HML EKS endpoint restoration failed (exit $status)." >> "$GITHUB_STEP_SUMMARY"; fi; exit "$status"' EXIT
-          deadline=$((SECONDS + 600))
-          while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
-            error=$(<"$error_file")
-            [[ "$error" == *ResourceNotFoundException* ]] && { echo 'HML EKS cluster no longer exists; endpoint state cannot be restored.' >> "$GITHUB_STEP_SUMMARY"; exit 0; }
-            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { echo 'Timed out requesting HML EKS endpoint restoration.' >&2; exit 1; }
-            sleep 10
-          done
-          deadline=$((SECONDS + 600))
-          while (( SECONDS < deadline )); do
-            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
-            if [[ "$status" == 'Successful' ]]; then
-              echo '### HML EKS endpoint access restored to the saved original settings.' >> "$GITHUB_STEP_SUMMARY"
-              exit 0
-            fi
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "HML EKS endpoint restoration ended with status $status." >&2; exit 1; }
-            sleep 10
-          done
-          echo 'Timed out waiting for HML EKS endpoint restoration.' >&2
-          exit 1
+          # Billing e Execução liberam o próprio runner no mesmo cluster: a restauração relê a
+          # configuração atual e remove só o /32 deste run, esperando antes qualquer update em
+          # andamento (inclusive a abertura deste run) e conferindo depois (scripts/eks_endpoint_update.sh).
+          if ! bash scripts/eks_endpoint_update.sh restore "$state_file" "$(<"$cidr_file")"; then
+            echo "### HML EKS endpoint restoration failed: $(<"$cidr_file") may still be allowed (see docs/infrastructure/aws.md §5)." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "### HML EKS endpoint without $(<"$cidr_file"); other deploys' access preserved." >> "$GITHUB_STEP_SUMMARY"
 
   deploy-prod:
     name: Deploy PROD
     needs: image
-    if: >-
-      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
-      (github.event_name == 'workflow_dispatch' && inputs.environment == 'prod' && github.ref == 'refs/heads/main')
+    # A Fase 4 é HML-only; manter o job histórico, mas nunca executar deploy em PROD.
+    if: false
     runs-on: ubuntu-latest
     environment: production
     env:
@@ -672,17 +706,41 @@ jobs:
           db_port=$(jq -er '.outputs.db_port.value | tostring' "$state_file")
           db_name=$(jq -er '.outputs.db_name.value' "$state_file")
           db_ssl_mode=$(jq -er '.outputs.db_ssl_mode.value' "$state_file")
-          for value in secret_arn db_host db_port db_name db_ssl_mode; do
+          master_secret_arn=$(jq -er '.outputs.db_master_secret_arn.value' "$state_file")
+          billing_secret_arn=$(jq -er '.outputs.db_billing_secret_arn.value' "$state_file")
+          billing_name=$(jq -er '.outputs.db_billing_name.value' "$state_file")
+          execucao_secret_arn=$(jq -er '.outputs.db_execucao_secret_arn.value' "$state_file")
+          execucao_name=$(jq -er '.outputs.db_execucao_name.value' "$state_file")
+          docdb_secret_arn=$(jq -er '.outputs.docdb_secret_arn.value' "$state_file")
+          docdb_endpoint=$(jq -er '.outputs.docdb_endpoint.value' "$state_file")
+          docdb_port=$(jq -er '.outputs.docdb_port.value | tostring' "$state_file")
+          docdb_name=$(jq -er '.outputs.docdb_name.value' "$state_file")
+          for value in docdb_secret_arn docdb_endpoint docdb_port docdb_name; do
+            test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
+          done
+          printf '::add-mask::%s\n' "$docdb_secret_arn"
+          printf '::add-mask::%s\n' "$docdb_endpoint"
+          for value in secret_arn db_host db_port db_name db_ssl_mode master_secret_arn billing_secret_arn billing_name execucao_secret_arn execucao_name; do
             test -n "${!value}" || { echo "repo-db-infra output $value is empty." >&2; exit 1; }
           done
           printf '::add-mask::%s\n' "$secret_arn"
           printf '::add-mask::%s\n' "$db_host"
+          printf '::add-mask::%s\n' "$master_secret_arn"
           {
             printf 'RDS_SECRET_ARN=%s\n' "$secret_arn"
             printf 'DB_HOST=%s\n' "$db_host"
             printf 'DB_PORT=%s\n' "$db_port"
             printf 'DB_NAME=%s\n' "$db_name"
             printf 'DB_SSLMODE=%s\n' "$db_ssl_mode"
+            printf 'MASTER_SECRET_ARN=%s\n' "$master_secret_arn"
+            printf 'BILLING_SECRET_ARN=%s\n' "$billing_secret_arn"
+            printf 'BILLING_DB_NAME=%s\n' "$billing_name"
+            printf 'EXECUCAO_SECRET_ARN=%s\n' "$execucao_secret_arn"
+            printf 'EXECUCAO_DB_NAME=%s\n' "$execucao_name"
+            printf 'DOCDB_SECRET_ARN=%s\n' "$docdb_secret_arn"
+            printf 'DOCDB_HOST=%s\n' "$docdb_endpoint"
+            printf 'DOCDB_PORT=%s\n' "$docdb_port"
+            printf 'DOCDB_NAME=%s\n' "$docdb_name"
           } >> "$GITHUB_ENV"
       - name: Save original PROD EKS endpoint access
         run: |
@@ -700,27 +758,13 @@ jobs:
           print(address)
           PY
           )
-          state_file="$RUNNER_TEMP/eks-prod-endpoint-access.json"
-          access=$(python3 - "$state_file" "$runner_ip" <<'PY'
-          import json, sys
-          state = json.load(open(sys.argv[1]))
-          cidrs = list(dict.fromkeys([*state['publicAccessCidrs'], f'{sys.argv[2]}/32']))
-          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess=true,publicAccessCidrs={','.join(cidrs)}")
-          PY
-          )
-          update_id=$(aws eks update-cluster-config --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --resources-vpc-config "$access" --query 'update.id' --output text)
-          deadline=$((SECONDS + 600))
-          while (( SECONDS < deadline )); do
-            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
-            [[ "$status" == 'Successful' ]] && exit 0
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "PROD EKS endpoint update ended with status $status." >&2; exit 1; }
-            sleep 10
-          done
-          exit 1
+          printf '%s/32' "$runner_ip" > "$RUNNER_TEMP/eks-prod-runner-cidr"
+          # Mesma regra do HML (scripts/eks_endpoint_update.sh).
+          bash scripts/eks_endpoint_update.sh open "${runner_ip}/32"
       - name: Credential, cluster and state preflight
         run: |
           set -euo pipefail
-          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
+          for value in EKS_CLUSTER_NAME RDS_SECRET_ARN DOCDB_SECRET_ARN DOCDB_HOST DB_HOST DB_NAME DB_PORT DB_SSLMODE TARGET_GROUP_ARN JWT_ISSUER JWT_AUDIENCE JWT_PUBLIC_KEY_PARAMETER_NAME JWT_PRIVATE_KEY_SECRET_ARN WEBHOOK_SECRET SEED_ADMIN_EMAIL SEED_ADMIN_PASSWORD SEED_RECEPCIONISTA_PASSWORD SEED_MECANICO_PASSWORD NEW_RELIC_APP_NAME NEW_RELIC_LICENSE_KEY; do
             test -n "${!value:-}" || { echo "$value is required." >&2; exit 1; }
           done
           aws sts get-caller-identity >/dev/null
@@ -743,14 +787,21 @@ jobs:
           export DB_PASSWORD=$(jq -er '.password' <<<"$secret_json")
           printf '::add-mask::%s\n' "$DB_USER"
           printf '::add-mask::%s\n' "$DB_PASSWORD"
+          docdb_json=$(aws secretsmanager get-secret-value --secret-id "$DOCDB_SECRET_ARN" --query SecretString --output text)
+          export DOCDB_USER=$(jq -er '.username' <<<"$docdb_json")
+          export DOCDB_PASSWORD=$(jq -er '.password' <<<"$docdb_json")
+          printf '::add-mask::%s\n' "$DOCDB_PASSWORD"
           export DB_USER_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_USER"], safe=""))')
           export DB_PASSWORD_URL=$(python3 -c 'import os, urllib.parse; print(urllib.parse.quote(os.environ["DB_PASSWORD"], safe=""))')
           kubectl create secret generic async-furious-secret \
             --namespace "$K8S_NAMESPACE" \
-            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}" \
+            --from-literal=DATABASE_URL="postgresql://${DB_USER_URL}:${DB_PASSWORD_URL}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=${DB_SSLMODE}&connection_limit=3" \
             --from-literal=DB_HOST="$DB_HOST" --from-literal=DB_PORT="$DB_PORT" \
             --from-literal=DB_NAME="$DB_NAME" --from-literal=DB_USER="$DB_USER" \
             --from-literal=DB_PASSWORD="$DB_PASSWORD" --from-literal=DB_SSLMODE="$DB_SSLMODE" \
+            --from-literal=DOCDB_HOST="$DOCDB_HOST" --from-literal=DOCDB_PORT="$DOCDB_PORT" \
+            --from-literal=DOCDB_NAME="$DOCDB_NAME" --from-literal=DOCDB_USER="$DOCDB_USER" \
+            --from-literal=DOCDB_PASSWORD="$DOCDB_PASSWORD" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
              --from-literal=JWT_PRIVATE_KEY="$JWT_PRIVATE_KEY" \
             --from-literal=JWT_PUBLIC_KEY="$JWT_PUBLIC_KEY" \
@@ -762,6 +813,8 @@ jobs:
             --from-literal=SEED_RECEPCIONISTA_PASSWORD="$SEED_RECEPCIONISTA_PASSWORD" \
             --from-literal=SEED_MECANICO_PASSWORD="$SEED_MECANICO_PASSWORD" \
             --dry-run=client -o yaml | kubectl apply -f -
+      - name: Bootstrap per-service databases and roles
+        run: bash scripts/db-bootstrap/run-bootstrap-job.sh
       - name: Run controlled Prisma migration
         run: |
           set -euo pipefail
@@ -858,6 +911,8 @@ jobs:
           kubectl delete targetgroupbinding/async-furious-api --namespace "$K8S_NAMESPACE" --ignore-not-found=true
           kubectl apply -f "$RUNNER_TEMP/target-group-binding.yaml"
           kubectl apply -f k8s/app/hpa.yaml
+          sed "s|\${app_image}|$IMAGE|g" k8s/app/detector-os-parada-cronjob.yaml > "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
+          kubectl apply -f "$RUNNER_TEMP/detector-os-parada-cronjob.yaml"
           kubectl rollout status deployment/async-furious-api --namespace "$K8S_NAMESPACE" --timeout=10m
 
       - name: Restore original PROD EKS endpoint access
@@ -865,34 +920,10 @@ jobs:
         run: |
           set -euo pipefail
           state_file="$RUNNER_TEMP/eks-prod-endpoint-access.json"
-          [[ -s "$state_file" ]] || exit 0
-          access=$(python3 - "$state_file" <<'PY'
-          import json, sys
-          state = json.load(open(sys.argv[1]))
-          print(f"endpointPrivateAccess={str(state['endpointPrivateAccess']).lower()},endpointPublicAccess={str(state['endpointPublicAccess']).lower()},publicAccessCidrs={','.join(state['publicAccessCidrs'])}")
-          PY
-          )
-          error_file=$(mktemp)
-          trap 'rm -f "$error_file"' EXIT
-          deadline=$((SECONDS + 600))
-          while ! update_id=$(aws eks update-cluster-config \
-            --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" \
-            --resources-vpc-config "$access" --query 'update.id' --output text 2>"$error_file"); do
-            error=$(<"$error_file")
-            [[ "$error" == *ResourceNotFoundException* ]] && { echo 'PROD EKS cluster no longer exists; endpoint state cannot be restored.' >&2; exit 0; }
-            [[ "$error" == *ResourceInUseException* ]] || { printf '%s\n' "$error" >&2; exit 1; }
-            (( SECONDS < deadline )) || { echo 'Timed out requesting PROD EKS endpoint restoration.' >&2; exit 1; }
-            sleep 10
-          done
-          deadline=$((SECONDS + 600))
-          while (( SECONDS < deadline )); do
-            status=$(aws eks describe-update --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME" --update-id "$update_id" --query 'update.status' --output text)
-            [[ "$status" == 'Successful' ]] && exit 0
-            [[ "$status" == 'Failed' || "$status" == 'Cancelled' ]] && { echo "PROD EKS endpoint restoration ended with status $status." >&2; exit 1; }
-            sleep 10
-          done
-          echo 'Timed out waiting for PROD EKS endpoint restoration.' >&2
-          exit 1
+          cidr_file="$RUNNER_TEMP/eks-prod-runner-cidr"
+          [[ -s "$state_file" && -s "$cidr_file" ]] || exit 0
+          # Mesma regra do HML (scripts/eks_endpoint_update.sh).
+          bash scripts/eks_endpoint_update.sh restore "$state_file" "$(<"$cidr_file")"
 
   smoke-hml:
     name: Smoke test HML gateway

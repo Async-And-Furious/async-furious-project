@@ -6,7 +6,7 @@
 `METHOD + path`, com política explícita de `auth`, `role`, `allowed_status`,
 `mutating` e `mock_body`. A matriz e as duas coleções HTTP geradas consomem
 este arquivo recursivamente, incluindo futuros grupos `routes` aninhados. O
-contrato atual tem 48 rotas únicas.
+contrato atual tem 45 rotas únicas.
 
 As políticas de autenticação são separadas:
 

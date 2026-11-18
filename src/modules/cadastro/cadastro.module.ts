@@ -26,10 +26,19 @@ import {
   UpdateServicoUseCase,
   DeleteServicoUseCase,
 } from './application/use-cases/servico.use-cases';
+import { ClienteReadModelProjector } from './infrastructure/read-model/cliente-read-model.projector';
+import { ClienteReadModelQuery } from './infrastructure/read-model/cliente-read-model.query';
+import {
+  CLIENTE_READ_MODEL_PROJECTOR,
+  CLIENTE_READ_MODEL_QUERY,
+} from './domain/interfaces/cliente-read-model.interface';
+import type { IClienteReadModelQuery } from './domain/interfaces/cliente-read-model.interface';
 
 @Module({
   controllers: [ClienteController, VeiculoController, ServicoController],
   providers: [
+    { provide: CLIENTE_READ_MODEL_PROJECTOR, useClass: ClienteReadModelProjector },
+    { provide: CLIENTE_READ_MODEL_QUERY, useClass: ClienteReadModelQuery },
     ClienteRepository,
     VeiculoRepository,
     ServicoRepository,
@@ -45,8 +54,8 @@ import {
     },
     {
       provide: GetClienteUseCase,
-      useFactory: (repo: ClienteRepository) => new GetClienteUseCase(repo),
-      inject: [ClienteRepository],
+      useFactory: (readModel: IClienteReadModelQuery) => new GetClienteUseCase(readModel),
+      inject: [CLIENTE_READ_MODEL_QUERY],
     },
     {
       provide: UpdateClienteUseCase,

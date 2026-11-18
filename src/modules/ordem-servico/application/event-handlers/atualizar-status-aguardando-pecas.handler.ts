@@ -1,9 +1,24 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import type { IEmissorEventos } from '../../../../shared/domain/interfaces/emissor-eventos.interface';
+import { FalhaRetentavelException } from '../../../../shared/domain/exceptions/falha-retentavel.exception';
 import type { IOrdemServicoRepository } from '../../domain/interfaces/ordem-servico.interface';
-import { PecasIndisponiveis } from '../../../pecas-insumos/domain/events/pecas-indisponiveis.event';
+import type { OSStatus } from '../../domain/entities/ordem-servico.entity';
+import { StatusTransitionService } from '../../domain/services/status-transition.service';
 import { StatusAtualizadoAguardandoPecas } from '../../domain/events/status-atualizado-aguardando-pecas.event';
+import { PecasIndisponiveis } from '../../../pecas-insumos/domain/events/pecas-indisponiveis.event';
+
+/**
+ * PecasIndisponiveis, com a OS ainda em AWAITING_APPROVAL, só registra a pendência da reserva.
+ * A transição para AWAITING_PARTS acontece em ExecucaoIniciada (AtualizarStatusExecucaoIniciadaHandler).
+ *
+ * Reserva tardia: se o reparo já começou (ExecucaoIniciada processado antes desta reserva,
+ * possível porque os eventos de tópicos diferentes não têm ordem entre si), a OS está em
+ * IN_PROGRESS e vai para AWAITING_PARTS, sem esperar a próxima gravação de ExecucaoIniciada.
+ *
+ * Fora de ordem (ADR-0018): antes da aprovação, falha retentável; com o reparo encerrado, ack.
+ */
+const ANTES_DA_APROVACAO: OSStatus[] = ['RECEIVED', 'UNDER_DIAGNOSIS'];
 
 @Injectable()
 export class AtualizarStatusAguardandoPecasHandler {
@@ -11,19 +26,65 @@ export class AtualizarStatusAguardandoPecasHandler {
 
   constructor(
     private readonly ordemServicoRepository: IOrdemServicoRepository,
-    private readonly emissor: IEmissorEventos
+    private readonly emissor: IEmissorEventos,
+    private readonly transicao: StatusTransitionService
   ) {}
 
   @OnEvent('PecasIndisponiveis')
   async handle(evento: PecasIndisponiveis): Promise<void> {
-    const os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
-    if (os.status !== 'AWAITING_APPROVAL') {
-      this.logger.warn(
-        `[P-15] OS ${evento.ordemServicoId} em status inválido para aguardar peças: ${os.status}`
+    let os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
+
+    if (os.status === 'AWAITING_APPROVAL') {
+      // Condicionada ao status no UPDATE: se ExecucaoIniciada levou a OS a IN_PROGRESS entre a
+      // leitura acima e esta gravação, a pendência não entra e a OS é relida abaixo.
+      const registrou = await this.ordemServicoRepository.atualizarSeCondicao(
+        evento.ordemServicoId,
+        { status: 'AWAITING_APPROVAL' },
+        { reserva_pecas_pendente: true }
+      );
+      if (registrou) {
+        return;
+      }
+      os = await this.ordemServicoRepository.findOne(evento.ordemServicoId);
+    }
+
+    if (os.status === 'IN_PROGRESS') {
+      this.transicao.validarTransicao('IN_PROGRESS', 'AWAITING_PARTS');
+      // Registra a pendência antes da gravação condicionada. Se PecasReservadas baixá-la antes
+      // do UPDATE condicionado, a condição não casa e a OS segue em IN_PROGRESS, sem ficar presa.
+      await this.ordemServicoRepository.update(evento.ordemServicoId, {
+        reserva_pecas_pendente: true,
+      });
+      const aplicou = await this.ordemServicoRepository.atualizarSeCondicao(
+        evento.ordemServicoId,
+        { status: 'IN_PROGRESS', reserva_pecas_pendente: true },
+        { status: 'AWAITING_PARTS' }
+      );
+      if (!aplicou) {
+        this.logger.log(
+          `[P-15] OS ${evento.ordemServicoId}: reserva chegou antes da gravação de AWAITING_PARTS, segue em IN_PROGRESS`
+        );
+        return;
+      }
+      await this.emissor.emitir(new StatusAtualizadoAguardandoPecas(evento.ordemServicoId));
+      return;
+    }
+
+    if (os.status === 'AWAITING_PARTS') {
+      this.logger.log(
+        `[P-15] PecasIndisponiveis ignorada: OS ${evento.ordemServicoId} já está em AWAITING_PARTS`
       );
       return;
     }
-    await this.ordemServicoRepository.update(evento.ordemServicoId, { status: 'AWAITING_PARTS' });
-    await this.emissor.emitir(new StatusAtualizadoAguardandoPecas(evento.ordemServicoId));
+
+    if (ANTES_DA_APROVACAO.includes(os.status)) {
+      throw new FalhaRetentavelException(
+        `[P-15] PecasIndisponiveis antes da aprovação: OS ${evento.ordemServicoId} em ${os.status}, esperado AWAITING_APPROVAL`
+      );
+    }
+
+    this.logger.log(
+      `[P-15] PecasIndisponiveis ignorada: OS ${evento.ordemServicoId} já encerrou o reparo (${os.status})`
+    );
   }
 }

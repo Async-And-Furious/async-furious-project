@@ -1,8 +1,10 @@
 # Infraestrutura AWS
 
-> **[ATUAL]** Este documento descreve a infraestrutura de nuvem efetivamente
-> provisionada por Terraform, não uma proposta. As evidências citadas apontam
-> para arquivos reais nos quatro repositórios do projeto.
+> **[ATUAL — Fase 4/HML e Fase 3/PROD]** Este documento descreve recursos de
+> nuvem provisionados por Terraform: HML é o ambiente-alvo dos três serviços da
+> Fase 4; PROD permanece no monólito da Fase 3. Provisionamento de infraestrutura
+> não constitui evidência de aceite ponta a ponta em HML. As evidências apontam
+> para arquivos reais nos repositórios responsáveis por cada recurso.
 >
 > Fontes: branch `main` de `repo-k8s-infra`, `repo-db-infra` e
 > `repo-auth-serverless`, e este repositório em `develop`.
@@ -124,10 +126,51 @@ Três add-ons são instalados por Helm, direto do Terraform
 
 O endpoint privado tem uma consequência direta no pipeline: o runner do GitHub
 Actions não alcança a API do cluster. O `deploy-eks.yml` resolve isso abrindo o
-endpoint temporariamente apenas para o IP do runner, com `/32`, e restaurando a
-configuração original em um passo `if: always()`
+endpoint temporariamente apenas para o IP do runner, com `/32`, e removendo esse
+`/32` num passo `if: always()`
 (passos "Allow HML runner to reach Academy EKS", nome legado, e "Restore original HML EKS endpoint access" do `.github/workflows/deploy-eks.yml`). O mesmo padrão existe no
-`cleanup-eks.yml`.
+`cleanup-eks.yml`. O cálculo das duas operações fica em `scripts/eks_endpoint_access.py`
+(`test/deploy/eks-endpoint-access.spec.ts`), e a aplicação em
+`scripts/eks_endpoint_update.sh` (`test/deploy/eks-endpoint-update.spec.ts`):
+espera o cluster ficar `ACTIVE`, lê a configuração atual, calcula, aplica, espera
+o update terminar e lê de novo, repetindo até a leitura confirmar o resultado (o
+`/32` presente na abertura, ausente na restauração). O EKS não tem
+compare-and-swap; reler depois do update é o que detecta outro update que chegou
+no meio.
+
+- **Abertura:** com o acesso público já ligado, o `/32` é acrescentado à lista
+  atual. Com o endpoint só privado, abre apenas para o runner. Nesse caso o EKS
+  devolve `publicAccessCidrs = ["0.0.0.0/0"]`, e acrescentar o `/32` a essa lista
+  abriria o endpoint para a internet inteira.
+- **Restauração:** relê a configuração atual e tira só o `/32` deste run. O OS,
+  o Billing e o Execução usam o mesmo cluster, e o `concurrency` de cada workflow
+  só vale dentro do repositório, então reaplicar a foto do início derrubaria o
+  acesso de um deploy em andamento em outro repositório. Se não sobra nenhum CIDR,
+  o acesso público é desligado. Se sobra algum de outro run, o acesso fica ligado
+  para ele. Caso contrário, volta ao valor original. Se o acesso público já está
+  desligado (outro pipeline restaurou antes), não faz nada: nunca religa.
+
+**Limitações conhecidas.**
+
+- A regra só vale se todo pipeline que mexe no endpoint a seguir. O CI do
+  `repo-k8s-infra` (`ci.yml`, passo "Allow HML runner to reach existing EKS
+  cluster" e a restauração dele) ainda grava só o próprio runner e depois
+  reaplica a foto do início. Isso corta o acesso de um deploy de serviço em
+  andamento e pode regravar o `/32` de um deploy que já terminou. Evite rodar o
+  CI do `repo-k8s-infra` junto com deploys de serviço até ele adotar a mesma regra.
+- Um `/32` que sobra de um runner perdido (o passo `always()` não roda quando o
+  runner morre) ou de uma restauração que falhou entra na foto "original" dos
+  runs seguintes e não sai sozinho. O resumo do job avisa quando a restauração
+  falha.
+
+**Reset manual do endpoint**, com nenhum deploy rodando (confira os workflows em
+andamento no OS, no Billing, no Execução e no `repo-k8s-infra`):
+
+```bash
+aws eks update-cluster-config --region us-east-2 --name tc3-eks-hml \
+  --resources-vpc-config endpointPrivateAccess=true,endpointPublicAccess=false
+aws eks wait cluster-active --region us-east-2 --name tc3-eks-hml
+```
 
 ## 6. Registry: ECR
 
@@ -150,7 +193,8 @@ exatamente o mesmo binário (passo "Build and push commit-SHA image" do `.github
 | Engine | PostgreSQL `16.4` |
 | Classe | `db.t4g.micro` (padrão) |
 | Armazenamento | 20 GB, criptografado (`storage_encrypted = true`) |
-| Database | `workshop`, usuário `postgres` |
+| Database | `os_service` (OS Service), `billing` e `execucao_producao`; usuário master `postgres` só para o Job de bootstrap |
+| NoSQL (read model) | cluster DocumentDB `tc3-docdb-<env>` (`db.t4g.medium`, TLS), banco `os_read_model`, secret `tc3-docdb-os-<env>` |
 | Senha | gerenciada pelo RDS via Secrets Manager (`manage_master_user_password = true`), nunca no estado Terraform |
 | Backup | 1 dia nos dois ambientes |
 | Multi-AZ | somente PROD |

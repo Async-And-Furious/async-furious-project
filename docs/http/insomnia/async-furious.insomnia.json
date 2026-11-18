@@ -849,31 +849,6 @@
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
-      "url": "{{base_url}}/api/v1/pagamentos/registrar",
-      "name": "POST /pagamentos/registrar",
-      "description": "Role: customer",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\"ordemServicoId\": \"{{ordem_id}}\", \"valor\": 1}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_030",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
       "url": "{{base_url}}/api/v1/webhooks/service-orders/status",
       "name": "POST /webhooks/service-orders/status",
       "description": "Role: webhook",
@@ -899,7 +874,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_031",
+      "_id": "req_030",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -924,7 +899,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_032",
+      "_id": "req_031",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -949,7 +924,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_033",
+      "_id": "req_032",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -974,7 +949,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_034",
+      "_id": "req_033",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -999,7 +974,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_035",
+      "_id": "req_034",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1024,32 +999,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_036",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/rastreamento",
-      "name": "GET /ordens-servico/{{ordem_id}}/rastreamento",
-      "description": "Role: customer",
-      "method": "GET",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_037",
+      "_id": "req_035",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1074,7 +1024,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_038",
+      "_id": "req_036",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1099,57 +1049,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_039",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/assumir",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/assumir",
-      "description": "Role: mechanic",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{mechanic_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_040",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/analisar",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/analisar",
-      "description": "Role: mechanic",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{mechanic_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_041",
+      "_id": "req_037",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1174,82 +1074,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_042",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/aprovar",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/aprovar",
-      "description": "Role: customer",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_043",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/orcamento/recusar",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/orcamento/recusar",
-      "description": "Role: customer",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_044",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/finalizar-execucao",
-      "name": "PATCH /ordens-servico/{{ordem_id}}/finalizar-execucao",
-      "description": "Role: mechanic",
-      "method": "PATCH",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{mechanic_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_045",
+      "_id": "req_038",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,
@@ -1274,32 +1099,7 @@
       "_type": "request"
     },
     {
-      "_id": "req_046",
-      "parentId": "wrk_async_furious",
-      "modified": 0,
-      "created": 0,
-      "url": "{{base_url}}/api/v1/ordens-servico/{{ordem_id}}/aprovar-servico",
-      "name": "POST /ordens-servico/{{ordem_id}}/aprovar-servico",
-      "description": "Role: customer",
-      "method": "POST",
-      "body": {
-        "mimeType": "application/json",
-        "text": "{\"decisao\": \"APROVADO\"}"
-      },
-      "headers": [
-        {
-          "name": "Content-Type",
-          "value": "application/json"
-        }
-      ],
-      "authentication": {
-        "type": "bearer",
-        "token": "{{customer_token}}"
-      },
-      "_type": "request"
-    },
-    {
-      "_id": "req_047",
+      "_id": "req_039",
       "parentId": "wrk_async_furious",
       "modified": 0,
       "created": 0,

@@ -14,6 +14,7 @@ interface MockPrismaVeiculo {
 
 interface MockPrismaService {
   veiculo: MockPrismaVeiculo;
+  ordemServico: { count: jest.Mock };
 }
 
 describe('VeiculoRepository', () => {
@@ -45,6 +46,7 @@ describe('VeiculoRepository', () => {
         delete: jest.fn(),
         count: jest.fn(),
       },
+      ordemServico: { count: jest.fn().mockResolvedValue(0) },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -263,6 +265,7 @@ describe('VeiculoRepository', () => {
       mockPrismaService.veiculo.findUnique.mockResolvedValue(null);
 
       await expect(repository.remove('nonexistent')).rejects.toThrow(NotFoundException);
+      expect(mockPrismaService.veiculo.delete).not.toHaveBeenCalled();
     });
   });
 

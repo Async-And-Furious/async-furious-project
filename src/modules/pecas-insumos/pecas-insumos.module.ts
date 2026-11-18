@@ -116,12 +116,9 @@ import {
     // P-23: Receber peças do fornecedor
     {
       provide: ReceberPecasDoFornecedorUseCase,
-      useFactory: (
-        pecaRepo: PecaInsumoRepository,
-        pedidoRepo: PedidoFornecedorRepository,
-        emissor: IEmissorEventos
-      ) => new ReceberPecasDoFornecedorUseCase(pecaRepo, pedidoRepo, emissor),
-      inject: [PecaInsumoRepository, PedidoFornecedorRepository, EMISSOR_EVENTOS],
+      useFactory: (pedidoRepo: PedidoFornecedorRepository, emissor: IEmissorEventos) =>
+        new ReceberPecasDoFornecedorUseCase(pedidoRepo, emissor),
+      inject: [PedidoFornecedorRepository, EMISSOR_EVENTOS],
     },
     {
       provide: CreatePecaInsumoUseCase,

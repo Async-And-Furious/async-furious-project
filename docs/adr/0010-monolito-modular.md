@@ -2,7 +2,12 @@
 
 ## Status
 
-Aceita
+**Substituída** por [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md)
+(22/09/2026) — a Fase 4 exige a divisão em, no mínimo, 3 microsserviços
+independentes (enunciado, p.2), o que é incompatível com a premissa desta
+ADR de manter um único processo de implantação. O conteúdo abaixo permanece
+como registro histórico de por que o monólito modular fez sentido nas Fases
+1 a 3 — não é reescrito nem removido.
 
 ## Contexto
 
@@ -59,5 +64,4 @@ por contexto), não *se* seria monólito.
 
 - `README.md` (seção "Estrutura do Projeto")
 - [`docs/ddd.md`](../ddd.md) §3 (nota de nomenclatura)
-- `docs/contexto-tecnico-consolidado.md` §2 (tabela dos 4 módulos de domínio)
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #7)

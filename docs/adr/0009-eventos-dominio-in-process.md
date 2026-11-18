@@ -2,12 +2,49 @@
 
 ## Status
 
-Aceita
+Aceita (parcialmente substituída pela [ADR-0016](./0016-saga-coreografada.md)
+e pela [ADR-0018](./0018-mensageria-contratos-eventos.md) a partir da
+Fase 4 — ver nota abaixo)
+
+> **Nota (Fase 4):** a comunicação **entre** OS Service, Billing Service e
+> Execução e Produção passa a usar eventos publicados em um broker externo
+> (Kafka, broker, topologia e contrato de evento definidos na
+> [ADR-0018](./0018-mensageria-contratos-eventos.md)) e a coordenação
+> distribuída segue o modelo de Saga coreografada da
+> [ADR-0016](./0016-saga-coreografada.md). Esta ADR continua vigente,
+> **sem alteração**, para a comunicação **interna** ao OS Service — em
+> particular entre os Bounded Contexts `ordem-servico` e `pecas-insumos`,
+> que permanecem no mesmo processo e continuam usando o `EmissorEventos`
+> in-process descrito abaixo.
+>
+> **Escopo remanescente (#331, 02/11/2026).** Saem do processo, pelo Kafka, só os
+> eventos de integração:
+> - **publicados:** `OrdemServicoRecebida`, `OrcamentoCalculado` e `EtapaDaSagaFalhou`;
+> - **consumidos:** `DiagnosticoIniciado`, `ExecucaoIniciada`, `ExecucaoConcluida`,
+>   `OrcamentoGerado`, `OrcamentoAprovado`, `OrcamentoRecusado`, `PagamentoConfirmado`,
+>   `PagamentoRecusado` e `EtapaDaSagaFalhou`.
+>
+> Continuam **in-process**, pelo `EmissorEventos`, sem passar pelo broker:
+> - **`ordem-servico`:** `OrdemServicoCriada`, `OrdemServicoEmDiagnostico`,
+>   `OrdemServicoAguardandoAprovacao`, `OrdemServicoEmExecucao`, `OrdemServicoFinalizada`,
+>   `OrdemServicoEntregue`, `OrcamentoEnviado`, `OrcamentoAprovadoComPecas`,
+>   `OsSemPecasConfirmada`, `ServicoAprovadoPeloCliente`, `PagamentoRegistrado`,
+>   `ClienteNotificadoConclusao` e os sete `StatusAtualizado*`;
+> - **`pecas-insumos`:** `PecasEmEstoqueConfirmadas`, `PecasIndisponiveis`,
+>   `PecasNaoExistem`, `PecasReservadas`, `EstoqueDebitado`, `PecasRecebidas`,
+>   `PedidoFornecedorEnviado`, `EstoqueAtualizadoAposRecebimento` e
+>   `BacklogValidadoPecasDisponiveis`;
+> - **`financeiro`:** `PagamentoRegistradoEvent`, `PagamentoConfirmadoEvent` e
+>   `PagamentoRecusadoEvent`, até a extração do contexto (#330).
+>
+> Até a #330, `OrcamentoGerado`, `OrcamentoAprovado` e `OrcamentoRecusado` também
+> circulam in-process, emitidos pelas rotas de orçamento do próprio OS. Os handlers
+> deles têm a mesma guarda de estado nos dois caminhos.
 
 ## Contexto
 
-O modelo de domínio (`docs/ddd.md` §5) define 29 eventos de domínio
-distribuídos pelos 4 Bounded Contexts de código (`ordem-servico`,
+O modelo de domínio (`docs/ddd.md` §5, catálogo de eventos) define os
+eventos de domínio distribuídos pelos 4 Bounded Contexts de código (`ordem-servico`,
 `cadastro`, `pecas-insumos`, `financeiro`). Precisávamos de um
 mecanismo para emitir e reagir a esses eventos sem acoplar módulos
 diretamente entre si, dentro do escopo acadêmico do projeto (sem
@@ -68,5 +105,4 @@ distintos nas Fases 1/2).
 - `src/shared/infrastructure/emissor-eventos/emissor-eventos.service.ts`
 - [ADR-0006 — Clean Architecture + DDD](./0006-clean-architecture-ddd.md)
 - [`docs/ddd.md`](../ddd.md) §5
-- `docs/contexto-tecnico-consolidado.md` §8
 - [`docs/adr/notas-fases-anteriores.md`](./notas-fases-anteriores.md) (ponto #6)

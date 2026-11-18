@@ -100,32 +100,6 @@ describe('OrdemDeServico Entity', () => {
     });
   });
 
-  it('deve permitir associar um orçamento', () => {
-    const ordemServico = new OrdemDeServico();
-    const orcamento = {
-      id: 'orc-123',
-      id_ordem_servico: 'os-123',
-      valor_total_servicos: 300.0,
-      valor_total_pecas: 200.0,
-      valor_total_geral: 500.0,
-      status: 'PENDING' as const,
-      created_at: new Date(),
-      updated_at: new Date(),
-    };
-
-    ordemServico.orcamento = orcamento;
-
-    expect(ordemServico.orcamento).toBeDefined();
-    expect(ordemServico.orcamento?.id).toBe('orc-123');
-    expect(ordemServico.orcamento?.valor_total_geral).toBe(500.0);
-  });
-
-  it('deve funcionar sem orçamento associado', () => {
-    const ordemServico = new OrdemDeServico();
-
-    expect(ordemServico.orcamento).toBeUndefined();
-  });
-
   it('deve permitir criar com dados completos', () => {
     const agora = new Date();
     const ordemServico = new OrdemDeServico();
@@ -149,5 +123,28 @@ describe('OrdemDeServico Entity', () => {
     expect(ordemServico.entregue_em).toBeDefined();
     expect(ordemServico.created_at).toBeDefined();
     expect(ordemServico.updated_at).toBeDefined();
+  });
+
+  describe('podeLancarServicosInsumos', () => {
+    const osComStatus = (status: OSStatus): OrdemDeServico =>
+      Object.assign(new OrdemDeServico(), { id: 'os-1', status });
+
+    it('aceita a OS em UNDER_DIAGNOSIS', () => {
+      expect(() => osComStatus('UNDER_DIAGNOSIS').podeLancarServicosInsumos()).not.toThrow();
+    });
+
+    it.each<OSStatus>([
+      'RECEIVED',
+      'AWAITING_APPROVAL',
+      'IN_PROGRESS',
+      'AWAITING_PARTS',
+      'FINISHED',
+      'DELIVERED',
+      'CLOSED_WITHOUT_EXECUTION',
+    ])('rejeita a OS em %s', (status) => {
+      expect(() => osComStatus(status).podeLancarServicosInsumos()).toThrow(
+        'OS deve estar Em Diagnóstico para lançar serviços e insumos'
+      );
+    });
   });
 });

@@ -1,8 +1,11 @@
 # API Gateway e Lambda
 
-> **[ATUAL]** A borda serverless está implementada e provisionada. Este
-> documento descreve os recursos reais, o contrato do token e como a aplicação
-> no EKS consome esse contrato.
+> **[ATUAL — Fase 3/PROD]** A borda serverless descrita aqui está implementada
+> e provisionada para o monólito da Fase 3 em PROD. Este documento descreve os
+> recursos reais, o contrato do token e como a aplicação no EKS consome esse
+> contrato. O alvo de borda da Fase 4 em HML está em
+> [edge-topology.md](../architecture/edge-topology.md); não é descrito como
+> implantado por esta marca.
 >
 > Fontes: `repo-auth-serverless` na branch `main` (`infra/hml`, `infra/prod`,
 > `src/`) e `src/auth/` deste repositório.
@@ -11,6 +14,12 @@
 > [RFC-006](../rfcs/RFC-006-secrets-and-jwt.md).
 
 ## 1. Topologia
+
+> **Escopo: borda da Fase 3 (um único serviço atrás do ALB).** O diagrama
+> mostra a borda como está provisionada hoje. Não reflete as rotas públicas sem
+> authorizer nem o roteamento por path para os três serviços da Fase 4: a
+> topologia-alvo está no diagrama-mestre de [overview.md](../architecture/overview.md)
+> e em [edge-topology.md](../architecture/edge-topology.md).
 
 O API Gateway é o único ponto de entrada público do sistema. Nem o ALB, nem o
 cluster, nem o banco são alcançáveis diretamente da internet.

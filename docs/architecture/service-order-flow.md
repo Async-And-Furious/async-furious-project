@@ -9,10 +9,14 @@
 > ([`relatorio-e2e-orcamento-curl.md`](../reports/relatorio-e2e-orcamento-curl.md)).
 > Este documento **formaliza** essa sequência já existente, anotando-a com
 > endpoints reais, papéis exigidos, estados (`SOStatus`) e eventos de domínio
-> documentados em [`ddd.md`](../ddd.md) §5.1 — sem inventar eventos ou passos
-> novos. Nenhuma parte deste fluxo muda entre o estado atual e a proposta
-> Fase 3, exceto o mecanismo de autenticação/autorização de borda (ver
-> [authentication-flow.md](./authentication-flow.md)).
+> documentados em [`ddd.md`](../ddd.md) §5.1. Entre a Fase 3 e a Fase 4 o
+> fluxo muda em um ponto: as ações do mecânico `assumir`, `analisar` e
+> `finalizar-execucao` saíram do OS Service para o Execução e Produção
+> (Feature #334) e chegam aqui por evento — o diagrama abaixo já reflete isso;
+> o detalhe está em
+> [`os-service-integracao-execucao.md`](./os-service-integracao-execucao.md).
+> O mecanismo de autenticação/autorização de borda segue em
+> [authentication-flow.md](./authentication-flow.md).
 
 ```mermaid
 sequenceDiagram
@@ -20,6 +24,8 @@ sequenceDiagram
     actor Recepcionista
     actor Mecanico
     participant API as Aplicação (ordem-servico BC)
+    participant Exec as Execução e Produção
+    participant Bill as Billing Service
     participant DB as PostgreSQL
     participant Obs as Observabilidade [PENDENTE]
 
@@ -27,44 +33,47 @@ sequenceDiagram
     Recepcionista->>API: POST /clientes, POST /veiculos (papel RECEPCIONISTA)
     API->>DB: persiste Cliente/Veículo
     Recepcionista->>API: POST /ordens-servico (papel RECEPCIONISTA)
-    API->>API: evento OrdemDeServicoRecebida
     API->>DB: cria OS (status=RECEIVED)
+    API->>API: eventos OrdemServicoCriada + OrdemServicoRecebida<br/>(esta última coloca a OS na fila de diagnóstico do Execução)
     API-->>Recepcionista: 201 { id da OS }
 
-    Mecanico->>API: PATCH /ordens-servico/:id/assumir (papel MECANICO)
-    API->>API: evento OrdemDeServicoEmDiagnostico
-    API->>DB: status=UNDER_DIAGNOSIS
-    Mecanico->>API: PATCH /ordens-servico/:id/analisar (papel MECANICO)
-    API->>DB: registra diagnóstico (status permanece UNDER_DIAGNOSIS)
+    Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/iniciar-diagnostico (papel MECANICO)
+    Exec-->>API: evento DiagnosticoIniciado
+    API->>DB: status=UNDER_DIAGNOSIS (ignora se a OS já não está em RECEIVED)
+    API->>API: evento OrdemServicoEmDiagnostico (notifica o cliente)
 
-    Mecanico->>API: PATCH /ordens-servico/:id/servicos-insumos<br/>(lista serviços + peças, papel MECANICO)
-    API->>API: evento OrcamentoGerado + OrdemDeServicoAguardandoAprovacao
-    API->>DB: calcula Orçamento, status=AWAITING_APPROVAL
-    API-->>Cliente: notifica orçamento (fora do sistema — e-mail/telefone, não modelado como integração)
+    Mecanico->>API: PATCH /ordens-servico/:id/servicos-insumos<br/>(lista serviços + peças, papel MECANICO; exige UNDER_DIAGNOSIS)
+    API-->>Mecanico: 200 { totais calculados }
+    API-->>Bill: evento OrcamentoCalculado (os.eventos.v1)
+    Bill-->>API: evento OrcamentoGerado (o Orcamento é do Billing)
+    API->>DB: status=AWAITING_APPROVAL
 
     alt Cliente aprova
-        Cliente->>API: PATCH /ordens-servico/:id/orcamento/aprovar (rota @Public, sem token)
-        API->>API: evento OrcamentoAprovado + OrdemDeServicoEmExecucao
+        Cliente->>Bill: PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar (público; Checkout Pro)
+        Bill-->>API: evento OrcamentoAprovado (reserva as peças)
+        Note over API,DB: A OS permanece em AWAITING_APPROVAL.<br/>Peça sem estoque: apenas marca reserva_pecas_pendente.
+        Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/iniciar-reparo (papel MECANICO, após PagamentoConfirmado)
+        Exec-->>API: evento ExecucaoIniciada
+        API->>API: evento OrdemServicoEmExecucao
         API->>DB: status=IN_PROGRESS, iniciada_em=now()
     else Cliente recusa
-        Cliente->>API: PATCH /ordens-servico/:id/orcamento/recusar (rota @Public, sem token)
-        API->>API: evento OrcamentoRejeitado
+        Cliente->>Bill: PATCH /api/v1/orcamentos/{ordemServicoId}/recusar (público)
+        Bill-->>API: evento OrcamentoRecusado
         API->>DB: status=CLOSED_WITHOUT_EXECUTION
-        Note over API,DB: Nenhum evento de domínio nomeado para esta<br/>transição em ddd.md §5.1 — gap já registrado<br/>na auditoria (Fase 3 não introduz nem resolve isso)
     end
 
-    opt Peças indisponíveis durante a execução
-        Mecanico->>API: atualização de estoque insuficiente
-        API->>DB: status=AWAITING_PARTS
-        Note over API,DB: Estado documentado no ciclo de vida do README/ddd.md,<br/>mas sem evento de domínio nomeado — gap pré-existente
-        API->>DB: peças repostas → status=IN_PROGRESS
+    opt Reserva de peças pendente (peça sem estoque)
+        API->>DB: logo após IN_PROGRESS, status=AWAITING_PARTS
+        Note over API,DB: Duas gravações: não existe transição direta<br/>AWAITING_APPROVAL → AWAITING_PARTS
+        API->>DB: peças repostas (PecasReservadas) → status=IN_PROGRESS
     end
 
-    Mecanico->>API: PATCH /ordens-servico/:id/finalizar-execucao (papel MECANICO)
+    Mecanico->>Exec: PATCH /api/v1/execucoes/{id}/concluir (papel MECANICO)
+    Exec-->>API: evento ExecucaoConcluida
     API->>API: evento OrdemDeServicoFinalizada
     API->>DB: status=FINISHED, finalizada_em=now()
 
-    Cliente->>API: PATCH /ordens-servico/:id/aprovar-servico (rota @Public, sem token)
+    Cliente->>API: PATCH /ordens-servico/:id/aprovar-servico (autenticada, JWT)
 
     Cliente->>Recepcionista: Retira o veículo (fora do sistema)
     Recepcionista->>API: PATCH /ordens-servico/:id/registrar-entrega (papel RECEPCIONISTA)
@@ -79,21 +88,64 @@ sequenceDiagram
 
 ## Integração com o contexto Financeiro
 
-`POST /pagamentos/registrar` (autenticado, qualquer papel) registra um
-pagamento e, segundo o README, "dispara a entrega da OS". A relação exata
-entre esse endpoint e `PATCH /ordens-servico/:id/registrar-entrega` **não
-está detalhada em nenhum artefato de modelagem** (nem Domain Storytelling,
-nem Event Storming, nem diagrama de sequência dedicado ao financeiro) — gap
-pré-existente, não introduzido nem resolvido pela Fase 3. `TODO`: confirmar
-com o time se um endpoint torna o outro redundante ou se são independentes.
+Até a Feature #330, `POST /pagamentos/registrar` disparava a entrega da OS
+por um evento `PagamentoRegistrado`, e `registrar-entrega` emitia esse mesmo
+evento sem existir pagamento. A #330 removeu os dois: hoje
+`PATCH /ordens-servico/:id/registrar-entrega` é o **único** caminho de
+escrita para `DELIVERED` (exige `FINISHED`, grava `entregue_em` e uma linha
+de histórico), e o webhook `POST /webhooks/service-orders/status` rejeita
+`DELIVERED` com `400`.
+
+**Orçamento e cobrança saíram do OS Service (#330).** O módulo `financeiro`
+(Mercado Pago, `POST /webhooks/mercado-pago`, porta `ICobrancaPagamentoPort`),
+o agregado `Orcamento` e as rotas `PATCH :id/orcamento/aprovar`,
+`PATCH :id/orcamento/recusar` e `POST :id/aprovar-servico` foram removidos;
+o Billing Service é o dono deles. O OS Service:
+
+- calcula os totais em `servicos-insumos` e publica `OrcamentoCalculado`;
+- consome do Billing, pelo Kafka (#331), `OrcamentoGerado` (vai a
+  `AWAITING_APPROVAL`), `OrcamentoAprovado` (reserva as peças, sem mudar
+  status), `OrcamentoRecusado` e `PagamentoRecusado` (encerram sem execução
+  antes do reparo) e `PagamentoConfirmado` (`RegistrarPagamentoConfirmadoHandler`:
+  grava `pago_em` e uma linha em `HistoricoStatusOS`, **sem mudar status**, e
+  não é gatilho da entrega).
+
+As tabelas `pagamentos`, `Orcamento` e `webhook_recebido` saíram do banco do
+OS Service na migration `20261103180000_remover_contexto_financeiro`.
+
+### Integração com o contexto Financeiro (Fase 4) {#integração-com-o-contexto-financeiro-fase-4}
+
+**Decidido na revisão de 30/09/2026: não há checagem de pagamento em
+`registrar-entrega`.** A decisão de 22/09/2026 (validar um `Pagamento`
+confirmado antes de aceitar `DELIVERED`) foi **cortada**.
+
+- "Entrega" aqui é a devolução do veículo ao cliente, ato presencial
+  registrado por `PATCH /ordens-servico/:id/registrar-entrega` (papel
+  RECEPCIONISTA), como já mostra o diagrama acima. Continua acionado
+  manualmente pelo Recepcionista; o pagamento **não** dispara a transição
+  para `DELIVERED`.
+- Na Fase 4 o `Pagamento` pertence ao Billing Service; o OS Service não o
+  tem e guarda só o marcador `pago_em` (usado pelo detector de OS parada,
+  [`saga-flow.md` §2](./saga-flow.md)). Validar a entrega exigiria uma chamada REST entre serviços, que a
+  Fase 4 não tem: toda a coordenação é por evento.
+- A checagem seria sempre verdadeira: a OS só chega a `FINISHED` depois de
+  `ExecucaoConcluida`, que só existe depois de `iniciar-reparo`
+  (`ExecucaoIniciada`), que só é possível depois de `PagamentoConfirmado`. O OS Service aceita `registrar-entrega`
+  para qualquer OS em `FINISHED`.
+- Existe **um único pagamento**, cobrado na etapa de aprovação do orçamento
+  (Checkout Pro), antes de `IN_PROGRESS`; não há sinal + saldo nem segundo
+  momento de cobrança. Detalhes em
+  [ADR-0016](../adr/0016-saga-coreografada.md) e
+  [`saga-flow.md` §4](./saga-flow.md).
 
 ## Erros e fluxos alternativos cobertos pela API (evidência: tabela de rotas do README)
 
 | Situação | Comportamento |
 |---|---|
-| Papel sem permissão (ex.: RECEPCIONISTA tentando `finalizar-execucao`) | 403 Forbidden (`RolesGuard`) |
+| Papel sem permissão (ex.: RECEPCIONISTA tentando `servicos-insumos`) | 403 Forbidden (`RolesGuard`) |
 | Token ausente/expirado/inválido em rota não-`@Public()` | 401 Unauthorized (`JwtAuthGuard`) |
-| Orçamento sem `valor_total_servicos > 0` | Validação de negócio rejeita a geração do orçamento (regra citada na síntese técnica consolidada; não confirmada linha a linha nesta auditoria — `TODO` verificar no use case) |
+| `servicos-insumos` com a OS fora de `UNDER_DIAGNOSIS` (ex.: `DiagnosticoIniciado` ainda não processado) | 400 (`DomainException`); o mecânico repete depois |
+| `servicos-insumos` com valor negativo | 400 (`GerarOrcamentoDto`: `valor_total_servicos` e `valor_total_pecas` com `@Min(0)`) |
 
 ## Consulta de status
 
@@ -101,7 +153,7 @@ com o time se um endpoint torna o outro redundante ou se são independentes.
 ADMIN) são consultas, não alteram o fluxo principal — incluídas para
 completude do mapeamento endpoint↔estado.
 
-## Relação com a arquitetura da Fase 3
+## Relação com a arquitetura da Fase 3 (monólito)
 
 Este fluxo roda **inteiramente dentro do Bounded Context `ordem-servico`, no
 mesmo monólito**, hoje e na arquitetura da Fase 3 — a separação em quatro
@@ -109,3 +161,67 @@ repositórios não o altera. A única mudança é *como* a requisição chega at
 aplicação (via API Gateway + Lambda Authorizer, em vez de acesso direto) —
 ver [authentication-flow.md](./authentication-flow.md) e
 [overview.md §4](./overview.md#4-comunicação-entre-bounded-contexts).
+
+## Relação com a arquitetura da Fase 4
+
+Deixa de ser verdade que este fluxo roda "inteiramente" num único processo:
+com a divisão em microsserviços (`docs/architecture/service-boundaries.md`),
+`Orcamento` e `Pagamento` passam a viver no Billing Service, em banco
+separado do OS Service. As transições `AWAITING_APPROVAL` → aprovação/recusa
+do orçamento e o pagamento passam a cruzar a fronteira de serviço **somente
+por evento** (Saga coreografada, sem chamada REST entre serviços); o fluxo
+distribuído está em [`saga-flow.md`](./saga-flow.md). O diagrama de sequência
+acima continua correto como fluxo de **negócio** do monólito atual; deixa de
+ser preciso como fluxo de **um único processo** a partir da Fase 4. A rota
+pública `POST /ordens-servico/:id/aprovar-servico` foi removida na #330 (era
+uma terceira via de aprovação que pulava o pagamento), e a aprovação/recusa
+passa a ser `PATCH /api/v1/orcamentos/{ordemServicoId}/aprovar|recusar` no
+Billing Service. `GET /ordens-servico/:id/rastreamento` (alias de `/status`)
+também está prevista para sair, fora do escopo da #330.
+Também migram para o Execução e Produção as ações do mecânico: `assumir` e
+`analisar` viram `PATCH /api/v1/execucoes/{id}/iniciar-diagnostico` e
+`finalizar-execucao` vira `PATCH /api/v1/execucoes/{id}/concluir`, com a
+nova `iniciar-reparo` entre elas; `servicos-insumos` e `registrar-entrega`
+ficam no OS Service ([`saga-flow.md` §2](./saga-flow.md)). No código do OS
+Service (Feature #334) as três rotas já foram removidas e o diagrama acima
+mostra o fluxo resultante; enquanto o Execução não existe, nada emite
+`DiagnosticoIniciado`, `ExecucaoIniciada` nem `ExecucaoConcluida` e a OS não
+avança além de `RECEIVED`/`AWAITING_APPROVAL` — ver
+[`os-service-integracao-execucao.md`](./os-service-integracao-execucao.md) §5.
+
+### Coreografia do serviço Execução e Produção
+
+O diagrama acima permanece como sequência do monólito; não representa a
+execução distribuída da Fase 4. Nesta, o Execução e Produção consome
+`OrdemServicoRecebida` e cria a `Execucao` na fila
+`AGUARDANDO_DIAGNOSTICO`; reentrega para a mesma OS não cria outra execução.
+Quando o mecânico inicia o diagnóstico, publica `DiagnosticoIniciado`. Depois
+disso, `PagamentoConfirmado` move `EM_DIAGNOSTICO` para
+`AGUARDANDO_REPARO`, sem publicar evento; execução ausente ou ainda em
+`AGUARDANDO_DIAGNOSTICO` é retentável, e estado já alcançado ou posterior é
+ignorado. O início do reparo pelo mecânico publica `ExecucaoIniciada`, e a
+conclusão publica `ExecucaoConcluida`.
+
+`OrcamentoRecusado` e `PagamentoRecusado` cancelam a execução, assim como
+`EtapaDaSagaFalhou` exceto quando `etapa=reparo`. O cancelamento só se aplica
+antes de `EM_REPARO`; eventos para execução inexistente, terminal ou já em
+reparo são reconhecidos e ignorados. As transições protegidas pelo estado
+atual tornam o consumo idempotente, sem criar ou depender de uma tabela de
+mensagens processadas; o model `ProcessedEvent` herdado do scaffold não é
+usado por este fluxo. Logs de consumo registram `eventId` e
+`ordemServicoId` (`correlationId`), conforme contrato da
+[ADR-0018](../adr/0018-mensageria-contratos-eventos.md).
+
+O webhook existente `POST /api/v1/webhooks/service-orders/status` permanece
+como fallback documentado, exceto para `DELIVERED`, que ele rejeita (a
+entrega só passa por `registrar-entrega`). A publicação após commit tem a janela aceita de
+perda entre persistência e publicação; não há garantia de outbox. O fluxo
+completo, a matriz de falhas e os contratos de eventos estão em
+[`saga-flow.md`](./saga-flow.md) e [`event-catalog.md`](./event-catalog.md).
+
+> **Revisão de 30/09/2026 (`rev/Epic_1`).** Atualizadas apenas as seções de
+> integração com o Financeiro e de arquitetura da Fase 4, alinhadas a
+> [`saga-flow.md`](./saga-flow.md) (fonte única do fluxo distribuído). O
+> diagrama descrevia o monólito antes da Feature #334 e foi atualizado por
+> ela (ações do mecânico via Execução e Produção). O `PATCH .../aprovar-servico`
+> do diagrama é autenticado; o `POST` público de mesmo path foi removido na #332.

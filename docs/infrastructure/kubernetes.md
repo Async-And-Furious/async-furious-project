@@ -90,7 +90,8 @@ ALB pertence a quem é dono da rede.
 ### Sequência de um deploy
 
 1. Endpoint público do cluster é aberto temporariamente para o IP do runner,
-   com máscara `/32`, e o valor original é guardado para restauração.
+   com máscara `/32`. No fim, só esse `/32` é removido, preservando o acesso de
+   deploys de outros serviços em andamento (ver [aws.md](./aws.md) §5).
 2. `namespace.yaml` e `configmap.yaml` são aplicados; o ConfigMap recebe um
    `kubectl patch` com `AUTH_MODE=gateway`, `DEPLOY_ENV` e o contrato JWT.
 3. O Secret é montado em tempo de execução a partir do Secrets Manager e

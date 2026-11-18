@@ -1,4 +1,8 @@
-"""Generate secret-free Postman and Insomnia exports from the route contract."""
+"""Generate secret-free Postman and Insomnia exports from the route contract.
+
+Phase 3 legacy (#350): describes the monolith routes. The Phase 4 contract is each
+service's versioned openapi.json.
+"""
 import json
 import yaml
 from pathlib import Path
@@ -25,7 +29,6 @@ routes += [
     ("DELETE", "/pecas/{{peca_id}}", "admin", None),
     ("POST", "/pecas/fornecedor/solicitar", "admin", {"fornecedorId": "{{fornecedor_id}}", "pecas": [{"pecaId": "{{peca_id}}", "quantidadeSolicitada": 1}]}),
     ("PATCH", "/pecas/fornecedor/pedidos/{{pedido_fornecedor_id}}/receber", "admin", None),
-    ("POST", "/pagamentos/registrar", "public", {"ordemServicoId": "{{ordem_id}}", "valor": 1}),
     ("POST", "/webhooks/service-orders/status", "webhook", {"status": "RECEIVED"}),
 ]
 
@@ -42,7 +45,7 @@ def flatten(nodes):
     return result
 
 manifest_routes = flatten(manifest)
-assert len(manifest_routes) == 48 and len({r["id"] for r in manifest_routes}) == 48
+assert len(manifest_routes) == 40 and len({r["id"] for r in manifest_routes}) == 40
 def route_role(route):
     if route["auth"] == "customer":
         return "customer"

@@ -7,6 +7,13 @@ import { LoginDto, RegisterDto } from '../dto/auth.dto';
 import { Role } from '../enums/role.enum';
 import type { AuthenticatedUser, JwtPayload } from '../types/auth.types';
 
+class IdentityLookupError extends Error {
+  constructor() {
+    super('Identity lookup failed');
+    this.name = 'IdentityLookupError';
+  }
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -99,20 +106,26 @@ export class AuthService {
       select: { id: true, email: true },
     });
     if (!customer) return null;
-    return { id: customer.id, email: customer.email, role: Role.RECEPCIONISTA };
+    return { id: customer.id, email: customer.email, role: Role.CLIENTE };
   }
 
   async validateTokenSubject(payload: JwtPayload): Promise<AuthenticatedUser | null> {
-    const user = await this.validateUser(payload.sub);
-    if (user) return user;
+    try {
+      const [user, cliente] = await Promise.all([
+        this.validateUser(payload.sub),
+        this.prisma.cliente.findUnique({
+          where: { id: payload.sub },
+          select: { id: true, email: true, ativo: true },
+        }),
+      ]);
+      if (user && cliente) return null;
+      if (user) return user;
+      if (!cliente?.ativo) return null;
 
-    const cliente = await this.prisma.cliente.findUnique({
-      where: { id: payload.sub },
-      select: { id: true, email: true, ativo: true },
-    });
-    if (!cliente?.ativo) return null;
-
-    return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
+      return { id: cliente.id, email: cliente.email, role: Role.CLIENTE };
+    } catch {
+      throw new IdentityLookupError();
+    }
   }
   async findById(id: string) {
     return this.validateUser(id);

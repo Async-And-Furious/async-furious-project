@@ -2,7 +2,7 @@
 
 ## Status
 
-Aceita
+Parcialmente substituída pela [ADR-0017](./0017-divisao-microsservicos-ownership-dados.md) quanto à topologia dos serviços de negócio; permanece vigente para a divisão de repositórios de infraestrutura e autenticação.
 
 ## Contexto
 

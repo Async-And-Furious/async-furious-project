@@ -56,6 +56,39 @@ export class PedidoFornecedorRepository implements IPedidoFornecedorRepository {
     );
   }
 
+  async receberECreditarEstoque(
+    pedidoId: string
+  ): Promise<Array<{ pecaId: string; novaQuantidade: number }> | null> {
+    return this.prisma.$transaction(async (tx) => {
+      // O status no WHERE garante que só uma chamada recebe o pedido: a
+      // segunda (ou uma retentativa) não soma o estoque de novo.
+      const { count } = await tx.pedidoFornecedor.updateMany({
+        where: { id: pedidoId, status: 'PENDENTE' },
+        data: { status: 'RECEBIDO', atualizado_em: new Date() },
+      });
+      if (count === 0) return null;
+
+      const itens = await tx.pedidoFornecedorItem.findMany({
+        where: { id_pedido_fornecedor: pedidoId },
+      });
+      const atualizadas: Array<{ pecaId: string; novaQuantidade: number }> = [];
+      for (const item of itens) {
+        // Incremento no próprio UPDATE (a FK com Restrict garante que a peça existe).
+        const peca = await tx.peca.update({
+          where: { id: item.id_peca },
+          data: { quantidade_estoque: { increment: item.quantidade_solicitada } },
+          select: { quantidade_estoque: true },
+        });
+        await tx.pedidoFornecedorItem.update({
+          where: { id: item.id },
+          data: { quantidade_recebida: item.quantidade_solicitada },
+        });
+        atualizadas.push({ pecaId: item.id_peca, novaQuantidade: peca.quantidade_estoque });
+      }
+      return atualizadas;
+    });
+  }
+
   async findAll(): Promise<PedidoFornecedor[]> {
     const pedidos = await this.prisma.pedidoFornecedor.findMany({
       include: { itens: true },
